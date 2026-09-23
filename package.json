@@ -1,0 +1,19 @@
+{
+  "name": "dragon-care",
+  "version": "0.1.0",
+  "description": "A game about raising dragons. Vanilla canvas, TypeScript, no runtime dependencies; the engine is vendored at src/lib/.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "node tools/server.ts",
+    "build": "node tools/build.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "check": "npm run typecheck"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3"
+  }
+}
