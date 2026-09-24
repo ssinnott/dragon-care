@@ -760,8 +760,9 @@ export function wakeAnim(stage: Stage, dims: DragonDims | null, tune: AnimTuning
   const k = baby ? 24 / 30 : stage === 'young' ? 26 / 30 : elder ? 36 / 30 : 1, L = Math.round(30 * k), s = (keys: Key[]) => stretchKeys(keys, k);
   const sl = tune.sleep, SP = sleepPose(stage, dims, tune), settle = SP.settle, { a0, a1, head: hr } = SP.head;
   const reach = baby ? 2 : stage === 'young' ? 5 : 7;
-  // the resting spread of the stretch: the elder's 0.6 leaning back 48 (its tears show), the others' 0.7 / 40
-  const sf = elder ? ELDER_SPREAD_FOLD : SPREAD_FOLD, sb = elder ? ELDER_SPREAD_BACK : SPREAD_BACK;
+  // the resting spread of the stretch: the elder's 0.6 leaning back 48 (its tears show), the others' 0.7 / 40, x the
+  // element's wakeSpread (rock's 0: its stub stays folded under the rim, 1.3)
+  const ws = sl.wakeSpread, sf = (elder ? ELDER_SPREAD_FOLD : SPREAD_FOLD) * ws, sb = elder ? ELDER_SPREAD_BACK : SPREAD_BACK;
   const tracks: Tracks = {
     'body.y': s([[0, settle], [10, settle * 0.5], [14, settle * 0.45], [20, 0, 'out'], [30, 0]]),
     'body.rot': s([[0, SP.bodyRot], [8, 12], [13, 12], [20, 0], [30, 0]]),
@@ -776,7 +777,7 @@ export function wakeAnim(stage: Stage, dims: DragonDims | null, tune: AnimTuning
     'tail.stiff': s([[0, 1], [12, 0.6], [30, 0]]),
     'wing.fold': baby ? s([[0, sl.nubFold], [5, 1], [8, 0.2], [11, 1], [14, 0.2], [17, 1], [20, 0]]) : s([[0, 0], [5, sf], [17, sf], [22, 0]]),
     // (leaned back SPREAD_BACK from the bowed body: the bow's +12 chest-down pitch turns the wings forward with it)
-    ...(baby ? {} : { 'wing.flap': s([[0, 0], [5, sb + 7], [8, sb + 12], [13, sb + 12], [17, sb + 5], [22, 0]]) }),
+    ...(baby ? {} : { 'wing.flap': s([[0, 0], [5, (sb + 7) * ws], [8, (sb + 12) * ws], [13, (sb + 12) * ws], [17, (sb + 5) * ws], [22, 0]]) }),
     jaw: s([[0, 0], [4, 0], [7, 30], [18, 30], [20, 0]]),
     // (the elder's shake is 2 deg: a steady shake, never a tremor)
     'root.rot': elder ? s([[0, 0], [18, 0], [21, 2], [24, -2], [27, 2], [30, 0]]) : s([[0, 0], [18, 0], [20, 3], [22, -3], [24, 3], [26, -3], [28, 3], [30, 0]]),
@@ -1153,35 +1154,48 @@ const AIR_NECK = -6, AIR_PITCH = -18;
 const AIR_SIT_MAX = 30;
 
 /**
- * AIRING THE WINGS (elder, 92 f; 1.3, 2.9, 4.2): about one idle cut in four, the one spread at idle, so the worn wings'
- * holes are seen at home and not only in flight. It sits back on its haunches (0-10: airingFit's pitch and settle, the
- * hind paws drawn in, the neck and head raised to the sun), spreads its wings FULL over 12 f (10-22) leaned back by
- * the fit, holds them 40 f (22-62) with its eyes `happy` and the tail sweeping once, a cormorant sunning, a slow
- * breath keeping it alive (no key holds), then folds them over 16 f (62-78) and settles back to standing (78-92).
+ * AIRING THE WINGS (elder, 106 f; 1.3, 2.9, 4.2): about one idle cut in four, the one spread at idle, so the worn
+ * wings' holes are seen at home and not only in flight. It sits back on its haunches over 24 f on the elder's soft
+ * ease (0-24: airingFit's pitch and settle, the hind paws drawn in, the neck and head raised to the sun, the tail
+ * LOWERED to the floor behind it), spreads its wings FULL over 12 f (20-32) leaned back by the fit, holds them 40 f
+ * (32-72) with its eyes `happy` and the tail sweeping once along the floor, a cormorant sunning, a slow breath keeping
+ * it alive (no key holds), then folds them over 16 f (72-88) and stands back up over 24 f (82-106).
  * act = ACT.airing, cue 0 as the spread begins: lightning's bolts never spread and flex to 95 deg on it instead (3.5).
  * A look that cannot take a full spread under the tip rule airs at the resting spread (airingFit's `wing`).
+ * (The first build sat back in 10 f with the tail keyed only for its sway: the rump dropping 4-6 px and the pitch
+ * turning 20-30 deg in 10 f were a kick to the tail chain, which flung every tail up to the vertical, fire's flame
+ * beside its head and water's fluke over it, and slapped it onto the floor 6 f later: snappy, D21 and 4.1's "no
+ * tremor-like jerks", and in fire's zone (3.0). The elder core review, round 2.)
  */
 export function airingAnim(stage: Stage, dims: DragonDims | null, wp: Readonly<WingParams> | null): DragonAnim {
   // (a 'custom' wing -- lightning's bolts, which never spread -- flexes to 95 on the spread instead: no sit, no lean)
   const fit = dims && wp && wp.style !== 'custom' ? airingFit(dims, wp) : { B: 0, F: 0, dy: 0, wing: 1, hole: false };
-  const full = fit.wing;
-  const L = 92, H = DFACE.happy, N = DFACE.neutral;
+  const full = fit.wing, B = fit.B;
+  const L = 106, H = DFACE.happy, N = DFACE.neutral;
   // the head's own pitch that holds AIR_PITCH in the world over the sit-back (rig.ts headAng: rest + neck + head + body)
-  const hp = dims ? dims.neck.headPitch : 0, air = AIR_PITCH - hp - AIR_NECK + fit.B;
+  const hp = dims ? dims.neck.headPitch : 0, air = AIR_PITCH - hp - AIR_NECK + B;
   return bake({
-    'body.rot': [[0, 0], [10, -fit.B], [62, -fit.B], [80, -fit.B * 0.3], [92, 0]],
-    'body.y': [[0, 0], [10, fit.dy], [30, fit.dy + 0.5], [44, fit.dy], [58, fit.dy + 0.5], [62, fit.dy], [80, fit.dy * 0.3], [92, 0]],
-    'legNH.slide': [[0, 0], [10, 2], [78, 2], [90, 0]], 'legFH.slide': [[0, 0], [10, 2], [78, 2], [90, 0]],
-    'neck.a0': [[0, 0], [10, AIR_NECK], [40, AIR_NECK - 1], [62, AIR_NECK], [84, 0]],
-    'head.rot': [[0, 0], [12, air], [42, air - 1], [64, air], [86, 0]],
-    'wing.fold': [[0, 0], [10, 0], [22, full], [62, full], [78, 0]],
-    'wing.flap': [[0, 0], [10, 0], [22, fit.F], [62, fit.F], [78, 0]],
-    'tail.sway': [[0, 0], [24, 0], [34, 10], [52, -10], [62, 0]],
-    face: [[0, N], [24, H], [60, N]],
-    mood: [[0, 0], [22, 1], [62, 1], [78, 0]],
-    act: K(ACT.airing), cue: [[0, -10], [L, L - 10]],
+    'body.rot': [[0, 0], [24, -B], [72, -B], [92, -B * 0.3], [106, 0]],
+    'body.y': [[0, 0], [24, fit.dy], [40, fit.dy + 0.5], [54, fit.dy], [68, fit.dy + 0.5], [72, fit.dy], [92, fit.dy * 0.3], [106, 0]],
+    'legNH.slide': [[0, 0], [24, 2], [88, 2], [104, 0]], 'legFH.slide': [[0, 0], [24, 2], [88, 2], [104, 0]],
+    'neck.a0': [[0, 0], [24, AIR_NECK], [50, AIR_NECK - 1], [72, AIR_NECK], [98, 0]],
+    'head.rot': [[0, 0], [26, air], [52, air - 1], [74, air], [100, 0]],
+    'wing.fold': [[0, 0], [20, 0], [32, full], [72, full], [88, 0]],
+    'wing.flap': [[0, 0], [20, 0], [32, fit.F], [72, fit.F], [88, 0]],
+    // the TAIL goes down with the rump: the chain faded to AIR_TAIL_STIFF through the sit and the stand (its kick from
+    // the dropping rump and the turning pitch, which it would read as the tail left behind, stays small) and the tail
+    // lowered half the sit's pitch past riding it, so it lies back along the floor behind the haunches; its one sweep
+    // runs along the floor
+    'tail.stiff': [[0, 0], [8, AIR_TAIL_STIFF], [96, AIR_TAIL_STIFF], [106, 0]],
+    'tail.lift': [[0, 0], [24, B * 0.5], [82, B * 0.5], [106, 0]],
+    'tail.sway': [[0, 0], [34, 0], [44, 8], [62, -8], [72, 0]],
+    face: [[0, N], [34, H], [70, N]],
+    mood: [[0, 0], [32, 1], [72, 1], [88, 0]],
+    act: K(ACT.airing), cue: [[0, -20], [L, L - 20]],
   }, { stage, len: L, next: 'idle' });
 }
+/** The airing's tail stiffness through the sit (0..1 of the chain faded out: tail.stiff). */
+const AIR_TAIL_STIFF = 0.85;
 
 /**
  * The idle's variants by table name, for DragonAnimPlayer.setVariants('idle', ...): a name may repeat to weight it

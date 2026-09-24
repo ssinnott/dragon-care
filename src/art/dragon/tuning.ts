@@ -81,6 +81,12 @@ export interface SleepTuning {
    * over the head, 1.4).
    */
   nubFold: number;
+  /**
+   * How far the WAKE's stretch spreads the wings, x the stage's resting spread (4.2: the preen's 0.7 leaning back 40,
+   * the elder's 0.6 / 48): 1; rock 0, whose stubby wing stays wholly under the dome's rim (1.3): spread, it poked a
+   * slate wedge below the rim for 12 f, adult and elder alike (the elder core review, round 2).
+   */
+  wakeSpread: number;
 }
 
 /** The signature breath (4.2): wind-up, snap, sustain, recover; the baby always fizzles. */
@@ -140,21 +146,21 @@ export type AnimTuningPatch = { [K in keyof AnimTuning]?: Partial<AnimTuning[K]>
 const BASE: Readonly<Record<Stage, AnimTuning>> = {
   baby: {
     walk: { cycle: 24, speed: 0.3, lift: 1.5, head: 0, sway: 0, wave: 0 },
-    sleep: { lieDown: 24, breath: 120, z: 90, tuck: 2, bodyRot: 0, tailCurl: 40, tailLift: 70, nubFold: 3.3, chin: 1.5, frontTuck: 1.5 },
+    sleep: { lieDown: 24, breath: 120, z: 90, tuck: 2, bodyRot: 0, tailCurl: 40, tailLift: 70, nubFold: 3.3, chin: 1.5, frontTuck: 1.5, wakeSpread: 1 },
     breath: { jaw: 20, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
     eat: { tailDroop: 22 },
     beg: { mood: -0.5, tilt: 14 },
   },
   young: {
     walk: { cycle: 40, speed: 0.5, lift: 2, head: 0, sway: 0, wave: 0 },
-    sleep: { lieDown: 34, breath: 150, z: 100, tuck: 0, bodyRot: 0, tailCurl: 18, tailLift: 8, nubFold: 0, chin: 1.5, frontTuck: -2 },
+    sleep: { lieDown: 34, breath: 150, z: 100, tuck: 0, bodyRot: 0, tailCurl: 18, tailLift: 8, nubFold: 0, chin: 1.5, frontTuck: -2, wakeSpread: 1 },
     breath: { jaw: 22, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
     eat: { tailDroop: 0 },
     beg: { mood: -0.5, tilt: 12 },
   },
   adult: {
     walk: { cycle: 48, speed: 0.45, lift: 3, head: 0, sway: 0, wave: 0 },
-    sleep: { lieDown: 40, breath: 180, z: 120, tuck: 0, bodyRot: 0, tailCurl: 18, tailLift: 8, nubFold: 0, chin: 1.5, frontTuck: -2 },
+    sleep: { lieDown: 40, breath: 180, z: 120, tuck: 0, bodyRot: 0, tailCurl: 18, tailLift: 8, nubFold: 0, chin: 1.5, frontTuck: -2, wakeSpread: 1 },
     breath: { jaw: 30, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
     eat: { tailDroop: 0 },
     beg: { mood: -0.5, tilt: 12 },
@@ -164,7 +170,7 @@ const BASE: Readonly<Record<Stage, AnimTuning>> = {
   // a slow, wise breath that never fails, jaw 28; the beg's tilt 10
   elder: {
     walk: { cycle: 64, speed: 0.34, lift: 2, head: 0, sway: 0, wave: 0 },
-    sleep: { lieDown: 52, breath: 216, z: 150, tuck: 0, bodyRot: 0, tailCurl: 18, tailLift: 8, nubFold: 0, chin: 1.5, frontTuck: -2 },
+    sleep: { lieDown: 52, breath: 216, z: 150, tuck: 0, bodyRot: 0, tailCurl: 18, tailLift: 8, nubFold: 0, chin: 1.5, frontTuck: -2, wakeSpread: 1 },
     breath: { jaw: 28, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
     eat: { tailDroop: 0 },
     beg: { mood: -0.5, tilt: 10 },

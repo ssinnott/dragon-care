@@ -1211,7 +1211,8 @@ export const ROCK: ElementSpec = {
       // the SLEEP tuck (3.4) rests the head on the ground OUTSIDE the rim, so it draws in the normal order (the head
       // last); tuck 1, the head under the dome, is the upset tuck's
       // FIRST PASS (elder): the adult's 240 f breath at the elder's x 1.2 (the shared 180 -> 216)
-      sleep: { tuck: st === 'baby' ? 2 : 0, nubFold: 0, breath: st === 'adult' ? 240 : st === 'young' ? 200 : st === 'elder' ? 288 : 160 },
+      // (its wake stretches with the wings kept folded under the rim: 1.3; spread, the stub poked a slate wedge below it)
+      sleep: { tuck: st === 'baby' ? 2 : 0, nubFold: 0, breath: st === 'adult' ? 240 : st === 'young' ? 200 : st === 'elder' ? 288 : 160, wakeSpread: 0 },
       // (gravelRoar replaces the shared breath; these are its numbers, for anything that reads the tuning)
       breath: { jaw: ROAR_JAW[st], fizzleFace: 'happy', fizzleChin: PROUD_CHIN },
     }),

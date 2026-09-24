@@ -206,13 +206,17 @@ export function backLineY(rig: DragonRig, x: number): number {
 
 /**
  * Body space: y of the dorsal line at x -- the body's back line, or behind the rump the top of the tail (body-space
- * tail nodes), whichever is higher.
+ * tail nodes), whichever is higher. The tail counts only as far as it runs BACK from the rump: from the first segment
+ * that turns forward again (a tail raised and curled over the rump) it is no longer the back's line, and taken as it
+ * was, the lowest y over every segment dragged water's dorsal fin up to a tail curled over its rump as a tall dark web
+ * (the elder core review, round 2).
  */
 export function dorsalLineY(rig: DragonRig, x: number): number {
   const J = rig.j, tn = J.tailN, d = rig.dims;
   let y = x > rig.hipB.x - d.hipR ? backLineY(rig, x) : 1e9;
   for (let k = 0; k < tn; k++) {
     const ax = J.tailBX[k], bx = J.tailBX[k + 1];
+    if (bx > ax) break;
     if ((x - ax) * (x - bx) > 0) continue;
     const u = (x - ax) / ((bx - ax) || 1);
     const ty = J.tailBY[k] + (J.tailBY[k + 1] - J.tailBY[k]) * u - (J.tailR[k] + (J.tailR[k + 1] - J.tailR[k]) * u);

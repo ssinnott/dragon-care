@@ -862,7 +862,7 @@ export const WATER: ElementSpec = {
       markings: [spot(-0.1), spot(0.3), spot(0.7), tailSpot(0.2), tailSpot(0.45, -2)],
       wing: wingParams({
         style: 'fin', plus: true, scallop: -3,
-        tears: [{ panel: 2, at: 0.5, depth: 4 }, { panel: 3, at: 0.4, depth: 4 }],
+        tears: [{ panel: 1, at: 0.5, depth: 4 }, { panel: 3, at: 0.4, depth: 4 }],
         // (2.9's spot re-measured for the notched window AND the airing: at 2.9's (-10.5, -7) the window lay on the back once
         // the airing leaned the spread back far enough for the tip rule (1.3); here, up the arm panel toward the
         // forearm, it keeps the ring and 2 px of membrane round it and clears the back line at the airing's 20 deg

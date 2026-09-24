@@ -24,7 +24,8 @@
 // is seeded from dragonTones for every slot, so the cel tones on screen, the silvered highlight band included, are
 // the ones tools/palette-check.ts measured (3.9). The elder's own parts are shared, drawn here and in parts.ts /
 // faces.ts: the settled chest and the paunch, the grey muzzle and brow tuft, the inked beard (which the head's floor
-// guard counts), the worn fangs, and the wing wear's whole-pixel hole (2.9: stampWingHole).
+// guard counts), the worn fangs, and the wing wear's whole-pixel hole and the far wing cut under the near wing's tears
+// (2.9: holeFrame, stampHoleRing, clipOffTears).
 import { rad, clamp } from '../../lib/engine/math.ts';
 import { farPalette } from '../../lib/art/palettes.ts';
 import type { Palette } from '../../lib/art/palettes.ts';
@@ -45,7 +46,7 @@ import type { AnchorName, DragonInfo, ElementSpec, ElementStageParams, MarkingSp
 import {
   drawBody, pathBody, pathBelly, drawLeg, drawBatWing, drawNub, drawGroundShadow, drawTube, drawNeck,
   drawSkull, pathSkull, drawJaw, drawMouthInterior, mouthCorner, legRadii, jawTopAt, drawBeard, beardLow, fitBeard, wingHoleAt,
-  armPanelHas, pathWingTears, HOLE_PX, HOLE_RING,
+  armPanelHas, armBoneGap, pathWingTears, HOLE_PX, HOLE_RING, HOLE_RING_OPEN,
 } from './parts.ts';
 import { drawEye, drawBrow, drawBlush, faceBlushes, drawNostril, drawMouthMark, drawEggTooth, drawFangs, drawMuzzle } from './faces.ts';
 import { drawHorn, hornOverlap, hornRise, hornRefClamped, drawDorsalRow, drawTailRing, drawMarkingPixels, markingPixel, backLineY } from './features.ts';
@@ -1442,16 +1443,30 @@ function markingTone(rig: DragonRig, pal: Readonly<DragonPalette>, P: DragonPose
 
 // ---------- the elder's wing hole (2.9) ----------
 
-/** This frame's hole: drawn or not, and the root-space point its window's centre pixel rounds from. */
-const HOLE = { on: false, x: 0, y: 0 };
+/**
+ * This frame's hole: drawn or not, the root-space point its window's centre pixel rounds from, and which of its ring's
+ * pixels are inked (bit k: HOLE_RING's k-th pixel).
+ */
+const HOLE = { on: false, x: 0, y: 0, ring: 0 };
 const HP: Point = { x: 0, y: 0 }, HQ: Point = { x: 0, y: 0 };
+/** How far (whole face pixels, each way) holeFrame may move the window from its spot to seat it against the bone. */
+const HOLE_SEAT = 3;
+/** HOLE_RING's sides: the face-space step from the window to each ring pixel (top, front, bottom, back). */
+const RING_STEP: readonly number[] = [0, -1, 0, -1, 0, -1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, -1, 0, -1, 0];
 
 /**
  * Decide this frame's elder wing hole (2.9): the near wing's window at its full-spread wing-space spot (WingParams.hole,
- * from `wing` >= its `from`), mapped to root space, where its centre pixel rounds to a whole device pixel. It is drawn
- * only where the WHOLE window has its ring and 2 px of membrane round it inside the arm panel (the forearm bone may be
- * one border) and lies above the back line + 1 px; otherwise it is skipped this frame, never shrunk (a partial hole is
- * a speck). Face space runs along root space here (no head flip), so a window pixel's centre is its offset in root px.
+ * from `wing` >= its `from`), mapped to root space, where its centre pixel rounds to a whole device pixel, then SEATED
+ * against the leading-edge bone: of the whole-pixel placements within HOLE_SEAT px of the spot, the one whose window
+ * comes nearest the bone without covering it (the bone is the window's border on that side, 2.9), the spot's own
+ * nearest on a tie. A placement counts only where the WHOLE window has its ring and 2 px of membrane round it inside the
+ * arm panel (the bone excepted) and lies above the back line + 1 px; with none, the hole is skipped this frame, never
+ * shrunk (a partial hole is a speck). Then the ring: inked only on the sides facing away from the bone, and never on
+ * the notched back (HOLE_RING_OPEN), so the pale window meets the bone and the membrane directly on two sides, a torn
+ * gap, not a dot in a closed ring. (Set in the middle of the arm panel, 2 px of membrane and its ring between it and
+ * the bone, the window read as an eye on fire's wing, an eyespot on dusk's and one more of water's pale spots: the
+ * elder core review, round 2.) Face space runs along root space here (no head flip), so a window pixel's centre is its
+ * offset in root px.
  */
 function holeFrame(rig: DragonRig, P: DragonPose): void {
   HOLE.on = false;
@@ -1462,18 +1477,58 @@ function holeFrame(rig: DragonRig, P: DragonPose): void {
   // the root point of the rounded pixel's centre (faceTransform rounds the screen point; a face pixel is kx / ky root
   // px, 1 but for a squash)
   const ox = Math.round(t.fs * (t.rx + HQ.x)) / t.fs - t.rx, oy = Math.round(t.ss * (t.ry + HQ.y)) / t.ss - t.ry;
-  const cx = ox + 0.5 * kx, cy = oy + 0.5 * ky;
-  const wc = Math.cos(rad(-J.wingAngN)), ws = Math.sin(rad(-J.wingAngN)), bc = Math.cos(rad(-J.bodyAng)), bs = Math.sin(rad(-J.bodyAng));
+  let bi = 0, bj = 0, bestGap = 1e9, bestD = 1e9;
+  for (let j = -HOLE_SEAT; j <= HOLE_SEAT; j++) for (let i = -HOLE_SEAT; i <= HOLE_SEAT; i++) {
+    const g = holeFits(rig, ox + (i + 0.5) * kx, oy + (j + 0.5) * ky, kx, ky), d = i * i + j * j;
+    if (g < 0) continue;
+    if (g < bestGap - 0.05 || (g < bestGap + 0.05 && d < bestD)) { bi = i; bj = j; bestGap = g; bestD = d; }
+  }
+  if (bestGap > 1e8) return;
+  const cx = ox + (bi + 0.5) * kx, cy = oy + (bj + 0.5) * ky;
+  // which way the bone lies from the window: the membrane gap's gradient over one face pixel
+  const g0 = gapAt(rig, cx, cy), gx = gapAt(rig, cx + kx, cy) - g0, gy = gapAt(rig, cx, cy + ky) - g0;
+  let ring = 0;
+  for (let k = 0, i = 0; i < HOLE_RING_OPEN; i += 2, k++) {
+    // (a side facing the bone -- stepping out of the window toward it -- is the bone's: no ink there)
+    if (RING_STEP[i] * gx + RING_STEP[i + 1] * gy < -0.3) continue;
+    if (gapAt(rig, cx + HOLE_RING[i] * kx, cy + HOLE_RING[i + 1] * ky) < 0.5) continue;
+    ring |= 1 << k;
+  }
+  HOLE.on = true; HOLE.x = HQ.x + bi * kx; HOLE.y = HQ.y + bj * ky; HOLE.ring = ring;
+}
+/**
+ * The window centred on root point (cx, cy) (a pixel centre): -1 where it does not fit (off the arm panel's membrane
+ * with its ring and 2 px round it, the bone excepted; on the bone; not above the back line + 1 px), else the smallest
+ * membrane gap between a window pixel's centre and the bone (armBoneGap). Reads the wing wingHoleAt solved.
+ */
+function holeFits(rig: DragonRig, cx: number, cy: number, kx: number, ky: number): number {
+  const J = rig.j;
+  const bc = Math.cos(rad(-J.bodyAng)), bs = Math.sin(rad(-J.bodyAng));
+  let gmin = 1e9;
   for (let i = 0; i < HOLE_PX.length; i += 2) {
     const X = cx + HOLE_PX[i] * kx, Y = cy + HOLE_PX[i + 1] * ky;
     // on the membrane: the ring (1 px) and 2 px of membrane beyond the window pixel's own half pixel
-    const dx = X - J.wingN.x, dy = Y - J.wingN.y;
-    if (!armPanelHas(dx * wc - dy * ws, dx * ws + dy * wc, 3)) return;
+    if (!armPanelHas(wingX(rig, X, Y), wingY(rig, X, Y), 3)) return -1;
+    // off the bone: the pixel's centre half a pixel clear of its paint
+    const g = armBoneGap(wingX(rig, X, Y), wingY(rig, X, Y));
+    if (g < 0.5) return -1;
+    gmin = Math.min(gmin, g);
     // above the back line + 1 px (body space)
     const ex = X - J.body.x, ey = Y - J.body.y, bx = ex * bc - ey * bs, by = ex * bs + ey * bc;
-    if (by + 0.5 > backLineY(rig, bx) - 1) return;
+    if (by + 0.5 > backLineY(rig, bx) - 1) return -1;
   }
-  HOLE.on = true; HOLE.x = HQ.x; HOLE.y = HQ.y;
+  return gmin;
+}
+/** armBoneGap at root point (X, Y). */
+function gapAt(rig: DragonRig, X: number, Y: number): number { return armBoneGap(wingX(rig, X, Y), wingY(rig, X, Y)); }
+/** Root point (X, Y) in the near wing's space (the space the rig enters for it). */
+function wingX(rig: DragonRig, X: number, Y: number): number {
+  const J = rig.j, a = rad(-J.wingAngN), dx = X - J.wingN.x, dy = Y - J.wingN.y;
+  return dx * Math.cos(a) - dy * Math.sin(a);
+}
+function wingY(rig: DragonRig, X: number, Y: number): number {
+  const J = rig.j, a = rad(-J.wingAngN), dx = X - J.wingN.x, dy = Y - J.wingN.y;
+  return dx * Math.sin(a) + dy * Math.cos(a);
 }
 
 /**
@@ -1489,11 +1544,11 @@ function clipOffHole(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
   leaveFaceKeepClip(ctx, rig, HOLE.x, HOLE.y);
 }
 
-/** The window's 4-neighbour ink ring, whole pixels in face space, over the near wing (2.9). */
+/** The window's ink ring (the pixels holeFrame kept: away from the bone, not the notched back), whole pixels in face space, over the near wing (2.9). */
 function stampHoleRing(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
   enterFace(ctx, rig, HOLE.x, HOLE.y);
   ctx.fillStyle = rig.col(rig.outline);
-  for (let i = 0; i < HOLE_RING.length; i += 2) ctx.fillRect(HOLE_RING[i], HOLE_RING[i + 1], 1, 1);
+  for (let k = 0, i = 0; i < HOLE_RING_OPEN; i += 2, k++) if (HOLE.ring & (1 << k)) ctx.fillRect(HOLE_RING[i], HOLE_RING[i + 1], 1, 1);
   ctx.restore();
 }
 

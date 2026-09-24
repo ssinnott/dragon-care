@@ -21,7 +21,7 @@
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
 //   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
 //   charge (0..1); a static pose overlay: face, jaw, wing, flap, sleep, tuck, fx, gulp, flare, bristle,
-//   body=<rot>,<y>, head, pupil
+//   body=<rot>,<y>, head, pupil; wear=0 draws the elders without their tears and hole (2.9's with / without measure)
 import { drawText } from './lib/engine/text.ts';
 import { dragonBuild } from './art/dragon/build.ts';
 import { buildDragon, drawDragon, stepDragon, solveDragon, rootToScreen } from './art/dragon/rig.ts';
@@ -76,6 +76,8 @@ export interface GalleryParams {
   anims: string[] | null;
   els: DragonElement[] | null;
   stages: Stage[] | null;
+  /** wear=0: the elders draw without their tears and hole (2.9), for measuring what the wear opens against the same frame. */
+  wear: boolean;
 }
 
 export function parseParams(search: string): GalleryParams {
@@ -105,6 +107,7 @@ export function parseParams(search: string): GalleryParams {
     anims: q.get('anims') ? (q.get('anims') || '').split(',') : null,
     els: q.get('els') ? (q.get('els') || '').split(',').filter((e) => (ELEMENT_IDS as readonly string[]).includes(e)) as DragonElement[] : null,
     stages: q.get('stages') ? (q.get('stages') || '').split(',').filter((s) => (STAGES as readonly string[]).includes(s)) as Stage[] : null,
+    wear: q.get('wear') !== '0',
   };
 }
 
@@ -152,6 +155,8 @@ export function makePet(el: DragonElement, stage: Stage, seed: number, anim: str
   opts: { scale?: number; facing?: number; mood?: number; desync?: boolean; blink?: boolean } = {}): Pet {
   const build = dragonBuild({ element: el, stage, seed });
   const rig = buildDragon(build);
+  // (wear=0: the same elder without its tears and hole, the other half of 2.9's with / without measure)
+  if (!WEAR) rig.sp = { ...rig.sp, wing: { ...rig.sp.wing, tears: undefined, hole: undefined } };
   const anims = dragonAnims(stage, build.spec, build.dims);
   const player = new DragonAnimPlayer(anims, seed, blinkFor(stage));
   player.blink = opts.blink !== false;
@@ -186,7 +191,7 @@ function bowlFor(rig: DragonRig, frames: readonly { pose?: import('./art/dragon/
 /** The query's static pose overlay, applied to every pet a scene makes (set by startGallery). */
 let STATIC_POSE: PartialDragonPose | null = null;
 /** The query's flash / tint, bond and charge, applied at draw time. */
-let FLASH = false, TINT: string | null = null, BOND = 1, CHARGE = 0;
+let FLASH = false, TINT: string | null = null, BOND = 1, CHARGE = 0, WEAR = true;
 
 function petOpts(p: Pet, extra: Partial<DrawDragonOpts> = {}): DrawDragonOpts {
   return { x: p.x, y: p.y, facing: p.facing, scale: p.scale, mood: p.mood, flash: FLASH, tint: TINT, tintAlpha: 0.35, wary: p.wary, bond: BOND, charge: CHARGE, ...extra };
@@ -884,7 +889,7 @@ function render(ctx: CanvasRenderingContext2D, scene: Scene, P: GalleryParams, l
 export function startGallery(canvas: HTMLCanvasElement, search: string, onReady: () => void): void {
   const ctx = canvas.getContext('2d')!;
   let P = parseParams(search);
-  STATIC_POSE = P.pose; FLASH = P.flash; TINT = P.tint; BOND = P.bond; CHARGE = P.charge;
+  STATIC_POSE = P.pose; FLASH = P.flash; TINT = P.tint; BOND = P.bond; CHARGE = P.charge; WEAR = P.wear;
   let scene = makeScene(P);
   const size = () => { canvas.width = scene.w; canvas.height = scene.h; };
   size();

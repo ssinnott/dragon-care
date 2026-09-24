@@ -259,7 +259,7 @@ const SPX = new Float32Array(6), SPY = new Float32Array(6), TPX = new Float32Arr
  * membrane's body attach (ax, ay), the root's drop, the trailing edge's scallop depth, the spar count and the
  * humerus angle (radians).
  */
-const W = { sx: 0, sy: 0, f: 0, g: 1, ex: 0, ey: 0, wx: 0, wy: 0, ax: 0, ay: 0, drop: 0, depth: 0, n: 0, eh: 0, thorn: 0 };
+const W = { sx: 0, sy: 0, f: 0, g: 1, ex: 0, ey: 0, wx: 0, wy: 0, ax: 0, ay: 0, drop: 0, depth: 0, n: 0, eh: 0, thorn: 0, ar: 1 };
 /** The ARM PANEL of the last solved wing (root, elbow, wrist, trail tip, its edge to the attach), unshifted wing space. */
 const ARM = new Float32Array(48);
 let armN = 0;
@@ -306,6 +306,8 @@ function solveWing(rig: DragonRig, wp: Readonly<WingParams>, fold: number): void
   // the folded wing's lower edge reads as a wing's, lobed between the finger tips
   const depth = wp.scallop > 0 ? wp.scallop * f + Math.min(wp.scallop, FOLD_SCALLOP[adult]) * g : wp.scallop * Math.max(0.35, f);
   W.ex = ex; W.ey = ey; W.wx = wx; W.wy = wy; W.ax = ax; W.ay = ay; W.depth = depth; W.n = n; W.eh = eh; W.thorn = thorn;
+  // (the painted arm's radius: drawBatWing's `ar`, the folded adult's 3 px leading edge thinned to 2)
+  W.ar = wd.armR - (wd.armR - 1) * g;
   // the arm panel (2.9: the rear panel, where an elder's hole goes): root, elbow, wrist, trail tip, then its trailing
   // edge to the attach sampled along the same curve edgeTo draws
   let k = 0;
@@ -329,7 +331,8 @@ function solveWing(rig: DragonRig, wp: Readonly<WingParams>, fold: number): void
  * every tip on one line under a 3 px bar, the membrane attached far back: a bar over a 1-2 px dark sliver.)
  * An ELDER's wing carries its TEARS (2.9, wp.tears) as notches of the same membrane polygon, so the one stroke inks
  * them, growing in from `wing` 0.35 to full at 0.55 (wearOf): folded they are closed, and the lobed edge stays clean.
- * Its hole is the rig's (a whole-pixel window stamped after the wing: rig.ts stampWingHole).
+ * Its hole is the rig's (a whole-pixel window cut through both wings and ringed after the near one: rig.ts holeFrame,
+ * stampHoleRing), and so is the far wing's cut under these tears (pathWingTears, rig.ts clipOffTears).
  */
 export function drawBatWing(ctx: CanvasRenderingContext2D, rig: DragonRig, wp: Readonly<WingParams>, fold: number, pal: Readonly<DragonPalette>): void {
   const wd = rig.dims.wing;
@@ -554,14 +557,21 @@ export function wingHoleAt(rig: DragonRig, wp: Readonly<WingParams>, fold: numbe
 }
 
 /**
- * The elder's hole as face-space pixels (x, y pairs) round the pixel its centre rounds to (2.9): the 3 x 3 window with
- * its top-back corner notched (8 px of background: an irregular, torn hole; EL's round 2 x 2 window in an ink ring read
- * as a rivet or a grommet), and its 4-neighbour 1 px ink ring, left OPEN at the notch: the notch pixel is membrane, not
- * ink, so the window breaks its outline there like a torn edge (closed all round, the 3 x 3 window in its ring was a
- * pale dot on dark membrane at game scale, a rivet or an eyespot: the elder core review).
+ * The elder's hole as face-space pixels (x, y pairs) round the pixel its centre rounds to (2.9): a 4 x 3 window with
+ * its top-back corner notched (11 px of background: an irregular, torn hole, never a square; EL's round 2 x 2 window in
+ * an ink ring read as a rivet or a grommet, and the first build's notched 3 x 3 in a closed ring as a ringed pale dot:
+ * an eye on fire's wing, an eyespot on dusk's, one more of water's spots, the elder core review, rounds 1 and 2).
  */
-export const HOLE_PX: readonly number[] = [0, -1, 1, -1, -1, 0, 0, 0, 1, 0, -1, 1, 0, 1, 1, 1];
-export const HOLE_RING: readonly number[] = [0, -2, 1, -2, 2, -1, -2, 0, 2, 0, -2, 1, 2, 1, -1, 2, 0, 2, 1, 2];
+export const HOLE_PX: readonly number[] = [-1, -1, 0, -1, 1, -1, -2, 0, -1, 0, 0, 0, 1, 0, -2, 1, -1, 1, 0, 1, 1, 1];
+/**
+ * Its 1 px ink ring's candidate pixels (the window's 4-neighbours; the notch pixel is never one): top, front, bottom,
+ * then the back. The rig inks only those on the membrane away from the bone: none beside the leading-edge bone the
+ * window is seated against (armBoneGap: the bone is that side's border, 2.9) and none along the notched BACK side
+ * (HOLE_RING_OPEN), so the window breaks the membrane on two sides like a torn gap instead of sitting in a closed ring.
+ */
+export const HOLE_RING: readonly number[] = [-1, -2, 0, -2, 1, -2, 2, -1, 2, 0, 2, 1, -2, 2, -1, 2, 0, 2, 1, 2, -3, 0, -3, 1];
+/** HOLE_RING's pixels from this index on (the notched back side) are never inked. */
+export const HOLE_RING_OPEN = 20;
 
 /**
  * Is wing-space point (x, y) (the space the rig enters: the fold's shift included) inside the arm panel of the wing
@@ -583,6 +593,22 @@ export function armPanelHas(x: number, y: number, pad: number): boolean {
     if (Math.hypot(px - xj - ex * t, py - yj - ey * t) < pad) return false;
   }
   return true;
+}
+
+/**
+ * The membrane between wing-space point (x, y) (the space the rig enters: the fold's shift included) and the
+ * leading-edge bone (root -> elbow -> wrist, painted `ar` px round its axis) of the wing wingHoleAt last solved, px:
+ * <= 0 on the bone. The hole is seated against it (2.9: the bone is one border of the window).
+ */
+export function armBoneGap(x: number, y: number): number {
+  const px = x - W.sx, py = y - W.sy;
+  let best = 1e9;
+  for (let j = 0; j < 2; j++) {
+    const xj = ARM[j * 2], yj = ARM[j * 2 + 1], ex = ARM[j * 2 + 2] - xj, ey = ARM[j * 2 + 3] - yj;
+    const l2 = ex * ex + ey * ey || 1, t = Math.max(0, Math.min(1, ((px - xj) * ex + (py - yj) * ey) / l2));
+    best = Math.min(best, Math.hypot(px - xj - ex * t, py - yj - ey * t));
+  }
+  return best - W.ar;
 }
 
 /**

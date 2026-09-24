@@ -38,8 +38,12 @@
 //     (water's 0.92), `tailLen` (slinkwing's adult length), `jawMax` (slinkwing's 36), `brow` (rock's 4), `bellyFrac`
 //     (rock's adult 38 %). The beard's depth is fitted to each head by the rig (parts.ts fitBeard).
 //   - WING WEAR: WingParams.tears / .hole on the elder stage (2.9's table), drawn by the shared bat / leaf / fin wing
-//     (parts.ts drawBatWing) and the rig's whole-pixel hole stamp. A 'custom' wing (lightning's bolt) draws its own
-//     tear from the same data with parts.ts pathTearEdge and wearOf.
+//     (parts.ts drawBatWing), the rig's whole-pixel hole stamp and its cut of the far wing under the near tears (so a
+//     tear shows the room, not the far membrane). A 'custom' wing (lightning's bolt) draws its own tear from the same
+//     data with parts.ts pathTearEdge and wearOf.
+//   - FIDGET: an element's idle fidget plays at stages.ts FIDGET_TIMING (the elder's x 1.3, its gestures at 0.8x), and
+//     so does any renderer keyed on the fidget's clock. Rock's elder, with no hole to air, reminisces instead of airing
+//     (anims.ts idleVariants(stage, wing)).
 //   - ANIMS: the shared set has an elder column (anims.ts: x 1.25 tempo, the soft ease, no key holds, the 10 f head
 //     lag), the elder's idle variants (the back stretch, reminisce and AIRING THE WINGS, act = ACT.airing, the one
 //     spread at idle: lightning flexes its bolts instead) and its breath (never fails; cue 0 = the snap at f 28, the
