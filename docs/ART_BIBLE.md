@@ -5,17 +5,17 @@
 - **7 elements:** fire, spike, rock, lightning, water, slinkwing, and **dusk** (new in v2: 3.8).
 - **4 life stages:** baby, young adult, adult, and **elder** (new in v2: 2.1, 2.5, 2.6, 2.9, 4.1, 4.2).
 
-**What v2 changed.** The user asked for six things, and this revision designs all of them:
+**What v2 changed.** The user asked for seven things, and this revision designs all of them:
 
 | Request | Where it lives |
 |---|---|
-| "add an elder dragon category" | The elder stage: proportions (2.1 Elder column), the elder face (2.5), what reads as elder (2.6), wing wear (2.9), timing and anims (4.1, 4.2), each element's weathered cue (section 3), the checks (5.1 #3). Decisions D21 to D23. |
-| "as dragons get older they should get a little grayer" | Greying with age (3.9): a derived, luminance-keeping transform per stage, like `farPalette`. D22. |
-| "elder dragon should even have some small holes in their wings" | Elder wing wear (2.9): torn notches whenever an elder spreads its wings, and see-through holes at full spread. D23. |
-| "The spike dragon should be spikier" | 3.3: fewer, taller back quills and more tail quills, by the overhang rule. D26. |
+| "add an elder dragon category" | The elder stage, the final and permanent one, drawn as a reward and never as decline: proportions (2.1 Elder column), the elder face (2.5), what reads as elder (2.6), wing wear (2.9), timing and anims (4.1, 4.2), each element's elder signature and permanent elder-only extra (section 3), the checks (5.1 #3). Decisions D21 to D23. |
+| "as dragons get older they should get a little grayer" | Greying with age (3.9): babies and the young keep their colours, the adult is a little grey and the elder clearly grey, where a player sees it: a silvered back and crown (the highlight band), a greyer belly and wings, and the elder's grey muzzle, brow tuft and beard. A derived, luminance-keeping transform per stage, like `farPalette`, with a gate that every step is visible. D22. |
+| "elder dragon should even have some small holes in their wings" | Elder wing wear (2.9): ragged tears whenever an elder spreads its wings, and see-through holes at full spread: in flight, the glide, and an elder-only idle variant that airs its wings so the holes are seen at home. D23. |
+| "The spike dragon should be spikier" | 3.3: fewer, taller back quills and a row of tail quills, by the overhang rule. D26. |
 | "the shriekscale should be renamed to a slinkwing" | Done before v2 (3.7). |
-| "a new dragon which is like a dark blue -> grey dragon" | **Dusk, "Wisp", the lamplighter** (3.8): navy at hatching, storm slate as an elder, grey creeping in from its tail tip and nose; its cue is a crook lamp ahead of the face. D24, D25. |
-| "the water dragon should be more like a sea green" | 3.6 and 3.1: "light sea green" `#28b0a6`. D27. |
+| "a new dragon which is like a dark blue -> grey dragon" | **Dusk, "Wick", the lamplighter** (3.8): deep Prussian blue at hatching, storm slate as an elder, grey creeping in from its tail tip and nose; its cue is a crook lamp, a small lantern hung ahead of the face. D24, D25. (The user is asked to confirm the element name "dusk" and the nickname.) |
+| "the water dragon should be more like a sea green" | 3.6 and 3.1: "light sea green" `#28b0a6`, the greenest vivid water that passes every gate. The user is shown it beside a true sea green and jade (`shots/v2/water_sea_green_options.png`) with the trade-off before it is final. D27. |
 
 **The house style.** Everything is drawn in the house style of the vendored engine (`src/lib/art/`):
 
@@ -30,7 +30,7 @@
 
 **Status.** v1 is built: the quadruped rig, the shared features and all six v1 elements, each finished by its own element artist, reviewed and integrated (the **Element pass** in the Review log), live in `src/art/dragon/` (file list in 1.1). Built: the core animation set of 4.2 per stage (idle with its variants, walk, happy, eat, sleep and wake, breath, pet, beg), authored as tracks from the 4.1 stage timing rules and tuned per element by the generic knobs of 4.3; every element's signature breath, baby fizzle, idle fidget (section 3) and 4.3 column (walk, happy flourish, hungry tell, sleep pose); the element anims fire's `bath`, rock's `upset` tuck and slinkwing's lonely `call`; rock's roll-over happy and the E8 fan flop; a turn in place (a paper turn: 4.1) and a head that looks back over its shoulder (a head pitched past vertical: 4.1). **Not built yet:** the anims grow-up, hopGlide, fly and rock's boulder hop, play, refuse and zap, and the other elements' baths; water floating belly-up (the habitat has no water) and spike's shed quills (a collectible). The game's side of the care loop does not exist yet: nothing consumes `event: 'shriek'`, `'call'` or `'hush'`, the pebble pile of rock's hungry tell is drawn by rock rather than placed as a habitat prop, and `bond`, `charge` and `wary` (DrawDragonOpts) are fed only by the gallery (its `bond` / `charge` query and the habitat's wary latch). Each element file's header lists what it draws.
 
-**v2 status: designed, and the colour half built.** The palette is code: `src/art/dragon/palettes.ts` holds the seven base palettes and the greying transform (`agePalette`, `agedPalette`, `muzzleOf`, with its strengths as data), and `tools/palette-check.ts` runs every gate on all seven elements at all four stages (report in 5.8: **2168 of 2168 gates pass**). Water is sea green and the sandstone a touch warmer in the rig today. The seventh element builds and draws as a **first-pass placeholder** (`elements/dusk.ts`: its palette, its 2.3 build and the shared features, a smoke band standing in for its tail tip; none of its renderers). **Not built yet (the implementation phase):** the elder in the rig's `Stage` type and `STAGE_DIMS` (2.1), the rig drawing each stage through `agedPalette` (build.ts `palette`; water's module-level `DIM` and rock's one `PAL` read would move to the rig's palette), the elder face, wing wear, elder timing and anims, every elder element cue, dusk's renderers and anims, spike's new comb (3.3) and the gallery's elder row. `npm run shots` renders the standard sheets of 5.5 and `npm run smoke` checks every gallery view, the floor audit and the leg-root audit included (all seven elements; the gallery's lineup, cast, mood and silhouette views lay out seven columns). Every hex below comes from that module and passed that check. The bible has been through one design review round (a readability critique and a care-game critique), four review rounds of the built rig, the element pass, two cast reviews (the whole cast judged together) and the v2 design round; what changed, and what was turned down, is in the **Review log** at the end, with what building the core animations found.
+**v2 status: designed, reviewed, and the colour half built.** The palette is code: `src/art/dragon/palettes.ts` holds the seven base palettes and the greying transform (`agePalette`, `agedPalette`, the silvered highlight in `dragonTones`, the elder face greys `muzzleOf` / `beardOf`, with every strength as data), and `tools/palette-check.ts` runs every gate on all seven elements at all four stages (report in 5.8: **2251 of 2251 gates pass**). Water is sea green and the sandstone a touch warmer in the rig today. The seventh element builds and draws as a **first-pass placeholder** (`elements/dusk.ts`: its palette, its 2.3 build and the shared features, a smoke band standing in for its tail tip; none of its renderers). **Not built yet (the implementation phase):** the elder in the rig's `Stage` type and `STAGE_DIMS` (2.1), the rig drawing each stage through `agedPalette` and seeding its tone cache from `dragonTones` for every slot (build.ts `palette`, rig.ts; water's module-level `DIM` and rock's one `PAL` read would move to the rig's palette), the elder face, wing wear, the airing variant, elder timing and anims, every elder element cue, dusk's renderers and anims, spike's new comb (3.3) and the gallery's elder row. `npm run shots` renders the standard sheets of 5.5 and `npm run smoke` checks every gallery view, the floor audit and the leg-root audit included (all seven elements; the gallery's lineup, cast, mood and silhouette views lay out seven columns). Every hex below comes from that module and passed that check. The bible has been through one design review round (a readability critique and a care-game critique), four review rounds of the built rig, the element pass, two cast reviews (the whole cast judged together), the v2 design round and the v2 review (a readability critique and a care-game critique of the v2 design); what changed, and what was turned down, is in the **Review log** at the end, with what building the core animations found.
 
 ---
 
@@ -56,14 +56,14 @@ The contested choices:
 | D5 | **Spike has leaf wings, and its tail tip is a plain taper.** The quills continue along the top of the tail instead. | C | An upright quill fan on the tail tip reads as fire's flame (C measured this in silhouette). Leaf wings fit a bramble dragon and differ from every bat wing. |
 | D6 | **Slinkwing is a sound dragon.** It has ribbed ear-fans that flare into a dish (R), rib "shriek-scales" (G), a throat sac that swells (C + G), a pale lilac eye mask, and it sings a rising 3-note scale when happy (C). There is no tail barb. | R + G + C | Sound is the only invisible element, so it needs a body part that shows it (the fans) and an effect (arcs). The tail end is water's zone. See 3.7. |
 | D7 | **The cue is the mood gauge**, driven by one `mood` channel from −1 to +1. At its lowest the cue keeps **at least 60 %** of its silhouette. | R (60 % floor) + G (channel) | Identity must never depend on the dragon being happy. |
-| D8 | **Far-side shading is split.** Far legs use `farPalette(0.55, 0.30)`. The far wing and far head features keep the engine default of `(0.62, 0.25)`. Slinkwing's legs are thin (radius × 0.75) so they stay flat and never get a shadow band. | C (legs) + G (wing reasoning) + review | Measured, gate c2: at the default, the far leg lands 19 to 24 % from the near leg's shadow band on fire, rock and slinkwing (24, 19 and 21 %). R kept the default everywhere and only measured against the base tone. A darker far wing would sink the dark membranes toward the ink (G). Slinkwing's shadow tone sits only about 12 Oklab L above the ink, so no far shade can clear both by the 6-point dark-pair floor; flat legs remove the shadow band instead (E4). |
-| D9 | **The body colours are value-stacked** (v2: seven, at every stage): luminance runs 0.49 rock > 0.34 water > 0.23 fire > 0.17 spike > 0.12 lightning > 0.08 dusk > 0.05 slinkwing (v1's water was 0.31). A search nudged the stack until all 15 pairs also separate under simulated deuteranopia and protanopia, **by the same rule as gate (b)**: a hue only counts when both simulated colours have S ≥ 0.30. | New, built on R's measurements and G's value ladder | R's palette had five body pairs that separated on hue alone, and four of those merge under simulated deuteranopia or protanopia. Now every pair separates in greyscale **and** for dichromats (gates b and f). No body hex moved more than 0.04 Oklab ΔE from the art-directed value (water, the largest, moved `#2fa5b5` → `#20a3ce` so fire / water survives deuteranopia on a hue that is saturated enough to count). |
+| D8 | **Far-side shading is split.** Far legs use `farPalette(0.55, 0.30)`. The far wing and far head features keep the engine default of `(0.62, 0.25)`. Slinkwing's legs are thin (radius × 0.75) so they stay flat and never get a shadow band (v2: dusk's too, × 0.76). | C (legs) + G (wing reasoning) + review | Measured, gate c2: at the default, the far leg lands 19 to 24 % from the near leg's shadow band on fire, rock and slinkwing (24, 19 and 21 %). R kept the default everywhere and only measured against the base tone. A darker far wing would sink the dark membranes toward the ink (G). Slinkwing's shadow tone sits only about 12 Oklab L above the ink, so no far shade can clear both by the 6-point dark-pair floor; flat legs remove the shadow band instead (E4). |
+| D9 | **The body colours are value-stacked** (v2: seven, at every stage): luminance runs 0.49 rock > 0.34 water > 0.23 fire > 0.17 spike > 0.12 lightning > 0.08 dusk > 0.05 slinkwing (v1's water was 0.31). A search nudged the stack until all 15 pairs also separate under simulated deuteranopia and protanopia, **by the same rule as gate (b)**: a hue only counts when both simulated colours have S ≥ 0.30. (v2: a pair that separates by value alone must also clear the dark-pair floor, ≥ 6 Oklab L or ≥ 0.08 Oklab ΔE, gate b: the stack's dark end, lightning / dusk / slinkwing, sits within 0.07 of luminance.) | New, built on R's measurements and G's value ladder | R's palette had five body pairs that separated on hue alone, and four of those merge under simulated deuteranopia or protanopia. Now every pair separates in greyscale **and** for dichromats (gates b and f). No body hex moved more than 0.04 Oklab ΔE from the art-directed value (water, the largest, moved `#2fa5b5` → `#20a3ce` so fire / water survives deuteranopia on a hue that is saturated enough to count). |
 | D10 | **Lightning has a blue body with a yellow signal colour; rock is a light sandstone.** | R + G | A yellow lightning body would sit within 20° of fire and rock (G), and a grey rock would break the neutral ceiling (R). |
 | D11 | **Dark membranes sit below the body's own shadow tone, except where the wing or fan *is* the cue.** Fire, rock and water run 0.19 to 0.33× the body's luminance, under the shadow tone's 0.41 to 0.54×. Spike's leaf membrane sits *between* shadow and base (0.70×) and clears both by ≥ 30 %. Lightning's is yellow and slinkwing's is pink. **Dusk's** (v2) is a pale moth-grey, lighter than its body: a membrane under a dark body's shadow tone lands within 6 Oklab L of the ink, as slinkwing's would, so it goes light (ledger E11). | G + R + review | G measured that a mid-value membrane is the body's own shadow tone and fuses with it. The first draft's "0.2 to 0.5×" band still contained the shadow tone (fire 19 %, rock 10 % from it), so gate (a) now measures scale.sh / membrane directly. R made the membrane the cue on the two elements whose cue is a membrane. |
 | D12 | **The eye's aspect ratio is a stage signal:** 7 × 8 for babies, 7 × 7 for young, 8 × 6 for adults and elders (v2: the elder keeps the adult eye and is told by the frame around it, 2.5), at nearly constant absolute size. There is a catchlight at every stage. A new gate keeps every iris at least 25 % from the catchlight. | C (aspect, layout), C + G (catchlights) | R dropped the catchlight on adults, but a care game's face must draw the eye. The iris gate was new, and it caught three of R's irises (fire 17 %, lightning 5 %, slinkwing 13 %) that would have swallowed their catchlight. The adult eye is 8 wide so its slit has iris on both sides (2.5). |
 | D13 | **Pigment is not inked; separate objects are.** The belly stripe, markings, eye mask and spots are clipped colour changes with no line. Horns, quills, dome, fans, flame and crystals each carry their own outline. **Claws are the exception:** they are drawn un-inked, because two inked claws with a 2 px gap between them fill the gap with ink. | R + G, and the engine (`drawLimbSegs` draws sleeve to skin with no line; `band()` inks only a change of material) | C inked the belly seam. The belly is countershading on the same hide, not a new material. Gate (a) guarantees every pigment step is at least 25 %, including where it crosses the shadow and highlight bands. |
 | D14 | **Base proportions come from R,** the smallest adult, so more pets fit across 640 px. Element modifiers stay **within ±30 %** (G) and apply at half strength on babies (new), full strength on adults and elders (v2, with the elder's own posture changes added after them: 2.3). Babies also get C's pot belly. | R + G + C | Unbounded modifiers (R had rock's neck at 0.6) blur the stages. A baby should look like a baby first and an element second. |
-| D15 | **Growth follows Seed → Sprout → Signature → Weathered signature** (v2). Each stage-up adds one sub-part to the cue, and each element has one adult-only extra; the elder's cue is grown or weathered within its zone budget, plus one elder-only extra (section 3). Babies carry the adult's *first* marking. | G | This gives "same species" continuity (R and G) and makes each stage-up visibly a reward. C gave babies no markings at all. |
+| D15 | **Growth follows Seed → Sprout → Signature → Elder signature** (v2). Each stage-up adds one sub-part to the cue, and each element has one adult-only extra; the elder keeps its adult signature or grows it within its zone budget, and gains one **permanent** elder-only extra, drawn at every mood (section 3). Babies carry the adult's *first* marking. | G, v2 review | This gives "same species" continuity (R and G) and makes each stage-up visibly a reward. C gave babies no markings at all. v2's first draft "weathered" every elder cue (chipped quills, a chipped dome, nicked fans and flukes) and made most extras conditional, so the last grow-up revealed only losses (the care review): wear is now the wings' alone, as the user asked. |
 | D16 | **Two claws per near paw, with 2 px gaps, drawn un-inked.** | G + review | Three claws on an 8 px paw (R, C) need 1 px gaps, and a 1 px gap closes, turning the claws into one pale band. For the same reason the claws carry no outline of their own (D13): each claw's ink would eat 1 px of the 2 px gap. |
 | D17 | **Animation uses R's frame tables as the base:** a 48 f lateral-sequence walk (R + G), the adult preens instead of hopping (R), plus C's beg loop and G's grow-up. Every baby breath fails, adorably (C + G). | R + C + G | A slow pet ambles in a four-beat lateral sequence, with a different leg moving on each of the 8 keys. C's 36 f diagonal gait is a two-beat trot that reads as hurrying. |
 | D18 | **The dragons get their own face set, DFACE:** neutral, happy, closed, hungry, sleepy, sad, surprised, grumpy, sheepish, scared, dazed. Never angry. | C + review | The engine's `FACE` is a combat set (angry, shout, grit), and this is a cozy game. Sheepish and scared were added because the care loop calls for them (lightning's zap, slinkwing's fright); dazed was redrawn because the engine's X-eyes are 1 px marks. |
@@ -76,16 +76,16 @@ The v2 design round (the Review log has the full verdicts). **EL** = the elder-s
 
 | # | Decision | Taken from | Why (and what lost) |
 |---|---|---|---|
-| D21 | **The elder is a fourth stage that is not bigger than the adult.** It reads as older through five things only: its **posture** (the head carried low and forward, the chest settled level, a small paunch), its **colour** (greyer: 3.9), its **face** (a grey muzzle, a grey brow tuft at every face and a small beard: 2.5), **worn wings** (2.9) and **slower, stiffer motion** (4.1). It is 1.03 to 1.10× the adult's length and 0.84 to 1.00× its height, so it takes an adult's place in the screen budget. Elders still fly, a glide-heavy flight (4.2). | EL | Size cannot carry the step (the adult is already the largest look), so 5.1 #3 gets four new elder checks instead (posture, colour, face, size cap). **Rejected, because they read as sick or sad in a care game:** a tremor, a limp, a cough or wheeze, a permanent heavy upper lid (that is `sleepy`, a care signal; rock's permanent hood already read as sleepy), bald patches, a cane, a missing tooth, a clouded iris or a dimmed catchlight. |
-| D22 | **Greying with age is derived, never stored, and keeps luminance.** Each stage's palette is the element's base pulled toward its own grey of equal luminance in linear light: k = G[stage] × weight[slot], with G = 0 / 0.08 / 0.18 / 0.45 (baby / young / adult / elder); skin (scale, belly, membrane) weight 1, pigment (marking) 0.5, and keratin, nostril, glow and iris never grey. Measured exceptions per element (3.9): fire's scale 0.3 darkening toward brick, spike's 0.9 lightening toward lichen, rock's 0.3, water's 0.8 darkening a little, the membrane at half strength where it is the signal (lightning, slinkwing) or keeps a hue-only pair chromatic (rock), and dusk on a curve of its own. | EL (transform, stages, slot weights), lead (the strengths) | Keeping luminance keeps every value-based gate (the stack, the ladder, the floor) valid by construction; only hue, chroma and the colour-blind gates can move, and those now run at all 16 stage pairs (5.8). EL's strengths (fire 0.4, rock 0.55, water −0.3 drift, dusk s 2.0) were measured only within a stage: across stages they merged the greyed rock with the sea-green water under protanopia and the elder water with fire under deuteranopia, and dusk's k 0.9 left a neutral grey body (S 0.06). |
-| D23 | **Elder wing wear is tears always, holes only at full spread.** Every elder membrane wing carries torn V notches in its trailing edge, showing from `wing` 0.55 (the preen, the wake stretch, flight); fire, slinkwing, spike, water and dusk add one see-through hole per near wing in the arm panel, only at full spread (flight and the glide), cut through the far wing too so the window shows the background; lightning's bolts are chipped instead; rock's stubby wings get only a tear (2.9). | EL | Measured clear membrane: no folded or resting-spread panel has room for a 4 × 4 cut with 2 px of membrane round it (outer panels ≤ 4.5 px, the arm panel 8 px only at full spread), and a shrunk hole is a speck under the mark floor. NA's three spread holes and a folded hole were turned down for the same measurement. |
-| D24 | **The seventh element is dusk, "Wisp", the lamplighter.** Zone: the air **ahead of the face**, unused by the other six at rest. Cue: a **crook lamp**, a thin scale stalk from the brow arching forward to a round coral lantern with a small silver cap, hung plumb ahead of the snout: at ÷ 3 a "?" ahead of the head. Its mood gauge is the lamp's **moon phase** (full, waning crescent, new-moon nightlight) and how far the stalk droops. It greys fastest in the cast (navy to storm slate), grey creeping in from its tail tip and nose; the lamp never ages. Element id **`dusk`** (unchanged), nickname **Wisp** (the user is asked to confirm it; runner-up "Vesper"). | NB (concept, zone, build, palette, coral lamp, moon-phase gauge, grey tail tip and nose frost, the lamp-bat fidget, the "blows out its own nightlight" fizzle, the nightlight sleep), NA (the lantern's silver cap, the Nightfall mist breath, the `hush` event, "a nap refills its lamp", the elder's second moth) | Both artists found the same free zone independently, after testing others (cloak wings, stilt legs, a swan neck alone, a bushy tail, a crescent crest, a trailing wisp: 5.7). NB reads "dark blue → grey" both ways, over its life and along its body. Grafted from NA: without a cap the lure reads as a deep-sea anglerfish; the mist is the only breath in the cast that goes **down** and lies on the floor (NB's coral "wisps" leaving the mouth read as fire's jet at game scale). Lost: NA's blue lamp (it read as a bubble or a bauble, and blue-on-blue sits by lightning), NA's crescent-moon flank markings (")" and "C" read as slinkwing's arcs or as text; the moon lives in the lamp), NB's Wisp Lights breath. "Wisp" over "Vesper": the cast's nicknames are everyday words (Ember, Bramble, Cobble, Zap, Ripple, Echo). |
-| D25 | **Dusk's body keeps one value and loses chroma.** Base scale `#3d4d91` (L 0.083, S 0.58) in the one free slot of the value stack between lightning (0.12) and slinkwing (0.05); it greys on its own curve (k 0 / 0.30 / 0.55 / 0.76) to `#4d5065` (S 0.24) at the same luminance, so it never collides in value with its neighbours. Afterglow belly, moth-grey wings from hatching, silver horn and marking, a coral lamp `#ffa98c` and a periwinkle iris, none of which age. | NB, lead (the curve) | No yellow or gold anywhere: gold on blue is lightning's storm pairing. The coral lamp sits 8 % / 20° from fire's glow, reported by (g): they differ by shape and zone (a flame over the tail tip, a round lamp ahead of the face). The elder keeps S ≥ 0.20 (gate j), so it stays chromatic and the neutral ceiling holds. |
-| D26 | **Spike is spikier: fewer, taller back quills and more tail quills.** Adult back 4 quills 10 / 14 / 15 / 10 on base 8 (was 5: 7 / 10 / 12 / 11 / 7), tail 5 quills 9 → 5 (was 3), young 3 + 2 tail, baby nubs 10 / 9 + 8; the elder one taller with one chipped quill. No quill may overhang the next notch at the 28° rest lean: height ≤ pitch / 0.47 (3.3). | SW (+ EL's elder sap-buds) | At the rest lean a tip sits 0.47 h behind its base; past the pitch the ÷ 3 saw fills in (the "flat box" of cast reviews 1 and 2). A taller 5-quill back kept 0.9 deep notches a frame at mood −1, 4 quills 2.6. Rejected (5.7): hock, elbow and shoulder spurs, nape quills, a double row, a baby thorn bud, EL's extra tail quill at 0.8 of the tail (the last 12 px stay a plain taper: D5, water's zone). |
-| D27 | **Water is sea green: "light sea green" `#28b0a6`** (H 176), with a deep sea-green membrane `#185e5b`, nostril `#0c2a2a` and a paler blush `#ffbccb`; belly, horn, spots, glow and iris kept. | SW | A search over the gates found no vivid water at hue ≤ 170: a true sea green (`#2aa88a`) greys to fire's value under deuteranopia (2 %), darker it separates from fire on hue alone, lighter it fails rock under protanopia. Jade `#68a794` passes but would be the dullest body in the cast and greys to the chromatic floor as an elder; it stays the alternative if the user wants greener and softer (3.6). |
-| D28 | **Rock's sandstone is a touch warmer, `#d4b67c` → `#d8b474`** (0.010 Oklab ΔE; the hand-set shadows unchanged). | lead | Under protanopia the sea-green water simulates to a grey, so greyed rock separates from it only by B3 (≥ 0.30 more simulated saturation). At the old base rock could grey only to k 0.05 and still hold it; the warmer base greys at weight 0.3 (S 0.46 → 0.40) and holds it at every stage pair. |
-| D29 | **Fire / spike may pass on hue alone in normal vision from the young stage** (ledger E10); every other same-stage body pair still separates in greyscale. | lead | Once both grey, protanopia and normal vision pull the pair opposite ways: fire must darken (or its protan-simulated luminance climbs onto spike's) and spike must lighten (or greying sinks its protan luminance onto fire's), which brings their true luminances together. No strengths keep both ≥ 25 % while spike greys visibly (3.9 shows the arithmetic). The colour-blind gate is what players need, so it is kept; the greyscale report gives way: 26 / 24 / 22 / 14 % (b / y / a / e), both scales S ≥ 0.34 and 104 to 112° apart. |
-| D30 | **The palette check runs every gate at every stage**, body pairs at all 16 stage combinations in normal vision and both dichromacies, plus a new gate (j): every stage's scale keeps S ≥ 0.30 (dusk ≥ 0.20). | EL + lead | An elder shares the habitat with babies; a pair that separates only at matched stages is not separated. |
+| D21 | **The elder is a fourth stage that is not bigger than the adult, and the final, permanent one.** Nothing comes after it and nothing in it reads as decline: it is the game's last reward, a dignified old dragon, never a sick or a dying one. It reads as older through five things only: its **posture** (the head carried a little lower and forward with the nose level, the chest settled level over a small paunch, a wider stance), its **colour** (greyer: 3.9), its **face** (a grey muzzle, a level grey brow tuft at every face and a small beard: 2.5), **worn wings** (2.9, the only wear anywhere: the user asked for it) and **slower, steadier motion** (unhurried, never stiff: 4.1). It is at most 1.10× the adult's length and 1.02× its height, so it takes an adult's place in the screen budget. Elders still fly, a glide-heavy flight (4.2). | EL, v2 review | Size cannot carry the step (the adult is already the largest look), so 5.1 #3 gets four new elder checks instead (posture, colour, face, size cap). **Rejected, because they read as sick, sad or declining in a care game:** a tremor, a limp, a cough or wheeze, a permanent heavy upper lid (that is `sleepy`, a care signal; rock's permanent hood already read as sleepy), bald patches, a cane, a missing tooth, a clouded iris or a dimmed catchlight; and (the v2 review) the head dropped and pitched down, drooping tails, a brow lower at the back (the `sad` tilt), a pointed beard (a tusk or a drip), key holds in the motion (stiffness), a landing stumble, and chips and nicks in any cue. |
+| D22 | **Greying with age is derived, never stored, keeps luminance, and is visible where it shows.** Each stage's palette is the element's base pulled toward its own grey of equal luminance in linear light: k = G[stage] × weight[slot], with G = 0 / 0 / 0.18 / 0.45 (baby / young / adult / elder: a teenager is not grey); skin (scale, belly, membrane) weight 1, pigment (marking) 0.5, and keratin, nostril, glow and iris never grey. On top, the scale's **highlight tone silvers** (`AGE_SILVER` 0 / 0 / 0.3 / 0.6, luminance kept): the silver back and crown, where identity is not carried. Measured exceptions per element (3.9): fire's and spike's bodies grey only as elders (fire 0.3 darkening toward brick, spike 0.9 lightening toward lichen) with their bellies and wings at 0.6, rock's sand 0.25 with its dome and belly greying instead, lightning's body at 0.5, water's 0.8 with its fins at 0.6, the membrane at half strength where it is the signal (lightning, slinkwing) or keeps a hue-only pair chromatic (rock), and dusk on a curve of its own. Gate (k) holds every step to ≥ 0.03 Oklab ΔE. | EL (transform, stages, slot weights), lead (the strengths), v2 review (silver, visibility) | Keeping luminance keeps every value-based gate (the stack, the ladder, the floor) valid by construction; only hue, chroma and the colour-blind gates can move, and those run at all 16 stage pairs (5.8). EL's strengths (fire 0.4, rock 0.55, water −0.3 drift, dusk s 2.0) were measured only within a stage: across stages they merged the greyed rock with the sea-green water under protanopia and the elder water with fire under deuteranopia, and dusk's k 0.9 left a neutral grey body (S 0.06). The first v2 draft's young and adult steps moved every body by ≤ 0.015 ΔE, under what a player can see (the v2 review), and pulling mid-tone bellies to grey went khaki and olive-drab; the grey now lives in the light band, the face and the belly. |
+| D23 | **Elder wing wear is tears always, holes at full spread, and the elder airs its wings at home so the holes are seen.** Every elder membrane wing carries ragged tears in its trailing edge (a ≥ 5 px mouth, one stepped side, deeper than its scallops), showing from `wing` 0.55 (the preen, the wake stretch, flight); fire, slinkwing, spike, water and dusk add one see-through hole per near wing in the arm panel at full spread, a whole-pixel 3 × 3 window with one corner notched, cut through the far wing too so it shows the background; lightning's bolts get a tear each; rock's stubby wings a tear (2.9). Full spread comes in flight, the glide and the elder-only **airing** idle variant (4.2). | EL, v2 review | Measured clear membrane: no folded or resting-spread panel has room for a window with 2 px of membrane round it (outer panels ≤ 4.5 px, the arm panel 8 px only at full spread), and a shrunk hole is a speck under the mark floor. The first draft's round 2 × 2 window read as a rivet, its 3 px tears as one more scallop, and with no fly animation built the holes were never seen at all (both v2 critiques). NA's three spread holes and a folded hole were turned down for the measurement. |
+| D24 | **The seventh element is dusk, "Wick", the lamplighter.** Zone: the air **ahead of the face**, unused by the other six at rest. Cue: a **crook lamp**, a thin scale stalk from the brow arching forward to a small coral **lantern** (taller than wide, a silver cap and base finial) hung by a bail, plumb ahead of the snout: at ÷ 3 a hook ahead of the face with a lantern hanging from it. Its mood gauge is the lamp's **moon phase** (full, waning crescent, new-moon nightlight) and how far the stalk droops. Its blue drains slowly, deep Prussian blue kept through the young and adult, storm slate as an elder, grey creeping in from its tail tip and nose; the lamp never ages. A soft, sleepy build: deep and round, low on short legs, a long full tail. Element id **`dusk`**, nickname **Wick** (the user is asked to confirm both; runners-up "Glim" and "Vesper"). | NB (concept, zone, palette family, coral lamp, moon-phase gauge, grey tail tip and nose frost, the lamp-bat fidget, the "blows out its own nightlight" fizzle, the nightlight sleep), NA (the lantern's silver cap, the Nightfall mist breath, the `hush` event, "a nap refills its lamp", the elder's moth), v2 review (the lantern silhouette, the build, the hue, the name, the lamp lexicon) | Both artists found the same free zone independently, after testing others (cloak wings, stilt legs, a swan neck alone, a bushy tail, a crescent crest, a trailing wisp: 5.7). NB reads "dark blue → grey" both ways, over its life and along its body. Grafted from NA: the mist is the only breath in the cast that goes **down** and lies on the floor (NB's coral "wisps" leaving the mouth read as fire's jet at game scale). The v2 review: a round glowing ball on a flesh stalk ahead of the mouth is the anglerfish's lure, and a 5 × 2 cap does not register at 1×, so the lamp is a lantern **shape**, a made thing, hung by a bail; NB's build was slinkwing's in six of eight modifier columns, so dusk is now soft and low; its first hue sat 0.056 Oklab ΔE from the greyed lightning. Lost: NA's blue lamp (a bubble or a bauble, and blue-on-blue sits by lightning), NA's crescent-moon flank markings (")" and "C" read as slinkwing's arcs or as text; the moon lives in the lamp), NB's Wisp Lights breath. "Wick" over "Wisp": "wispy" is thin and frail, worst on an elder, and a will-o'-the-wisp is a lure that leads travellers astray; the cast's nicknames name the cue in an everyday word (Ember, Bramble, Cobble, Zap, Ripple, Echo), and this cue is a lamp. |
+| D25 | **Dusk's body keeps one value and loses chroma, slowly and then as an elder.** Base scale `#1f5580`, a deep Prussian blue (L 0.083, HSV 207° / S 0.76), in the one free slot of the value stack between lightning (0.12) and slinkwing (0.05), its hue turned 17° (HSV) toward petrol from lightning's cobalt; it greys on its own curve (k 0 / 0.12 / 0.30 / 0.65: S 0.76 / 0.67 / 0.55 / 0.32) to the storm slate `#455365` at the same luminance, so it never collides in value with its neighbours and keeps S ≥ 0.30 like every other body. Afterglow belly, moth-grey wings from hatching, silver horn, a smoke-grey marking `#b0b7ca` (tail tip and nose frost), a coral lamp `#ffa98c` and a periwinkle iris, none of which age. | NB, lead (the curve), v2 review (hue, curve, smoke) | No yellow or gold anywhere: gold on blue is lightning's storm pairing. The first draft's `#3d4d91` passed lightning by luminance alone, 0.056 Oklab ΔE from the greyed lightning, and read as a navy Zap without its bolts; now ≥ 0.106 at every stage pair, with lightning's own body greying at half strength. The first curve (0 / 0.30 / 0.55 / 0.76) had spent half the blue by the adult stage, where a pet lives longest, and left a near-neutral elder (S 0.24). The first smoke `#c9cfdd` sat 8 % from the straw floor. The coral lamp sits 8 % / 20° from fire's glow, reported by (g): they differ by shape and zone (a flame over the tail tip, a lantern ahead of the face). |
+| D26 | **Spike is spikier: fewer, taller back quills and a row of tail quills.** Adult back 4 quills 10 / 14 / 15 / 10 on base 8 (was 5: 7 / 10 / 12 / 11 / 7), tail 4 quills 9 / 7 / 6 / 5 with flats between them (was 3), young 3 (peak 11) + 2 tail, baby nubs 8 / 7 + 6 (v1 6 / 6 + 5); the elder the adult's comb, unworn, plus sap-buds. No quill may overhang the next notch at the 28° rest lean: height ≤ pitch / 0.47, **after** the pet's ± 1 px length variant (3.3). | SW, v2 review (the tail row, the stage ladder, the variant clamp, the unworn elder), EL (sap-buds) | At the rest lean a tip sits 0.47 h behind its base; past the pitch the ÷ 3 saw fills in (the "flat box" of cast reviews 1 and 2). A taller 5-quill back kept 0.9 deep notches a frame at mood −1, 4 quills 2.6. SW's 5-quill tail had bases as wide as its pitch, a continuous saw of tooth-white points (teeth); its baby and young were 67 % and 87 % of the adult, where 2.6's ladder wants a seed and a 55 to 65 % sprout; a +1 variant pushed the adult's 15 px quill 0.3 px past its limit. Rejected (5.7): hock, elbow and shoulder spurs, nape quills, a double row, a baby thorn bud, EL's extra tail quill at 0.8 of the tail (the last 12 px stay a plain taper: D5, water's zone). |
+| D27 | **Water is sea green: "light sea green" `#28b0a6`** (H 176), with a deep sea-green membrane `#185e5b`, nostril `#0c2a2a` and a paler blush `#ffbccb`; belly, horn, spots, glow and iris kept. **The user sees it beside a true sea green and jade before it is final** (`shots/v2/water_sea_green_options.png`, 3.6). | SW, v2 review | A search over the gates found no vivid water at hue ≤ 170: a true sea green (`#2aa88a`) greys to fire's value under deuteranopia (2 %), darker it separates from fire on hue alone, lighter it fails rock under protanopia. Jade `#68a794` passes but would be the dullest body in the cast. `#28b0a6` is CSS "lightseagreen" (0.007 Oklab ΔE), which many players call teal, so the choice is the user's. The membrane stays a deep sea green: bluer (`#16566e`) it lands 0.019 ΔE from dusk's new body, greener it lands on spike's leaf (3.6). |
+| D28 | **Rock's sandstone is a touch warmer, `#d4b67c` → `#d8b474`** (0.010 Oklab ΔE; the hand-set shadows unchanged). | lead | Under protanopia the sea-green water simulates to a grey, so greyed rock separates from it only by B3 (≥ 0.30 more simulated saturation). At the old base rock could grey only to k 0.05 and still hold it; the warmer base greys at weight 0.25 (S 0.46 → 0.41) and holds it at every stage pair, with a little room (the B3 margin 1.04). |
+| D29 | **Fire / spike may pass on hue alone in normal vision as elders** (ledger E10); every other same-stage body pair still separates in greyscale. | lead, v2 review | Once both grey, protanopia and normal vision pull the pair opposite ways: fire must darken (or its protan-simulated luminance climbs onto spike's) and spike must lighten (or greying sinks its protan luminance onto fire's), which brings their true luminances together. No strengths keep both ≥ 25 % while spike greys visibly (3.9 shows the arithmetic). The colour-blind gate is what players need, so it is kept; the greyscale step gives way, at the elder stage only: their bodies keep their base colours through the adult stage (their adult grey is the silver back, the belly and the wings), so the pair holds 26 % at baby, young and adult and 14 % as elders, both scales S ≥ 0.34 and 111° apart. |
+| D30 | **The palette check runs every gate at every stage**, body pairs at all 16 stage combinations in normal vision and both dichromacies, plus the v2 gates: (b)'s dark-pair floor on value-only pairs, (j) every stage's scale keeps S ≥ 0.30, (k) every greying step moves the scale or its highlight band ≥ 0.03 Oklab ΔE, and the elder face and floor-contact colours in (a) and (i). | EL + lead + v2 review | An elder shares the habitat with babies; a pair that separates only at matched stages is not separated. A luminance ratio is lenient in the darks, and a greying nobody can see is not greying. |
 
 **Hard rules (the readability constraints, never traded):**
 
@@ -104,7 +104,7 @@ The v2 design round (the Review log has the full verdicts). **EL** = the elder-s
 - far parts show ≥ 3 px or are hidden;
 - every scale, belly and floor-level effect ≥ 25 % from the habitat floor;
 - (v2) every older stage's colours derived from the base palette by the luminance-keeping greying of 3.9, never hand-set, and every palette gate passing at every stage;
-- (v2) old age never drawn as sickness (D21).
+- (v2) old age never drawn as sickness, sadness or decline: the elder is the final, permanent stage, its wear is on the wings only, and its posture, face and motion stay out of the cast's low-mood language (D21).
 
 Section 5 lists each rule with the failure it prevents.
 
@@ -144,12 +144,12 @@ Section 5 lists each rule with the failure it prevents.
 - **Planted paws.** Legs are solved by 2-bone IK toward each paw's rest spot (the rest pose's FK, fixed at build), so the body can bob, dip, pitch and crouch while the paws stay on y = 0. The pose's leg `upper` / `lower` then only slide a planted paw along the ground (a stance stroke). Each leg has a `plant` weight (default 1); 0 hands it back to plain FK, for swing and airborne frames only. A plant spot is a **ground** spot: `root.rot` turns the whole sprite about the ground point, so planted targets are counter-rotated into root space (and the paw box levelled), and a waddle or a rock keyed as root rotation keeps its soles on the floor. `root.x` / `root.y` move the whole sprite, paws included: bob and pitch with `body`, and key `root.y` only on airborne frames (with `plant` 0). The middle joint keeps the side its rest angles put it on (hind knee forward, front elbow back), so the digitigrade Z survives any pose, and a target up to 1 px out of reach stretches the bones rather than lifting a paw. A gait moves the planted target itself: `slide` (px along the ground) and `lift` (px off it) per leg. The stance stroke is a linear slide at exactly the walk speed, so a paw on the floor never skates, and the swing is the same IK leg with its target lifted, so a leg never pops between FK and IK (a stroke keyed through `upper` / `lower` is a sine of the angle and cannot hold a constant speed).
 - **The floor.** Nothing a dragon draws goes under y = 0 but the outer half of its ink (5.1 #14). `computeDragonJoints` guards it in root space against the real floor line, which `root.y` lifts and `root.rot` tilts (a circle's clearance on a tilted floor is r / cos): a settled body rests **on** it (the hip and chest balls, the baby's belly sag at its pitched extent), a thigh ball through it lifts the body and the legs are solved again, a sole's lowest corner (a tilted toe, a heel under a root rotation) stays on it, a knee or elbow pushed through it lies on it on its own side with the lower bone folded flat (the sphinx forearm), the head lifts out of it (cranium, snout, jaw at its opening), and a tail node that would sink lies on it further along the way the tail was going (a tail-tip feature that hangs below the tip lifts the tail's end: `ElementStageParams.tipBox`). Snapping never rounds a floor-resting joint down. Tumbling past 60° or flipped (`stretch` < 0: rock's roll) the guards stand aside and the anim places the sprite. `view=floor` plays every look through every core anim and variant (and the element anims `bath`, `upset`, `call`) and reports the deepest row reached; the smoke run fails on anything past row 1.
 - **Files** (all under `src/art/dragon/`):
-  - `palettes.ts`: the 7 × 8 base palette (`DRAGON_PALETTES`: the hatchling's colours), shared colours, `blushOf`, `moodTones`, `DRAGON_FAR`, and (v2) the greying with age of 3.9: its data (`AGE_STAGES`, `AGE_GREY`, `AGE_WEIGHT`, `AGE_RULES`, `AGE_K_MAX`) and functions (`ageK`, `ageDrift`, `ageShade`, `agePalette(p, element, stage)`, the cached `agedPalette(element, stage)`, the stage-aware `dragonTones(element, slot, ramp, stage)`, and the elder's `muzzleOf` and `fanFrostOf`). It keys the greying by its own four stage names; the rig's `Stage` gains the elder in the implementation phase.
+  - `palettes.ts`: the 7 × 8 base palette (`DRAGON_PALETTES`: the hatchling's colours), shared colours, `blushOf`, `moodTones`, dusk's `smokeBandOf`, `DRAGON_FAR`, and (v2) the greying with age of 3.9: its data (`AGE_STAGES`, `AGE_GREY`, `AGE_SILVER`, `AGE_WEIGHT`, `AGE_RULES`, `AGE_K_MAX`) and functions (`ageK`, `ageDrift`, `ageShade`, `atLum`, `agePalette(p, element, stage)`, the cached `agedPalette(element, stage)`, the stage-aware `dragonTones(element, slot, ramp, stage)` with its silvered highlight, and the elder face greys `muzzleOf`, `beardOf` (their luminances `MUZZLE_LUM`, `BEARD_LUM`) and `fanFrostOf`). It keys the greying by its own four stage names; the rig's `Stage` gains the elder in the implementation phase.
   - `pose.ts`: `DragonPose` (the 4.1 channels, the leg `plant` / `lift` / `slide`, `tail.stiff`, the stepped `sleep` and `tuck` of the tuck branch, the stepped `act` / `cue` the element renderers key their flourishes on (`ACT.fidget` and `ACT.variant` included, and one id per element anim past the shared table: `ACT.bath` fire, `ACT.upset` rock, `ACT.call` slinkwing), the stepped `eyeClip` (1; 0 lets an anim's near head features over the eye: E8 only), the stepped `pupil` (1: contracted, lightning's wind-up) and the runtime `blink`), `DFACE`, `ACT`, make / copy / lerp / add / blend and the `DP()` shorthand.
   - `anim.ts`: `DragonAnimPlayer`, the engine `AnimPlayer`'s semantics over `DragonPose`, with runtime blinks and desync, a loop with an intro (`loopFrom`: the sleep's lie-down), per-frame root motion (`move`: the walk), a cross-fade on `play` (`blend`) and the idle-variant schedule (`setVariants`: a seeded cut to a variant every 6 to 10 s, and back).
   - `anims.ts`: the track authoring (`bake`, `lag`, `neckFit`) and the core set of 4.2 per stage, with the idle variants (`VARIANT_NAMES`, `idleVariants(stage)`); its builders are exported, so an element override is authored the same way.
   - `tuning.ts`: the generic knobs of the shared set that 4.3 changes per element (walk cycle, speed, lift, head, sway and S-wave; the sleep's breath, "z" interval, tuck, body pitch, tail, chin height and where the forepaws rest (`frontTuck`); the breath's jaw, fizzle face, baby puff and fan flop and lightning's pupil flag; the baby bite's tail droop; the beg's mood and tilt).
-  - `stages.ts`: the 2.1 / 2.2 tables, the 2.3 modifiers, the tail rest shapes, the 4.1 chain parameters and timing rules (v2: baby, young and adult built; the elder column of 2.1 / 4.1 goes in with the implementation phase, with a `chestLift` parameter and an elder `STAGE_TIMING` row with a key hold).
+  - `stages.ts`: the 2.1 / 2.2 tables, the 2.3 modifiers, the tail rest shapes, the 4.1 chain parameters and timing rules (v2: baby, young and adult built; the elder column of 2.1 / 4.1 goes in with the implementation phase, with a `chestLift` parameter and an elder `STAGE_TIMING` row: × 1.25 tempo, softer easing, no key holds).
   - `build.ts`: `dragonBuild({ element, stage, seed })` resolves a complete build (modifiers, the seeded variant of 2.8, the solved body height); `buildDragonFor(element, stage)`.
   - `rig.ts`: `buildDragon`, `computeDragonJoints` (with the leg IK), `stepDragon` and `drawDragon` in the draw order of 1.4; the one-time marking fit of body and tail markings (2.7); the face-space helpers element renderers use (`enterFace`, `enterFaceFromCranium` / `cranToRootPt` from the head, `enterFaceFromLocal` / `localToRootPt` from any anchor space).
   - `parts.ts`: body, neck, skull, jaw, legs and paws, the n-node tube, bat / leaf / fin wings, nubs, the ground shadow.
@@ -157,7 +157,7 @@ Section 5 lists each rule with the failure it prevents.
   - `features.ts`: the shared, parameterised features: paired horns (with the far-horn fork and overlap cull), markings, the dorsal row, emitter helpers, and `pixelStroke` for 2 px whole-pixel ribs and rays (fan ribs, fin-ear and fluke rays).
   - `fx.ts`: deterministic particle schedules, the top pass (1.4 step 14) and the ambient caps (5.4), the "z" and dazed-star glyphs and the eat crumbs (the rig schedules those shared act effects).
   - `element.ts`: **the seam**, `ElementSpec`: the renderers at their anchors, the per-stage params (with `tipBox` for a tail-tip feature the floor guard must lift, and `tailLen`, `tailR` and `tailStiff` for a look's own tail), and `anims` (`tuning`, `overrides(stage, dims)`, `fidget(stage, dims)`). Everything an element artist needs is reachable from it. `elements/<id>.ts`: one file per element; `elements/index.ts`: the registry. `DragonInfo` carries the owner's per-pet inputs (`bond`, `wary`, `charge`); `ElementSpec.markingTone(info, pose, rig)` colours the shared markings per frame (water's spots) and `ElementSpec.tint` asks for the offscreen tint, or at 1 the opaque flash inside the ink (lightning's bolt flash).
-  - Shared features are **part kinds with parameters** (horns, markings, wing style, tail rest shape, dorsal row), drawn by one renderer for all 28 looks. What only one element has (a flame, a quill comb, a dome, bolt wings, a fluke, ear-fans) is a renderer at a **fixed anchor** of the draw order, declared in that element's `ElementSpec`; each element artist owns exactly one `elements/<id>.ts`. (v2: `elements/dusk.ts` is a **first-pass placeholder**: its palette, build and shared features only, until the element pass draws 3.8.)
+  - Shared features are **part kinds with parameters** (horns, markings, wing style, tail rest shape, dorsal row), drawn by one renderer for all 28 looks. What only one element has (a flame, a quill comb, a dome, bolt wings, a fluke, ear-fans) is a renderer at a **fixed anchor** of the draw order, declared in that element's `ElementSpec`; each element artist owns exactly one `elements/<id>.ts`. (v2: `elements/dusk.ts` is a **first-pass placeholder**: its palette, build (the soft, low build of 2.3) and shared features only, until the element pass draws 3.8.)
   - The gallery is `src/gallery.ts`, laid out for every element in the registry (seven columns; the cast sheet 4 × 2) (views: lineup, silhouette (`set=all` stacks idle, lowest mood, asleep and a walk key; `set=idle|low|asleep|walk` one block), stages, grey, cvd, strip (`from` / `span` pick the frames; a walk strip is one cycle over scrolling ground ticks; any variant or `fidget` plays by name), habitat (`anim=mix` plays every act at once; walkers roam), floor (the floor audit: `els`, `stages`, `anims` narrow it; a failing run shows its worst frame), roots (the leg-root audit: every look's walk, idle and rest drawn without its far legs, each far leg's sunk root measured against what is drawn over it; the smoke run fails a root under 0.25 px deep), plus zoom (16 rows under the ground, the ground row marked), cast, mood and faces for close review). An eating pet gets a bowl, drawn after it, its rim ≥ 2 px under the eye. The query also takes `facing=-1` (zoom and strip mirrored), `bond`, `charge`, and the static-pose `pupil`; any anim plays by name, the element anims (`bath`, `upset`, `call`) included, and the floor audit covers them. The habitat steps its pets in lockstep and runs the wary latch (5.4) between them; its cast holds two overlapping pairs in place (5.4).
 
 ### 1.2 Parts and the primitive each one uses
@@ -168,14 +168,14 @@ Every part is **one outlined path**, stroked once and filled once (the `drawLimb
 | **Body** | `pathTaperedCapsule` + `celPath` | A hip ball joined to a chest ball in one path. The chest ball sits 1 px higher than the hip ball (a proud chest). Babies add a belly-sag ellipse to the same path. `ext` = half the body length. **Belly band:** the lower 38 % of the depth (babies 45 %), clipped inside, in `belly`, its line on a whole pixel (a crisp step, not a row of anti-aliased in-between tone). At the chest front it rises into a **bib** whose top runs along the throat stripe's inner edge at the neck root, so the stripe runs on into it: a bib that stopped at a fixed height left a 2 to 4 px wedge of the chest's scale shadow between them. It carries one shadow band that switches to `belly.sh` inside the belly, and the belly line is **not inked** (D13). **Elder** (v2): the chest ball sits level with the hip ball (`chestLift` 0: the proud chest has settled), the band is 42 %, and the baby's belly-sag ellipse returns as a small paunch (rx 12, ry 3.5, 2 px under the belly line; asleep it flattens to ry 1.5). |
 | **Neck** | subpaths of `pathTaperedCapsule`, appended | 1 to 2 segments, one stroke and one fill. The root is sunk into the chest top-front, and **neck and body are one silhouette**: the whole neck is clipped to outside the body (the hip–chest capsule shrunk 1 px), so its fill covers the body's ink where the two overlap and its own ink stops at the body contour. No collar arc is stroked across the chest. A throat stripe in `belly`, clipped to the lower 45 %, runs on continuously from the belly's bib. The neck's shadow band covers 0.2 of its diameter, not a limb's 0.6. Its shadow side *is* its underside, so the band lies over the stripe: at 0.4 / 0.26 about 1 px of `belly` showed between them, at 0.45 / 0.2 it is 2 px or more, with the band turning `belly.sh` along its edge. **Bulges live in this contour:** the eat gulp is an extra node appended to the same path, so it changes the silhouette instead of hiding inside the stripe. Slinkwing's throat sac is its own (3.7): a sac centred on the neck's last node, under the jaw, lay under the head drawn after the neck and never showed. |
 | **Skull** | one `celPath` union | Made of a cranium circle, a snout taper, a brow-ridge bump (young and adult) and optional bumps (rock's nose horn root, slinkwing's nose-leaf). This is the `drawSkull` approach: bumps in the contour, not new outlined objects. `ext` = half the head length. The shadow band covers **0.22** of the head on young and adult (babies 0.34): the band runs perpendicular to the light across a *long* head, and at 0.34 it crossed the snout at its root, so the whole muzzle sat in shadow. At 0.22 the snout's top stays base and the shadow takes its front-bottom and the chin. |
-| **Jaw** | `celTaper`, drawn **under** the skull | Hinged. Open, the upper half is `scale` and the lower half `belly`, so the chin continues the throat stripe. **Closed**, the belly half is tucked and the ~1 px sliver that shows below the snout is the scale's shadow tone, the head's underside: in `belly` it read as a lip line, and on slinkwing's near-white belly as bared teeth at neutral. **An open jaw is either 0° or at least the stage minimum**: baby 20°, young 20°, adult 16°, and an open jaw first **drops** its hinge (baby 4 px, young and adult 3) before it turns. The baby's jaw is short (hinge to tip 6.5 px): at 8 px with a 5 px drop its open tip lay on the bib as a diagonal belly-coloured sash, a white stick on rock and slinkwing; its tip now stays within about 2 px under the snout. Closed, the jaw's top edge lies about 2 px inside the skull, so a jaw that only turned about its hinge showed no mouth at all at its old minima (`atan(2.5 / length)`: 20 / 14 / 10°): measured, 0 px of mouth on the baby. Open, the wedge between the snout's underside and the jaw's top is filled with mouth `#5a2030`, with a 2 × 2 tongue `#f07890` on the jaw (in face space: under the jaw it was hidden) and fangs `#f8f4ec` hanging into the opening, never over the chin. **Elder beard** (v2): a small pointed goatee, part of the jaw's single path so the jaw's one outline inks it: its root runs 4 px along the chin's underside (jaw x from tip − 5 to tip − 1), its round 2 px tip 3.2 px below the jaw's bottom and 1.5 px back, filled in the muzzle grey (`muzzleOf`), clipped below the jaw's underside; it moves with the jaw (open, it grows out of the chin stripe). The floor guard lifts the head by the beard's tip circle too (1.1): a sleeping elder rests its chin on its beard. |
+| **Jaw** | `celTaper`, drawn **under** the skull | Hinged. Open, the upper half is `scale` and the lower half `belly`, so the chin continues the throat stripe. **Closed**, the belly half is tucked and the ~1 px sliver that shows below the snout is the scale's shadow tone, the head's underside: in `belly` it read as a lip line, and on slinkwing's near-white belly as bared teeth at neutral. **An open jaw is either 0° or at least the stage minimum**: baby 20°, young 20°, adult 16°, and an open jaw first **drops** its hinge (baby 4 px, young and adult 3) before it turns. The baby's jaw is short (hinge to tip 6.5 px): at 8 px with a 5 px drop its open tip lay on the bib as a diagonal belly-coloured sash, a white stick on rock and slinkwing; its tip now stays within about 2 px under the snout. Closed, the jaw's top edge lies about 2 px inside the skull, so a jaw that only turned about its hinge showed no mouth at all at its old minima (`atan(2.5 / length)`: 20 / 14 / 10°): measured, 0 px of mouth on the baby. Open, the wedge between the snout's underside and the jaw's top is filled with mouth `#5a2030`, with a 2 × 2 tongue `#f07890` on the jaw (in face space: under the jaw it was hidden) and fangs `#f8f4ec` hanging into the opening, never over the chin. **Elder beard** (v2, after the v2 review): a small **rounded tuft set back under the chin**, its own object with its own 1 px ink (hair, like a quill: drawn right after the jaw, in jaw space, so it moves with the jaw), never part of the chin's colour ladder. Its root runs along the jaw's underside from jaw x tip − 8 to tip − 3 (so it never lengthens the chin's point); it is 5 px wide and 3 px deep below the jaw, its bottom round, and its lowest point swept ≥ 3 px back toward the throat (a teardrop pointing back along the throat, never down: EL's pointed goatee under the jaw tip read as a single tusk or a drip, and open it grew out of the chin stripe into one long pointed chin). Filled in `beardOf` (2.5: the muzzle grey, or on rock a mid stone grey), which gate (a) keeps ≥ 25 % from the belly, the belly's shadow tone and the closed jaw's shadow sliver, and gate (i) from the floor. The floor guard lifts the head by the beard's lowest point too (1.1): a sleeping elder rests its chin on its beard. |
 | **Eye** | flat rects in a 1 px ink ellipse | Only the near eye is drawn, since the far eye is hidden in profile. It has a coloured iris and **no whites**. See 2.5. |
-| **Brow** | 2 px bar, in `scale.deep`, face space | Sits 1 px clear of the eye's **visible** top (the happy arc, a lid's edge, else the ring), so it follows a lidded eye down instead of floating over it. The **whole bar** must lie inside the skull: a bar that ran off the cranium read as a hat brim, and one clipped to its inside columns left a 2 px nick on the contour. Where an expression's lift does not fit, the bar is lowered a pixel at a time, each end stopping at 1 px clear (so a lift gives way to a tilt, then to a flat bar), never dropped. The grow faces (hungry, surprised, scared: the ring 1 px bigger each way) have no room above their ring on any head, so their bar is measured from the **un-grown** ring: its low end may sit on the grown ring's top. Only if no drop fits is the longest inside run drawn, and never one under 3 columns. Upside down (rock's roll) no brow is drawn: under the screen-upright "^" it read as a mouth. The engine rule: a 3 px brow reads as a lid. **Elder brow tuft** (v2): the same bar used as pigment, 7 px long and 2 thick from 1 px behind the ring, its back 2 columns 1 px lower (a bushy, drooping brow), drawn in the muzzle grey at **every** face, neutral included; expressions move it exactly as they move the bar, every rule above still applies, and any tuft pixel that would land in the skull's highlight cap is dropped (the muzzle grey is only 6 to 19 % from fire's, spike's, rock's and water's head highlight). |
+| **Brow** | 2 px bar, in `scale.deep`, face space | Sits 1 px clear of the eye's **visible** top (the happy arc, a lid's edge, else the ring), so it follows a lidded eye down instead of floating over it. The **whole bar** must lie inside the skull: a bar that ran off the cranium read as a hat brim, and one clipped to its inside columns left a 2 px nick on the contour. Where an expression's lift does not fit, the bar is lowered a pixel at a time, each end stopping at 1 px clear (so a lift gives way to a tilt, then to a flat bar), never dropped. The grow faces (hungry, surprised, scared: the ring 1 px bigger each way) have no room above their ring on any head, so their bar is measured from the **un-grown** ring: its low end may sit on the grown ring's top. Only if no drop fits is the longest inside run drawn, and never one under 3 columns. Upside down (rock's roll) no brow is drawn: under the screen-upright "^" it read as a mouth. The engine rule: a 3 px brow reads as a lid. **Elder brow tuft** (v2): the same bar used as pigment, 7 px long and 2 thick from 1 px behind the ring, its top edge **level** (a brow lower at the back is the `sad` tilt, front end up, and put a worried brow on every neutral elder: the v2 review), drawn in the muzzle grey at **every** face, neutral included: age reads from its length and its colour, never its tilt. Expressions move it exactly as they move the bar (happy up 1, hungry and sad front end up, grumpy front end down 1), every rule above still applies, and any tuft pixel in the skull's highlight cap or 4-adjacent to it is dropped (a silvered cap and a pale tuft need not clear each other). |
 | **Nostril** | 2 × 2 rect in `dark` | Near the snout tip, top side, at least 4 px ahead of the eye's ring along the snout (so ≥ 2 px of skin between them whatever the head's pitch): at 1 px the nostril read as a smudge on the eye, and in line with a `closed` eye's bar the two read as one dash. |
 | **Legs × 4** | `drawLeg`: `drawLimbSegs`' construction with the paw appended | **One silhouette per leg, paw included:** the tube (root sunk 0.35 r → knee → ankle) and the paw box are one path, stroked once and filled once, so no ink crosses the ankle. The limb's one shadow band is clipped inside; the paw stays flat. Radii run root → knee → ankle from `r1` to `r2` (`legRadii`: r1 = r2 is the engine's `limbRadii`), so the hind shin tapers. The hind leg has its knee forward and hock back, the digitigrade "Z" (G); the front elbow sits back with the forearm reaching forward. Solved by IK (1.1). |
 | **Paws** | a rounded rect (r 2) in the leg's path | One flat tone. The paw starts at the leg's back edge (ankle − ankle radius), so the leg's round end never pokes out behind the heel, and reaches forward to the toe. Claws on **near** paws only: 2 claws in `horn`, drawn **un-inked** inside the toe with their tips on the paw's ink line, with a 2 px gap between them (D16). |
 | **Tail** | an n-node tube, as `drawLimbSegs` generalised to n nodes (`drawTube`) | One stroke, one fill and one clipped shadow band, gated by the root radius. A belly stripe runs along the underside for the first half (to the next whole segment: run on to 60 % it dragged a long band of `belly.sh` down a drooping tail's shaded underside, rock's limp flap). The tip feature is drawn in the last segment's space. |
-| **Wing** | arm capsules + membrane `celPoly`, unioned, stroked once | The membrane fills with `hi 0`: membranes are matte, and a highlight would add a boundary. Its shading gate measures its own depth (how far the finger tips stand off the leading edge): folded, that is 3 to 4 px, so the folded panel is one flat tone like any part that thin (a band across it cut it into two slivers). Arm and spars are 3 px (adult) or 2 px (young) fills in `scale` with **no ink of their own**; folded, the adult's leading edge thins to 2 px (1.3). Only the bones painted join the silhouette: a capsule winds against the membrane polygon, so an unpainted one (the folded humerus and inner fingers) cut a hole that showed its ink through the panel as scribbles. Each spar's round cap **ends at its membrane tip** (a capsule centred on the tip poked its radius past the membrane as a bare stick, and on the far wing as a brown twig); only spike's thorns poke past on purpose. Between spar tips the trailing edge is cut with concave arcs (or, a negative depth, convex lobes: spike's leaf, water's fin, dusk's moth-soft wing), the scallop depth set per element and **scaled by the `wing` channel down to a folded depth** (young ≤ 1.5 px, adult ≤ 2 px): the folded finger tips land 4 to 6 px apart, and the lobes between them are part of the folded read. **Elder** (v2): the membrane attaches further back, (−19, +2) from the root (the old membrane has stretched), and carries its wear in the same one path: the tears are notches of the membrane polygon, the hole a subpath wound against it (2.9). |
+| **Wing** | arm capsules + membrane `celPoly`, unioned, stroked once | The membrane fills with `hi 0`: membranes are matte, and a highlight would add a boundary. Its shading gate measures its own depth (how far the finger tips stand off the leading edge): folded, that is 3 to 4 px, so the folded panel is one flat tone like any part that thin (a band across it cut it into two slivers). Arm and spars are 3 px (adult) or 2 px (young) fills in `scale` with **no ink of their own**; folded, the adult's leading edge thins to 2 px (1.3). Only the bones painted join the silhouette: a capsule winds against the membrane polygon, so an unpainted one (the folded humerus and inner fingers) cut a hole that showed its ink through the panel as scribbles. Each spar's round cap **ends at its membrane tip** (a capsule centred on the tip poked its radius past the membrane as a bare stick, and on the far wing as a brown twig); only spike's thorns poke past on purpose. Between spar tips the trailing edge is cut with concave arcs (or, a negative depth, convex lobes: spike's leaf, water's fin, dusk's moth-soft wing), the scallop depth set per element and **scaled by the `wing` channel down to a folded depth** (young ≤ 1.5 px, adult ≤ 2 px): the folded finger tips land 4 to 6 px apart, and the lobes between them are part of the folded read. **Elder** (v2): the membrane attaches further back, (−19, +2) from the root (the old membrane has stretched), and carries its tears in the same one path, as notches of the membrane polygon; the hole is a whole-pixel window cut after the wing is drawn, at the rounded wing-space position, never a subpath in rotated wing space (which anti-aliased to 1 px as the wing flapped: the fluke-ray lesson of 3.6), 2.9. |
 | **Back row** (spike quills, water dorsal fin) | one path each | Drawn **before** the body, so the body contour hides the roots (the `sunk` idea). Spike's whole comb, back and tail quills, is **one path** stroked once and filled once in flat `horn`, so overlapping neighbours share one outer ink line; a `celPoly` per quill crossed each quill's ink over its neighbour's and left grey scribbles. |
 | **Rock dome** | one path | Drawn **after** the body, with its rim inked. A shell resting on the back: its top edge is the body's back line lifted by a thickness that is the dome's rise at the centre and tapers to 1.5 px at the ends, and its rim sags over the flank mid-body. Facet corners on that arc, plus a ridge vertex over the middle facet. Facets are tone steps with no line, planes radiating from a point under the dome, toned in thirds (3.4); a run of facets in one tone is one plane, since two planes meeting edge to edge left a faint anti-aliased seam. |
 | **Emitters** (flame, crystals, sparks, glow dots) | `flat()` | Outlined when they are part of the silhouette. **Never banded** (D20). An emitter that can land on the floor carries a 1 px ring in a dark slot of its own palette (5.4, gate i). |
@@ -194,8 +194,9 @@ Every part is **one outlined path**, stroked once and filled once (the `drawLimb
   - Body markings are fitted around the folded wing (2.7): where the panel covers the upper flank, a haunch or shoulder mark moves down or forward to where all of it shows, and a seeded optional extra is dropped where it no longer fits whole.
   - **Baby nubs** have no bones and cannot fold flat. They rest at 170° (10° above the back, pointing back), so a knuckle about 4 × 3 px shows behind the head, and rise to 140° only in flutter and happy. Spike's rest at 200° along the flank instead, below its quills (3.3).
 - **Spread.**
-  - Spread wings appear **only** in happy, the wake stretch, breath, hop-glide and flight. They never appear at idle.
-  - **Elders** (v2) rest-spread at **0.6, leaning back 48°**: with the elder's head carried lower, the adult's 0.7 / 40° put the wing tip level with the head top (margin −1 to +1 px on fire and water, against 8 px at 0.6 / 48°). Their wear shows at any spread from 0.55 (2.9).
+  - Spread wings appear **only** in happy, the wake stretch, breath, hop-glide and flight, and (v2) the elder's airing variant. They never appear in the idle loop itself.
+  - **Elders** (v2) rest-spread at **0.6, leaning back 48°**: EL measured, with the head carried 7 to 9 px lower, the adult's 0.7 / 40° tip level with the head top (margin −1 to +1 px on fire and water) and 0.6 / 48° 8 px under it. The elder's head now sits only 3 to 5 px lower (2.1), so 0.6 / 48° keeps about 12 px (re-measured in the implementation phase); it stays, so the tears show in the preen. Their wear shows at any spread from 0.55 (2.9).
+  - **Airing the wings** (v2, the elder's idle variant, 4.2): the one spread at idle. `wing` 1.0, held about 40 f, leaning back until the lead spar's tip sits ≥ 7 px under the head's top (the resting-spread rule), so the full-spread holes of 2.9 are seen at home, not only in flight. The lean is measured per element in the implementation phase; an element whose full spread cannot lean back that far without its trailing spar crossing the body keeps its holes to flight and the glide (and the user is told).
   - A **resting** spread (the adult preen, the wake's stretch) is **0.7 and leans back 40°** (`wing.fold` / `wing.flap`, anims.ts `SPREAD_FOLD` / `SPREAD_BACK`; the wake adds the play-bow's pitch back): upright at 0.8, the lead spar stood at 108° and every membrane wing was a vertical spire behind the head in lightning's zone (3.0), and the wake's full spread a tall dark plank, edge-on; at 0.8 leaning back 25° the membrane showed its face, but the tip still stood 5 px over spike's head top and level with fire's, and at ÷ 3 every adult preen was lightning's "spire behind the head". Now the tip stays well under the head top on every membrane wing (measured at the preen's hold against the head's top, horns and fin-ears included: fire 11 px, spike 7, water 16, slinkwing's cranium ≥ 10), a hump behind the head at ÷ 3. Spike's leaf still lies over its mid-back quills through the 16 f hold (the ripple's second wave runs as it folds, 4.3). Lightning's bolts give the lean back and stand excited.
   - They are the tallest thing in the habitat, so they are an event, not a resting state.
 - **Cocked (lightning only).** At rest, lightning holds its bolt wings upright at 115° (25° back from vertical) with the spars closed. They **never fold flat**: asleep, they drop to the sad cock of 140° (3.5).
@@ -214,11 +215,11 @@ Every part is **one outlined path**, stroked once and filled once (the `drawLimb
 11. Near wing (every element except rock).
 12. **Head group, always last among body parts:**
     1. mouth interior (jaw open, which always means ≥ the stage minimum: 1.2);
-    2. jaw;
+    2. jaw, then (v2) the elder's beard, its own inked tuft;
     3. skull;
     4. face markings (clipped): slinkwing's mask, dusk's nose frost, then (v2) the elder's grey muzzle, so the eye, nostril and mouth marks sit on it;
     5. eye, brow (the elder's tuft), nostril, fangs;
-    6. near horn, near fan, near fin-ear and dusk's lamp stalk and lantern, **clipped to exclude the eye's largest box + 1 px** (`DragonInfo.eye`), so no element renderer can cover the eye.
+    6. near horn, near fan, near fin-ear and dusk's lamp stalk, bail and lantern, **clipped to exclude the eye's largest box + 1 px** (`DragonInfo.eye`), so no element renderer can cover the eye.
 13. The dragon's own effects: breath, sound arcs, sparks.
 14. **Top pass, after every dragon:** rising particles (embers, "z", bubbles, notes, dazed stars), so a neighbour never hides them.
 
@@ -240,8 +241,8 @@ In the sleep poses the eyes are closed. In rock's upset tuck one eye peeks out *
 | Body, neck, head, tail, back row, dome, dusk's lamp | Near palette. These are midline parts (the lamp is one lamp, drawn with the near head: there is no far stalk). |
 
 ### 1.6 What is inked, and what is not
-- **Inked:** any separate object, which is a change of material (`band()` rule 0.4d). This means the body, legs, neck, head, jaw, tail, the wing (one silhouette), horns, quills, the dome, the fluke, fans, fin-ears, the flame's outer shape, crystals, pebbles and bolts; (v2) dusk's lamp stalk (one silhouette with the skull), lantern and cap, the elder's beard (inside the jaw's path, so the jaw's ink carries it), a wing tear (a notch in the membrane's one outline) and a wing hole's 1 px ring.
-- **Not inked:** pigment on the same hide. This means the belly band and throat stripe, markings, the eye mask, spots, cel bands, the flame's core and dome facets; (v2) the elder's grey muzzle and brow tuft, slinkwing's frosted fan tips, dusk's nose frost and smoke tail tip, and the lamp's core and dark face. Each is guaranteed ≥ 25 % luminance or ≥ 40° hue from what it sits on by gate (a), including the shadow and highlight tones it crosses.
+- **Inked:** any separate object, which is a change of material (`band()` rule 0.4d). This means the body, legs, neck, head, jaw, tail, the wing (one silhouette), horns, quills, the dome, the fluke, fans, fin-ears, the flame's outer shape, crystals, pebbles and bolts; (v2) dusk's lamp stalk (one silhouette with the skull), bail, lantern, cap and finial, the elder's beard (its own tuft and ink, like a quill), a wing tear (a notch in the membrane's one outline) and a wing hole's 1 px ring.
+- **Not inked:** pigment on the same hide. This means the belly band and throat stripe, markings, the eye mask, spots, cel bands, the flame's core and dome facets; (v2) the elder's grey muzzle and brow tuft, slinkwing's frosted fan tips, dusk's nose frost and its smoke tail tip with the slate band before it, and the lamp's core and dark face. Each is guaranteed ≥ 25 % luminance or ≥ 40° hue from what it sits on by gate (a), including the shadow and highlight tones it crosses.
 - **Not inked, by exception:** claws (D13, D16).
 
 ---
@@ -263,14 +264,14 @@ All values are px at scale 1. Positions are given as (x, y) in body space unless
 | **Neck** | segments × length | 1 × 3 (hidden; the head sits on the chest) | 2 × 6 | 2 × 9 | 2 × 8.5 |
 | | radius, root → head | 5.5 → 5 | 5 → 4 | 6.5 → 4.5 | 7 → 5 |
 | | root / sink | (+5, −5) / 2 | (+10, −5) / 2 | (+13, −7) / 3 | (+13.5, −6) / 3 |
-| | rest elevation per segment | 70° | 70°, 45°, head pitched 4° down | 65°, 35° (an S), head pitched 10° down | **38°, 10°, head pitched 8° down**: the head carried low and forward, peering ahead |
+| | rest elevation per segment | 70° | 70°, 45°, head pitched 4° down | 65°, 35° (an S), head pitched 10° down | **52°, 22°, the head level (0°)**: carried a little lower and forward, the nose level, the head top 3 to 5 px under the adult's (EL's 38° / 10° with the head pitched 8° down was the cast's low-mood carriage: the v2 review) |
 | **Head** | **cranium radius** | **8.5** | **9** | **9.5** | **9.5** |
 | | cranium centre from the neck end | (+1, −3) | (+1.5, −2) | (+2, −2) | (+2, −2) |
 | | snout taper, cranium space: from → to, r0 → r1 | (1.5, 1.5) → (6.5, 2), 5 → 4 | (2.5, 1) → (11.5, 1.5), 5.5 → 4 | (3, 1) → (15, 2), 6 → 3.5 | (3, 1) → (15.5, 2.5), 6 → 3.8 |
 | | **snout length** beyond the cranium | **2** (a button) | **6.5** | **9** (a wedge) | **9.8** |
 | | head length / `celPath` ext / tones | 19 / 9.5 / 2 | 24.5 / 12.25 / 3 | 28 / 14 / 3 | 28.8 / 14.4 / 3 |
 | | brow ridge bump in the skull path | none | 1 px | 2 px | **3 px** (rock 4) |
-| | jaw: hinge → tip (cranium space), r; the open jaw's hinge drop | (0.5, 4.5) → (8.5, 5.2), 2.5 → 1.5; drop 5 | (−1, 4.5) → (10, 5), 3 → 2; drop 3 | (−1, 5) → (13, 5.5), 3.5 → 2; drop 3 | (−1, 5.2) → (13.5, 6), 3.6 → 2.2; drop 3; the **beard** in the same path (1.2) |
+| | jaw: hinge → tip (cranium space), r; the open jaw's hinge drop | (0.5, 4.5) → (8.5, 5.2), 2.5 → 1.5; drop 5 | (−1, 4.5) → (10, 5), 3 → 2; drop 3 | (−1, 5) → (13, 5.5), 3.5 → 2; drop 3 | (−1, 5.2) → (13.5, 6), 3.6 → 2.2; drop 3; the **beard**, its own inked tuft under the chin (1.2) |
 | | jaw maximum opening | 40° | 34° | 30° (slinkwing 40°) | 28° (slinkwing 36°) |
 | | **jaw minimum opening** (any open frame; 1.2) | **20°** | **20°** | **16°** | **16°** |
 | **Eye** | **outer size including the ink ring / interior** | **7 × 8 / 5 × 6** | **7 × 7 / 5 × 5** | **8 × 6 / 6 × 4** | **8 × 6 / 6 × 4** (the adult's: 2.5) |
@@ -306,7 +307,7 @@ All values are px at scale 1. Positions are given as (x, y) in body space unless
   - Baby and young legs (< 5) are flat, and so are slinkwing's at every stage (leg r × 0.75: adult hind root 4.9).
   - Adult and young body and head get 3 tones.
   - The baby body and head (ext 9.5 < 10) get 2 tones, so **a baby has no highlights at all**. That is part of its softness.
-- **The elder column (v2; EL, prototyped in a scratch copy of the rig with the adult row drawn as the elder).** An elder is not bigger than the adult (D21): the column changes posture, not size. The head sits low and forward (neck 38° / 10°, against the adult's 65° / 35°), the chest settles level with the hips, a paunch sags 2 px, the knees and elbows settle (+40 / −82, −12 / +24), and the stance widens a little (X 3.75, paws 1 px longer). Measured on that prototype: the floor audit ran 81 rows on the six v1 elders with 0 failures once the beard joined the head's floor guard (without it, 12 rows sank 2 to 4 px: the sleep, the wake, rock's upset tuck, lightning's eat); the smallest far-leg root depth was 2.5 px. The whole column goes into `STAGE_DIMS.elder` in the implementation phase and is re-measured there by the same audits.
+- **The elder column (v2; EL, prototyped in a scratch copy of the rig with the adult row drawn as the elder; the posture revised after the v2 review).** An elder is not bigger than the adult (D21): the column changes posture, not size. The head sits a little lower and forward with the nose level (neck 52° / 22°, against the adult's 65° / 35°), the chest settles level with the hips, a paunch sags 2 px, the knees and elbows settle (+40 / −82, −12 / +24), and the stance widens a little (X 3.75, paws 1 px longer): at ÷ 3 the level chest, the paunch and the wide stance carry the step before the head does. EL's head (38° / 10°, pitched 8° down, 7 to 9 px under the adult's) read as tired or sad on a pet, the cast's low-mood carriage; halved, it reads settled. Measured on EL's prototype (the deeper head): the floor audit ran 81 rows on the six v1 elders with 0 failures once the beard joined the head's floor guard (without it, 12 rows sank 2 to 4 px: the sleep, the wake, rock's upset tuck, lightning's eat); the smallest far-leg root depth was 2.5 px. The whole column goes into `STAGE_DIMS.elder` in the implementation phase and is re-measured there by the same audits.
 
 ### 2.2 Wing bone angles
 Measured from +x, with positive going up, and lerped by `wing`.
@@ -334,7 +335,7 @@ Multipliers on 2.1. Every modifier stays within **0.7 to 1.3** (G), and on **bab
 | Lightning | 1.0 | 0.85 | 1.2 | 0.9 | 1.0 | 1.0 | 0.85 (tip 0.5: a true point) | 1.2 | −5°, 0° (straight and stiff, lifted a little: level, it was a ruler-straight rod) |
 | Water | 1.1 | 0.9 | 0.8 | 1.0 | 1.3 | 1.15 | 1.0 (baby: 3.5 → 1.5 absolute, see below) | 1.0 | 0°, 0° (level) |
 | Slinkwing | 1.0 | 1.0 | 1.0 | **0.75** (thin, bat-like legs: flat at every stage, D8) | 1.1 | 1.1 | 0.7 (a whip) | 1.0, jaw depth 1.3 | +15°, −4° |
-| **Dusk** (v2) | 1.0 (NB's compact 0.95 put the baby walk's far front root 0.2 px inside the chest, under the leg-root audit's 0.25: 5.1 #5; at 1.0 it keeps 0.9) | 1.05 | 0.95 | **0.76** (thin and light-footed: flat at every stage, the adult hind root 4.9 px, D8) | 1.15, neck angles **+12°** (halved on babies): a raised, stargazing carriage that carries the lamp high | 1.1 | 0.85 (tip r 1.3: a plain taper ≤ 4 px) | 0.9, a softer muzzle | +8°, +2° (young +7°, +2°): long and gently drooping, trailing like smoke, never above the back line |
+| **Dusk** (v2) | 1.0 (NB's compact 0.95 put the baby walk's far front root 0.2 px inside the chest, under the leg-root audit's 0.25: 5.1 #5) | **1.2**: deep and round, soft | **0.85**: low | **0.76** (thin: flat at every stage, D8) | 1.0, neck angles **+6°** (halved on babies): carried a little up, easy, never proud | **1.2** | **1.0** (tip r 1.5: a plain taper, 3 px) | **0.8**, a short soft muzzle | +8°, +2° (young +7°, +2°): long, full and gently drooping, trailing like smoke, never above the back line |
 
 **Baby tail rest shapes** (tail angles: + droops, − lifts; 1.1):
 - **only fire** curls up like a comma: first segment −10°, then −25° per segment, so its flame rises above the tail tip;
@@ -344,36 +345,35 @@ Multipliers on 2.1. Every modifier stays within **0.7 to 1.3** (G), and on **bab
 - water stays level (0°, 0°) on a thinner tail (radius 3.5 → 1.5 instead of 4 → 2), so its 10 × 6 tadpole paddle is clearly wider than the tail that carries it;
 - dusk's droops a little and trails (+4°, 0°), its grey tip showing behind.
 
+**Dusk's build (v2 review).** NB's build (1.0 / 1.05 / 1.0 / 0.95 / 0.76 / 1.15 / 1.1 / 0.85 across body length, depth, leg length, leg r, neck, tail and tail r) was slinkwing's (1.0 / 1.0 / 1.0 / 1.0 / 0.75 / 1.1 / 1.1 / 0.7) in six of eight columns, on the two darkest, night-themed bodies, and its +12° "stargazing" neck carried the head highest in the cast, an alert, proud carriage for a dreamy, sleepy dragon. Now it is soft and low: a deep round body on short thin legs, a plain neck at +6°, a short muzzle, a long full tail. Measured on the placeholder (seed 1, rest pose, no lamp yet): baby 47 × 33, young 86 × 43, adult 112 × 54, steps 1.83 / 1.30 (baby → young, length / height) and **1.30** / 1.26 (young → adult: the length floor is 1.29, carried by the 1.2 tail); the leg-root audit's shallowest far root 0.8 px (the baby's; ≥ 0.25) and the floor audit clean on seeds 1, 2, 3 and 5.
+
 **Elders (v2).** The modifiers above at full strength, then the elder column's posture, with these exceptions:
-- **Rock:** half the elder's neck lowering (its neck-angle modifier becomes −30 instead of −40 on the elder): its head drops 4 px, not 8, and stays at least 6 px under the dome's top (a head carried any lower sank into the chest).
-- **Water:** neck length × 0.92 on the elder, so the elder is at most 1.08× the adult's length (uncapped it measured 136 px, 1.10×).
+- **Rock:** half the elder's neck lowering (its neck-angle modifier becomes −33 instead of −40 on the elder): its head drops about 2 px and stays at least 6 px under the dome's top (a head carried any lower sank into the chest).
+- **Water:** neck length × 0.92 on the elder, so the elder is at most 1.08× the adult's length (uncapped, with EL's lower neck, it measured 136 px, 1.10×; re-measured with the higher neck).
+- **Slinkwing:** the adult's tail length (6 × 7): EL's elder measured 122 / 110 = 1.109× the adult's length, over the 1.10 cap.
 - **Slinkwing and dusk:** leg radii left alone, so their legs stay flat.
-- **Lightning:** its tail stays straight and stepped.
-- **Dusk:** its +12° lifts the elder's lowered neck (net 50° / 22°), so the lamp hangs lower and further forward: a stooped lamplighter (3.8).
+- **Lightning:** its tail stays straight and stepped; its bolts rest at the adult's 115° cock (3.5).
+- **Dusk:** its +6° applies on top (net 58° / 28°); the lamp keeps the adult's shape and place on the head (3.8).
 
-**Elder tail rest shapes** (first-segment angle, bend per segment; + droops):
-
-| Fire | Spike | Rock | Lightning | Water | Slinkwing | Dusk |
-|---|---|---|---|---|---|---|
-| +2°, −8° (the flame base stays ≥ 4 px above the back line) | +11°, 0° | +13°, +7° | 0°, 0° (straight, stepped) | +3°, 0° (`tipBox` updated for the 18 × 9 fluke) | +21°, −4° | +10°, +3° |
+**Elder tail rest shapes:** the adult's, unchanged (2.3's table and the element files), with the elder's chain (4.1) making the sway slower. EL's elder rests drooped every tail a few degrees (spike +5 → +11°, slinkwing +15 → +21°, rock +10 → +13°, dusk +8 → +10°, lightning −5 → 0°): on a pet a lower tail reads as a lower mood (the v2 review). Water's `tipBox` is updated for the 18 × 9 fluke.
 
 ### 2.4 Resulting sizes
 Length is nose → tail tip and height is ground → top, both including the cue at rest mood and excluding effects. The figures are **measured on the drawn rig** (the silhouette sheet at the rest pose, ink included) after the review of the built rig, and hold to ±2 px.
 
 | | Fire | Spike | Rock | Lightning | Water | Slinkwing | Dusk (v2) |
 |---|---|---|---|---|---|---|---|
-| **Elder** (v2, prototype) | 117 × 53 | 108 × 46 | 97 × 48 | 114 × 63 (≈ 66 with the × 1.1 bolts) | ≈ 133 × 48 (136 before the neck cap) | 122 × 59 (≈ 61 with 19 px fans) | ≈ 122 × 61 |
-| **Adult** | 107 × 55 | 100 × 51 | 93 × 48 | 105 × 64 | 123 × 55 | 110 × 70 | 120 × 64 (prototype) |
-| **Young** | 80 × 45 | 77 × 41 | 72 × 38 | 80 × 47 | 92 × 45 | 84 × 55 | 92 × 51 (prototype) |
-| **Baby** | 41 × 36 | 43 × 33 | 38 × 30 | 38 × 36 | 50 × 33 | 45 × 41 | 53 × 38 (prototype) |
+| **Elder** (v2, EL's prototype, head 7 to 9 px low) | 117 × 53 | 108 × 46 | 97 × 48 | 114 × 63 | ≈ 133 × 48 (136 before the neck cap) | 122 × 59 (≈ 61 with 19 px fans) | not measured |
+| **Adult** | 107 × 55 | 100 × 51 | 93 × 48 | 105 × 64 | 123 × 55 | 110 × 70 | 112 × 54 (no lamp yet) |
+| **Young** | 80 × 45 | 77 × 41 | 72 × 38 | 80 × 47 | 92 × 45 | 84 × 55 | 86 × 43 (no lamp yet) |
+| **Baby** | 41 × 36 | 43 × 33 | 38 × 30 | 38 × 36 | 50 × 33 | 45 × 41 | 47 × 33 (no lamp yet) |
 
 (Against the first rest-pose solve: spike is lower (adult 51, young 41) now that its brow thorns lie back along the neck from the back of the head, where they no longer top its head; rock is 6 px longer at young and adult, the cost of carrying its head low and forward. Re-measured in the second rig review, and again in the first cast review (seed 1, silhouette at the rest pose): rock's and lightning's babies are 5 and 8 px shorter with their short tails, rock's adult 2 px longer with its tail running straight to the floor, slinkwing's fans 2 px taller since the element pass. In the second cast review, every figure still within ±2 px: rock's curved tail 72 × 39 / 94 × 49 (young / adult; the young's curls a little sooner, 2.3, so the length step stays 1.31×), spike's young 76 × 42 with its taller comb.)
 
-(v2. The **elder** row is measured on EL's prototype, seed 1, rest pose, with the adult cues; the figures in brackets add the elder cues of section 3. The **dusk** column is NB's prototype with its lamp at the compact 0.95 body; the 1.0 body adds about 1 px of length on the baby and 2 on the adult. Both are re-measured on the drawn rig in the implementation phase. Spike's sizes hold with the spikier comb of 3.3, since the head stays its highest point; as an elder its tallest quill stands about level with the lowered head.)
+(v2. The **elder** row is measured on EL's prototype, seed 1, rest pose, with the adult cues and EL's deeper head (38° / 10°, pitched 8° down); the figures in brackets add EL's elder cues. With the head carried only 3 to 5 px lower and level (2.1) the elders come out a little shorter and up to 4 px taller, still under the adult's height; slinkwing keeps the adult's tail length for the 1.10 length cap, and lightning's elder bolt keeps the adult's height (3.5). The **dusk** column is the placeholder's soft, low build (2.3, measured in the v2 review) without its lamp: the lamp adds its rise over the skull (≤ 5 / 6 / 8 px) where it tops the head, and 6 to 10 px of length ahead of the snout (3.8). All of it is re-measured on the drawn rig in the implementation phase. Spike's sizes hold with the spikier comb of 3.3, since the head stays its highest point.)
 
-- **Height.** An adult stands about 45 to 65 px, a pony-sized pet beside a 72 to 76 px hero. An elder stands 0 to 9 px lower: its head is carried lower (rock 4 px, fire, spike and lightning 7, water and slinkwing 9).
+- **Height.** An adult stands about 45 to 65 px, a pony-sized pet beside a 72 to 76 px hero. An elder stands 0 to 5 px lower: its head is carried 3 to 5 px lower (rock about 2), never higher than the adult's (≤ 1.02×).
 - **Screen budget.** Two adults, two young and three babies fit across the 640 px habitat, with room between them. An elder takes an adult's place (1.03 to 1.10× its length).
-- **Stage steps.** Within an element, every stage step is at least 1.29× in length (rock, young → adult) and 1.22× in height (fire and water, young → adult; baby → young at least 1.24×, spike), so a stage is never mistaken for its neighbour. These are the floors 5.1 #3 checks against. The head ratio, eye and neck carry the rest. Dusk's prototype steps 1.74× / 1.34× (baby → young) and 1.30× / 1.25× (young → adult), clearing the floors with little room on the length step: its tail must not shorten below 1.1. **Adult → elder is not a size step** (D21): 5.1 #3 checks it by posture, colour and face instead, with a size cap.
+- **Stage steps.** Within an element, every stage step is at least 1.29× in length (rock, young → adult) and 1.22× in height (fire and water, young → adult; baby → young at least 1.24×, spike), so a stage is never mistaken for its neighbour. These are the floors 5.1 #3 checks against. The head ratio, eye and neck carry the rest. Dusk's soft build steps 1.83× / 1.30× (baby → young) and 1.30× / 1.26× (young → adult) without its lamp, clearing the floors with little room on the length step: its tail must not shorten below 1.2, and the element pass re-measures the steps with the lamp. **Adult → elder is not a size step** (D21): 5.1 #3 checks it by posture, colour and face instead, with a size cap.
 
 ### 2.5 The eye, and the face set
 The eye's **aspect ratio is itself a stage signal**: taller than wide for babies, square for young, wider than tall for adults (C). Its absolute size barely changes, so relative to the head it is largest on the baby (47 % of head height, against 32 % on the adult).
@@ -426,14 +426,15 @@ The **elder** (v2) uses the adult's lids, row for row: it has the adult's eye.
 **The elder face (v2; EL).** The elder keeps the adult's 8 × 6 almond, its slit, catchlight and lid rows unchanged, and **no lid by default**: a permanent lid is `sleepy`, a care signal, and rock's permanent hood already read as sleepy in an earlier review. The "wise" read comes from the **frame around the eye** instead, three greys and a heavier brow:
 - **the brow ridge** grows 2 → 3 px (rock 3 → 4) in the skull contour;
 - **the grey muzzle** (pigment: clipped, not inked): a face-space bitmap clipped to the skull, drawn at step 12.4 before the eye, nostril and mouth marks so they sit on it (slinkwing's mask construction). It covers every skull pixel whose cranium x ≥ 11 − 0.3 × cranium y: its back edge slants back 1 px for every 3 px down from x 11 at the eye row, so it takes the front of the snout, about 8 × 6 px, with the nostril on it. It never meets the belly (the closed jaw shows a sliver in the scale's shadow tone between them; an open jaw has the mouth between them) and never crosses the head's highlight cap on the top-back of the cranium. On dusk the muzzle is its nose frost (its `marking`, 3.8), which has crept back from the nose since the young stage and now reaches the eye line;
-- **the brow tuft**, the brow bar as pigment in the muzzle grey at every face (1.2);
-- **the beard**, a small goatee in the jaw's path (1.2): the elder's stage signal on the face.
+- **the brow tuft**, the brow bar as pigment in the muzzle grey at every face, level (1.2);
+- **the beard**, a small rounded tuft set back under the chin, swept back along the throat, with its own ink (1.2): the elder's stage signal on the face.
 
-The **muzzle grey** is derived, not stored (palettes.ts `muzzleOf`): the elder's belly pulled 0.85 of the way to its own grey, or, where the belly is near-white (L > 0.8: rock's cream, slinkwing's white), a mix 0.4 of the way from belly to scale first, since a near-white muzzle read as a bandage on slinkwing. Measured at the elder palette (gate a, 5.8), every muzzle clears the scale (32 to 87 %), the scale's shadow tone (62 to 93 %), the nostril (92 to 99 %) and the ink (≥ 98 %), and slinkwing's clears its lilac mask (53 %):
+The **face greys** are derived, not stored (palettes.ts `muzzleOf`, `beardOf`): the elder's belly pulled 0.85 of the way to its own grey, then **set to a luminance chosen per element** (`MUZZLE_LUM`, `BEARD_LUM`, the `atLum` transform). The first draft kept the belly's luminance, so muzzle and beard were 0 % from the belly on fire, spike, lightning and water, and the beard fused with the chin stripe on every open jaw (both v2 critiques). Each luminance sits in the element's measured window: the muzzle and tuft ≥ 25 % from the scale, its shadow tone, the nostril and the ink (slinkwing's also from its mask, rock's from its nose horn); the beard ≥ 25 % from the belly, the belly's shadow tone, the closed jaw's shadow sliver, the ink and the straw floor it rests on asleep. No one grey clears both on rock (its muzzle window is pale, L ≥ 0.65; its beard window mid, 0.37 to 0.50), so rock's beard is a mid stone grey under a pale stone muzzle; water's only window is a near-white frost (L ≥ 0.90, sea foam), and slinkwing's a mid grey under its white belly (a near-white muzzle read as a bandage there). Measured at the elder palette (gates a and i, 5.8): muzzle / scale 32 to 82 %, muzzle / scale shadow 62 to 91 %, nostril 89 to 98 %, beard / belly 29 to 70 %, beard / belly shadow 31 to 76 %, beard / floor 27 to 61 %, slinkwing's muzzle / mask 30 %, rock's muzzle / nose horn 89 %:
 
 | | Fire | Spike | Rock | Lightning | Water | Slinkwing | Dusk |
 |---|---|---|---|---|---|---|---|
-| muzzle, tuft and beard | `#a59c98` | `#a6a7a2` | `#dfdcd8` | `#b4b6bc` | `#b5bab8` | `#afadb0` | `#c9cfdd` (its nose frost) |
+| muzzle and tuft (L) | `#beb7b4` (0.48) | `#8c8d87` (0.265) | `#dddddb` (0.72) | `#97989d` (0.315) | `#f5f6f6` (0.92) | `#929192` (0.285) | `#b0b7ca` (its nose frost, 0.47) |
+| beard | = muzzle | = muzzle | `#afafae` (0.43) | = muzzle | = muzzle | = muzzle | = muzzle |
 
 **The elder blink** is slower: 3 half-lid, 5 closed, 3 half-lid frames, every 200 to 340 f. The fangs are worn to 2 × 2 (still the mark floor).
 
@@ -484,19 +485,21 @@ The cue is a **seed**: small, soft and already in its adult zone. Where the baby
   - the full marking set;
   - the cue's signature form, including **one adult-only extra** per element (section 3).
 - **Adult → elder (v2):**
-  - the head carried low and forward, the chest settled, a small paunch (2.1);
-  - greyer: the belly and wings most, the body a little (3.9);
-  - the grey muzzle, brow tuft and beard (2.5);
-  - worn wings: tears when spread, holes in flight (2.9);
-  - slower, stiffer, steadier motion with a hold at every key, and a glide-heavy flight (4.1, 4.2);
-  - the cue **weathered or grown** within its zone budget, plus **one elder-only extra** per element (section 3), and a breath that ends in one ring (4.2).
+  - the head carried a little lower and forward with the nose level, the chest settled level, a small paunch, a wider stance (2.1);
+  - greyer: the silver back and crown (the highlight band), the belly and wings, the body a little (3.9);
+  - the grey muzzle, the level brow tuft and the beard (2.5);
+  - worn wings, the only wear: tears when spread, holes at full spread, seen in flight and when it airs its wings (2.9);
+  - slower, steadier motion (tempo × 1.25, softer easing, a later head: unhurried, never stiff) and a glide-heavy flight (4.1, 4.2);
+  - the cue at its adult signature or **grown** within its zone budget, plus **one permanent elder-only extra** per element, drawn at every mood (section 3), shown off in the grow-up's "look at me" pose, and a breath that never fails and ends in one ring (4.2).
 
-**Elder, at about an adult's size.** Nothing is bigger; everything is settled. Five cues read as "old" before any detail does, and none reads as ill (D21):
-1. The head is carried low and forward, peering ahead, 7 to 9 px under the adult's head top (rock 4): 2 to 3 px at ÷ 3, visible in silhouette.
-2. It is greyer, the belly and wings more than the body (3.9).
+**Elder, at about an adult's size.** Nothing is bigger; everything is settled. Five cues read as "old" before any detail does, and none reads as ill, sad or declining (D21):
+1. It is settled: the chest level over a small paunch, the stance wider, the head carried 3 to 5 px lower (rock about 2) with the nose level. At ÷ 3 the level chest and the paunch read first.
+2. It is greyer: a silver back and crown, a greyer belly and wings (3.9).
 3. The face is framed in grey: muzzle, brow tuft and beard (2.5).
-4. Its spread wings are torn, and in flight they show a hole (2.9).
-5. It moves slower and steadier, holding each key (4.1).
+4. Its spread wings are torn, and at full spread they show a hole (2.9).
+5. It moves slower and steadier (4.1).
+
+And it has **gained** something: its element's elder-only extra (the hearth's coal bed, the sap-buds, a fourth crystal, a third bolt tooth, the pearls, the frosted fans, the moth that lives on its lamp). **The elder is the final, permanent stage**: no stage and no event follows it, and nothing in it points to one.
 
 At ÷ 3 every elder keeps its element's shape (U / saw / dome / spire / bar-and-crescent / big head / hook ahead of the face): posture and size change, the zone does not.
 
@@ -515,23 +518,23 @@ A baby next to its adult shares all of these. Only proportion and detail count d
 Two pets of the same element and stage would otherwise be pixel-identical, and 5.4 expects several on screen. Each pet gets a seed at hatching, and the seed picks, **inside the invariants of 2.7**:
 - every marking after the first shifts ±2 px along its anchor line (the first marking stays put: it is an invariant);
 - one optional extra marking of the element's own kind, on half of the pets, placed only where the marking rules already allow one: further out along the tail, or on the flank where the rig's fit shows all of it (otherwise it is not drawn). Only a stage that already carries a second marking gets one (a baby carries its first alone: D15);
-- horn, quill and fan lengths ±1 px (never past a quiet-zone budget in 3.0): `sp.lenVar`, which spike's quills and slinkwing's fans add to their own lengths;
+- horn, quill and fan lengths ±1 px (never past a quiet-zone budget in 3.0, nor, on spike's comb, past the overhang limit pitch / 0.47: `backRow` clamps each quill's h + variant to it, 3.3): `sp.lenVar`, which spike's quills and slinkwing's fans add to their own lengths;
 - the tail rest bend ±2° per segment (never past the 3 px limit above the back line);
-- (v2) which back quill an elder spike has chipped (quill 1 or 2: 3.3).
+- (v2) nothing else for the elder: its wear (2.9) is the same on every pet of an element, so no seed reads as "more worn".
 
 The palette, the iris colour and the cue never vary. The seed survives stage-ups, so a pet keeps its own pattern as it grows. Players will still tell pets apart mostly by name and place; the variant only makes sure two of them never look like copies.
 
 ### 2.9 Elder wing wear: tears and holes (v2)
-"Elder dragons should even have some small holes in their wings." EL measured the clear membrane on every wing (the largest clear square, bones excluded) before choosing where wear can go:
+"Elder dragons should even have some small holes in their wings." This is the only wear an elder shows anywhere (D21): its cues are kept or grown, never chipped. EL measured the clear membrane on every wing (the largest clear square, bones excluded) before choosing where wear can go:
 - outer panels, at any spread: ≤ 4.5 px (fire's first panel), ≤ 3 px on 4-spar wings;
 - the rear (arm) panel: 8 px, but only at full spread and only with the elder's stretched attach point (−19, +2);
-- a see-through hole needs a 4 × 4 cut plus 2 px of membrane all round: 8 px.
+- a see-through window needs its own ring and 2 px of membrane round it, with the forearm bone allowed to stand for the border on one side.
 
-So wear comes in two forms (D23).
+So wear comes in two forms (D23). **The mark floor for wear is counted in background pixels a player sees**, not in the size of the cut: the engine inks 1 px outside every fill (shading.ts), so a cut loses 1 px of its opening to ink on each side (a 3 px notch showed 1 px of background at its mouth and nothing below it, an ink tick; the v2 review).
 
 **Tears: every elder membrane wing, the wear seen most.**
-- **Shape:** a V cut into the trailing edge, a notch of the membrane polygon itself, so the wing's one stroke inks it; 3 px wide at the mouth, 3 px deep toward the wrist, its tip ≥ 2 px from both spars. Spike's leaf gets a round **bite** (4 wide × 2 deep), water's fin a **split** (2 wide × 4 deep between two rays), rock's stubby wing a 2 px nick, dusk's moth-soft lobe a V like fire's.
-- **When it shows:** depth × clamp((`wing` − 0.35) / 0.2, 0, 1). Folded it is 0, so the folded lobed edge stays clean (a 1 to 2 px nick would read as one more lobe); it is full from `wing` 0.55, so it shows in the elder's preen (0.6), the wake stretch and flight.
+- **Shape:** a ragged notch cut into the trailing edge, a notch of the membrane polygon itself, so the wing's one stroke inks it: a **5 px mouth** (≥ 3 px of background between its ink lines), **deeper than the wing's scallops by ≥ 2 px** (fire's, dusk's and slinkwing's 3 px scallops: 5 deep; water's and spike's smooth edges: 4 and 3), and one side **stepped** 1 px halfway down, so it reads torn, not as one more smooth scallop; its tip ≥ 2 px from both spars. Spike's leaf gets a round **bite** 5 wide × 3 deep (a nibbled leaf), water's fin a ragged notch 5 × 4 between two rays, rock's stubby wing one 5 × 3 notch where its panel holds it with 2 px of membrane on each side (else none), dusk's moth-soft lobe a notch like fire's.
+- **When it shows:** depth × clamp((`wing` − 0.35) / 0.2, 0, 1). Folded it is 0, so the folded lobed edge stays clean (a 1 to 2 px nick would read as one more lobe); it is full from `wing` 0.55, so it shows in the elder's preen (0.6), the wake stretch, the airing and flight.
 - **Where**, as a fraction along each scallop from its leading tip, the far wing carrying the same:
 
 | Wing | Tears |
@@ -539,20 +542,20 @@ So wear comes in two forms (D23).
 | Fire (3-spar bat) | panel 1 at 0.35, panel 2 at 0.60 |
 | Slinkwing (4-spar bat) | panel 1 at 0.35, panel 3 at 0.45 |
 | Spike (leaf) | panel 1 at 0.50 (a bite) |
-| Water (fin) | panel 2 at 0.50 and panel 3 at 0.40 (splits) |
-| Rock (stubby) | panel 1 at 0.50 |
+| Water (fin) | panel 2 at 0.50 and panel 3 at 0.40 |
+| Rock (stubby) | panel 1 at 0.50, where it fits |
 | Dusk (3-spar, moth lobes) | as fire's: panel 1 at 0.35, panel 2 at 0.60 |
+| Lightning (bolt) | one notch on each bolt's upper trailing edge, 55 % of the way down from the tip, 5 px mouth × 2 deep, keeping ≥ 2 px of yellow past the spar (to measure on the 16.5 px wide elder bolt, 3.5) |
 
-**See-through holes: full spread only.**
-- **How many and where:** one per near wing, in the rear (arm) panel.
-- **Cut:** a whole-pixel square with its corners cut 1 px; the ink ring lies 1 px inside the cut; at least 2 px of membrane all round. Fire, slinkwing and dusk: a 4 × 4 cut (a 2 × 2 window), drawn at `wing` ≥ 0.95. Spike and water: a 5 × 5 cut (3 × 3 window), drawn at `wing` ≥ 0.90.
-- **Position at full spread** (wing space; it moves with the membrane): fire and dusk (−9.5, −8.5; dusk shares fire's spars and attach point, its fit is re-measured on its lobed edge in the element pass), slinkwing (−9.5, −5), spike (−10.5, −6), water (−10.5, −7). With the elder's attach point EL found 70 fitting positions for fire, 18 for slinkwing, 49 for spike and 82 for water; with the adult's, slinkwing had exactly one.
-- **How it is drawn:** a subpath of the wing's one path, wound against the membrane (nonzero fill). The same footprint is cut through the far wing (step 2 of 1.4), so the window shows the background: without it the window showed the far wing's darker membrane and read as a rivet. A frame where the cut is not wholly above the back line + 1 px skips the hole; it is never shrunk (a partial hole is a speck).
-- **When it shows:** in flight and the glide (4.2), the only times an elder's wing is at full spread. The fly animation is not built yet.
-- **No holes on** rock (its 0.7-span wings have no 8 px room at any spread), on lightning (its × 1.1 bolt has at most 6 px of room, which would leave 1 px yellow slivers) or on any baby, young or adult.
-- **Lightning's wear instead,** on both bolts: the lowest trailing tooth, at (−15, −8) × 1.1, is **chipped** (its point cut back 2 px along the shelf), and a 3 × 2 **tear** sits on the upper trailing edge 55 % of the way down from the tip; the spire's peak is untouched.
+**See-through holes: full spread.**
+- **How many and where:** one per near wing, in the rear (arm) panel, on fire, slinkwing, dusk, spike and water.
+- **Cut:** a **whole-pixel bitmap** window of **3 × 3 with one corner notched** (8 px of background: an irregular, torn hole, where EL's round 2 × 2 window in an ink ring read as a rivet or a grommet, on water's fin as a pearl spot and on dusk's moth wing as an eyespot: the v2 review), inside a 4-neighbour 1 px ink ring (so the notch stays open), with ≥ 2 px of membrane on three sides and the forearm bone as the fourth, so it fits the 8 px arm panel. It is stamped at the **rounded** wing-space position after the wing is drawn, never as a subpath in rotated wing space: rotated, a 2 px window anti-aliased to 1 px and shimmered as the wing flapped (the fluke-ray lesson of 3.6).
+- **Position at full spread** (wing space; it moves with the membrane): fire and dusk (−9.5, −8.5; dusk shares fire's spars and attach point, its fit re-measured on its lobed edge in the element pass), slinkwing (−9.5, −5), spike (−10.5, −6), water (−10.5, −7). With the elder's attach point EL found 70 fitting positions for fire, 18 for slinkwing, 49 for spike and 82 for water for a 4 × 4 cut; each is re-measured for the notched window with the bone border.
+- **How it is drawn:** the same footprint is cleared through the far wing (step 2 of 1.4), so the window shows the background: without it the window showed the far wing's darker membrane and read as a rivet. A frame where the window is not wholly above the back line + 1 px skips the hole; it is never shrunk (a partial hole is a speck). Drawn at `wing` ≥ 0.95 (fire, slinkwing, dusk) or ≥ 0.90 (spike, water).
+- **When it shows:** in flight and the glide (4.2), and in the elder's **airing** idle variant (1.3, 4.2), so a player sees the holes at home and not only in an animation the pet rarely plays. The fly animation is not built yet; the airing variant is built with the elder. If an element's airing cannot lean back far enough (1.3's measure), its holes are flight-only and the user is told.
+- **No holes on** rock (its 0.7-span wings have no room at any spread), on lightning (its elder bolt has at most 6 px of room, which would leave 1 px yellow slivers) or on any baby, young or adult.
 
-**Silhouette zones are unaffected:** a tear is ≤ 1 px at ÷ 3, and a hole only appears in flight. EL's prototype renders are in `shots/elder/` (`mock_elder_preen_tears.png`, `mock_elder_flight_holes.png`).
+**Silhouette zones are unaffected:** a tear is ≤ 2 px at ÷ 3, and a hole shows only at full spread. EL's prototype renders (`shots/elder/mock_elder_preen_tears.png`, `mock_elder_flight_holes.png`) show the first draft's tears and holes, which the v2 review turned down.
 
 ---
 
@@ -567,35 +570,35 @@ So wear comes in two forms (D23).
 | **Lightning** | the space above the back, behind the head | bolt wings, held cocked upright and leaning back | one tall zigzag spire over the back | cock 140° (79 % of the rest height) → 115° → 95° (1.1 convention) |
 | **Water** | the tail end, low and level | a crescent fluke on the longest, flattest body | a long flat bar (about 3 : 1) ending in a crescent | spot glow, fin-ears and fluke droop or flare |
 | **Slinkwing** | the head | ribbed ear-fans | a head doubled in size by two broad fans | fans flat back → up-back → upright → dish |
-| **Dusk** (v2) | **ahead of the face**: the air in front of the brow and above the snout, forward of the eye | a crook lamp: a thin stalk from the brow arching forward to a round, capped lantern hung plumb ahead of the snout | a "?": the head carried high, a thin hook reaching forward, a knob hanging ahead of the nose | the lamp's moon phase and the stalk's droop: waning crescent, the lamp 5 px lower (−1) → full (0) → full + hot core, the lamp lifted 2 px (+1); asleep a new-moon nightlight on the floor. The silhouette never shrinks (NB measured the stalk and lamp at ≥ 100 % of their idle area at −1 and asleep, every stage) |
+| **Dusk** (v2) | **ahead of the face**: the air in front of the brow and above the snout, forward of the eye | a crook lamp: a thin stalk from the brow arching forward to a small lantern (taller than wide, a silver cap and finial) hung by a bail, plumb ahead of the snout | a crook ahead of the face: a thin arch reaching forward from the brow, a lantern hanging ≥ 4 px clear of the nose | the lamp's moon phase and the stalk's droop: waning crescent, the lamp 5 px lower (−1) → full (0) → full + hot core, the lamp end lifted 1 px (+1); asleep a new-moon nightlight on the floor. The silhouette never shrinks (NB measured the stalk and lamp at ≥ 100 % of their idle area at −1 and asleep, every stage) |
 
 **Quiet-zone rule (C), with numbers (G).** A feature on one element that sits in another element's zone stays at or under **half** that zone's cue at the same stage, and keeps the shape language quiet:
 - **Head (slinkwing's):**
-  - Every other head feature is ≤ half the fan height (adult ≤ 8 px, young ≤ 6, baby ≤ 5).
-  - Dusk's lamp (v2) roots at the top-**front** of the skull (60 to 64° on the cranium circle), where slinkwing's fans root at the top-back (128°), and rises ≤ 5 / 6 / 8 px above the skull top (baby / young / adult, the elder 6.4) at every mood: half the fan height. Its stalk is 2 to 2.5 px and its lantern round, so it never makes a fan shape; it replaces horns, as the fans do.
+  - Every other head feature is ≤ half the fan height (adult ≤ 8 px, young ≤ 6, baby ≤ 5; elder ≤ 9.5 beside the elder's 19 px fans, though dusk's elder lamp keeps the adult's 8).
+  - Dusk's lamp (v2) roots at the top-**front** of the skull (60 to 64° on the cranium circle), where slinkwing's fans root at the top-back (128°), and rises ≤ 5 / 6 / 8 px above the skull top (baby / young / adult and elder) at **every** mood, the happy lift included, with ≥ 0.5 px to spare at rest: half the fan height. Its stalk is 2 to 2.5 px and its lantern a small upright box, so it never makes a fan shape; it replaces horns, as the fans do.
   - Paired horns (fire, spike, lightning) are ≤ 3 px thick, swept back within 20° of the neck line, and ≤ 3 px above the skull top. The rig measures the neck line every frame (the last neck segment, seen from the cranium), and `HornParams.sweep` is authored **relative to it** (0 = lying along it), so the rule holds at every stage and pose. Measured at rest, root to tip: fire and lightning within 10° of the neck line, spike's thorns within 14° (near horns; the far horn forks 28° further up behind the head, 1.5, and still stays under the skull top). Babies, whose neck hides under the head, point their buds relative to straight back. Spike's brow thorn also keeps a **world** clamp like water's fin-ear, never more than 20° above or 40° below straight back (`HornParams.worldClamp`): laid along the steep neck line behind a head lowered asleep it stood upright behind the eye as a white tusk or an ear.
   - Rock's single blunt nose horn sits on the snout, well forward of where the fans would be.
   - Water's fin-ear points back along the neck, never up: flared it rises ≤ 10° above the neck line. In the world it never rises more than 20° above straight back (only where the neck itself rises behind a lowered head, eating or asleep, does it go above straight back) and never hangs more than 40° below it. One ear shows (3.6).
 - **Back line (spike's):**
   - Other elements' back features are ≤ 3 px tall with smooth, round shapes: water's dorsal fin, the folded wing knuckle, the resting baby wing nub.
   - Rock's dome is one convex arc, never teeth.
-- **Above the back (lightning's):** every other element folds its wings flat at rest; a baby's resting nub shows only a knuckle about 4 × 3 px. A resting spread (the adult preen, the wake) opens to 0.7 and leans back 40°, so its tip stays at least 7 px under the head top and no membrane spire tops the head (1.3).
+- **Above the back (lightning's):** every other element folds its wings flat at rest; a baby's resting nub shows only a knuckle about 4 × 3 px. A resting spread (the adult preen, the wake) opens to 0.7 and leans back 40° (the elder's 0.6, leaning back 48°; the elder's airing, full spread, leans back as far as it must), so its tip stays at least 7 px under the head top and no membrane spire tops the head (1.3).
 - **Above the tail tip (fire's):** at rest, no other tail rises > 3 px above the back line. Other tails rest level, drooped, or (baby spike and slinkwing) lifted about 2 px. The baby's bite bows its body 24° nose-down, so every baby tail but fire's droops 22° with it (`tuning.eat.tailDroop`): riding the pitch, they rose about 10 px over the back line and water's paddle became a stick with a knob on top, fire's torch. Spike's tail quills belong to its back row, which runs along the top of the tail; they are not a tail-tip shape.
 - **Tail end (water's):** no other element has a tail-tip shape wider than 4 px. That is why there is no rock club (and rock's tip radius is capped at 2), no lightning arrowhead and no slinkwing barb.
 - **Body mass (rock's):** other elements' backs are smooth arcs with no carapace.
-- **Ahead of the face (dusk's, v2):** no other element hangs anything in the air ahead of the snout at rest. A feature on the snout stays rooted on its contour and within 3 px past the snout's tip (rock's blunt nose horn, leaning 60° up from the snout's top-front, is the only one: to measure on the silhouette sheet in the implementation phase). Breaths and sounds pass through this zone only as events. Dusk's own tail droops, never above the back line, and ends in a plain taper ≤ 4 px wide; its folded wings sit flat with the standard 3 px knuckle; its back is a smooth arc.
+- **Ahead of the face (dusk's, v2):** no other element hangs anything in the air ahead of the snout at rest. A feature on the snout stays rooted on its contour and within 3 px past the snout's tip (rock's blunt nose horn, leaning 60° up from the snout's top-front, is the only one: to measure on the silhouette sheet in the implementation phase). Breaths and sounds pass through this zone only as events. Dusk's own tail droops, never above the back line, and ends in a plain taper ≤ 4 px wide; its folded wings sit flat with the standard 3 px knuckle; its back is a smooth arc. The lamp is also its own **tap target** in the game (3.8), so a tap meant for the face never lands on it by accident.
 - **Elders (v2):** every elder cue and elder-only extra stays inside its own element's zone and its budget above (section 3's elder columns). The elder's lowered head leaves the budgets as they are: they are measured from the skull, the back line and the snout.
 
 ### 3.1 PALETTE TABLE
-All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-check.ts` at all four stages (5.8). These are the **base** palettes, the hatchling's colours; every older stage is derived from them by the greying of 3.9 (per-stage values there). v2 changes: the dusk column, water's sea green (scale, membrane, dark), rock's warmer sandstone scale.
+All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-check.ts` at all four stages (5.8). These are the **base** palettes, the hatchling's colours; every older stage is derived from them by the greying of 3.9 (per-stage values there). v2 changes: the dusk column (its scale and smoke marking revised in the v2 review), water's sea green (scale, membrane, dark), rock's warmer sandstone scale.
 
 | Slot | Fire | Spike | Rock | Lightning | Water | Slinkwing | Dusk |
 |---|---|---|---|---|---|---|---|
-| **scale** | `#f04422` | `#2f8232` | `#d8b474` | `#2d58cc` | `#28b0a6` | `#5a2f6e` | `#3d4d91` |
+| **scale** | `#f04422` | `#2f8232` | `#d8b474` | `#2d58cc` | `#28b0a6` | `#5a2f6e` | `#1f5580` |
 | **belly** | `#e08a2c` | `#a3ad55` | `#fff5cc` | `#9fb4f2` | `#85c6ae` | `#fff5f8` | `#c28771` |
 | **membrane** | `#7f1e3a` | `#2e6b58` | `#4c5670` | `#ffcf33` | `#185e5b` | `#ff6fae` | `#98a1b6` |
 | **horn** | `#734a4c` | `#f2e8c6` | `#5e4e46` | `#404a9c` | `#eaf6f0` | `#f0dce6` | `#e2e6f0` |
-| **marking** | `#ffe29a` | `#173a19` | `#7e5f44` | `#ffcf33` | `#dcfff6` | `#9a6aa8` | `#c9cfdd` |
+| **marking** | `#ffe29a` | `#173a19` | `#7e5f44` | `#ffcf33` | `#dcfff6` | `#9a6aa8` | `#b0b7ca` |
 | **dark** | `#2b1418` | `#4a2618` | `#3b2c24` | `#141a3c` | `#0c2a2a` | `#2e1638` | `#10142a` |
 | **glow** | `#ffa21f` | `#7dff8c` | `#b48cff` | `#fff6a0` | `#40d8f0` | `#ff9ed2` | `#ffa98c` |
 | **eye** | `#ffc02e` | `#ff9a3c` | `#ffb84a` | `#ffc41f` | `#ffc64a` | `#3fe0a0` | `#7fb8ff` |
@@ -603,27 +606,28 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
 **Where each slot is painted:**
 - **scale:** body, neck, head, legs, paws, tail, wing arm and spars; the 1 px ring or edge on floor-level effects (fire puffs, spike sap, lightning sparks, the outer edge of slinkwing's sound arcs).
 - **belly:** the underside stripe and jaw underside. It is the bottom edge of the silhouette, so it is gated against the floor: every belly sits ≤ 0.49 or ≥ 0.89 in luminance (gate i).
-- **membrane:** the wing membrane, plus the element's skin features (water's fluke, fins and fin-ears; slinkwing's fans and throat sac), slinkwing's sound arcs, the 1 px ring on water's bubbles and drips, and dusk's Nightfall mist and baby huff.
-- **horn:** horns, claws (un-inked), quills, fan ribs and fin rays; water's elder barnacles; dusk's lantern cap and moths.
-- **marking:** element markings, rock's dome and slinkwing's eye mask; dusk's smoke tail tip, nose frost (its elder muzzle) and the smoke curl of its fizzle.
+- **membrane:** the wing membrane, plus the element's skin features (water's fluke, fins and fin-ears; slinkwing's fans and throat sac), slinkwing's sound arcs, the 1 px ring on water's bubbles and drips, and dusk's Nightfall mist, baby huff and moths.
+- **horn:** horns, claws (un-inked), quills, fan ribs and fin rays; water's elder pearls; dusk's lantern cap, bail and finial.
+- **marking:** element markings, rock's dome and slinkwing's eye mask; dusk's smoke tail tip (with its derived slate band, `smokeBandOf`), nose frost (its elder muzzle) and the smoke curl of its fizzle.
 - **dark:** nostrils (2 × 2). The claw and quill tips it once coloured were dropped: at 2 px they were under the mark floor.
 - **glow:** the one signal colour, drawn flat; dusk's lamp and motes (its `glow.sh` is the lamp's dark face, its `glow.hi` the hot core).
 - **eye:** the iris.
 
-**Derived tones.** These come from the engine (`makeTones`, `farPalette`) and from `moodTones()` in the palette module; none is stored, with one exception: **rock's scale and belly shadows are set by hand** (`DRAGON_SHADOW`, read through `dragonTones()` by the rig and the palette check), `#a88a66` and `#e6d49e` (marked * below), hue kept, their `deep` following at × 0.78. The engine's cool ramp made them `#8c7e69` and a neutral `#a8a9a7`: the baby's face split into a clean half and a grey, dirty one, and the cream belly's shadow read as a grey diaper on the baby and a metal plate under the adult (the cast reviews). The hand-set shadows sit 43 % (44 % under v1's `#d4b67c`) and 27 % under their bases (gate d checks ≥ 25 %, at every stage). They are exact.
+**Derived tones.** These come from the engine (`makeTones`, `farPalette`) and from `moodTones()` in the palette module; none is stored, with one exception: **rock's scale and belly shadows are set by hand** (`DRAGON_SHADOW`, read through `dragonTones()` by the rig and the palette check), `#a88a66` and `#e6d49e` (marked * below), hue kept, their `deep` following at × 0.78. The engine's cool ramp made them `#8c7e69` (`#8f7c62` on v2's warmer sandstone) and a neutral `#a8a9a7`: the baby's face split into a clean half and a grey, dirty one, and the cream belly's shadow read as a grey diaper on the baby and a metal plate under the adult (the cast reviews). The hand-set shadows sit 43 % (44 % under v1's `#d4b67c`) and 27 % under their bases (gate d checks ≥ 25 %, at every stage). They are exact.
 
 | Tone | Fire | Spike | Rock | Lightning | Water | Slinkwing | Dusk |
 |---|---|---|---|---|---|---|---|
-| scale.hi / .sh / .deep | `#ff5927` `#9e2f23` `#7c251e` | `#47a539` `#1f5a2f` `#184728` | `#ffe284` `#a88a66`* `#837064`* | `#4571e9` `#1e3da7` `#173089` | `#3fddbd` `#1a7989` `#156071` | `#7c3f7d` `#3b205e` `#2e1a4e` | `#5864a5` `#283579` `#1f2a64` |
+| scale.hi / .sh / .deep | `#ff5927` `#9e2f23` `#7c251e` | `#47a539` `#1f5a2f` `#184728` | `#ffe284` `#a88a66`* `#837064`* | `#4571e9` `#1e3da7` `#173089` | `#3fddbd` `#1a7989` `#156071` | `#7c3f7d` `#3b205e` `#2e1a4e` | `#346e92` `#143b6c` `#102e59` |
 | belly.sh | `#945f2a` | `#6c774a` | `#e6d49e`* | `#697cc5` | `#588990` | `#a8a9c9` | `#805d60` |
 | membrane.sh (hi unused) | `#541535` | `#1e4a4d` | `#323b5f` | `#a88f30` | `#10414f` | `#a84d90` | `#646f96` |
-| marking.hi / .sh | `#ffffb0` `#a89c80` | `#2a4d1c` `#0f281c` | `#a87a4e` `#53423d` | `#ffff3a` `#a88f30` | `#ffffff` `#91b0c8` | `#ca87c0` `#66498b` | `#fffffc` `#858fb4` |
+| marking.hi / .sh | `#ffffb0` `#a89c80` | `#2a4d1c` `#0f281c` | `#a87a4e` `#53423d` | `#ffff3a` `#a88f30` | `#ffffff` `#91b0c8` | `#ca87c0` `#66498b` | `#e5e5e6` `#747ea6` |
 | glow.hi (hot core) / .sh (banked: fire asleep, rock's dim crystals, dusk's dark face) | `#ffcc23` `#a87020` | `#a7ffa0` `#53b075` | `#eab1ff` `#7761cf` | `#ffffb6` `#a8aa85` | `#5cffff` `#2a95c3` | `#ffc7ef` `#a86dac` | `#ffd4a0` `#a87575` |
 | dim spot, `mix(marking, scale, 0.5)` (water only) | | | | | `#82d8ce` | | |
-| far leg scale (0.55 / 0.30) | `#702d26` | `#224229` | `#716451` | `#203063` | `#265a5c` | `#2e1d3b` | `#252b4b` |
+| slate band, `smokeBandOf`: `mix(scale, marking, 0.5)` (dusk only) | | | | | | | `#6886a5` |
+| far leg scale (0.55 / 0.30) | `#702d26` | `#224229` | `#716451` | `#203063` | `#265a5c` | `#2e1d3b` | `#182d43` |
 | far wing membrane (0.62 / 0.25) | `#45182b` | `#233f3c` | `#313547` | `#96803d` | `#16373c` | `#904d70` | `#606474` |
 
-These are the baby's tones. Every older stage derives its own from its greyed colours (makeTones of the aged base, farPalette of the aged palette, moodTones of the aged palette; rock's hand-set shadows greyed with their slot): 3.9.
+These are the baby's tones. Every older stage derives its own from its greyed colours (makeTones of the aged base, farPalette of the aged palette, moodTones of the aged palette; rock's hand-set shadows greyed with their slot), and its scale highlight silvers (`AGE_SILVER`): 3.9.
 
 **Shared by the whole family:**
 
@@ -639,10 +643,10 @@ These are the baby's tones. Every older stage derives its own from its greyed co
 
 **Colour rules:**
 - **The value ladder is the same in every palette:** belly lighter than scale, membrane darker than scale (and darker than the scale's shadow tone, except spike's: D11), except where the membrane *is* the signal colour (lightning, slinkwing) and on dusk, whose dark body leaves no room under its shadow tone (a pale moth-grey membrane: E11).
-- **The seven bodies are value-stacked** (D9): L 0.49 / 0.34 / 0.23 / 0.17 / 0.12 / 0.08 / 0.05 (rock, water, fire, spike, lightning, dusk, slinkwing), and the greying keeps each body's luminance, so the stack holds at every stage (3.9). They separate under both common colour-blindnesses at every pair of stages, and in greyscale at every stage but for fire / spike from the young stage (E10). The silhouette zones still carry identity first. Colour is the second, independent channel.
-- **One saturated signal family per dragon.** Glow is the signal. Lightning uses its yellow for membrane, stripes and eye as well, one hue family. Slinkwing's pink is membrane and glow. Dusk's coral is its lamp alone; its belly is a warm afterglow, its greys and silvers are neutral. Glow is drawn flat and never banded, and never greys.
+- **The seven bodies are value-stacked** (D9): L 0.49 / 0.34 / 0.23 / 0.17 / 0.12 / 0.08 / 0.05 (rock, water, fire, spike, lightning, dusk, slinkwing), and the greying keeps each body's luminance, so the stack holds at every stage (3.9). A pair that separates by value alone also clears the dark-pair floor (≥ 6 Oklab L or ≥ 0.08 ΔE: lightning / dusk, the closest, 0.106). They separate under both common colour-blindnesses at every pair of stages, and in greyscale at every stage but for fire / spike as elders (E10). The silhouette zones still carry identity first. Colour is the second, independent channel.
+- **One saturated signal family per dragon.** Glow is the signal. Lightning uses its yellow for membrane, stripes and eye as well, one hue family. Slinkwing's pink is membrane and glow. Dusk's coral is its lamp alone (the lantern, its core and motes); its belly is a warm afterglow, its greys and silvers are neutral. Glow is drawn flat and never banded, and never greys.
 - **The iris is exempt from the signal rule** (ledger E1). It is at most 6 × 4 px, inside an ink ring, and a care game's attention belongs on the face.
-- **Neutral area stays ≤ 40 %.** The neutral slots are small: spike's bone quills, rock's cream belly, water's pearl horn and spots, slinkwing's belly and ribs, dusk's moth-grey wings, silver cap and grey tail tip (folded wings and a tip band, well under the ceiling), and every elder's muzzle. No body colour is neutral at any stage (gate j: S ≥ 0.30 at every stage, dusk ≥ 0.20; the lowest are spike's and dusk's elders, 0.34 and 0.24).
+- **Neutral area stays ≤ 40 %.** The neutral slots are small: spike's bone quills, rock's cream belly, water's pearl horn and spots, slinkwing's belly and ribs, dusk's moth-grey wings, silver cap and grey tail tip (folded wings and a tip band, well under the ceiling), every elder's muzzle, tuft and beard, and the adult's and elder's silvered highlight band (a band on the back and crown, the body's lit third at most). No body colour is neutral at any stage (gate j: S ≥ 0.30 at every stage, with no exception; the lowest are dusk's and spike's elders, 0.32 and 0.34). The elder dusk is the one to measure: grey wings, a smoke tail tip about half its tail, the frost to the eye and the silver back beside a slate body (S 0.32); the recorder's neutral-area check (5.5) runs on it first.
 - **Pigment edges clear every cel tone they cross.** A marking runs through the body's shadow and highlight bands, and the belly line through the shadow band, so gate (a) measures those tones too, not just the base.
 
 ### 3.2 FIRE: "Ember", the hearth dragon
@@ -659,12 +663,12 @@ These are the baby's tones. Every older stage derives its own from its greyed co
 - **Width.** Every tongue is ≥ 3 px wide at its base.
 - **It never squashes.** The flame keeps its shape through the body's squash and stretch (it is scaled back out of them), so a turn or a puff-up never thins its tongues. Emitters are not flesh.
 
-| Feature | Baby (seed) | Young (sprout) | Adult (signature) | Elder (weathered) |
+| Feature | Baby (seed) | Young (sprout) | Adult (signature) | Elder (elder signature) |
 |---|---|---|---|---|
-| Flame, w × h, tongues | 5 × 7, 1 | 7 × 10, 2 | 10 × 14, 3; flame base about 4 px above the back line | **the hearth**: 12 × 14, wider but not taller, 3 tongues with the middle one tallest; core 65 % (adult 55 %); the flicker 2 f slower (steadier); at `mood` −1 9 × 9, 3 tongues kept. The flame never greys |
+| Flame, w × h, tongues | 5 × 7, 1 | 7 × 10, 2 | 10 × 14, 3; flame base about 4 px above the back line | **the hearth**: 12 × 14, wider but not taller, 3 tongues with the middle one tallest; core 65 % (adult 55 %); the flicker 2 f slower (steadier); at `mood` −1 9 × 9, 3 tongues kept; **a coal bed** in its base (the elder-only extra, below). The flame never greys |
 | Horns: 2, swept back along the neck line, `celTaper` in `horn` | 3 px buds, r 1.5: near-round nubs on the top-back of the cranium pointing up and back (a flat 6 × 3 capsule read as a bruise) | 5 px, r 1.5 → 1 | 8 px, r 1.5 → 1, bent +20° at the midpoint | as the adult (8 px, bent +20°) |
 | Back row | none: a smooth back leaves the flame and head as the only high points | none | none | none |
-| Wings | nub | bat, 2 spars, 2 px scallops | bat, 3 spars, 3 px scallops | bat, 3 spars, 3 px scallops; tears at 0.35 / 0.60, a 4 × 4 hole in flight (2.9) |
+| Wings | nub | bat, 2 spars, 2 px scallops | bat, 3 spars, 3 px scallops | bat, 3 spars, 3 px scallops; ragged tears at 0.35 / 0.60, a notched 3 × 3 hole at full spread (2.9) |
 | Head | round, no ridge | 1 px brow bump | 2 px brow bump | 3 px brow bump; grey muzzle, tuft and beard (2.5) |
 | Markings: flame-lick chevrons in `marking`, pointing up: chunky filled carets (5.2), SOLID (no notched foot: notched, the adult's three read as the letters "A A A") | 1 on the **tail base**, 4 × 4 (the baby's shoulder is under its head) | 5 × 5: tail base + haunch | 6 × 6: tail base + haunch + shoulder | as the adult, greyed at half strength (3.9) |
 
@@ -674,6 +678,7 @@ These are the baby's tones. Every older stage derives its own from its greyed co
   - **Asleep:** banked to 0.6× in `glow.sh` `#a87020`, one tongue swapping every 12 f, no core, never under 4 × 5. This marks sleep at a glance. A 2 × 2 `glow` ember stays lit low in the bud on every sleeping frame, and on each sleeping inhale the bud grows to 0.7× and the ember to the core's shape (≥ 2 px, low in the base), so the bud reads as alight but resting (5.1 #8's light marks on emitters gain this banked ember). Lit only on the inhales, the bud between them was a brown seed pod, a cattail or an acorn, near the body's own value.
   - By act: the walk swaps every 4 f with the tip leaning back; happy is 1.4× for 30 f; beg is 0.6× with no core; the bath sputters at 0.6× on 3 f swaps; the wake flares to 1.2× for 10 f after the eyes open (4.3).
 - **Adult-only extra:** the third tongue and the bent horns.
+- **Elder (v2).** The cue is **the hearth** (the table): wider, steadier, the one colour that never greys. Fire's body greys only as an elder and least of all (scale weight 0.3, darkening toward brick, 3.9): greyed fully, luminance-kept, fire and spike merge under protanopia; its age shows on the silver back and crown, the belly and wings (at 0.6: fully, the orange belly went khaki and the wine membrane brown), the muzzle, tuft and beard. **Elder-only extra: the coal bed**, permanent at every mood: the hearth's bottom 2 rows, inside the flame's ink, in `glow.sh` `#a87020`, with two 2 × 2 `glow.hi` specks that swap places with the flicker's keys; it stays through `mood` −1 (a banked hearth still has coals) and merges into the banked flame asleep, where the ember of 3.2 carries on. Gate (a): coal / flame 58 %, speck / coal 69 %. (The first draft's hearth smoke is dropped: smoke off the flame is fire's sigh, hungry tell, fizzle and bath steam, and on the element whose flame is its mood meter it read as the fire going out.)
 - **Smoke** (the tell, the sighs, the jet's end, the hiccup) is opaque `#a4a8c0` (the catchlight's shadow tone, a cool pale grey) in a 1 px `horn` ring, each group's rings drawn before any fill so it merges into one cloud, fading by shrinking, never by alpha (5.1 #14). It replaces `horn` at α 0.5 / 0.45. (A derived tone: no palette gate checks it.)
 - **Signature: Fire Breath.**
   - **Tell:** 2 nostril smoke puffs, r 2.
@@ -691,8 +696,10 @@ These are the baby's tones. Every older stage derives its own from its greyed co
 - **The quills are its mood meter, and bristling is its alarm.**
 - It is slow to bond, and *where* you pet it matters: stroking its back makes it bristle, the head and chin build trust. (Lightning's zap comes from boredom instead, so the two never punish the same mistake: 3.5.)
 - Adults shed quills, which are a collectible.
+- **v2: spikier** (D26). Fewer, taller back quills and a row of tail quills with flats between them (the table): the tallest adult quill 12 → 15 px, its base-to-height ratio 1 : 1.5 → 1 : 1.9, the tail row 3 → 4 quills from 9 px at the root; still plain `horn`, still leaning back 28° at rest (upright stays the bristle alarm's alone, so it looks friendly, not aggressive), and the stages still a ladder: the baby's seed nubs about half the adult's height, the young's sprout about three quarters.
 
 **The cue: the comb back.** A row of pale bone quills from the nape to the tail: triangles in plain `horn`, drawn before the body so their roots are hidden, the whole comb **one path** stroked once and filled once (1.2), so neighbours share one outer ink line.
+- **The overhang rule (v2).** At the 28° rest lean a quill's tip sits h sin 28° = 0.47 h behind its base; past the gap to the next quill (the pitch) the tip hangs over the next notch and the ÷ 3 saw fills in (the "flat box" of cast reviews 1 and 2). So no quill is taller than **pitch / 0.47**, and the rule holds **after** the pet's seeded ± 1 px length variant (2.8): `backRow` clamps each quill's h + `lenVar` to pitch / 0.47 (the v2 review: a +1 pet grew the adult's 15 px quill to 16 against its 15.7 limit, and its tip overhung the next notch by 7.5 px). The adult back's 4 quills over its 22.1 px span sit 7.37 px apart (≤ 15.7 px; five at 5.5 px apart were already at their 11.7 limit), the young's 7.24 (≤ 15.4), the adult tail's t pitch 0.18 × 37.8 px = 6.8 (≤ 14.5); on the tail each base is also ≤ pitch − 1, so a flat of tail shows between teeth (bases as wide as the pitch made a continuous saw of tooth-white points: teeth, the v2 review). SW counted its proposal on the ÷ 3 top edge (`view=silhouette`, seeds 1–3 × t 0 / 40 / 80 × 3 phases), notches ≥ 1 px | ≥ 2 px deep a frame, v1 → SW: adult idle 4.7 | 1.1 → 5.4 | 2.6, adult `mood` −1 4.3 | **0.0** → 5.5 | 2.6, adult walk 4.4 | 0.4 → 5.4 | 2.7, adult asleep 1.1 | 0.6 → 1.7 | 1.2 (at least 1 on every frame, where v1 had frames with none); young idle 3.7 | 1.0 → 4.1 | 2.0, young `mood` −1 3.3 | 0.4 → 4.1 | 1.0; baby 1.1 | 0.2 → 1.2 | 0.6. The revised tail row, the young's 11 px peak and the baby's 8 / 7 / 6 nubs are re-counted the same way in the element pass (the back, which carries most notches, is SW's). The mood gauge keeps its fractions (all heights scale together: 69 % of upright, 78 % of rest at −1). The taller mid-back quills show over the spread leaf through the preen's hold, the round-2 gap.
 - **Along the tail.** The quills carry on along the *top* of the tail, shrinking toward the tip. The tail tip itself is a plain taper (D5). A tail quill stands only while its side of the tail faces at least 37° above level, growing in to full by 53°: at 14°, the first quill of a tail hanging from the rump (the young's quill ball, the lie-down, the wake) stuck straight back out as a lone stinger.
 - **Lean and length, driven by `mood` like every other cue (D7).** `mood` −1: the quills **shrink to × 0.8** (bases too) and lean only **30°** back, a sad, flattened comb that keeps 0.8 cos 30° = 69 % of the upright height; `mood` 0: 28° at full length; `mood` +1: 15°, perky, with the ripple. Babies lean only (25° → 14° → 7°). Leaning the droop out instead (50°; the young 36°), each tip overhung the notch behind it by h sin(lean), 9.2 and 5.3 px against quills 5.5 and 7.3 px apart, and at ÷ 3 phase 2 the young's back was flat with one step and the adult's a flat-topped box (the cast reviews, rounds 1 and 2). At 30° the overhang is 0.4 h: counted on the ÷ 3 top edge at phase 2, 3 or more notches on 8 of 9 sampled frames of the young (seeds 1–3, t 0 / 40 / 80; 2 on the ninth) and 9 of 9 of the adult. At × 0.74 (the gauge's 64 %) the young's teeth stood 4 px and phase 2 kept two. (The rest lean was 35°; at /3 the young saw came down to 2 px bumps.) Hungry and sad read as a droop, happy as a lift, the same direction as the other five cues.
   - The **back** quills' lean is measured from the **world's** upright (the body's pitch leaned back out), capped relative to the body where lean and length together keep 64 % of the upright height (50° at full length, 36° at −1's × 0.8; babies 25°); the tail quills lean from their own tail segment. Measured from the body, the beg's 14° nose-up sit made its 39–47° droop stick out flat behind like twigs. Bristle and the breath's wind-up bring them upright **and** full length.
@@ -701,19 +708,20 @@ These are the baby's tones. Every older stage derives its own from its greyed co
 
 | Feature | Baby | Young | Adult | Elder (weathered) |
 |---|---|---|---|---|
-| Quills (count × height, base; v2 spikier, D26: back `[x rump 0 → neck 1, h, base]`, tail `[t, h, base]`) | 3 soft nubs, points rounded 1 px, on the **loin, rump and tail**: rump `[−8.25, 10, 5]`, loin `[−2.25, 9, 5]`, tail `[0.6, 8, 5]` (v1: 6, 6 and 5 tall at −7.75 / −2). Taller nubs, not more: a 4th nub took the deep notches from 0.2 to 0 a frame; the baby's head covers the front 60 % of its back. Lean at half the adult range (25° → 14° → 7°). **Asleep** `[10, 9]` + `[8]` | 3 on the back `[0.04, 9, 6] [0.48, 13, 7] [0.92, 10, 6]` (v1 [8, 10, 7] on base 6) + **2 on the tail** `[0.20, 7, 6] [0.42, 5, 5]` (v1: one): the added tail quill is the young's growth step. Three at about 7 px keep a saw at ÷ 3 even at `mood` −1 (four teeth over the young's short back merged into a flat edge). **Asleep** `[10, 9, 8]` + `[7, 5]`, graded against the back line so the tips run level | **4** on the back `[0, 10, 8] [0.333, 14, 8] [0.667, 15, 8] [1.0, 10, 8]` (v1: 5, [7, 11, 12, 10, 7]) + **5 on the tail** at t 0.12 / 0.26 / 0.40 / 0.54 / 0.68, heights 9 / 8 / 7 / 6 / 5, bases 7 / 6 / 6 / 5 / 5 (v1: 3, [6, 5, 4]); none past t 0.68, so the last ~12 px of the tail are a plain taper. **Asleep** tall and short by turns, `[13, 5, 13, 12]` + `[9, 8, 7, 6, 5]`: a level crown. Wide bases (at 5 to 6 px a leaning quill left 1 to 2 px of bone between two ink edges, a grey scribble). All in plain `horn`, no dark tips | as the adult, each back quill 1 px taller where the pitch allows: `[0, 11, 8] [0.333, 15, 8] [0.667, 15, 8] [1.0, 11, 8]`; tail heights 10 / 9 / 8 / 7 / 6, bases 7 / 7 / 6 / 6 / 5. **One chipped quill**: the pet seed picks back quill 1 or 2, snapped at 65 % of its height to a flat top about 3 px wide, still in the comb's one path (a shed quill, gentle, not battle-scarred). **Asleep** `[14, 6, 14, 13]` + `[10, 9, 8, 7, 6]` |
+| Quills (count × height, base; v2 spikier, D26: back `[x rump 0 → neck 1, h, base]`, tail `[t, h, base]`) | 3 soft nubs, points rounded 1 px, on the **loin, rump and tail**: rump `[−8.25, 8, 5]`, loin `[−2.25, 7, 5]`, tail `[0.6, 6, 5]` (v1: 6, 6 and 5 tall at −7.75 / −2; SW's 10 / 9 / 8 stood 67 % of the adult and put a 10 px lump behind the hips beside the baby's 5 × 7 flame, fire's zone: the v2 review). Taller nubs, not more: a 4th nub took the deep notches from 0.2 to 0 a frame; the baby's head covers the front 60 % of its back. Lean at half the adult range (25° → 14° → 7°). **Asleep** `[8, 7]` + `[6]` | 3 on the back `[0.04, 8, 6] [0.48, 11, 7] [0.92, 9, 6]` (v1 [8, 10, 7]; SW's 13 px peak was 87 % of the adult, a sprout no longer) + **2 on the tail** `[0.20, 7, 5] [0.42, 5, 5]` (v1: one): the added tail quill is the young's growth step. Three at about 7 px keep a saw at ÷ 3 even at `mood` −1 (four teeth over the young's short back merged into a flat edge). **Asleep** `[9, 8, 7]` + `[6, 5]`, graded against the back line so the tips run level | **4** on the back `[0, 10, 8] [0.333, 14, 8] [0.667, 15, 8] [1.0, 10, 8]` (v1: 5, [7, 11, 12, 10, 7]) + **4 on the tail** at t 0.14 / 0.32 / 0.50 / 0.68, heights 9 / 7 / 6 / 5, bases 5 / 5 / 5 / 4 (≤ the 6.8 px pitch − 1; v1: 3, [6, 5, 4]); none past t 0.68, so the last ~12 px of the tail are a plain taper. **Asleep** tall and short by turns, `[13, 5, 13, 12]` + `[9, 7, 6, 5]`: a level crown. Wide back bases (at 5 to 6 px a leaning quill left 1 to 2 px of bone between two ink edges, a grey scribble; the tail's shorter quills stand closer to their own segment). All in plain `horn`, no dark tips | **the adult's comb, unchanged**: no quill chipped, taller or worn (wear is the wings' alone, D21), plus the **sap-buds** (below). **Asleep** as the adult |
 | Brow thorns: 2, pointing back, lying back along the neck line, rooted on the cranium's **back** contour (145°) as fire's horns are (rooted on its top, at 105°, they stood up like ears; then, lying back, they lay along the skull's own top and read as a pale strap or goggles), tapering to a point (r → 0.5: with a round 2 px end the thorn read at game scale as a pale capsule, a hair clip or a bandage), and never more than 20° above or 40° below straight back in the world (3.0) | none | 3 px, r 1.5 → 0.5 (the far one culled: one thorn) | **7 px** (v2; 7 + the seeded +1 = 8, the adult head cap), r 1.5 → 0.5; the far thorn forks at 8° (`farTilt`), so the overlap cull removes it and one thorn shows, as on the young (at the adult default 28°, and still at 16–20°, it lay over the near one as a flat grey slab, a hair clip) | 7 px, as the adult |
-| Wings: leaf-shaped, smooth convex trailing edge, the spar is the leaf's vein | nub | 2 spars | 3 spars. Each spar pokes 3 px past the membrane as a thorn, plus a 4 px wrist thorn. | 3 spars with the thorns, as the adult (parts.ts must let the elder through its adult-only thorn test); a round bite 4 × 2 in the leaf's edge and a 5 × 5 hole in flight (2.9) |
+| Wings: leaf-shaped, smooth convex trailing edge, the spar is the leaf's vein | nub | 2 spars | 3 spars. Each spar pokes 3 px past the membrane as a thorn, plus a 4 px wrist thorn. | 3 spars with the thorns, as the adult (parts.ts must let the elder through its adult-only thorn test); a round bite 5 × 3 in the leaf's edge and a notched 3 × 3 hole at full spread (2.9) |
 | `foldRise` | 0: the nub rests at 200°, along the flank below the quills, so it never hides one | 0: a folded wing never hides a quill | 0 | 0 |
 | Markings: dark tail rings, 3 px wide; the first at the tail base at every stage, just behind the hip where the tail shows (15 % of a young or adult tail, 32 % of the baby's short one), later rings further out | 1 (tail base) | 2 (+ 45 %) | 3 (+ 40 %, 62 %) | 3, as the adult |
 
 - **Adult-only extra:** the wing thorns.
+- **Elder (v2).** The adult's comb, unworn (the table). Spike's body greys only as an elder, to a lichen green (scale weight 0.9, lightening a little, 3.9), its belly and leaf at 0.6 (fully they went olive-drab), its bone quills never greying, so the pale comb gains contrast as the body greys; its adult grey is the silver back. With the elder's head carried only 3 to 5 px lower (2.1), the tallest quills stay under the head's top, a comb and not a threat display. **Elder-only extra: sap-buds**, drawn at every mood. Two 3 × 3 buds in `glow.sh` `#53b075`, flat and inked, on the back between the rump quill and its neighbour and on the tail between its first two quills, ≥ 1 px clear of any quill's ink (the bud and the bone are 58 % apart even so); at `mood` ≥ 0.5 each carries a 2 × 2 glint in `glow` (56 % over the bud: a `glow.hi` glint on a `glow` bud was 5 %, invisible). "The old bramble fruits."
 - **Signature: Quill Volley.**
   - **Wind-up:** the quills snap upright over 4 f, and the body puffs (stretch 1.06).
-  - **Volley:** 5 real quills (young: 3) fly out in a forward-up fan: all launched from the neck base within 4 f, the most forward quill first, from 20° above level to 60°, toward the facing side at 3 px/f, so the fan opens in front of and above the head (launched straight up first, 85° → 40° 2 f apart, the five stood in one column behind the head and read as a crest or a feather duster). They are drawn with the back row, before the body, so the neck and head lie over them until they clear the silhouette. Each is `horn`, 3 × 6, ink-outlined, trailing a 6 px sap streak (`glow`, flat, with a 1 px `scale` edge so it reads on the pale floor; at α 0.5 it was 5 % from the floor), the streak in whole pixels.
+  - **Volley:** one real quill per back quill, the adult's **4** (v2; v1's 5), the young's 3, fly out in a forward-up fan: all launched from the neck base within 4 f, the most forward quill first, from 20° above level to 60°, toward the facing side at 3 px/f, so the fan opens in front of and above the head (launched straight up first, 85° → 40° 2 f apart, the five stood in one column behind the head and read as a crest or a feather duster). They are drawn with the back row, before the body, so the neck and head lie over them until they clear the silhouette. Each is `horn`, 3 × 6, ink-outlined, trailing a 6 px sap streak (`glow`, flat, with a 1 px `scale` edge so it reads on the pale floor; at α 0.5 it was 5 % from the floor), the streak in whole pixels.
   - **Leaving the comb:** back quill k fires as volley quill n − 1 − k and leaves the comb 5 f after its launch, as its flight comes out from behind the neck and head, front first, one a frame. Gone at the snap, the whole comb vanished while the flights were still hidden: a bare back with nothing in the air. (Launched each from its own place on the back, the quills flew as a parallel row over the back and head: a crest again.)
   - **After 20 f:** each quill pops into **one** sap sparkle for 6 f (2 × 2 `glow.hi` with a 1 px `scale` ring on its four sides, corners cut: a full 4 × 4 box round a pale centre read as a hollow square, and two per quill read as pairs of rings, "oo oo oo"). The fired quills regrow from nothing over 30 f, each base shrinking with its height (full from ⅔ grown, never under 4 px), and a quill under 3 px tall is not drawn: at full base the first frames were ink crumbs along the back line.
-  - **Baby:** it bristles into a puffball (squash 1.15 wide). At the snap the **rump** nub pops off with one sap sparkle, thrown ≥ 14 px up and 8 px over the head, tumbling a quarter turn every 4 f (its bottom 2 px in `horn`'s shadow tone: all cream, on the straw only its ink read, a hollow "▷" play glyph), while the head tips back to watch it ("ah-", cue 4–10). At cue 12 it lands on the back of the head: BONK, the sneeze ("CHOO": the head snaps 10° down), `dazed`, and 3 sap drops fanning out of the snout at −40 / 0 / +30° and 2 / 2.4 / 1.6 px/f for 8 f, born 3 px clear of it (the level one fastest, so they spread as a ">" burst). The nub hops 3 px off the head and drops back into its own socket at cue 18, upright: no crumb, no regrow. (Thrown up and back it hung over the tail nub, then lay behind the tail away from the face; landed on the crown it sat among the dazed stars.)
+  - **Baby:** it bristles into a puffball (squash 1.15 wide). At the snap the **rump** nub pops off (v2: drawn 5 × 8 to match the taller rump nub; `breath()` hard-codes 5 × 6 today) with one sap sparkle, thrown ≥ 14 px up and 8 px over the head, tumbling a quarter turn every 4 f (its bottom 2 px in `horn`'s shadow tone: all cream, on the straw only its ink read, a hollow "▷" play glyph), while the head tips back to watch it ("ah-", cue 4–10). At cue 12 it lands on the back of the head: BONK, the sneeze ("CHOO": the head snaps 10° down), `dazed`, and 3 sap drops fanning out of the snout at −40 / 0 / +30° and 2 / 2.4 / 1.6 px/f for 8 f, born 3 px clear of it (the level one fastest, so they spread as a ">" burst). The nub hops 3 px off the head and drops back into its own socket at cue 18, upright: no crumb, no regrow. (Thrown up and back it hung over the tail nub, then lay behind the tail away from the face; landed on the crown it sat among the dazed stars.)
 - **Ambient:**
   - Quill ripple: each quill (the tail quills included) leans 15° toward upright in turn, from rump to neck, 4 f apart, 10 f each, never more upright than 4°, only at `mood` ≥ 0; babies at 0.6× and 1 px taller at the peak. Each wave comes 240 ± 60 f after the last (each jittered ± 30 f about its 240 f slot: independent ± 60 jitter gave gaps of 120 to 360 f), 1.5× slower with more than 4 dragons on screen.
   - Idle fidget: it grooms its quills (44 f; young × 0.85, baby × 0.6). The head eases round (`inout`; keyed −150, with the neck's arch the whole head angle reaches about −195 to −220) past vertical, so the rig draws it **looking back** (4.1): upright over the shoulder, snout down to the comb, the thorn on top of the skull (pitched upside down, the thorns pointed down like tusks). The eyes shut from f 3; it pecks into the comb every 4 f from f 10 to 30, working the front two quills; it eases back over f 32–44 and opens its eyes at f 40, the head within 40° of level (opening them at f 32 and whipping round 150° in 8 f showed an upside-down open eye).
@@ -730,14 +738,14 @@ These are the baby's tones. Every older stage derives its own from its greyed co
 - **Facets** are tone steps with no lines: planes radiating from a point under the dome, toned **in thirds**. `marking.hi` `#a87a4e` on the lit rear facets (adult 0–1, young 0), the base colour on top (adult 2, young 1), `marking.sh` `#53423d` on the front (adult 3–4, young 2). Only the outermost facets were toned before, 3 px slivers, and the dome read as one flat brown. The baby's pebble is one tone.
 - **Head.** Carried below the dome top, at least 2 px (young 3, adult 4.5 at rest): the neck runs out nearly level from low on the chest (2.3).
 
-| Feature | Baby | Young | Adult | Elder (weathered) |
+| Feature | Baby | Young | Adult | Elder (elder signature) |
 |---|---|---|---|---|
-| Dome, width × rise above the back, facets | 12 × 5, 1 facet: a pebble backpack | 22 × 9, 3 facets (rise 7 → 9: with the head low it still tops the young's silhouette) | 34 × 11, 5 facets | **36 × 12, 6 facets**, a 2 px chip in the rear rim |
-| Crystals: `flat()` `glow` pixel constructions in face space, upright, with a 4-neighbour ink ring, on the rear third; the count is ceil(bond × n), ≥ 1 (`DragonInfo.bond`, 1 when the owner passes none) | 1 seed crystal, 3 × 4 (a 2 px crystal kept a 1 px core, under the mark floor), from hatching, at u 0.15 on the dome, where it stays ≥ 2 px clear of the baby's head (2.6) | 1 to 2: the seed grown to 3 × 5 at u 0.34, + one 3 × 5 at u 0.15 | 1 to 3: the 4 × 7 at u 0.27, + 3 × 5 at 0.11 and 0.43; one `glow.hi` facet on the 4 × 7 only (on a 3 px crystal a facet would be under 2 px), its point off-centre, stepping 4 → 2 → 1 high on the lit left. The outer crystals (the young's rear one, the adult's rear and front) lean outward 1 px per 3 rows with their points on the outer side, so the cluster fans; a dome tipped past 12° (the roll-over) leans them with it | 1 to 4, ceil(bond × 4): the elder crystal **4 × 8** at u 0.27 with the adult's facet stepping, + 3 × 5 at 0.08 and 0.43, + **the fourth**, 3 × 4 at 0.55 (the elder-only extra; at 9 px the cluster read as spike's saw, so it stops at 8) |
+| Dome, width × rise above the back, facets | 12 × 5, 1 facet: a pebble backpack | 22 × 9, 3 facets (rise 7 → 9: with the head low it still tops the young's silhouette) | 34 × 11, 5 facets | **36 × 12, 6 facets**, grown, whole (no chip: wear is the wings' alone) |
+| Crystals: `flat()` `glow` pixel constructions in face space, upright, with a 4-neighbour ink ring, on the rear third; the count is ceil(bond × n), ≥ 1 (`DragonInfo.bond`, 1 when the owner passes none) | 1 seed crystal, 3 × 4 (a 2 px crystal kept a 1 px core, under the mark floor), from hatching, at u 0.15 on the dome, where it stays ≥ 2 px clear of the baby's head (2.6) | 1 to 2: the seed grown to 3 × 5 at u 0.34, + one 3 × 5 at u 0.15 | 1 to 3: the 4 × 7 at u 0.27, + 3 × 5 at 0.11 and 0.43; one `glow.hi` facet on the 4 × 7 only (on a 3 px crystal a facet would be under 2 px), its point off-centre, stepping 4 → 2 → 1 high on the lit left. The outer crystals (the young's rear one, the adult's rear and front) lean outward 1 px per 3 rows with their points on the outer side, so the cluster fans; a dome tipped past 12° (the roll-over) leans them with it | up to 4, **ceil(bond × 3) + 1** (2 at any bond above 0): the elder crystal **4 × 8** at u 0.27 with the adult's facet stepping, + 3 × 5 at 0.08 and 0.43, + **the fourth**, 3 × 4 at 0.55 (the elder-only extra: always one more than an adult of the same bond, so it shows at any bond, where ceil(bond × 4) needed bond > 0.75; at 9 px the cluster read as spike's saw, so it stops at 8) |
 | Nose horn: one, blunt, on the snout, pointing up and forward, near palette; the whole horn ≥ 2 px clear of the eye's largest box (`info.eye`). Young and adult root it on the snout's rounded top-front (its end circle, 60° up from the front) and lean it 60° up in head space: rooted at the tip and leaning forward it continued the snout's line and read as a cigar | 2 × 3 nub **on the snout tip**, leaning forward (35°): behind the tip it sat on the eye's ring | 4 px, r 2 → 1.5 | 5 px, r 3 → 1.5 | as the adult |
 | Brow ridge | none | 2 px | 3 px, a contour bump in the skull path only. No lid over the eye at neutral: a permanent hood made the neutral face read as `sleepy` | 4 px |
-| Tail | a stub, 0.65 as long on a thinner root (r 3.4 → 2), angled down and back, stiff: as long as the body and broad, rising up and back, it read as a beaver's tail | short and thick (root r × 1.2), leaving the hip under the dome's rim nearly level (young 14° down, adult 10°) and curving down 9° (adult 7°) a segment to rest its tip on the ground: a heavy tail with a convex top, a concave step under the rim between the dome's arc and the tail (run straight at 34° it continued the dome's back slope to the floor as one line, and the young and adult read as a wedge, a doorstop or a kickstand: the cast reviews, round 2); the chain's wobble mostly held (`tailStiff` 0.7): bent 6° a segment and let swing, the outline went wavy between segments, a limp flap; tip radius capped at 2 (≤ 4 px, water's zone rule), blunt by its round cap, no club | same | as the adult, resting +13°, +7° (2.3) |
-| Wings: slate | a nub under the dome rim, its root 3 px further back (`rootDx` −3): at the stage root its front showed as a 3 px slate speck in the notch between shell, body and head | stubby, 0.7× span, 2 spars, 1 px scallops | stubby, 0.7×, 3 spars; flaps hard and hops 3 px. It cannot fly: its adult reward is the **boulder hop** (4.2) | stubby, 0.7×, 3 spars; one 2 px tear, no hole (2.9) |
+| Tail | a stub, 0.65 as long on a thinner root (r 3.4 → 2), angled down and back, stiff: as long as the body and broad, rising up and back, it read as a beaver's tail | short and thick (root r × 1.2), leaving the hip under the dome's rim nearly level (young 14° down, adult 10°) and curving down 9° (adult 7°) a segment to rest its tip on the ground: a heavy tail with a convex top, a concave step under the rim between the dome's arc and the tail (run straight at 34° it continued the dome's back slope to the floor as one line, and the young and adult read as a wedge, a doorstop or a kickstand: the cast reviews, round 2); the chain's wobble mostly held (`tailStiff` 0.7): bent 6° a segment and let swing, the outline went wavy between segments, a limp flap; tip radius capped at 2 (≤ 4 px, water's zone rule), blunt by its round cap, no club | same | as the adult, its rest unchanged (2.3) |
+| Wings: slate | a nub under the dome rim, its root 3 px further back (`rootDx` −3): at the stage root its front showed as a 3 px slate speck in the notch between shell, body and head | stubby, 0.7× span, 2 spars, 1 px scallops | stubby, 0.7×, 3 spars; flaps hard and hops 3 px. It cannot fly: its adult reward is the **boulder hop** (4.2) | stubby, 0.7×, 3 spars; one ragged 5 × 3 tear where the panel holds it, no hole (2.9) |
 | Markings | the dome is the marking | same | same | same |
 
 - **Mood.** The dome never changes, so the cue is always at 100 %.
@@ -749,6 +757,7 @@ These are the baby's tones. Every older stage derives its own from its greyed co
     - **Sleep tuck:** the head rests on the ground *outside* the rim, snout forward, eyes `closed`; the tail wraps forward; the crystals go to `glow.sh`; "z" glyphs rise. Breath slows to 240 f.
     - **Upset tuck** (the element anim `upset`, `ACT.upset`, cue = frames into it: an intro of 16 f, young 13, baby 10, then a 96 f loop). Young and adult: the body lies flat, pitched 7° nose-down; the neck folds so the head sits back with its chin on the floor, level (2°: pitched snout-down, the upright `sad` brow read as a scowl). Tuck 1: the dome's front **rolls forward** from its crest as one convex arc, over the crown and the nose horn, down to a round lip 2 px off the floor ahead of the snout tip, a boulder; the lit top and the shaded front meet at one facet step. The rim runs back under the snout, up a wall 2 px ahead of the eye's largest box, then back over the eye, rising 6° toward the front with its ink 2 px above that box, so the window it opens is taller than 4 px (it clears the LARGEST eye box). Over the intro the hood swings down about the crest like a visor, so it never pops on and never sweeps over the eye. The baby has no hood (on a head that big it read as a beret): the sleep bun (tuck 2), its head bowed about 14° over its paws, one `sad` eye open. All stages: `scared` then `sad`, a 1 px tremble every 8 f, the crystals flickering between `glow.sh` and `glow` every 12 f, no "z".
 - **Adult-only extra:** the 3-crystal cluster.
+- **Elder (v2).** The dome grows to 36 × 12 with 6 facets, whole; the head drops about 2 px (half the elder's neck lowering, 2.3), staying 6 px under the dome's top. The sandstone greys least in the cast (scale weight 0.25, D28): it must keep its simulated saturation against the sea-green water under protanopia. Its age shows where the colour is free to move: the **dome** greys at full weight (`#7e5f44` → `#746255`, S 0.46 → 0.27, still chromatic, so the dim crystals keep their hue pass on it, gate h), the cream belly at 1.5 (`#fff5cc` → `#f8f5e8`), the silver crown, the slate wings, and the elder face: a pale stone muzzle and tuft `#dddddb` and a mid stone beard `#afafae` (2.5). **Elder-only extra: the fourth crystal** (the table): permanent, one more than an adult of its bond, a cluster of 4 at full bond.
 - **Signature: Gravel Roar.**
   - **Tell:** the crystals flash `glow.hi` for 4 f, twice, and the head lowers.
   - **Blast:** jaw at 25° (young 22), the eyes `closed` for the snap's first 8 f.
@@ -788,14 +797,15 @@ These are the baby's tones. Every older stage derives its own from its greyed co
 
 | Feature | Baby | Young | Adult | Elder (weathered) |
 |---|---|---|---|---|
-| Bolt wings, h × w, notches, rest cock | 2 bolt nubs, 12 × 5, one zigzag step 2 px deep at 55 % of the height, a pointed tip, at 105° from (−3, −6): the only upright shape behind a baby's head (about 37 px² of it clears head and body). The far nub tucks INSIDE the near one's outline, (−1, −1) net (`farDx` −1, `farDy` 1), so the seed is one spire with an olive rim: stepped 4 px back it stood apart as a second 12 px tooth, and the pair gave the baby a two- or three-point top edge at /3, the saw language on spike's back line | 16 × 10, 2 notches, 115° | 28 × 15, 2 notches, 115° | **× 1.1** (31 × 16.5), 2 notches, rest cock **118°**; the lowest trailing tooth chipped and a 3 × 2 tear on the upper trailing edge (2.9) |
+| Bolt wings, h × w, notches, rest cock | 2 bolt nubs, 12 × 5, one zigzag step 2 px deep at 55 % of the height, a pointed tip, at 105° from (−3, −6): the only upright shape behind a baby's head (about 37 px² of it clears head and body). The far nub tucks INSIDE the near one's outline, (−1, −1) net (`farDx` −1, `farDy` 1), so the seed is one spire with an olive rim: stepped 4 px back it stood apart as a second 12 px tooth, and the pair gave the baby a two- or three-point top edge at /3, the saw language on spike's back line | 16 × 10, 2 notches, 115° | 28 × 15, 2 notches, 115° | **28 × 16.5**: the adult's height (the elder's 1.02 height cap), 1.1× as wide, with a **third tooth** (the elder-only extra); rest cock 115°, the adult's; a ragged tear on each bolt's upper trailing edge (2.9), no chipped tooth |
 | Horns: 2, swept back along the neck line, with one kink at 60 % of their length | 3 px buds, pointing up and back | 5 px, r 1.5 → 1 | 8 px, r 1.5 → 1 | as the adult |
 | Back row | none | none | none | none |
-| Tail | thin, straight and stiff, 0.65 as long, lifted a perky 12°; a plain taper to a true point (tip r 0.5); motion is stepped (4 f holds) | the same, full length, lifted 5° (level it was a ruler-straight rod, and its round-capped tip read as a spear's end) | same | as the adult, level (0°, 0°), still stepped |
+| Tail | thin, straight and stiff, 0.65 as long, lifted a perky 12°; a plain taper to a true point (tip r 0.5); motion is stepped (4 f holds) | the same, full length, lifted 5° (level it was a ruler-straight rod, and its round-capped tip read as a spear's end) | same | as the adult, lifted 5°, still stepped |
 | Markings: yellow Z-stripes, 3 px thick, below the wing root, ≥ 3 px above the belly line (preferred; 2.7) | 1 on the **tail base**, 5 × 5 (the baby's shoulder is under its head; a 6 px Z never fits whole in its thin tail) | tail base 6 × 6 + haunch 6 × 7 (a 5-wide Z has no step at any height and reads as a slash) | tail base 7 px + haunch and shoulder, 6 × 8 (the lean flank between the leg roots and the back holds no 9 px Z whole) | as the adult, greyed at half strength |
-| Build | lean (depth 0.85), long legs (1.2), head high | same | same | same, the head 7 px lower |
+| Build | lean (depth 0.85), long legs (1.2), head high | same | same | same, the head about 4 px lower |
 
-- **Mood:** cock 140° (sad; the spire keeps 79 % of its rest height) → 115° → 95° (excited). The baby nubs run 125° → 105° → 95°.
+- **Mood:** cock 140° (sad; the spire keeps 79 % of its rest height) → 115° → 95° (excited). The baby nubs run 125° → 105° → 95°. The elder's (v2) run the adult's 140° → 115° → 95° (EL's 118° rest leaned toward the sad 140°).
+- **Elder-only extra (v2): the third tooth**, permanent at every mood: the elder bolt keeps the adult's leading edge (0, 0) → (−3, −13) → (−8, −28) and height, and its trailing edge steps three times, (−8, −28) → (−15, −20) → (−11, −20) → (−16, −12) → (−12, −12) → (−16.5, −5) → (−12.5, −5) → (−8.5, 0): each shelf ends 5.7, 9.2 and 11.3 px behind the leading edge (the adult's: 5.7 and 9.2), so the 3 px spar and ≥ 2 px of yellow survive at every step, and the storm has grown a tooth. Its teeth sit 7 to 8 px apart, about 2.5 px at ÷ 3: the element pass checks they keep the spire's zigzag and do not fuse into a comb (if they do, the third tooth goes and the extra is the arc below, made permanent). **Ambient (elder):** at `mood` ≥ 0.5, every 150 ± 40 f (1.5× slower in a crowd), a 3-segment stepped spark in the signal yellow jumps from the near bolt tip to the far one for 4 f; it shares the crackle's budget. Its body greys at half strength (so it stays clear of dusk's dark blue, 3.9), its membrane too (it is the signal); its bolts carry a tear each (2.9).
 - **Adult-only extra:** **charge**. Above `mood` 0.5 one spark crawls from the near horn's tip to a bolt tip, the near and the far one in turn, in 6 hops of 3 f (18 f), every 90 ± 30 f (1.5× slower in a crowd), sharing the ambient budget with the crackle. Crawling every frame, a well-kept adult (above 0.5 most of its life) flickered all the time and never rested.
 - **Signature: Spark Bolt.**
   - **Wind-up:** the wings flare to 95°. Spark crawlers (the spark glyph, below) hop between the horn tips and wing tips every 3 f for 18 f, and the **pupil contracts** (the stepped pose channel `pupil`, keyed by `tuning.breath.pupil` until the snap: 2.5).
@@ -816,25 +826,35 @@ These are the baby's tones. Every older stage derives its own from its greyed co
 - Its spots dim when it dries out or is sad.
 - It sings in bubbles, follows toys and floats belly-up in the pond.
 
+**Colour (v2): sea green** (D27). The body is "light sea green" `#28b0a6` (H 176, S 0.77, L 0.34), its fins and fluke a deep sea green `#185e5b` (0.26× the body's luminance, inside D11's range), its nostril `#0c2a2a`, its blush `#ffbccb`; the sea-foam belly, pearl horn and spots, aqua glow and gold iris are kept. SW's search over the gates, with the dusk dragon in the cast and no pair allowed to separate on hue alone: **no water with hue ≤ 170 and S > 0.42 passes**. A vivid true sea green (`#2aa88a`) turns into a near-grey at fire's value under deuteranopia (2 % apart); darker, the fire pair separates on hue alone; lighter, it fails rock under protanopia. Hue 173 to 178 is the greenest a vivid water can be.
+
+**The user's choice (v2 review).** `#28b0a6` is 0.007 Oklab ΔE from CSS "lightseagreen", a colour many players call teal or turquoise, so before it is final the user sees three options on the rig, `shots/v2/water_sea_green_options.png` (top to bottom, each baby / young / adult):
+1. **light sea green `#28b0a6`** (the default): the greenest vivid water that passes every gate; reads teal to some eyes.
+2. **true sea green `#2aa88a`** (H 166): reads plainly sea green; fails the deuteranopia gate against fire (the two bodies 2 % apart for about 1 player in 16), so choosing it means moving fire or water's value and re-running the whole cast.
+3. **jade `#68a794`** (H 162, S 0.38): greener and passes, but the least saturated body in the cast, dusty beside the others, and it greys toward the chromatic floor as an elder.
+
+The membrane stays the deep sea green `#185e5b` (the fluke is the cue, so it carries the "sea" in every option): the readability review proposed a bluer `#16566e` to part it from spike's leaf membrane (0.045 ΔE), but beside the revised dusk body `#1f5580` that lands 0.019 ΔE from the dusk dragon's own body; the care review proposed a greener one, which lands on spike's leaf. Instead water's fins grey at 0.6 and spike's leaf at 0.6, so their elders do not converge on one grey. Measured against the v1 cyan: scale.sh / membrane 29 → 43 %, lightning / water now passes on hue and value (it was value only). Nothing in water's construction changes: the fins and fluke take the new membrane, pearl rays sit 90 % from it, bubble and drip rings 87 % from the floor.
+
 **The cue: the fluke tail.** A vertical crescent fluke at the end of the longest, flattest, level body in the cast (the body and tail form a bar about 3.5 : 1).
 - **Construction.** The fluke is `membrane` with 2 tones (no highlight) and 2 px rays in `horn` that radiate from the tail's end, just outside its contour, toward each lobe tip (from 2.5 px out they were 2 × 3 stubs by the lobe's back edge). Rays, the fin-ear ray and the lobe dots are whole-pixel runs in face space (`pixelStroke`): a 2 px stroke in the rotated tail-tip space anti-aliased into mush. The rays sit on 10° angle buckets, so they no longer crawl as the tail sways. The adult's glow dot sits at (−depth + 3.5, ± (h/2 − 2.5)) at the REST height, so it stays whole when the lobes flare, and its ray stops so ≥ 1 px of membrane shows between them. There is no ink line across the tail / fluke joint.
 - **Notch.** A central notch ≥ 3 px deep keeps both lobes readable.
 
 | Feature | Baby | Young | Adult | Elder (weathered) |
 |---|---|---|---|---|
-| Fluke, h × depth | paddle 10 × 6, no rays, on a thinner tail (r 3.5 → 1.5, 2.3): a tadpole paddle clearly wider than the tail that carries it, ONE rounded leaf in one flat `membrane` tone, widest two-thirds of the way out, its back end round. Its top and bottom edges leave the tail's own contour 6 px before the tip and swell out along it, drawn only outside the tail and its ink, so the tail runs into the fin. A disc hung on the tip read as a lollipop; notched at the back, banded and with the tail run on through it, it split into two round dark lobes, a dog-bone or a club end | crescent 11 × 6, 2 rays | crescent 16 × 8, 2 rays, notch ≥ 3 px, and a 2 × 2 `glow` dot set 2 px in from each lobe tip (the tips themselves are under 3 px wide). A third ray down the middle fills the notch, and a lobe 4 to 5 px thick holds one 2 px ray: the adult's extra is the dots | **18 × 9**, notch ≥ 3 px; each lobe a **2 px nick** in its back edge 3 px from the tip, the glow dots ≥ 2 px from it |
+| Fluke, h × depth | paddle 10 × 6, no rays, on a thinner tail (r 3.5 → 1.5, 2.3): a tadpole paddle clearly wider than the tail that carries it, ONE rounded leaf in one flat `membrane` tone, widest two-thirds of the way out, its back end round. Its top and bottom edges leave the tail's own contour 6 px before the tip and swell out along it, drawn only outside the tail and its ink, so the tail runs into the fin. A disc hung on the tip read as a lollipop; notched at the back, banded and with the tail run on through it, it split into two round dark lobes, a dog-bone or a club end | crescent 11 × 6, 2 rays | crescent 16 × 8, 2 rays, notch ≥ 3 px, and a 2 × 2 `glow` dot set 2 px in from each lobe tip (the tips themselves are under 3 px wide). A third ray down the middle fills the notch, and a lobe 4 to 5 px thick holds one 2 px ray: the adult's extra is the dots | **18 × 9**, grown, whole, notch ≥ 3 px; the lobe dots grown into **3 × 3 pearls** in `horn` (the elder-only extra), ≥ 2 px in from each lobe tip |
 | Fin-ear: ONE, drawn behind the neck and skull (at `farHead`, in the near palette: only its contour-breaking part shows), riding on the neck, its lower edge along the neck's top contour and its root hidden behind the back of the skull; a small fan with a webbed trailing edge (two shallow scallops and a middle point). The far ear is not drawn (1.5: it was a sliver cap over the near one), and a round lobe read as an ear-cup or a headphone. Length past the skull × height: | 4.5 × 4 | 5 × 4, no ray | 7 × 6, 1 ray (from the skull's contour to the edge's middle point) that shows ONLY when it flares: at rest a 2 × 4 white bar in a small dark fan read as a headphone highlight or a cat's inner ear | as the adult |
 | Horns | none: a smooth, domed forehead | none | none | none |
 | Dorsal fin: low, continuous, round scallops, `membrane` | none | 2 px, 2 scallops | 3 px, 3 scallops (inside spike's zone budget) | as the adult |
-| Wings: fin-wings with a rounded, smooth trailing edge and no scallops | nub | 3 rays | 4 rays | 4 rays; splits 2 × 4 between rays 2–3 and 3–4, and a 5 × 5 hole in flight (2.9) |
+| Wings: fin-wings with a rounded, smooth trailing edge and no scallops | nub | 3 rays | 4 rays | 4 rays; ragged 5 × 4 notches between rays 2–3 and 3–4, and a notched 3 × 3 hole at full spread (2.9) |
 | Markings: pearl spots, 3 × 3, on the lateral line, ≥ 3 px apart. The first sits low on the rear flank at every stage (2.7); the rest run forward along the flank and back along the tail's side, and the pet seed steps each one after the first 1 px across the line, **alternating** up and down, so the row never reads as a dashed stripe or as pairs at one height. The flank anchor is the lateral line itself, halfway down from the back to the belly line. The last tail spot is authored `dx` −2 (it predates the tail fit's counting of the seeded `dx`: 2.7) | 2 (flank + tail) | 3: 1 flank + 2 tail (t 0.18, 0.52): the young's visible flank between the folded wing and the leg roots is one spot tall, and two flank spots fitted side by side at one height on every seed, a pair | 5 (3 flank + 2 tail at t 0.2 / 0.45) | 5, as the adult |
 | Build | long (1.1), low legs (0.8), long neck (1.3), long level tail (1.15) | same | same | same, the neck × 0.92 (2.3) |
 
 - **Mood.** Three spot states, each ≥ 40 % from the next (gate h):
   - `mood` ≥ +0.5: spots swap to `glow` `#40d8f0` (40 % from the resting spot; the first draft's `#7ff4ff` was only 18 % from it, and the marking is too grey for hue to count), and the fin-ear **flares**: +10° over the neck line and 2 px longer, with its ray. (Open, for the bible owner: `#40d8f0`, luminance about 0.57, is darker than the resting pearl `#dcfff6`, about 0.95, so happy spots read duller, not lit. Proposed: at +1 keep the pearl and add a flat 1 px `glow` halo, a 4-neighbour ring, round each spot, which needs the rig to draw a ring round fitted markings or `markingTone` to return a fill and a ring.)
   - rest: spots in `marking` `#dcfff6`.
-  - `mood` ≤ −0.3 (dry or sad) and asleep: spots dim to `moodTones().dimSpot` `#7ed1e2` (41 % from the resting spot, 44 % from the scale), the fin-ear droops (8° below the neck line, folded to ¾ length, no ray; standing, the 40° world clamp takes it further) and the fluke droops 15°. The fluke keeps its full size. At rest the ear sits 4° over the neck line; where the neck rises steeply behind the head (eat, asleep) it lifts 4° at a time until it clears the neck, so asleep it lies up-back along the nape, about 20° above straight back.
+  - `mood` ≤ −0.3 (dry or sad) and asleep: spots dim to `moodTones().dimSpot` `#82d8ce` (38 % from the resting spot, 41 % from the scale; v1's cyan gave `#7ed1e2`, 41 / 44 %), the fin-ear droops (8° below the neck line, folded to ¾ length, no ray; standing, the 40° world clamp takes it further) and the fluke droops 15°. The fluke keeps its full size. At rest the ear sits 4° over the neck line; where the neck rises steeply behind the head (eat, asleep) it lifts 4° at a time until it clears the neck, so asleep it lies up-back along the nape, about 20° above straight back.
 - **Adult-only extra:** the lobe glow dots and the dorsal fin.
+- **Elder (v2).** The fluke grows to 18 × 9, whole (the table); the neck is capped (× 0.92) so the elder is ≤ 1.08× the adult's length. Water greys at 0.8 with its luminance kept (3.9): darkened as it greys (SW's −0.3 drift), its elder met fire's value under deuteranopia; its fins at 0.6; its elder face is a sea-foam frost (2.5). **Elder-only extra: the pearls**, permanent at every mood: the adult's 2 × 2 lobe dots grown to 3 × 3 pearls in `horn` `#eaf6f0` on the fluke's membrane (90 %; the pearl-white horn is also its rays and spots' family), "the old tide dragon's pearls". (The first draft's barnacles, inked 3 × 2 cones on the tail top, left a 1 px top row under the mark floor, read as ticks or warts, and used spike's pale-points language in spike's zone: the v2 review.)
 - **Signature: Bubble Jet.**
   - **Wind-up:** cheeks puff (head squash-x 1.1) and the fin-ear flares.
   - **Stream:** a bubble every 4 f (young 6) from cue 3 over the whole sustain: the adult's 9, r 2 to 5 with one r 6 at the jet's middle (radii 3, 2, 4, 2, 6, 2, 5, 3, 4; its 8 of r 2 to 5 were a few small bubbles beside fire's flame, the cast review, round 2), the young's 4, r 2 to 3; along the snout at 2.5 px/f, life 18 f + a 2 f pop, in a seeded cone of ± 8 to 12° on alternating sides, so the rings keep ≥ 2 px of air between them. Each swells from r 1 by 1 px every 2 f as it leaves the lip.
@@ -869,8 +889,9 @@ These are the baby's tones. Every older stage derives its own from its greyed co
 > If the user meant something else, two things change: the palette column and the head-zone cue. Everything else is parameters.
 
 **Identity and care.**
-- Dramatic, clingy and nocturnal.
+- Dramatic, clingy and nocturnal: **the night owl** of the cast (dusk is the early sleeper, 3.8).
 - It shrieks for attention when lonely, chirps when content and sings when happy.
+- (v2, the rename.) "Slink" is given a motion of its own: its walk is a low, crouched, stop-and-go bat crawl (4.3), so the name fits the dragon as well as the wings.
 - Loud noises make it flatten its fans.
 - It is the hardest to settle, and it bonds the deepest.
 
@@ -887,19 +908,20 @@ These are the baby's tones. Every older stage derives its own from its greyed co
 
 | Feature | Baby | Young | Adult | Elder (weathered) |
 |---|---|---|---|---|
-| Ear-fans, h × w, ribs, edge | 10 × 8 fennec leaf, 1 rib, on top of the cranium | 13 px tall, 2 ribs as 1 pleat, 1 scallop 3 px deep on the near fan | 17 px tall, 3 ribs as 2 pleats, 2 scallops 3 px deep on the near fan | **19 px** tall, **4 ribs as 3 pleats**, 2 scallops; a **nick** (a V 3 wide × 3 deep) in the near fan's upper-back scallop, an old tomcat's ear; frosted tips (below) |
+| Ear-fans, h × w, ribs, edge | 10 × 8 fennec leaf, 1 rib, on top of the cranium | 13 px tall, 2 ribs as 1 pleat, 1 scallop 3 px deep on the near fan | 17 px tall, 3 ribs as 2 pleats, 2 scallops 3 px deep on the near fan | **19 px** tall, **4 ribs as 3 pleats**, 2 scallops, whole (no nick: wear is the wings' alone); frosted tips (below) |
 | Horns | none: the fans replace them | none | none | none |
 | Eye mask in `marking` (lilac `#9a6aa8`), from the snout base to behind the eye (the mint iris sits inside it): a pale "spectacles" patch on the dark head, drawn like the eye as a **pixel bitmap in face space** (3 px behind the eye to 3 px in front, corners cut 1 px), clipped to the skull. A rect in the pitched cranium space stair-stepped into a band that read as a highlight. The ink face marks read on it (97 %) as they do on every other dragon, and it clears the head's shadow (86 %) and highlight (53 %) tones | 6 px tall, present from hatching | 6 px | 7 px | 7 px, met in front by the grey muzzle (53 % apart) |
 | Throat sac: a `membrane` bulge 0.6 of the way up the neck from its root, along the throat's normal, drawn by the element at its breath anchor and clipped behind the head; inked only outside the neck's contour (over the neck's skin it is a colour change); shown while shrieking and through the lonely call | swells 3 px | 5 px | 7 px | 7 px |
 | Legs | thin, bat-like (leg r × 0.75): flat at every stage, so the far leg never has to clear a shadow band (D8) | same | same | same |
 | Jaw | depth 1.3, opens to 40° (the element's jawMax 40 replaces the young's 34) | same | same | depth 1.3, opens to 36° |
-| Tail | a whip (r × 0.7), plain taper, no barb | same | same | same, resting +21°, −4° |
-| Wings | nub | bat, 3 spars, 3 px scallops | bat, 4 spars, 3 px scallops (at 5 px its four dark spars stood well past the membrane, and the spread wing read as a raised hand, a rake), 3 px thumb claw | bat, 4 spars, 3 px scallops, 3 px thumb claw; tears at 0.35 / 0.45 and a 4 × 4 hole in flight (2.9) |
+| Tail | a whip (r × 0.7), plain taper, no barb | same | same | same: the adult's length (6 × 7, for the 1.10 length cap) and rest |
+| Wings | nub | bat, 3 spars, 3 px scallops | bat, 4 spars, 3 px scallops (at 5 px its four dark spars stood well past the membrane, and the spread wing read as a raised hand, a rake), 3 px thumb claw | bat, 4 spars, 3 px scallops, 3 px thumb claw; ragged tears at 0.35 / 0.45 and a notched 3 × 3 hole at full spread (2.9) |
 | Markings | eye mask | eye mask + one 5 × 4 "volume-bar" chevron on the tail at t 0.4 | eye mask + a 6 × 5 chevron at t 0.3, then a 5 × 4 at t 0.5, stepping down along the whip ("3 px" is the chevron's band thickness, 5.2) | as the adult |
 
 (The fan heights are 10 / 13 / 17 px, not the first table's 10 / 12 / 16: at those sizes three ribs with 2 px of membrane on every side were 1–2 px specks, and they vanished on a pet whose seeded length variant is −1.)
 
 - **Adult-only extra:** the ribs rattle during a shriek (the pleats ± 3°, every 2 f), plus a 4 × 4 nose-leaf bump in the skull path.
+- **Elder (v2).** Fans 19 px with 3 pleats (the table), grown and whole; other head features may then reach 9.5 px, half the elder fan. Its membrane greys at half strength (it is the signal). **Elder-only extra: frosted fan tips**, permanent: a 2 px pigment band along the near fan's top edge in `fanFrostOf` (`#c5c3bf`, halfway from its mid-grey muzzle to the catchlight white): 35 % from the elder's membrane.
 - **Signature: Shriek.**
   - **Wind-up:** the fans fold flat over 10 f, the head pulls back, and the throat sac swells (3 / 5 / 7 px).
   - **Release:** the fans snap from the fold to the dish in 4 f with an overshoot, and the jaw opens to 40°. `event: 'shriek'` on the snap frame (cue 0), young and adult only.
@@ -916,6 +938,154 @@ These are the baby's tones. Every older stage derives its own from its greyed co
   - Fan twitch: one fan flicks for 6 f, alternating near and far, every 120 ± 40 f.
   - Happy: it **sings** a rising 3-note scale: 3 eighth notes at cue 0 / 8 / 16, each 5 × 7 (a 3 × 3 ball, a 2 px stem and a 1 px flag hooking down) in `glow` with a 4-neighbour ink ring (a solid 2 × 2 flag or an 8-neighbour ring read as a boot or a bean), each starting 10 px further out and 5 px higher than the last and rising 8 px over 40 f in the top pass, in alpha steps.
   - **Idle fidget: the echo-ping** (adult 64 f; young × 0.85, baby × 0.6). The head lifts 15° and leans in 2 px, the fans go upright; at f 12 a "))" pair goes out, 5 px apart; at f 30 a "((" pair comes back, centred 30 / 26 / 20 px ahead; at f 43 the fans flick to flare 1.25; at f 45, a happy nod.
+
+### 3.8 DUSK: "Wisp", the lamplighter (v2)
+
+> **This element is an interpretation**, like slinkwing's. The user asked for "a new dragon which is like a dark blue → grey dragon". The reading here takes both senses of the arrow:
+>
+> - **over its life:** it hatches deep navy and silvers to storm slate as an elder, the cast-wide greying (3.9) made its identity, the steepest in the cast;
+> - **along its body:** it is dark blue with grey at the edges (a smoke-grey tail tip, a frosted nose, moth-grey wings), and that grey creeps inward stage by stage.
+>
+> Its element is **dusk**, the blue hour turning grey; its cue is the light it carries into the evening, a **lamp**. Element id `dusk`; nickname **Wisp** (a will-o'-the-wisp is a small light carried at dusk; a wisp of smoke is grey). The user is asked to confirm the name; the runner-up is "Vesper" (the evening star). Built as NB's "Wisp" with NA's grafts (D24); `elements/dusk.ts` is a first-pass placeholder until its element pass.
+
+**Identity and care.**
+- Gentle, dreamy and a little shy: the quiet one. It makes no sound; its lamp speaks for it (the opposite of Echo, loud and clingy). Drowsy by day, brightest at dusk.
+- **Care hook: bedtime.** It wants to be put to bed, and no other element's need is sleep (fire's is food, spike's touch, rock's bond, lightning's play, water's baths, slinkwing's company). A nap refills its lamp. A **tuck-in** (petting it once it lies down) dims the lamp to a nightlight and it sleeps well; with no tuck-in it lies awake with its lamp lit and wakes `grumpy`; woken early, its lamp gutters. As a baby it is **afraid of the dark**, and its lamp is its nightlight. (A possible element anim `tuckin`, in the family of fire's `bath`: not designed yet.)
+- **Social: the habitat's night-light.** Its breath raises `event: 'hush'` (not consumed yet, like `shriek` and `call`), meant to calm neighbours: spike's wary lean eases, slinkwing's lonely call is answered. Echo shrieks in the night; Wisp hushes it.
+- **Growth, the most visible in the cast.** Every stage-up changes four things together: its blue drains away (3.9), its lamp grows from a bud into a lantern, grey creeps in from its tail tip and nose, and its neck lifts, then stoops again as an elder. **The lamp never ages:** it is the one colour an elder keeps from hatching.
+
+**The cue: the crook lamp** (zone: ahead of the face; budgets: 3.0). A thin stalk rises from the front of the brow, arches forward and hooks down; a round lantern with a small silver cap hangs plumb from the hook, ahead of the snout. Flat black at ÷ 3 it is a "?": the head carried high, a thin hook, a knob hanging ahead of the nose.
+- **Stalk.** A cubic Bézier in cranium space from a root on the cranium circle (0.5 px inside it) at the skull's top-front, through P1 and P2 to its tip P3 (the table), stroked in `scale`, 2 px (baby, young) or 2.5 px (adult, elder), inside a 1 px ink line each side. It is flesh, so it is flat, and it is drawn at `nearHead` **clipped outside the skull path**, so its ink stops at the skull's contour and stalk and skull are one silhouette (the construction that makes neck and body one: 1.2). Its visible part starts ≥ 1.5 px outside the eye clip and the whole arch lies ahead of the eye.
+- **Lantern.** A `flat()` disc of radius r in `glow` inside a 1 px ink ring, an emitter, never banded (D20), hung **plumb in root space** at P3 + (0, r) (counter-rotated like fire's flame, honouring `J.headFlip`), with a **silver cap** on its top, 2 px tall and 1.2 r wide, in `horn`, inked with the lantern (NA: without a cap the lure read as a deep-sea anglerfish, a water animal). It lags the stalk's tip as a one-node pendulum (stiffness 0.18, damping 0.72, at most 25° off plumb) and never sinks below the floor (clamped r + 1 above it; the head's floor guard counts it, like the beard). The **core** is a flat `glow.hi` disc: young 2 × 2, adult and elder 3 × 3; the baby has none (babies have no highlights).
+
+| Cranium space (+x to the snout, y down) | Baby (seed) | Young (sprout) | Adult (signature) | Elder (weathered) |
+|---|---|---|---|---|
+| Form | a glowing bud on a fiddlehead curl | the curl opens into an arch, + a 2 × 2 core | a lantern crook ahead of the nose, + a 3 × 3 core | stooped: the lamp hangs lower and further forward, + the full-moon core (r × 0.6) |
+| Root angle on the cranium; P1; P2; P3 | 60°; (5.5, −11.5); (11, −12.5); (14, −8.5) | 64°; (5.5, −13.5); (13.5, −14.8); (19, −10.5) | 62°; (7, −15.5); (17.5, −17.5); (25, −12) | 62°; (7, −15); (18.5, −16); (26, −8.5) |
+| Lantern r; cap | 3 (6 px across); 4 × 2 | 3.5; 4 × 2 | 4.5 (9 px); 5 × 2 | 4.5; 5 × 2 |
+| Stalk width / length | 2 / 12.5 | 2 / 18 | 2.5 / 24 | 2.5 / 25 |
+| Rise above the skull top (budget: half the fan height) | 4.5 (≤ 5) | 6.0 (≤ 6) | 7.9 (≤ 8) | 6.4 |
+| Arch peak x (the eye's front edge) | 9.3 (5.5) | 11.8 (6) | 15.5 (7) | 14.1 |
+
+- **Mood gauge: the lamp's moon phase and the stalk's droop** (D7). Measured on NB's prototype (the stalk and lamp's silhouette, idle / `mood` −1 / asleep): adult 169 / 180 / 187 px², young 115 / 119 / 133, baby 89 / 93 / 97. The cue never shrinks, and the arch keeps 69 to 76 % of its rest rise at −1.
+
+| State | Lamp | Stalk |
+|---|---|---|
+| `mood` ≥ +0.5 | full moon + the core | the lamp end lifts: P3 up 2 px (P2 stays, so the arch keeps its budget) |
+| −0.3 < `mood` < +0.5 | full moon, flat `glow` | rest |
+| `mood` ≤ −0.3, and the `sad` / `scared` faces | a **waning crescent**: the dark face (`glow.sh` `#a87575`) covers the lamp but for a lit crescent on the dragon's side, max(2, 0.7 r) px wide (adult 3, young 2.5, baby 2) | droops at −1: P2 +1 / +3.5 and P3 +1.5 / +5 px (baby × 0.7), so the lamp hangs about 5 px lower |
+| asleep | a **new-moon nightlight**: a lit sliver max(2, 0.55 r) px wide; the lamp rests on the floor ahead of the snout | slack |
+
+  Gate (h): lit / dark face 57 %, dark face / ink 97 %, dark face / scale 63 %; gate (a): the core / glow 27 %, glow / scale 84 %, cap / glow 35 %.
+
+| Feature | Baby | Young | Adult | Elder |
+|---|---|---|---|---|
+| Lamp | the bud (above) | the arch | the lantern crook | the stooped crook |
+| **Smoke tail tip**: the first marking (an invariant), pigment in `marking` from the tail's tip back, clipped to the tail, no ink: a new `tip` marking kind | 6 px | 10 px | 14 px | 22 px, about half the tail |
+| **Nose frost**: a face-space bitmap clipped to the skull (`headMarkings`, slinkwing's mask construction), in `marking`; the eye is never covered, so it never becomes a mask like Echo's; the nostril sits on it (99 %) | none | the front 3 px of the snout | 5 px | back to the eye line: its **elder muzzle** (2.5), with the grey brow tuft and beard |
+| Horns | none: the lamp replaces them, as the fans do | none | none | none |
+| Wings: bat, **moth-soft lobes** (a convex trailing edge), moth-grey membrane, folded as standard (the knuckle rises 3 px) | nub | 2 spars, lobes 1 px | 3 spars, lobes 1.5 px | 3 spars; the tears and a hole of 2.9 read as moth-eaten wings, a joke on the moth-visited lamp |
+| Tail: a plain taper (tip r 1.3, ≤ 4 px), long and drooping, trailing like smoke (2.3) | +4°, 0° | +7°, +2° | +8°, +2° | +10°, +3° |
+| Head | round, no ridge | 1 px brow | 2 px brow; snout 0.9, a softer muzzle | 3 px brow |
+| Legs | thin (× 0.76), flat at every stage (D8, E4) | same | same | same |
+
+(The placeholder draws the tail tip as a wide `ring` fitted out toward the tip until the `tip` kind exists; it draws no lamp and no frost.)
+
+- **Colour** (base in 3.1, curve in 3.9). Only the skin greys, on dusk's own curve (k 0 / 0.30 / 0.55 / 0.76 on the scale, × 0.75 on the belly); horn, marking, membrane, dark, glow and iris are fixed at every stage.
+
+| | Baby | Young | Adult | Elder |
+|---|---|---|---|---|
+| scale (L 0.083 at every stage) | `#3d4d91` S 0.58 | `#444e82` S 0.48 | `#495074` S 0.37 | `#4d5065` S 0.24 |
+| belly: afterglow, fading to ash-rose | `#c28771` | `#b98a7a` | `#b18d81` | `#aa8f87` |
+| membrane (moth grey) / horn (silver) / marking (smoke) | `#98a1b6` / `#e2e6f0` / `#c9cfdd` | same | same | same |
+| dark / glow (coral lamp) / eye (periwinkle) | `#10142a` / `#ffa98c` / `#7fb8ff` | same | same | same |
+
+  **Why these colours.** No yellow or gold anywhere, on purpose: gold on blue is lightning's storm pairing (a gold lamp sat within 2° of Zap's `#ffcf33`). Every pale-blue lamp NA tried failed against water's or lightning's glow, and the mid-blue one that passed read as a bubble or a bauble; the warm coral reads as lamplight at dusk and is 84 % from the navy stalk. The belly is peach (the last light on the horizon), not periwinkle (Zap's) nor rose (next to Echo's pinks). The membrane is lighter than the body (E11). The body keeps one value all its life (the free slot of the stack: darker it falls on slinkwing under deuteranopia, lighter than ~0.09 it meets lightning) and ages as chroma, staying chromatic (S ≥ 0.20, gate j). Its iris is the cast's only blue one (49 % from the catchlight). The coral lamp sits 8 % / 20° from fire's glow (report g): they differ by shape and place, a flame over the tail tip against a round lamp ahead of the face.
+
+- **Adult-only extra: the moth.** At `mood` ≥ 0 with the lamp lit, every 360 ± 120 f (1.5× slower in a crowd), one ambient particle in the top pass: a 5 × 3 wings-open / 3 × 4 wings-closed glyph, stepped every 4 f, in `horn` with a 4-neighbour ink ring. It arrives from 20 px up and forward, circles the lamp twice on an ellipse (rx 7, ry 4) over 72 f, flutters off 24 px and shrinks out; it never lands on the dragon.
+- **Elder-only extra: a second moth** at `mood` ≥ 0 in counter-phase ("moths love an old lamp"), and the full-moon core. The lamp itself never ages: the elder's weathering is its stoop, its greyed body, its frosted muzzle and its moth-eaten wings.
+- **Signature: Nightfall**, a mist that rolls along the floor (NA's breath, with NB's "comes home").
+  - **Tell** (f 0–18): the lamp turns up in two steps (full, then full + core, with the +1 lift), the neck draws back 6°, and the eyes close for the tell's last 4 f: it makes a wish.
+  - **Snap** (f 18–24): jaw 26° (young 22°), a soft 1 px recoil. `event: 'hush'` at cue 0, young and older.
+  - **Sustain** (f 24–54): **the mist.** 5 lobes (young 3): opaque `membrane` discs, each in a 1 px `scale` ring, every ring drawn before any fill so the bank reads as one cloud (fire's smoke technique). One lobe is born every 5 f from cue 2; it leaves along the snout at 0.8 px/f and drops to the floor within 8 f (gravity 0.12), then rolls forward along y = 0 easing from 1.0 px/f and growing r 3 → 6 (young 5): a low bank 8 to 11 px tall reaching from 14 to 34 px ahead of the chest (young 26). Each lobe fades by shrinking in 3 steps over its last 9 f, never by alpha.
+  - **Motes:** 4 (young 2) at cue 10 / 14 / 18 / 22, each 2 × 2 `glow` in a 4-neighbour ink ring, in the top pass: they rise out of the mist 12 px over 24 f, stepping ±1 px sideways every 4 f and blinking (8 f on, 2 f off). **Adult-only:** the last mote turns back at age 20, circles the lamp once (r 8, 24 f) and winks out beside it: "it comes home".
+  - **Recover** (f 54–70): `happy` for 10 f.
+  - **Why it is distinct:** it is the only breath that goes **down** and lies on the floor. Fire's jet turns up at its end, rock's dust billows at mouth height, water's bubbles rise, spike's quills fly up, lightning's bolt is a line, slinkwing's arcs spread from the mouth. (NB's own breath, coral teardrop "wisps" weaving out of the mouth, read as fire's jet at game scale.)
+  - **Floor** (gate i): mist lobes 47 %, their ring 88 %; the motes are inked.
+  - **Baby: it blows out its own nightlight** (36 f, jaw 20°; NB). It puffs up (squash 1.10); one huff (2 lobes, r 2 → 3, `membrane` in `scale` rings, rings before fills) rises into its own lamp; at cue 6 the lamp goes out (the whole lamp `glow.sh` for 14 f) and a curl of smoke rises from it (2 puffs, r 2 → 3, `marking` in ink rings, rising 8 px over 20 f and shrinking out); its face goes `scared` with the 1 px tremble, afraid of the dark; at cue 20 the lamp flickers back on (on 2 f, off 2 f, on), then `sheepish` with the 2 px sneeze-back (`tuning.breath.fizzleFace` `'sheepish'`).
+- **Ambient:**
+  - **The pendulum.** The lamp's swing is the always-on motion: at most 1 px at idle, ±2 px in the walk, ±3 px in a baby's waddle, up to 3 px when the head whips round in the look-around. No particles, so it is the cheapest element in a crowd.
+  - **The lamp breathes.** At `mood` ≥ 0 its core shows for 16 f at the top of every other inhale, stepped, like water's spots.
+  - The moth (the adult-only extra, above).
+  - **Idle fidget: the lamp bat** (adult 70 f; young × 0.85, baby × 0.6), a kitten batting a toy: 0–10 it notices (the lamp kicks 2 px, `surprised`); 10–22 it sits back (body −22°, nose up, the beg's sit); 22–28 swipe 1 (near front leg `plant` 0, upper −100° / lower +30°; the lamp swings away 5 px); 28–40 it tracks the swing back with its head (±6°); 40–46 swipe 2 misses; 46–52 **bonk**: the lamp swings into its snout, a 2 px head recoil, eyes `closed` 4 f, the core flashes; 52–62 `happy`; 62–70 it stands back up. The baby topples onto its rump at the first swipe (the plop-sit) and blinks there, `happy`.
+- **Why it cannot be mistaken for any of the six.**
+  - **Lightning (also blue):** the height is at the other end: Zap's is a zigzag spire behind the head on long legs, Wisp's a thin hook ahead of the face over a smooth back. Wisp is 27 to 33 % darker in every vision and at every pair of stages (B2), never as saturated (S ≤ 0.58 against 0.78), with a coral signal, not yellow, and a peach belly, not periwinkle. Its wings fold flat (Zap's never do) and its tail droops and sways where Zap's is stiff and stepped. Asleep, Zap keeps a 140° spire; Wisp lies flat with a lamp on the floor at its nose.
+  - **Slinkwing (also dark, head high):** the lamp roots at the top-front of the skull (60 to 64°), the fans at the top-back (128°): at ÷ 3 a hook ahead of the nose against a big blob at the top-back. 29 % or more apart in value in every vision; coral against pink (47°), periwinkle iris against mint, peach belly against white. Asleep, Echo holds its head up with the fans over it; Wisp lies chin-down with the lamp ahead.
+  - **Rock (also low in saturation):** a light sandstone dome with the head below its top, 81 to 83 % apart in value; Wisp has a smooth back and carries its head highest. Asleep, rock is a pyramid; Wisp a flat bar with a hook at the front.
+  - **Water:** the longest flat bar ending in a fluke, against a raised neck and a plain grey-tipped taper; 73 to 78 % apart.
+  - **Fire:** both carry a warm light, at opposite ends (the flame high at the back, the lamp at the front); 39 % (protanopia) to 70 % apart.
+  - **Spike:** a saw-toothed back against a smooth one; 47 to 56 % apart.
+  - **Babies:** the curl hangs forward of the head, where baby Echo's leaf ear leans back: visible at all 3 phases, but subtle (every baby is weak at ÷ 3).
+- **Open risks** (for its element pass): the anglerfish read (the cap is the fix; check at game scale); young dusk against young slinkwing on each silhouette sheet; the baby's cue at ÷ 3 (7 to 12 px, in line with the other seeds); the dazed stars circling near the lamp's space; the lamp's floor clamp in the floor audit.
+
+### 3.9 GREYING WITH AGE (v2)
+"As dragons get older they should get a little grayer." Greying is **derived, like `farPalette`**: one base palette per element (3.1), and each older stage's palette computed from it, never stored (D22). It lives in `palettes.ts` (`agePalette(p, element, stage)`, cached as `agedPalette(element, stage)`), and the palette check runs every gate on its output at every stage (5.8).
+
+**The transform** (`ageShade`), in linear light, with the palette check's own luminance maths:
+
+```
+ageShade(hex, k, lambda = 0):
+  (r, g, b) = srgbToLinear(hex)              // the palette check's lin()
+  Y  = 0.2126 r + 0.7152 g + 0.0722 b        // WCAG relative luminance
+  c' = (c + (Y - c) k) (1 + lambda k)        // for each channel, clamped to 0..1
+  return linearToSrgbHex(c')                 // rounded
+
+k(element, stage, slot) = min(0.9, G[stage] x weight[slot])   // AGE_K_MAX 0.9
+```
+
+- The result's luminance is Y (1 + λk), exact to one rounding step: with λ = 0 it is **Y, unchanged**. So every gate that is luminance-based (the value stack, the ladder, the floor, the far side, the ink floor) holds at every stage by construction; only pairs that pass on hue or chroma, and the colour-blind gates, can move, and those are re-run at all four stages and across them.
+- The hue is kept exactly in linear light (within about 2° in sRGB); the saturation falls by about a factor (1 − k).
+- **What derives from the greyed base:** `makeTones` (every cel tone), rock's hand-set shadows (greyed by the same k and λ as their slot: `dragonTones(element, slot, ramp, stage)`), `farPalette` (far legs, far wing and head), `moodTones` (banked glow, water's dim spot) and the elder's muzzle grey (`muzzleOf`).
+- **In the rig** (the implementation phase): `dragonBuild` takes `palette: agedPalette(element, stage)`, and the two module-level palette reads left in the element files (water's `DIM`, rock's one `PAL`) move to the rig's palette.
+
+**The strengths (data in `palettes.ts`).**
+
+| `AGE_GREY` (G) | Baby | Young | Adult | Elder |
+|---|---|---|---|---|
+| | 0 | 0.08 | 0.18 | 0.45 |
+
+| `AGE_WEIGHT` (slot weight) | scale | belly | membrane | marking | horn | dark | glow | eye |
+|---|---|---|---|---|---|---|---|---|
+| | 1 | 1 | 1 | 0.5 | 0 | 0 | 0 | 0 |
+| why | skin | skin | skin | pigment greys at half | keratin: claws, quills (spike's cue), ribs | the nostril | the fire still burns | the eye stays bright (D21) |
+
+| `AGE_RULES` (per element) | What | Why (measured by the v2 check) |
+|---|---|---|
+| Fire | scale weight **0.3**, drift λ **−0.6** on the scale | Greyed fully with its luminance kept, fire's protanopia-simulated luminance climbs onto spike's (the two are only 26 % apart there at hatching): it greys least and darkens a touch toward brick. Its age shows on the belly (S 0.80 → 0.42), wings, muzzle, brows and beard. |
+| Spike | scale weight **0.9**, λ **+0.2** | Lightens toward lichen, the other half of the fire / spike fix (greying lowers spike's protan luminance onto fire's); 0.9 keeps its elder at S 0.34, over the identity floor. |
+| Rock | scale weight **0.25**; membrane **0.5** | Under protanopia the sea-green water simulates to a grey, so the greyed sand separates from it only by keeping ≥ 0.30 more simulated saturation (B3); the half-strength slate keeps rock's membrane / horn pair, which passes on hue alone, chromatic. |
+| Lightning | membrane (and its yellow marking) **0.5** | The membrane is the signal colour. |
+| Water | scale weight **0.8** | Its elder at full strength thinned the rock / water protan margin; SW's −0.3 drift darkened its elder onto fire's value under deuteranopia (4 % apart). |
+| Slinkwing | membrane **0.5** | The membrane is the signal colour. |
+| Dusk | its own **curve** 0 / 0.30 / 0.55 / 0.76; belly **0.75**; membrane and marking **0** | Its blue-to-grey journey is its growth (3.8), so it greys fastest, at a constant value, to S 0.24 (gate j's 0.20 floor for dusk); its wings are grey from hatching and its silver, coral and iris never age. EL's s 2.0 (k 0.9) left a neutral grey body (S 0.06) that broke the neutral ceiling. |
+
+**The values** (scale · belly · membrane · marking, baby / young / adult / elder; the elder's muzzle is in 2.5):
+
+| | scale | belly | membrane | marking |
+|---|---|---|---|---|
+| Fire | `#f04422` `#ed4628` `#e8482d` `#dd4d39` | `#e08a2c` `#dc8c40` `#d68e51` `#c69372` | `#7f1e3a` `#7c233b` `#77283c` `#69333f` | `#ffe29a` → `#f9e3ae` |
+| Spike | `#2f8232` `#38823a` `#418143` `#558056` | `#a3ad55` `#a3ac5f` `#a4ac6a` `#a5aa82` | `#2e6b58` `#346a59` `#3b695a` `#4a665c` | `#173a19` → `#1f3821` |
+| Rock | `#d8b474` `#d7b476` `#d7b478` `#d5b57e` | `#fff5cc` `#fef5d0` `#fdf5d4` `#faf5df` | `#4c5670` → `#4e566b` | `#7e5f44` → `#79604d` |
+| Lightning | `#2d58cc` `#3359c6` `#3a5abe` `#4a5ca7` | `#9fb4f2` `#a1b4ee` `#a3b4e9` `#aab5d9` | = marking: `#ffcf33` `#fdcf44` `#fccf54` `#f6d074` | (the membrane's) |
+| Water | `#28b0a6` `#3aafa6` `#49aea5` `#67aaa3` | `#85c6ae` `#8ac5af` `#90c4b0` `#9fc0b3` | `#185e5b` `#215d5a` `#2a5c5a` `#3c5a58` | `#dcfff6` → `#e3fdf6` |
+| Slinkwing | `#5a2f6e` `#58316b` `#563368` `#50385d` | `#fff5f8` → `#fcf6f8` | `#ff6fae` `#fc72ae` `#f875ad` `#ee7dab` | `#9a6aa8` → `#946e9f` |
+| Dusk | `#3d4d91` `#444e82` `#495074` `#4d5065` | `#c28771` `#b98a7a` `#b18d81` `#aa8f87` | `#98a1b6` (never greys) | `#c9cfdd` (never greys) |
+
+Scale saturation b / y / a / e: fire 0.86 / 0.83 / 0.81 / 0.74, spike 0.64 / 0.57 / 0.50 / 0.34, rock 0.46 / 0.45 / 0.44 / 0.41, lightning 0.78 / 0.74 / 0.69 / 0.56, water 0.77 / 0.67 / 0.58 / 0.39, slinkwing 0.57 / 0.54 / 0.51 / 0.40, dusk 0.58 / 0.48 / 0.37 / 0.24. The belly and wings grey much more than most bodies (fire's belly S 0.80 → 0.42), so an elder reads "greyer" even where its body colour carries its identity.
+
+**Why fire / spike gives way in greyscale (D29, E10).** Normal-vision luminance F, S (fire, spike) and protanopia-simulated luminance f, s: at hatching F / S = 1.36 and s / f = 1.35, both just over the 1.333 of B2. Greying keeps F and S but pulls f up toward F (the red's lost luminance comes back as grey) and s down toward S. Holding s / f ≥ 1.333 needs fire to darken (λ < 0) or spike to lighten (λ > 0), which shrinks F / S; holding F / S needs the opposite. With spike greying visibly (k ≈ 0.4) no pair of strengths keeps both: the protanopia gate is what players need, so it holds (26 / 26 / 27 / 28 %, gate f) and the greyscale step thins (26 / 24 / 22 / 14 %). In normal vision they still pass B1 at every stage (S ≥ 0.34, 104 to 112° apart: red against green).
+
+**Checks added to `tools/palette-check.ts`:** every gate at all four stages; (b) and (f) at all 16 stage combinations of every pair (an elder shares the habitat with babies); (a) the elder face pairs (muzzle / scale, scale.sh, dark, ink; slinkwing's muzzle / mask and frost / membrane); (j) identity through age. **Result: 2168 of 2168 gates pass** (5.8). The thinnest passes, all by design and all re-run whenever a hex or strength moves: deuteranopia fire / water 14 % by B3 (baby / baby: water's simulated grey against fire's saturated olive), protanopia rock / water B3 with ΔS 0.31 at elder / elder (margin 1.04), fire / spike in greyscale (E10), rock / floor 28 % and rock's belly / floor 26 % (unchanged since v1), lightning's glow / membrane 26 %.
 
 ---
 
@@ -943,39 +1113,42 @@ Channels:
 | Baby | 0.20 | 0.65 | 2.6 | 0.15 | a stiff, springy wag from the root |
 | Young | 0.14 | 0.70 | 2.2 | 0.35 | |
 | Adult | 0.10 | 0.78 | 1.6 | 0.5 | a slow, heavy wave that travels down the tail |
+| Elder (v2) | 0.12 | 0.84 | 1.2 | 0.55 | a slow, damped sway |
 
 Lightning's tail is **stepped**: it snaps between poses on 4 f holds instead of swaying.
 
 **Stage timing rules:**
-- **Durations:** baby about 0.6× the adult, young about 0.85×.
-- **Squash range:** baby 0.85 to 1.15, young 0.94 to 1.06, adult 0.96 to 1.04.
-- **Head lag:** the baby's head follows the body 6 f late at 2× amplitude (a heavy head on a small body). The adult's follows 8 f late at 1×.
-- **Easing:** babies use `out` (bouncy, quick to settle). Adults use `inout` (weight). Young adults overshoot.
+- **Durations:** baby about 0.6× the adult, young about 0.85×, elder (v2) **1.25×**.
+- **Squash range:** baby 0.85 to 1.15, young 0.94 to 1.06, adult 0.96 to 1.04, elder 0.97 to 1.03.
+- **Head lag:** the baby's head follows the body 6 f late at 2× amplitude (a heavy head on a small body). The adult's follows 8 f late at 1×, the elder's 10 f late at 0.8×.
+- **Easing:** babies use `out` (bouncy, quick to settle). Adults use `inout` (weight). Young adults overshoot. Elders use `inout` plus a **3 f hold at every key** (bake adds it): the stiffness read, never a tremor (D21).
+- **Idle variants:** every 6 to 10 s; elders every 8 to 12 s.
+- **Blinks:** runtime, every 180 to 300 f; the elder's slower blink (3 / 5 / 3 frames) every 200 to 340 f (2.5).
 
 **Desync.** Every loop starts at a random phase, with duration ±10 % per dragon, so the habitat never breathes in lockstep. The phase and the ±10 % come from the pet seed (never `Math.random`); a loop with an intro (sleep) starts inside its loop, so a pet that is already asleep is asleep.
 
 **Authoring in tracks (`anims.ts`).** Every anim is written as one key list (or a function of time) per channel and baked into the player's frames every 2 f and at every key, so channels on different beats coexist: the head keys are the body's shifted by the stage's head lag and scaled by its amplitude (`lag`), `'stage'` easing resolves to the rule above, squash is clamped to the stage's range, and one-shots end on a held frame. Where a pose must put the head somewhere (the chin on the floor asleep, the snout in the bowl), `neckFit` solves the neck from the build's dims with a small forward model of the rig's neck, so it fits rock's short dropped neck and water's long one alike.
 
 ### 4.2 The core set
-Adult key beats are in frames at 60 Hz. The young and baby columns give only what differs.
+Adult key beats are in frames at 60 Hz. The young and baby columns give only what differs. The elder column (v2) is authored whole (EL): it is slower, steadier and never ill (D21), and dusk's anims follow 3.8 at every stage.
 
-| Anim | Adult | Young | Baby |
-|---|---|---|---|
-| **idle** (loop) | 120 f. **Inhale** 0 to 56 (`inout`): body y −1, squash 1.03, wing knuckle +1 px, neck a0 −2°. **Exhale** 56 to 120. The head follows 8 f late. The tail sways ±5° over 150 f, out of sync with the breath. Blinks run at runtime every 180 to 300 f. **Variants** every 6 to 10 s: look-around (head ±12°, 40 f), yawn (jaw 30°, 40 f), hind-leg scratch (36 f), and the element fidget (section 3). | 100 f; tail ±8° over 100 f; a curious head tilt of ±5° | 72 f; bob 2 px with squash 0.97 ↔ 1.03, **dipping down** from the rest height: the body drops 1 px on its planted, nearly straight legs and the squash (about the ground point) carries the head the other ~1 px. A bob upward would lift the paws: 4 px legs have no reach left, and a 2 px dip folds them into a frog crouch; head wobble ±4°, 15 f behind; the tail **wags** ±12° over 48 f; 30 % of blinks are double blinks. Its scratch variant topples (root rot 20°, 48 f, then recovers). One loop in four is a **plop-sit**: hind legs fold over 10 f, it sits for 60 f, then pops up over 6 f with stretch 1.1. |
-| **walk** (loop) | 48 f = 8 keys × 6. **Lateral-sequence gait:** NH → NF → FH → FF, legs 25 % apart in phase, stance 60 % / swing 40 %. Contact: upper +20°. Passing: upper −15°, lower +35°, paw lifted 3 px. The body dips 1 px at each hind contact. The head counter-bobs 1 px, 4 f late. Neck ±3°. The tail sways ±5° against the hips. Folded wings jiggle 1 px. Speed 0.45 px/f. | 40 f (8 × 5), paw lift 2 px, 0.5 px/f (teens are quick) | **24 f (8 × 3)**, so the stubby legs churn. Waddle: root rot ±4°, bounce 2 px at every contact, 0.3 px/f. One cycle in 6 stumbles (a face-plant squash of 0.85 for 12 f, then a head shake for 12 f). |
-| **happy** (one-shot: pet, feed, play) | 72 f, **no hop: it preens.** Chest puff 0 to 14 (body rot −6°, neck a0 −10°). Wings to 0.7, leaning back 40° (1.3), held 14 to 30. The tail sweeps ±20° twice at 12 f each, 30 to 54. Settle 54 to 72. Face `happy` from 10 to 60, jaw 10° (the adult minimum). Element flourish at f 14 (rock's runs longer: 4.3). `mood` jumps to +1. | 64 f: one hop (−5 px) with half-spread wings (0.6), 3 wags at 10 f each | 60 f: **two hops.** Crouch 0 to 6 (squash 0.88). Hop −6 px, 6 to 16 (stretch 1.12, wings flutter 2 × 5 f). Land 16 to 22 (0.90). Hop −4, 22 to 28. Land 28 to 34. Wag ±25° at 8 f per swing, 34 to 60. Jaw 20° (the baby minimum) with the tongue out. |
-| **eat** (one bite; the bowl is drawn after the dragon) | 84 f. Neck down to the bowl 0 to 20 (`out`, a0 +35°, head +25°). Jaw 20°, 20 to 26. **Chomp** 26 to 29 (jaw to 0, stepped) with 3 crumbs (2 × 2). Lift 4 px, 29 to 35. Chew: jaw 0 ↔ 10° on 6 f beats × 3 with a 1 px head bob, 35 to 71. **Gulp** 71 to 80: a bulge in the neck contour (a ball 2.5 px proud of the neck's underside) travels from the head to the chest in 3 stepped positions, 3 f each, and the eyes close. A ball inside the throat stripe would change nothing on screen. Tail swish 78 to 84. | 72 f | 56 f: **the snout plunges** 3 px behind the bowl rim, 2 chomps, 5 crumbs spray, a 2 px chew bob, `happy` on the swallow, a 6 f tongue lick; the tail droops 22° through the bow (fire's excepted: 3.0) |
-| **sleep** (lie-down → loop → wake) | **Lie-down**, 40 f: hind legs tuck (upper +70°, lower −140°), front paws fold under the chest, the belly settles to the ground, the head rests on the paws, the tail wraps forward (curl +18° per segment), wings fold (lightning's drop to the 140° sad cock instead: 3.5), `closed` from f 20. **Loop**, 180 f: breath 90 / 90 (squash 1.00 ↔ 1.03, y 1 px). Every 120 f a "z" glyph drifts up 12 px (and 3 px on along facing) over 60 f in the top pass, in 3 alpha steps: a **light** 7 × 8 "z" in `#f8f4ec` (2-row bars top and bottom, a diagonal of 2 px runs stepping 1 px a row) with a thin 1 px ink edge hugging its strokes on 4-neighbours, its corners and counters open (each counter keeps 3 px of background), so it floats as a letter. It rises from 8 px over the head's top, above a point 4 px ahead of the **snout's tip** (5.2). At 6 × 6 the 1-row counters could hold no edge: the round-4 glyph, ink strokes in a `belly` ring round its box, read at game scale as a dark block with a "z" in it, and before that a pale "z" in an ink frame read as an empty box (at 5 × 5 the diagonal had one row and read as "≡"). From above the cranium it spawned on slinkwing's fan tips and between horns, and from over the snout's middle its first frames lay on the baby slinkwing's ear in the sleep bun. **Wake**, 30 f: stretch (front legs forward, rump up, body rot +10°), **a wing spread for 12 f** (the preen's 0.7 leaning back 40° from the bowed body, 1.3: full and upright it was a dark plank edge-on, a sail on the back), yawn (jaw 30°, 16 f), shake (root ±3°, 3 × 4 f). | lie-down 34 f, loop 150 f | lie-down 24 f; loop **120 f** (60 / 60) with a dream-kick paw twitch (6 f) at f 90 and a "z" every 90 f; it curls into a tighter bun with the wing nubs over its head (the tuck branch, 1.4); the wake has a flutter instead of a spread |
-| **breath** (signature, one-shot) | 70 f. **Wind-up** 0 to 18: head back −8°, neck a1 −10°, chest squash 1.05, the element's tell. **Snap** 18 to 24: head forward +12° (`out`), jaw 30°, root recoils x −1. **Sustain** 24 to 54: the effect stream; the head jitters ±1 px every 4 f; the tail is stiff. **Recover** 54 to 70: the jaw closes, `happy` for 10 f (proud). | 56 f (14 / 5 / 22 / 15), jaw 22°, half-strength effect, a 3 px recoil (still learning) | 36 f (10 / 4 / 8 / 14), jaw 20°: **it always fails, adorably** (the per-element fizzle in section 3), then `dazed` for 12 f and a 2 px sneeze-back ("did I do that?") |
-| **pet** (loop while held) | 48 f: the head leans 15° toward the hand, `happy`, blush, the tail wags, a 1 px purr vibration every 4 f, `mood` +0.2 per loop | 44 f | 36 f; the whole body leans in and the root rotates 6°; the jaw open 20° with the tongue out (2.5: its mouth-corner notch would sit on the eye) |
-| **beg** (hungry idle, loop) | 120 f: sits with the head tilted up, `hungry` face, cue at `mood` −0.5. A stomach growl every 120 f (3 shakes of 1 px, 2 f each). | same | same, with a bigger head tilt (14°, against 12°: at 20° the enlarged hungry eye pressed against the skull's top); the egg tooth is hidden while the jaw is shut in `hungry` (beside the two catchlights it read as a third) |
-| **grow-up** (stage transition, the biggest reward in the game) | n/a | 240 f, the same for baby → young and young → adult. Curls into the sleep bun. 3 tint pulses in `glow` (the engine tint, α 0.3 → 0.8), speeding up: 40, 30, then 20 f apart. Squash 0.8, then the **new proportion set is swapped in** with stretch 1.2, and the **new silhouette flashes flat `glow.hi` at α 1.0 for 12 f** before its colours return, so the new shape is seen before any detail. 6 to 10 old-skin flakes (2 × 2 and 3 × 2 in `scale`) fall. Then a "look at me" pose, **held until the player taps**: the new cue flashes once, the wings spread if newly allowed, `happy`. | the same 240 f |
-| **hopGlide** (young; the baby → young reward) | n/a | 56 f: crouch 0 to 8 (squash 0.9); leap −10 px with 2 wing flaps of 6 f; glide 24 px forward on spread wings (`wing` 1); land 46 to 56 (squash 0.92, wings fold). Rock: a 3 px hop with the stubby flaps. | n/a |
-| **fly** (adult; the young → adult reward) | take-off 30 f (crouch, spring, 2 hard flaps); flap loop 24 f at `flap` ±40°, the legs trailing, the tail as a rudder; land 24 f. **Lightning** flaps its cocked bolts ±20° about 115° with the spars closed, so the spire never turns into a bat wing. **Rock** cannot fly: its reward is the **boulder hop**, 50 f: crouch 10 f (squash 0.88), a heavy hop of −6 px with 3 hard flaps of 4 f, a landing of 8 f with a ring of 3 dust puffs and a 1 px root jitter. | n/a | n/a |
-| **bath** (one-shot, per element) | **water:** flops belly-up and splashes (90 f, `happy`, `mood` +). **fire:** hisses (jaw 10°, `grumpy`), the flame shrinks to 0.6× and gives off 3 steam puffs (flat `#f8f4ec` discs with a 1 px `scale` ring), then a dog-style shake (60 f). **The others:** a shake that throws 4 droplets (36 f). | same | same, with the baby squash range |
-| **play** (one-shot, with a toy) | 60 f: crouch 12 f, a butt-wiggle of 3 × 4 f, pounce −6 px forward, bat the toy with the near front paw, `happy`. Lightning's play drains its static charge (3.5). | 54 f | 48 f; the pounce often overshoots and plops (1 in 3) |
-| **refuse** (one-shot: disliked food, a bath for fire) | 48 f: the head turns away −20°, `grumpy`, a tail flick, then back to idle. | same | same, plus a 2 px stamp of the near front paw |
-| **zap** (lightning only) | 40 f: a spark crackles at the touched point, the bolt wings snap to 95°, a recoil of −3 px, then `sheepish` with the wings back at 115°. | same | same |
+| Anim | Adult | Young | Baby | **Elder** (v2; EL) |
+|---|---|---|---|---|
+| **idle** (loop) | 120 f. **Inhale** 0 to 56 (`inout`): body y −1, squash 1.03, wing knuckle +1 px, neck a0 −2°. **Exhale** 56 to 120. The head follows 8 f late. The tail sways ±5° over 150 f, out of sync with the breath. Blinks run at runtime every 180 to 300 f. **Variants** every 6 to 10 s: look-around (head ±12°, 40 f), yawn (jaw 30°, 40 f), hind-leg scratch (36 f), and the element fidget (section 3). | 100 f; tail ±8° over 100 f; a curious head tilt of ±5° | 72 f; bob 2 px with squash 0.97 ↔ 1.03, **dipping down** from the rest height: the body drops 1 px on its planted, nearly straight legs and the squash (about the ground point) carries the head the other ~1 px. A bob upward would lift the paws: 4 px legs have no reach left, and a 2 px dip folds them into a frog crouch; head wobble ±4°, 15 f behind; the tail **wags** ±12° over 48 f; 30 % of blinks are double blinks. Its scratch variant topples (root rot 20°, 48 f, then recovers). One loop in four is a **plop-sit**: hind legs fold over 10 f, it sits for 60 f, then pops up over 6 f with stretch 1.1. | **150 f.** Inhale 0 to 70 (body y −1, squash 1.03, knuckle +1, neck a0 −2°); exhale 70 to 150, ending in a 10 f rest. Every third loop a **contented "hmm"**: the exhale 30 f longer, the head dips 3° and the jaw opens 16° for 10 f; the eyes do not change (closed they would read as sleep). Tail ±3° over 180 f. **Variants every 8 to 12 s:** a slow look-around (±10°, 60 f); a yawn (jaw 28°, 56 f, a 1 px head shake at its end); a **back stretch** in place of the scratch (a half play-bow: chest down 6°, front paws sliding 4 px, 60 f); **reminisce** (head up 6°, held 40 f, `happy` "^" for its middle 20 f); the element fidget at × 1.3 duration and 0.8× amplitude (fire makes 2 half-turns, not 4; lightning's zoomies go 28 px in 60 f) |
+| **walk** (loop) | 48 f = 8 keys × 6. **Lateral-sequence gait:** NH → NF → FH → FF, legs 25 % apart in phase, stance 60 % / swing 40 %. Contact: upper +20°. Passing: upper −15°, lower +35°, paw lifted 3 px. The body dips 1 px at each hind contact. The head counter-bobs 1 px, 4 f late. Neck ±3°. The tail sways ±5° against the hips. Folded wings jiggle 1 px. Speed 0.45 px/f. | 40 f (8 × 5), paw lift 2 px, 0.5 px/f (teens are quick) | **24 f (8 × 3)**, so the stubby legs churn. Waddle: root rot ±4°, bounce 2 px at every contact, 0.3 px/f. One cycle in 6 stumbles (a face-plant squash of 0.85 for 12 f, then a head shake for 12 f). | **64 f = 8 keys × 8** at 0.34 px/f: a 13.1 px stride, the adult's, so the leg-spacing results carry over. Paw lift 2 px, the head 6° lower, a 1 px body dip and a head nod 10 f late at each hind contact, neck ±2°, tail ±3°, the wings jiggling only every other contact. Rock 72 f at 0.26 px/f; lightning 54 f at 0.38 |
+| **happy** (one-shot: pet, feed, play) | 72 f, **no hop: it preens.** Chest puff 0 to 14 (body rot −6°, neck a0 −10°). Wings to 0.7, leaning back 40° (1.3), held 14 to 30. The tail sweeps ±20° twice at 12 f each, 30 to 54. Settle 54 to 72. Face `happy` from 10 to 60, jaw 10° (the adult minimum). Element flourish at f 14 (rock's runs longer: 4.3). `mood` jumps to +1. | 64 f: one hop (−5 px) with half-spread wings (0.6), 3 wags at 10 f each | 60 f: **two hops.** Crouch 0 to 6 (squash 0.88). Hop −6 px, 6 to 16 (stretch 1.12, wings flutter 2 × 5 f). Land 16 to 22 (0.90). Hop −4, 22 to 28. Land 28 to 34. Wag ±25° at 8 f per swing, 34 to 60. Jaw 20° (the baby minimum) with the tongue out. | **84 f.** Chest puff 0 to 18 (body −4°, neck −8°); wings to **0.6 leaning back 48°**, held 18 to 40 (the tears show: 2.9); a 3-bob chuckle at f 44 / 50 / 56 (jaw 16°); the tail ±14° twice, 40 to 68; `happy` 12 to 72; the element flourish at f 18 |
+| **eat** (one bite; the bowl is drawn after the dragon) | 84 f. Neck down to the bowl 0 to 20 (`out`, a0 +35°, head +25°). Jaw 20°, 20 to 26. **Chomp** 26 to 29 (jaw to 0, stepped) with 3 crumbs (2 × 2). Lift 4 px, 29 to 35. Chew: jaw 0 ↔ 10° on 6 f beats × 3 with a 1 px head bob, 35 to 71. **Gulp** 71 to 80: a bulge in the neck contour (a ball 2.5 px proud of the neck's underside) travels from the head to the chest in 3 stepped positions, 3 f each, and the eyes close. A ball inside the throat stripe would change nothing on screen. Tail swish 78 to 84. | 72 f | 56 f: **the snout plunges** 3 px behind the bowl rim, 2 chomps, 5 crumbs spray, a 2 px chew bob, `happy` on the swallow, a 6 f tongue lick; the tail droops 22° through the bow (fire's excepted: 3.0) | **100 f.** Head down 0 to 24, the chomp 30 to 33, **4** chews of 7 f, a 3-step gulp 68 to 80, a 6 f lick at f 90 |
+| **sleep** (lie-down → loop → wake) | **Lie-down**, 40 f: hind legs tuck (upper +70°, lower −140°), front paws fold under the chest, the belly settles to the ground, the head rests on the paws, the tail wraps forward (curl +18° per segment), wings fold (lightning's drop to the 140° sad cock instead: 3.5), `closed` from f 20. **Loop**, 180 f: breath 90 / 90 (squash 1.00 ↔ 1.03, y 1 px). Every 120 f a "z" glyph drifts up 12 px (and 3 px on along facing) over 60 f in the top pass, in 3 alpha steps: a **light** 7 × 8 "z" in `#f8f4ec` (2-row bars top and bottom, a diagonal of 2 px runs stepping 1 px a row) with a thin 1 px ink edge hugging its strokes on 4-neighbours, its corners and counters open (each counter keeps 3 px of background), so it floats as a letter. It rises from 8 px over the head's top, above a point 4 px ahead of the **snout's tip** (5.2). At 6 × 6 the 1-row counters could hold no edge: the round-4 glyph, ink strokes in a `belly` ring round its box, read at game scale as a dark block with a "z" in it, and before that a pale "z" in an ink frame read as an empty box (at 5 × 5 the diagonal had one row and read as "≡"). From above the cranium it spawned on slinkwing's fan tips and between horns, and from over the snout's middle its first frames lay on the baby slinkwing's ear in the sleep bun. **Wake**, 30 f: stretch (front legs forward, rump up, body rot +10°), **a wing spread for 12 f** (the preen's 0.7 leaning back 40° from the bowed body, 1.3: full and upright it was a dark plank edge-on, a sail on the back), yawn (jaw 30°, 16 f), shake (root ±3°, 3 × 4 f). | lie-down 34 f, loop 150 f | lie-down 24 f; loop **120 f** (60 / 60) with a dream-kick paw twitch (6 f) at f 90 and a "z" every 90 f; it curls into a tighter bun with the wing nubs over its head (the tuck branch, 1.4); the wake has a flutter instead of a spread | **Lie-down 52 f in two stages** (rear 0 to 24, a 4 f pause, front 28 to 52 with a squash 0.97 "oof"); loop **216 f** (108 / 108), a "z" every 150 f; the paunch flattens and the chin rests on the beard. **Wake 36 f:** stretch 0 to 14, spread 0.6 / 48° 6 to 20, yawn 4 to 24, shake 22 to 36 |
+| **breath** (signature, one-shot) | 70 f. **Wind-up** 0 to 18: head back −8°, neck a1 −10°, chest squash 1.05, the element's tell. **Snap** 18 to 24: head forward +12° (`out`), jaw 30°, root recoils x −1. **Sustain** 24 to 54: the effect stream; the head jitters ±1 px every 4 f; the tail is stiff. **Recover** 54 to 70: the jaw closes, `happy` for 10 f (proud). | 56 f (14 / 5 / 22 / 15), jaw 22°, half-strength effect, a 3 px recoil (still learning) | 36 f (10 / 4 / 8 / 14), jaw 20°: **it always fails, adorably** (the per-element fizzle in section 3), then `dazed` for 12 f and a 2 px sneeze-back ("did I do that?") | **Slow and wise** (not strong-but-wheezy, which reads as sick): 84 f, **never fails**. Wind-up 0 to 22, snap 22 to 28 (jaw 28°), sustain 28 to 60 (the adult stream at 1.1× reach), recover 72 to 84 (`happy` and a 2° nod). Optional finale 60 to 72: the last puff becomes **one ring** that widens and drifts up, 2 px thick, in the element's floor-safe colours (fire's smoke, a water bubble, rock dust, 4 of lightning's sparks on a circle, a sap ring, slinkwing's echo circle, a ring of dusk's mist) |
+| **pet** (loop while held) | 48 f: the head leans 15° toward the hand, `happy`, blush, the tail wags, a 1 px purr vibration every 4 f, `mood` +0.2 per loop | 44 f | 36 f; the whole body leans in and the root rotates 6°; the jaw open 20° with the tongue out (2.5: its mouth-corner notch would sit on the eye) | 56 f, the head leaning 12°, a purr every 6 f |
+| **beg** (hungry idle, loop) | 120 f: sits with the head tilted up, `hungry` face, cue at `mood` −0.5. A stomach growl every 120 f (3 shakes of 1 px, 2 f each). | same | same, with a bigger head tilt (14°, against 12°: at 20° the enlarged hungry eye pressed against the skull's top); the egg tooth is hidden while the jaw is shut in `hungry` (beside the two catchlights it read as a third) | 140 f, the tilt 10° |
+| **grow-up** (stage transition, the biggest reward in the game) | n/a | 240 f, the same for baby → young and young → adult. Curls into the sleep bun. 3 tint pulses in `glow` (the engine tint, α 0.3 → 0.8), speeding up: 40, 30, then 20 f apart. Squash 0.8, then the **new proportion set is swapped in** with stretch 1.2, and the **new silhouette flashes flat `glow.hi` at α 1.0 for 12 f** before its colours return, so the new shape is seen before any detail. 6 to 10 old-skin flakes (2 × 2 and 3 × 2 in `scale`) fall. Then a "look at me" pose, **held until the player taps**: the new cue flashes once, the wings spread if newly allowed, `happy`. | the same 240 f | adult → elder: the same 240 f; the grey palette, the muzzle and the beard arrive with the new silhouette under the flat flash |
+| **hopGlide** (young; the baby → young reward) | n/a | 56 f: crouch 0 to 8 (squash 0.9); leap −10 px with 2 wing flaps of 6 f; glide 24 px forward on spread wings (`wing` 1); land 46 to 56 (squash 0.92, wings fold). Rock: a 3 px hop with the stubby flaps. | n/a | n/a |
+| **fly** (adult; the young → adult reward) | take-off 30 f (crouch, spring, 2 hard flaps); flap loop 24 f at `flap` ±40°, the legs trailing, the tail as a rudder; land 24 f. **Lightning** flaps its cocked bolts ±20° about 115° with the spars closed, so the spire never turns into a bat wing. **Rock** cannot fly: its reward is the **boulder hop**, 50 f: crouch 10 f (squash 0.88), a heavy hop of −6 px with 3 hard flaps of 4 f, a landing of 8 f with a ring of 3 dust puffs and a 1 px root jitter. | n/a | n/a | **Yes: a gliding flight.** Take-off 40 f (crouch 12, 2 flaps of 8 f); the loop is 2 flaps of 12 f at ±30°, then a 36 f glide at `wing` 1.0 (the holes show against the sky: 2.9); landing 32 f with squash 0.97, a 2 px stumble forward, then `happy`. Rock's boulder hop: 58 f, −4 px, 3 flaps of 5 f |
+| **bath** (one-shot, per element) | **water:** flops belly-up and splashes (90 f, `happy`, `mood` +). **fire:** hisses (jaw 10°, `grumpy`), the flame shrinks to 0.6× and gives off 3 steam puffs (flat `#f8f4ec` discs with a 1 px `scale` ring), then a dog-style shake (60 f). **The others:** a shake that throws 4 droplets (36 f). | same | same, with the baby squash range | same, at the elder's timing |
+| **play** (one-shot, with a toy) | 60 f: crouch 12 f, a butt-wiggle of 3 × 4 f, pounce −6 px forward, bat the toy with the near front paw, `happy`. Lightning's play drains its static charge (3.5). | 54 f | 48 f; the pounce often overshoots and plops (1 in 3) | × 1.25 the adult by the timing rule; the pounce −4 px |
+| **refuse** (one-shot: disliked food, a bath for fire) | 48 f: the head turns away −20°, `grumpy`, a tail flick, then back to idle. | same | same, plus a 2 px stamp of the near front paw | same, at the elder's timing |
+| **zap** (lightning only) | 40 f: a spark crackles at the touched point, the bolt wings snap to 95°, a recoil of −3 px, then `sheepish` with the wings back at 115°. | same | same | same, at the elder's timing; the bolts snap to 98° |
 
 **Notes from building the set (the numbers above are the authored ones unless listed here).**
 - **Walk.** The far pair (5.1 #5): each far leg runs half a cycle from its near partner, so over a stride longer than the rest splay it crossed exactly behind it twice a cycle and only two legs read at those keys. Through the walk the far hip slides back by half a stride and the far shoulder forward (the leg channel `shift`: root and planted spot together, so the leg keeps its shape and its reach), and the far hind's stroke sits another 0.15 stride back (the hind has reach to spare behind, the front none ahead). The far SHOULDER's slide is capped so its root stays sunk (the hard rule "roots sunk into the body"): the largest half pixel whose root disc keeps min(3, its rest depth) px inside the chest ball or behind the near shoulder (anims.ts `farFrontShift`, from the build's dims): 3 to 5.5 px on adults, 0 to 3.5 on the young, 0 on a baby (−0.5, tucked back, on lightning's and slinkwing's, whose roots lie shallowest). Slid the whole half stride, a young or baby shoulder left the chest altogether and the far front leg hung in front of it with background all round its top, and an adult's joined at the throat, a leg growing from the neck (the cast review's blocker; the leg-root audit, 5.1 #5, now fails it). Measured, ≥ 3 px of every far leg's fill shows at all 8 keys on all 18 looks (≥ 4 on 17: young rock's front, behind its low head, keeps 3 at two keys), and planted far soles still hold their world x within 1 px. The stride is solved from the speed: stride = speed × stance frames (adult 0.45 × 28.8 f = 13 px), so a planted paw slides back at exactly the speed the owner moves the pet by (`move`) and never skates; `node`-measured on all 18 looks, planted soles stay on y = 0 and hold their world x to ≤ 1 px (snapping). The contact angle above (+20°) would give only about 9 px. A front paw reached ahead of its rest spot runs out of forearm first, so the front strokes sit a fifth of a stride further back than the hind ones. The swing is a cubic whose end tangents match the stance speed (the paw leaves and meets the floor with no world velocity) under a sine lift. Head counter-bob, tail sway and the wing jiggle ride the gait phase; the baby's loop is 6 cycles, the last one the stumble (standing still: `move` 0).
@@ -996,6 +1169,9 @@ How an element gets its column (`ElementSpec.anims`, element.ts), cheapest first
 | **Lightning** | 20 % faster; the tail is stepped | 3 crackles 5 f apart, then from cue 18 (as the last crackle ends) the spark shower (6 / 4 / 3 sparks): one leaves the near and far bolt tips in turn every 5 f, each along its own heading of an up-and-back fan (100 / 150 / 75 / 125 / 170 / 95°), at 1.5 px/f under a light pull down, so it is 6 px clear of its tip within 4 f, and pops after 14 f: never more than 3 in the air, and a spark whose ink ring would touch an older one's is not drawn. Launched in pairs 1 f apart, 4 to 6 stacked on the bolt tips as a pale clump of popcorn, a crown; no idle sparks on top | sparks come out irregular and jittery: every 22 ± 10 f on a 3 f beat (flicker and jitter), through the ambient budget, the bolts twitching | the bolt wings drop to the 140° sad cock with the spars closed (they never fold flat); the horns keep their colour; eyes `closed`; a loop of 6 breaths, the **dream-twitch** at 60 % of the 6th, fully stepped (held frames): two 4 f kicks of the near hind out behind the rump (slide −5, lift +3; young × 0.8, baby × 0.5), a near-front paddle, one 4 f tail flick (lift −10), a 1 px body jolt on the first kick, the bolts flicking up 15° for 4 f, and one spark falling to the floor |
 | **Water** | slinky: body rot ±2°, the neck and tail carry an S-wave 8 f behind the legs | 3 bubbles in the top pass; the fin-ear flares with its ray | spots dim, the fin-ear droops (the 40° world clamp), and it licks its lips every 120 f (the curl key stays under the snout's upper contour: 1 px higher it read as a pink nose) | spots pulse one state up at the top of each breath; a nostril bubble (r 2 → 4) on each exhale; fluke and fin-ear relaxed; floats belly-up if in water (not built: the habitat has no water) |
 | **Slinkwing** | the fans bob 1 f behind the head's counter-bob (baby ± 6°, young ± 4.5°) | sings a 3-note rising scale (3.7's eighth notes) | the fans pinned forward (28°; the baby's 36°); a chirp arc at f 0 and f 60, the jaw at its stage minimum for 6 f at each | young and adult hold the head up (chin 10 / 8 px) over forepaws slid 10 px forward (tuning `sleep.frontTuck`): resting it on folded paws left a mound at ÷ 3, and a head held up without the paws under it floated in front of the chest. The fans lie 40° back from the world's vertical (not 25°: more upright than the awake lean of about 30° they read "ears up") with their tips curled 20° down, the far fan 20° more upright than the near one, topping the lying body by 12 / 9 px (≥ 4 px at ÷ 3), so both the cue and the `closed` eye stay in view. The baby's lie 55° back from its bowed crown. The fans ease over 8 f between the asleep and awake leans, falling asleep and waking. A snore arc (3.7) on each exhale |
+| **Dusk** (v2) | a **lantern carry**: 0.4 px/f (young 0.45, baby 0.28), paw lift 2.5 / 2 / 1.5, the head held level with its counter-bob halved to 0.5 px, so the lamp is carried steady and only the lantern swings, a beat behind the stride; tail lift +4° | the lamp flares (full + core, 30 f); the stalk bobs up 2 px at f 14 and f 26; 3 motes rise from the lamp in the top pass, 2 f apart, spread −4 / 0 / +4 px, 0.5 px/f, 28 f each | **searching by lamplight**: the shared sit at `mood` −0.5 (the lamp a crescent), the head lowered 18° so the lamp hangs 6 px (baby 4) over where the bowl goes; it peers at the empty spot (f 0–40), looks up at the owner with the `hungry` face (f 50–90, where the growl lands), and on each growl the lamp gutters out (all dark face) for 8 f | **the nightlight**: young and adult lie chin on the floor, the lamp resting on the floor 2 px ahead of the snout as a new-moon sliver that widens 1 px for 20 f on each sleeping exhale; the baby's bun keeps its lamp on the floor in front of it, under its chin, a nightlight beside the bed. The "z" rises from its usual spot, above the lamp. **Wake:** the lamp switches on as the eyes first open (on 3 f, off 2 f, on), like fire's rekindle. **Eat** (a rule): the stalk takes its +1 shape so the lamp hangs ≥ 2 px over the food |
+
+**Elders (v2)** keep their element's column at the elder's timing (4.1: × 1.25, the key holds), with the walk speeds of 4.2's elder column (rock 72 f at 0.26 px/f, lightning 54 f at 0.38) and the happy flourish at f 18. Each element's elder-only extra (section 3) is a renderer flourish keyed on the same `act` / `cue`: fire's hearth smoke rides the ember's schedule, lightning's arc the crackle's, dusk's second moth the moth's.
 
 ---
 
@@ -1004,11 +1180,11 @@ How an element gets its column (`ElementSpec.anims`, element.ts), cheapest first
 ### 5.1 Failure modes, what prevents them, and how each is checked
 | # | Risk | Prevention (hard rules) | Check |
 |---|---|---|---|
-| 1 | **Two elements read as the same dragon** by shape | One zone per element. Quiet-zone budgets (3.0). Tail-end, head and back budgets. The cue is ≥ 60 % at `mood` −1. | **Silhouette sheet** (`view=silhouette&set=all` stacks idle, lowest mood, asleep (the sleep loop's pose) and walk key 3 of 8, where the near legs come closest): all 18 as flat `#1a1018` at idle, walk keys, lowest mood and the sleep pose, reduced ÷ 3 (the humanoids' own 72 → 24 px ratio) by **area coverage** (box filter, a pixel is ink when ≥ 50 % covered), at **3 sub-pixel phase offsets**. A viewer must name every element at all three phases. Expected shapes: U / saw / dome / spire / bar-and-crescent / big head. (Nearest-neighbour to 24 px wide was ÷ 4.4 to ÷ 5.1 on adults, and whether a 3 to 10 px feature survived depended on sub-pixel phase.) |
-| 2 | **Two elements read as the same dragon** by colour | Value-stacked bodies (D9). | Gate (b), plus the colour-blind gate (f), which applies the same RULE_B: **all 15 pairs pass in normal vision, deuteranopia and protanopia; none passes on hue alone in normal vision.** |
-| 3 | **Stages confused** | Head : height ratio 52 / 40 / 34 %. Eye aspect 7 × 8 / 7 × 7 / 8 × 6. Visible neck. Snout 2 / 6.5 / 9. Seed → sprout → signature. Each step ≥ 1.29× length and ≥ 1.22× height (2.4, measured on the drawn rig). | Stage contact sheet: every element's three stages side by side. |
-| 4 | **Adjacent parts fuse** (the "gold blob") | The ladder between every touching pair. The folded wing stays ≥ 5 px above the belly line. Markings stop ≥ 3 px above the belly line unless belly / marking passes. | Gate (a), 11 core pairs (including the shadow and highlight tones a pigment edge crosses) + element extras + face pairs. Thinnest by value: lightning glow / membrane 26 %, rock membrane / marking 28 %, water scale.sh / membrane 29 %; rock membrane / horn passes on hue alone (157°). |
-| 5 | **Far side fuses** (a two-legged or one-winged read), or **a far leg floats free** of the body | Far legs at 0.55 / 0.30 (D8); slinkwing's legs thin and flat. Leg joints at gap/2 + X, so the near legs leave ≥ 3 px of background at rest and at every walk key (2.1). Far paws 2 px up and splayed ±4 px. Far horn and fan offsets. The ≥ 3 px sliver rule. No far eye, claws, markings, ribs or rays. The walk's far shoulder slides only as far as its root stays sunk (4.2 notes). | Gates (c1 to c3) and (e), with a 6-point Oklab L floor on the dark pairs (the luminance ratio alone is lenient in the darks). Walk contact sheet: all four legs countable at all 8 keys. **Leg-root audit** (`view=roots`, in the smoke run): every look's walk, idle and rest frame by frame, drawn without its far legs; each far leg's sunk root must lie ≥ 0.25 px inside what is drawn over it (every look measures ≥ 0.5 on seeds 1, 2, 3 and 5; the walk that hung the far front leg in front of the chest measured −0.2 to −3.6). |
+| 1 | **Two elements read as the same dragon** by shape | One zone per element. Quiet-zone budgets (3.0). Tail-end, head and back budgets. The cue is ≥ 60 % at `mood` −1. | **Silhouette sheet** (`view=silhouette&set=all` stacks idle, lowest mood, asleep (the sleep loop's pose) and walk key 3 of 8, where the near legs come closest): all 28 (v2: seven columns × four stage rows) as flat `#1a1018` at idle, walk keys, lowest mood and the sleep pose, reduced ÷ 3 (the humanoids' own 72 → 24 px ratio) by **area coverage** (box filter, a pixel is ink when ≥ 50 % covered), at **3 sub-pixel phase offsets**. A viewer must name every element at all three phases. Expected shapes: U / saw / dome / spire / bar-and-crescent / big head / **hook ahead of the face** (dusk's "?", v2). Every elder keeps its element's shape; the adult-to-elder difference is posture (5.1 #3). (Nearest-neighbour to 24 px wide was ÷ 4.4 to ÷ 5.1 on adults, and whether a 3 to 10 px feature survived depended on sub-pixel phase.) |
+| 2 | **Two elements read as the same dragon** by colour | Value-stacked bodies (D9). | Gate (b), plus the colour-blind gate (f), which applies the same RULE_B: **all 21 pairs pass at all 16 stage combinations in normal vision, deuteranopia and protanopia** (v2: 1008 body gates); gate (j) keeps every stage's body chromatic. **At the same stage none passes on hue alone in normal vision, except fire / spike from the young stage** (E10, D29). |
+| 3 | **Stages confused** | Head : height ratio 52 / 40 / 34 %. Eye aspect 7 × 8 / 7 × 7 / 8 × 6. Visible neck. Snout 2 / 6.5 / 9. Seed → sprout → signature. Each step ≥ 1.29× length and ≥ 1.22× height (2.4, measured on the drawn rig). **Adult → elder (v2) cannot be told by size**, so four checks instead (D21): **(a) posture**, the elder's head top ≥ 6 px lower than the adult's at rest (rock ≥ 3; EL's prototype 7 / 7 / 4 / 7 / 9 / 9); **(b) colour**, the elder's scale saturation ≤ the adult's − 0.05 (the six that pass drop 0.07 to 0.19); rock's sand greys least (0.44 → 0.41, D28), so rock is checked on its belly (0.16 → 0.11), its muzzle and its dome; **(c) face**, the grey muzzle, brow tuft and beard present; **(d) size**, length ≤ 1.10× and height ≤ 1.02× the adult's. | Stage contact sheet: every element's four stages side by side (the elder row joins `view=stages` with the implementation phase). |
+| 4 | **Adjacent parts fuse** (the "gold blob") | The ladder between every touching pair. The folded wing stays ≥ 5 px above the belly line. Markings stop ≥ 3 px above the belly line unless belly / marking passes. | Gate (a), 11 core pairs (including the shadow and highlight tones a pigment edge crosses) + element extras + face pairs. Thinnest by value, at any stage: lightning glow / membrane 26 %, dusk glow.hi / glow 27 %, rock membrane / marking 28 %, water scale / belly and scale.sh / belly.sh 28 to 29 %; rock membrane / horn passes on hue alone (157°). v2: every pair at all four stages, plus the elder face (muzzle / scale 32 to 87 %). |
+| 5 | **Far side fuses** (a two-legged or one-winged read), or **a far leg floats free** of the body | Far legs at 0.55 / 0.30 (D8); slinkwing's and dusk's legs thin and flat. Leg joints at gap/2 + X, so the near legs leave ≥ 3 px of background at rest and at every walk key (2.1). Far paws 2 px up and splayed ±4 px. Far horn and fan offsets. The ≥ 3 px sliver rule. No far eye, claws, markings, ribs or rays. The walk's far shoulder slides only as far as its root stays sunk (4.2 notes). | Gates (c1 to c3) and (e), with a 6-point Oklab L floor on the dark pairs (the luminance ratio alone is lenient in the darks). Walk contact sheet: all four legs countable at all 8 keys. **Leg-root audit** (`view=roots`, in the smoke run): every look's walk, idle and rest frame by frame, drawn without its far legs; each far leg's sunk root must lie ≥ 0.25 px inside what is drawn over it (every v1 look measures ≥ 0.5 on seeds 1, 2, 3 and 5; the dusk placeholder ≥ 0.4, its baby's idle the shallowest; the walk that hung the far front leg in front of the chest measured −0.2 to −3.6). |
 | 6 | **Membrane vanishes into the body shadow** | Dark membranes below the scale's own shadow tone (D11), or signal membranes. No highlight on a membrane. | Gate (a) scale / membrane and scale.sh / membrane; gate (c) far membrane. |
 | 7 | **Markings read as shading** | A marking is ≥ 25 % (or ≥ 40° of hue) from the base, the shadow and the highlight tones it crosses, and from the belly. | Gate (a) scale / marking, scale.sh / marking, scale.hi / marking, belly / marking. |
 | 8 | **Emitters look like objects** | Flame, crystals, bolts, sparks, bubbles, dots and arcs are `flat()`, never banded. The only light marks on them are the listed cores and facets. | Recorder check (to build): no `celPath` call on an emitter part. |
@@ -1025,8 +1201,8 @@ How an element gets its column (`ElementSpec.anims`, element.ts), cheapest first
 |---|---|---|
 | Pupil | 3 × 4 (baby and young; the young's with iris on both sides and below); 2 × 4 slit with iris on both sides (adult; its top-left 1 × 2 under the catchlight) | all |
 | Catchlight | 2 × 2, never 1 px | all |
-| Brow, brow ridge | 2 px bar | young and adult; babies only in expressions |
-| Nostril, egg tooth, fangs | 2 × 2 (adult fangs 2 × 3) | all / baby / young and adult |
+| Brow, brow ridge | 2 px bar | young, adult and elder; babies only in expressions |
+| Nostril, egg tooth, fangs | 2 × 2 (adult fangs 2 × 3; the elder's worn to 2 × 2) | all / baby / young, adult and elder |
 | Claws | 2 × 2 (young), 2 × 3 (adult), 2 px gaps, **un-inked**; **none on far paws or babies** | young, adult |
 | Wing arm and spars | 3 px (adult), 2 px (young); folded, the adult's leading edge 2 px (1.3); none on baby nubs | young, adult |
 | Fan ribs, fin rays | 2 px, with ≥ 2 px of membrane between them and the edge; a fan rib is drawn only where each of its 2 × 2 stamps has 2 full pixels of membrane on all four sides (every mood, the dish, the rattle, asleep), the ribs starting about 3.6 px apart; none on far fans. The young and adult fans draw theirs as pleats, tone planes the floor does not bind (3.7) | all that have them |
@@ -1037,7 +1213,13 @@ How an element gets its column (`ElementSpec.anims`, element.ts), cheapest first
 | Spots, glow dots, sparks, embers, crumbs | ≥ 2 × 2 (spots 3 × 3). Crumbs stay 2 × 2 for their whole life and then are gone (shrunk in steps they spent two-thirds of it as 1 px specks), landing within 8 px of the mouth. A glow dot sits ≥ 2 px in from the tip it decorates. A crystal facet only on a crystal ≥ 4 px wide. No "+" sparkles with 1 px arms. | all |
 | Sound arcs, sap streaks | 2 px, plus a 1 px dark edge | all |
 | "z" glyph, dazed stars | a light 7 × 8 "z" in `#f8f4ec`, 2 px strokes, with a 1 px ink edge on its strokes' 4-neighbours (corners and 3 px counters open: 4.2 sleep); 5 × 5 solid four-point stars with an ink ring | all |
-| Water dorsal fin | ≥ 2 px tall; omitted on babies | young, adult |
+| Water dorsal fin | ≥ 2 px tall; omitted on babies | young, adult, elder |
+| Elder brow tuft (v2) | 2 px thick, ≥ 3 columns, 7 px long | elder |
+| Elder beard (v2) | a 4 px root, a 2 px round tip: not a whisker | elder |
+| Wing tear (v2) | a 3 px mouth, ≥ 2 px deep (spike's bite 4 × 2, water's split 2 × 4) | elder |
+| Wing hole (v2) | a window ≥ 2 × 2 inside a 1 px ring, ≥ 2 px of membrane all round; never shrunk (skipped instead) | elder, full spread only |
+| Dusk's lamp (v2) | stalk 2 px (adult and elder 2.5) inside its ink; lantern ≥ 6 px across; cap 2 px tall; core ≥ 2 × 2 (none on the baby); a lit crescent ≥ 2 px wide | all |
+| Dusk's motes and moth (v2) | motes 2 × 2 in a 4-neighbour ink ring; the moth 5 × 3 / 3 × 4 | all / adult and elder |
 
 **Banned outright:**
 - scale texture of any kind (scales are implied by the cel bands, never drawn);
@@ -1048,11 +1230,12 @@ How an element gets its column (`ElementSpec.anims`, element.ts), cheapest first
 ### 5.3 Shape budget (principle 22: about 45 cel shapes per rig)
 The adult base comes to about 30 cel shapes: body, neck, 4 legs, 4 paws, tail, 2 wings (one silhouette each), jaw, skull, 2 horns and the eye group. With the element features:
 
-| Element | Fire | Spike | Rock | Lightning | Water | Slinkwing |
-|---|---|---|---|---|---|---|
-| Adult (≤ 45) | 32 | 33 (the comb is one shape, 8 quills in one path; thorns) | 35 (dome + 3 crystals) | 33 | 36 (fluke, fins, dorsal, spots; 1 fin-ear ray, 2 fluke rays) | 35 (2 fans + 3 ribs on the near fan) |
+| Element | Fire | Spike | Rock | Lightning | Water | Slinkwing | Dusk (v2) |
+|---|---|---|---|---|---|---|---|
+| Adult (≤ 45) | 32 | 33 (the comb is one shape, v2's 9 quills in one path; thorns) | 35 (dome + 3 crystals) | 33 | 36 (fluke, fins, dorsal, spots; 1 fin-ear ray, 2 fluke rays) | 35 (2 fans + 3 ribs on the near fan) | about 33 (the base − 2 horns + stalk, lantern, cap, core, tail tip, nose frost) |
+| Elder (≤ 45) | 35 (+ smoke) | 37 (+ 2 sap-buds) | 38 (+ the 4th crystal) | 36 | 39 (+ 2 barnacles) | 38 (+ the frost band) | 36 (+ the second moth) |
 
-Babies come in at about 18 to 22 and young adults at about 26 to 32.
+Babies come in at about 18 to 22 and young adults at about 26 to 32. An elder adds the muzzle, the tuft, the beard (inside the jaw's path, no new shape) and one hole: 2 to 3 cel shapes over its adult, plus its elder-only extra: 35 to 39 in all.
 
 ### 5.4 Several dragons on screen
 - **Sorting.** Y-sort by feet. Every dragon has a ground-shadow ellipse and the full 1 px outline, so even two same-element dragons (a parent and its baby) separate when they overlap.
@@ -1060,7 +1243,7 @@ Babies come in at about 18 to 22 and young adults at about 26 to 32.
   - Breath is drawn with its owner and always points away from its own body.
   - Rising particles go in the top pass.
   - Ambient particles are capped at 6 per dragon **and 12 across the whole habitat**, handed out by a round-robin scheduler so no dragon starves. With more than 4 dragons on screen, every ambient interval stretches 1.5×.
-  - `event: 'shriek'` flinches are capped at 2 neighbours. The lonely call (`event: 'call'`) makes neighbours look, not flinch (3.7). Both events are raised by slinkwing's anims; nothing consumes them yet (the game's pet loop will).
+  - `event: 'shriek'` flinches are capped at 2 neighbours. The lonely call (`event: 'call'`) makes neighbours look, not flinch (3.7). Both events are raised by slinkwing's anims; (v2) dusk's breath raises `event: 'hush'`, which calms neighbours (spike's wary lean eases, a lonely slinkwing is answered). Nothing consumes any of the three yet (the game's pet loop will).
 - **Reacting to each other.** Spike's wary lean (4.3) reads `DragonInfo.wary`, which the owner of the scene steps once per tick for every pet: the gap to the nearest other dragon in game px (between the two sprites' extents along the floor, tail tip to snout, and their depth apart), latched on under 30 px and off over 36 (a dragon walking past does not flicker the lean) and eased over about 8 f. The gallery habitat does this (it steps its pets in lockstep); the game's pet renderer will.
 - **Per-pet inputs** the owner passes (DrawDragonOpts, copied to DragonInfo): `bond` (0..1, default 1: rock's crystal count), `charge` (0..1, default 0: lightning's boredom crackle), `wary` (above).
 - **Telling pets apart.** Two same-element, same-stage pets differ by their seeded variant (2.8).
@@ -1068,21 +1251,24 @@ Babies come in at about 18 to 22 and young adults at about 26 to 32.
 - **Motion.** Loops are desynchronised (random phase, ±10 % duration). Spread wings are events, never idle, so a crowd never becomes a wall of membranes.
 - **Habitat floor constraint** (gate i).
   - The floor under the dragons must sit ≥ 25 % in luminance from every body colour **and every belly colour**: the belly is the bottom edge of the silhouette, and about 10 px of bare floor shows between it and the ground shadow. The floor's saturation is under 0.20, so hue can never rescue a pair.
-  - Because the bodies span L 0.05 to 0.49, that means a **pale floor**. The reference is straw `#e0d6b8` (L 0.67), which clears all six bodies (rock is the closest, at 27 %) and all six bellies (26 to 49 %; rock's warm cream is the closest).
+  - Because the bodies span L 0.05 to 0.49, that means a **pale floor**. The reference is straw `#e0d6b8` (L 0.67), which clears all seven bodies (rock is the closest, at 28 %) and all seven bellies (26 to 56 %; rock's warm cream is the closest) at every stage: the greying keeps luminance, so an elder sits exactly where its baby did (3.9).
   - That forces every belly to sit ≤ 0.49 or ≥ 0.89 in luminance: fire, spike, lightning and water have mid-value bellies, rock and slinkwing near-white ones. The first draft's pale bellies sat 2 to 21 % from this floor on five of the six.
   - A mid-value or green floor fails: a grass floor would swallow spike.
 - **Effect colours were chosen to survive that floor** (gate i measures each one). Every effect that can land on the floor carries a ring or edge in a dark slot, and fades by shrinking or narrowing, never by alpha:
   - fire puffs have a `scale` outer ring (66 %);
   - bolts, quills and pebbles are ink-outlined;
-  - water's bubbles, drips and droplets have a `membrane` ring (85 %);
+  - water's bubbles, drips and droplets have a `membrane` ring (87 % with the v2 sea-green membrane);
   - spike's sap streaks and sparkles have a `scale` edge (75 %);
   - lightning's sparks are inked stepped bolts (3.5), the ink outline carrying them on the floor;
   - rock's dust is opaque `scale` (27 %);
-  - slinkwing's sound arcs are `membrane` (47 %) with a `scale` outer edge (92 %).
+  - slinkwing's sound arcs are `membrane` (47 %) with a `scale` outer edge (92 %);
+  - (v2) dusk's Nightfall mist is opaque `membrane` (47 %) in a `scale` ring (88 %); its motes, moths and the smoke of its fizzle are ink-ringed; its lamp resting on the floor asleep is inked, with a dark face 97 % from the ink;
+  - the elder's breath finale ring (4.2) takes the element's own floor-safe colours above.
 
 ### 5.5 Automated checks: what exists and what to build
 - **Exists: `node tools/palette-check.ts`** (also `npm run palette`; `npm run check` runs it after the typecheck). It reads only the palette data and the engine's own colour maths, with no canvas, so it is the cheapest check and runs first. It exits with code 1 on any failed gate.
-  - **Gate (a):** adjacency within each dragon, including the cel tones a pigment edge crosses (scale.sh / belly.sh, scale.sh / membrane, scale.sh and scale.hi / marking) and, on slinkwing, the brow and the ink face marks on the eye mask.
+  - **v2: every gate runs on all seven elements at all four stages**, each stage's palette the base greyed by `agedPalette` (3.9) with its cel, far and mood tones derived from the greyed colours; a report line carries one number per stage (b / y / a / e) and each number is one gate.
+  - **Gate (a):** adjacency within each dragon, including the cel tones a pigment edge crosses (scale.sh / belly.sh, scale.sh / membrane, scale.sh and scale.hi / marking), on slinkwing the brow and the ink face marks on the eye mask, on dusk its lamp (glow / scale, core / glow, cap / glow) and the marks on its nose frost, and (v2) the elder face: muzzle / scale, scale.sh, dark and ink, and slinkwing's muzzle / mask and frost / membrane.
   - **Gate (b):** body colours across elements. The rule:
     - **B1:** both S ≥ 0.30 and ≥ 40° apart;
     - **or B2:** ≥ 25 % in luminance;
@@ -1090,16 +1276,17 @@ Babies come in at about 18 to 22 and young adults at about 26 to 32.
   - **Gate (c):** the far side, c1 to c3; c2 also needs ≥ 6 Oklab L (the dark-pair floor).
   - **Gate (d):** cel ramps, with no collapsed tones; a hand-set shadow (`DRAGON_SHADOW`, rock's) ≥ 25 % under its base.
   - **Gate (e):** far legs, far membranes and far paired horns against the ink, ≥ 25 % and ≥ 6 Oklab L.
-  - **Gate (f):** colour-blind safety, by RULE_B (the same rule as gate b), plus each dragon's blush on its cheek.
+  - **Gate (f):** colour-blind safety, by RULE_B (the same rule as gate b), plus each dragon's blush on its cheek. (v2: gates b and f take every body pair at all 16 stage combinations, an elder beside a baby included, and print each pair's thinnest combination.)
   - **Gate (h):** mood states: every pair of colours a mood swaps between.
   - **Gate (i):** the habitat floor: every scale, belly and floor-level effect.
-  - **Report (g):** hue-only pairs and glow collisions.
+  - **Gate (j)** (v2): identity through age: every stage's scale keeps S ≥ 0.30 (dusk ≥ 0.20), so greying never takes a body's hue away.
+  - **Report (g):** same-stage hue-only pairs and glow collisions. v2 reports fire / spike from the young stage (E10) and the coral lamp beside fire's glow (8 % / 20°: they differ by shape and place).
 - **To build with the rig:**
   1. `tools/dragon-sheet`, through `tools/shot.ts`, rendering:
      - the ÷ 3 area-coverage silhouette sheet at 3 phase offsets (5.1 #1);
-     - the stage sheet;
+     - the stage sheet (four stages from the implementation phase);
      - the walk-leg sheet (built: the walk strips, 8 keys of one cycle over scrolling ground ticks, and the walk block of the silhouette sheet);
-     - a greyscale sheet and a deuteranopia sheet of all 18 dragons;
+     - a greyscale sheet and a deuteranopia sheet of all 28 dragons (the gallery's `grey` and `cvd` views draw the lineup: they take the elder row with the implementation phase);
      - a habitat shot with 8 dragons;
      - (built) the floor audit (`view=floor`, 5.1 #14: the core set, the idle variants and the element anims `bath`, `upset` and `call`), the leg-root audit (`view=roots`, 5.1 #5), the idle-variant, fidget and element-anim strips and the face sheets, all in `npm run shots`.
   2. A recorder pass (the Aether & Brass `art-invariants` pattern) for:
@@ -1112,268 +1299,369 @@ Babies come in at about 18 to 22 and young adults at about 26 to 32.
 ### 5.6 Exemption ledger
 | # | Exemption | Why it is allowed | Measured |
 |---|---|---|---|
-| E1 | The iris is saturated and outside the signal family on spike (orange), rock (honey), water (gold) and slinkwing (mint). | It is at most 6 × 4 px inside an ink ring, and in a care game the face is where attention belongs. | Every iris is ≥ 31 % from the catchlight and ≥ 98 % from the pupil. |
+| E1 | The iris is saturated and outside the signal family on spike (orange), rock (honey), water (gold), slinkwing (mint) and dusk (periwinkle, v2). | It is at most 6 × 4 px inside an ink ring, and in a care game the face is where attention belongs. | Every iris is ≥ 31 % from the catchlight and ≥ 98 % from the pupil. |
 | E2 | The adult pupil is a 2 × 4 slit, against the engine's "3 px pupils". | The engine's pupil is 3 × 2, so its smallest dimension is also 2. The slit keeps the 2 px floor and more area (8 px against 6), and it has iris on both sides (2.5). The catchlight covers its top-left 1 × 2, a glint on the pupil (the young eye's convention): the dark still shows 6 px, 2 px wide below the glint. | Pupil vs ink ring: 1.0 Oklab L, which is why the slit may never touch the ring's side. |
 | E3 | No eye whites, where `drawFace` draws whites. | A profile animal eye. The ink ring does the separating. | n/a |
-| E4 | Far legs use `farPalette(0.55, 0.30)`, not the engine's 0.62 / 0.25. | The engine exposes `farShade` / `farDesat` as per-build readability knobs. The quadruped far leg sits next to the near leg's shadow. | Gate c2 against the near leg's shadow band: 38 to 48 % and 7.1 to 10.2 Oklab L at 0.55 / 0.30, against 19 to 33 % at the default (2 of the 5 banded elements fail). Slinkwing's legs are flat (× 0.75 radius), because its shadow tone is too near the ink for any far shade to clear both by 6 Oklab L; against the near base its far leg measures 67 % and 12.2. |
+| E4 | Far legs use `farPalette(0.55, 0.30)`, not the engine's 0.62 / 0.25. | The engine exposes `farShade` / `farDesat` as per-build readability knobs. The quadruped far leg sits next to the near leg's shadow. | Gate c2 against the near leg's shadow band: 38 to 48 % and 7.1 to 10.2 Oklab L at 0.55 / 0.30, against 19 to 33 % at the default (2 of the 5 banded elements fail). Slinkwing's legs are flat (× 0.75 radius), because its shadow tone is too near the ink for any far shade to clear both by 6 Oklab L; against the near base its far leg measures 67 % and 12.2. Dusk's (v2) likewise (× 0.76): 68 % and 13.7 at every stage. |
 | E5 | Pigment boundaries are not inked (belly, markings, eye mask, spots). | The same hide, following `drawLimbSegs`' sleeve → skin precedent. `band()` is for changes of material. | Gate (a): every pigment pair is ≥ 25 %, including against the shadow and highlight tones it crosses (lowest: lightning belly / marking, 30 %). |
 | E6 | The signal colour covers a large area on lightning (the wings) and slinkwing (fans and wings), not only small emitters. | That area *is* the silhouette cue. It is one hue family, and the neutral ceiling is unaffected. | n/a |
 | E7 | Water's pearl spots have a weak highlight step (7 %). | Spots are 3 × 3, below `FLAT_R`, and drawn flat, so the ramp is never used. | Gate (d) reports it. No other banded slot is below it. |
 | E8 | Baby slinkwing's fans flop over its eyes for 24 f after its squeak. | A gag, and the only frame range where a head feature covers the eye. It ends on a pop back up and a blink. Asleep, the fans lie back and the eye stays in view (4.3). The rig clips every near head feature off the eye (1.4 step 12.6); this gag opts out through the stepped `eyeClip` pose channel (0 for exactly those frames), the only anim that does. | Frame review of the baby breath strip. |
 | E9 | The tuck poses draw the head group before the dome (rock) or before the wing nubs (baby sleep bun), against "the head drawn last". | The eyes are `closed` in the sleep tucks; in rock's upset tuck the one peeking eye sits under the raised rim with nothing drawn over it, and the rolled-forward hood is clipped off the eye's largest box + 1 px (1.4, 3.4). | Frame review of the sleep and upset loops. |
+| E10 | (v2) Fire / spike pass on hue alone in normal vision from the young stage: same-stage luminance 26 / 24 / 22 / 14 % (b / y / a / e), under the 25 % of B2. | Greying pulls the pair apart under protanopia only if it brings them together in normal vision (3.9 has the arithmetic, D29). The colour-blind gate is what players need, so it holds; in normal vision the pair is red against green, both S ≥ 0.34, 104 to 112° apart (B1), and the zones (a torch tail against a saw back) name them first. | Gate (b) B1 at every stage; gate (f) protanopia 26 to 28 % (B2), deuteranopia ≥ 30 %. Report (g) lists it. |
+| E11 | (v2) Dusk's membrane `#98a1b6` is lighter than its body, against D11's "dark membranes sit below the body's shadow tone". | A membrane under a body at L 0.08 would sit within 6 Oklab L of the ink (gate e), slinkwing's case; so, like slinkwing's, it goes light, and the grey of "dark blue → grey" lives in the wings from hatching. | scale / membrane 77 %, scale.sh / membrane 88 %, far membrane vs ink 95 % (okL 31.6), far membrane vs near scale 35 %. |
+| E12 | (v2) Dusk's coral lamp `#ffa98c` sits 8 % / 20° from fire's glow `#ffa21f` (report g's first glow collision). | The two differ by shape and place, the rule report (g) asks for: a flame on an up-curled tail over the hips against a round, capped lamp hung ahead of the face; the bodies behind them are 39 (protanopia) to 70 % apart. A lamp 25 % lighter (`#ffc6a6`) sat 4 % from the straw floor and read as a bubble; ≥ 40° of hue away is pink, slinkwing's and the blush's. | Report (g). |
 
 ### 5.7 Rejected ideas
 - **Readability:** fire's markings in the belly colour (it fails belly / marking by definition); the rock tail club; the lightning tail arrowhead; the slinkwing tail barb; 3 claws per paw; far wing as a knuckle only.
 - **Charm:** shared sharp/soft zones; zigzag head horns for lightning; the flat whale fluke; spike's blossom (a second signal colour on the head); an inked belly seam; outlining emitters in `marking` instead of ink.
 - **Growth:** three head-zone cues; a single nose horn for lightning; axolotl cheek fins as water's cue; `farPalette(0.5, 0.3)` for legs (charm's 0.55 / 0.30 passes with more margin to the ink); rock's two tail plates (the tail end is water's zone); a 3-thorn caltrop on spike's tail tip.
 - **Review round** (details in the Review log): a dark bat mask with pale face marks on slinkwing; pale sage tail rings on spike; making the young adult lankier than the adult; a reference wall colour.
+- **v2 round** (details in the Review log, "v2 design round"):
+  - *the elder:* any cue that reads as sick or sad (a tremor, a limp, a cough or wheeze, a permanent heavy lid, bald patches, a cane, a missing tooth, a clouded iris, a dimmed catchlight); an elder bigger than the adult; holes in a folded or resting wing, or several holes (no room: 2.9); shrinking a hole to fit; a near-white muzzle (a bandage on slinkwing); greying dusk at k 0.9 (a neutral body);
+  - *dusk:* cloak wings draped over the flanks (a blanket, rock's zone), stilt legs (only readable past the 1.3 cap, and a leggy blue dragon is Zap), a swan neck alone (nothing on the baby or asleep; kept as the build), a bushy tail (a bar or a leaf at ÷ 3), a crescent-moon crest (invisible in the head budget), a trailing wisp as the resting cue (an emitter cannot be a silhouette), a blue lamp (a bubble, a bauble, lightning's family), a capless lure (an anglerfish), crescent-moon flank markings (")" and "C" read as arcs or text), a gold lamp or iris (lightning's pairing), the coral-wisp breath (fire's jet), three spread holes and a folded one;
+  - *spike:* a taller five-quill back (the ÷ 3 saw fills at mood −1), a hock spur (a speck, or it cuts the far leg), an elbow spur (the near legs' gap), nape quills (hidden behind the head), shoulder spurs (read as markings under the folded leaf), a double row (fills the notches), a baby thorn bud (the hair clip again), a fourth baby nub, a tail quill past t 0.68 (D5);
+  - *water:* a vivid true sea green such as `#2aa88a` (fire's value under deuteranopia), jade `#68a794` as the default (the dullest body; kept as the alternative), darkening its greyed elder (fire's value under deuteranopia).
 
 ### 5.8 Palette check report
-Output of `node tools/palette-check.ts` for the palette in 3.1. Re-paste it whenever a hex changes.
+Output of `node tools/palette-check.ts` for the base palettes of 3.1 at all four stages (the greying of 3.9). Re-paste it whenever a hex or a greying strength changes.
 
 ```
 DRAGON PALETTE CHECK  (tools/palette-check.ts)
 ladder: >= 25% rel. luminance OR >= 40deg hue (hue counts only when S >= 0.2 and V >= 0.25)
+stages: baby / young / adult / elder (b/y/a/e), each the base palette greyed by agedPalette (bible 3.9); one number per stage is one gate, "!" marks a failing stage
 
-(a) ADJACENT COLOURS WITHIN EACH DRAGON
+(a) ADJACENT COLOURS WITHIN EACH DRAGON  (lum % b/y/a/e, hue deg b/y/a/e; hexes at baby -> elder)
  fire
-  ok   scale/belly         #f04422 #e08a2c  lum  33%  hue 21deg  lum
-  ok   scale.sh/belly.sh   #9e2f23 #945f2a  lum  36%  hue 24deg  lum
-  ok   scale/membrane      #f04422 #7f1e3a  lum  75%  hue 27deg  lum
-  ok   scale.sh/membrane   #9e2f23 #7f1e3a  lum  39%  hue 23deg  lum
-  ok   scale/horn          #f04422 #734a4c  lum  60%  hue 13deg  lum
-  ok   scale/marking       #f04422 #ffe29a  lum  71%  hue 33deg  lum
-  ok   scale.sh/marking    #9e2f23 #ffe29a  lum  88%  hue 37deg  lum
-  ok   scale.hi/marking    #ff5927 #ffe29a  lum  63%  hue 29deg  lum
-  ok   belly/marking       #e08a2c #ffe29a  lum  56%  hue 11deg  lum
-  ok   membrane/horn       #7f1e3a #734a4c  lum  37%  hue 14deg  lum
-  ok   scale/dark          #f04422 #2b1418  lum  95%  hue   n/a  lum
-  ok   glow/scale          #ffa21f #f04422  lum  52%  hue 25deg  lum
-  ok   eye/catchlight      #ffc02e #f8f4ec  lum  35%  hue   n/a  lum
-  ok   eye/pupil           #ffc02e #1a1418  lum  99%  hue   n/a  lum
-  ok   blush/scale         #ff9ab0 #f04422  lum  52%  hue 23deg  lum
+  ok   scale/belly         lum 33/34/36/38     hue 21/20/19/16     lum          #f04422 #e08a2c -> #dd4d39 #c69372
+  ok   scale.sh/belly.sh   lum 36/37/38/41     hue 24/22/19/6      lum          #9e2f23 #945f2a -> #923534 #836561
+  ok   scale/membrane      lum 75/74/74/73     hue 27/25/24/21     lum          #f04422 #7f1e3a -> #dd4d39 #69333f
+  ok   scale.sh/membrane   lum 39/38/38/36     hue 23/21/19/14     lum          #9e2f23 #7f1e3a -> #923534 #69333f
+  ok   scale/horn          lum 60/60/59/57     hue 13/12/12/10     lum          #f04422 #734a4c -> #dd4d39 #734a4c
+  ok   scale/marking       lum 71/71/72/73     hue 33/33/33/35     lum          #f04422 #ffe29a -> #dd4d39 #f9e3ae
+  ok   scale.sh/marking    lum 88/88/88/89     hue 37/38/38/42     lum,lum+hue  #9e2f23 #ffe29a -> #923534 #f9e3ae
+  ok   scale.hi/marking    lum 63/63/62/61     hue 29/30/29/31     lum          #ff5927 #ffe29a -> #ff6441 #f9e3ae
+  ok   belly/marking       lum 56/56/56/56     hue 11/13/14/19     lum          #e08a2c #ffe29a -> #c69372 #f9e3ae
+  ok   membrane/horn       lum 37/36/36/37     hue 14/13/12/10     lum          #7f1e3a #734a4c -> #69333f #734a4c
+  ok   scale/dark          lum 95/95/95/95     hue n/a             lum          #f04422 #2b1418 -> #dd4d39 #2b1418
+  ok   glow/scale          lum 52/52/53/56     hue 25/26/26/28     lum          #ffa21f #f04422 -> #ffa21f #dd4d39
+  ok   eye/catchlight      lum 35/35/35/35     hue -               lum          #ffc02e #f8f4ec
+  ok   eye/pupil           lum 99/99/99/99     hue -               lum          #ffc02e #1a1418
+  ok   blush/scale         lum 52/53/54/56     hue -               lum          #ff9ab0 #f04422 -> #ff9ab0 #dd4d39
+  ok   muzzle/scale        lum -/-/-/38        hue n/a             lum          #a59c98 #dd4d39
+  ok   muzzle/scale.sh     lum -/-/-/74        hue n/a             lum          #a59c98 #923534
+  ok   muzzle/dark         lum -/-/-/97        hue n/a             lum          #a59c98 #2b1418
+  ok   muzzle/ink          lum -/-/-/98        hue n/a             lum          #a59c98 #1a1018
  spike
-  ok   scale/belly         #2f8232 #a3ad55  lum  56%  hue 55deg  lum+hue
-  ok   scale.sh/belly.sh   #1f5a2f #6c774a  lum  54%  hue 62deg  lum+hue
-  ok   scale/membrane      #2f8232 #2e6b58  lum  30%  hue 39deg  lum
-  ok   scale.sh/membrane   #1f5a2f #2e6b58  lum  34%  hue 25deg  lum
-  ok   scale/horn          #2f8232 #f2e8c6  lum  79%  hue   n/a  lum
-  ok   scale/marking       #2f8232 #173a19  lum  80%  hue   n/a  lum
-  ok   scale.sh/marking    #1f5a2f #173a19  lum  58%  hue   n/a  lum
-  ok   scale.hi/marking    #47a539 #173a19  lum  89%  hue   n/a  lum
-  ok   belly/marking       #a3ad55 #173a19  lum  91%  hue   n/a  lum
-  ok   membrane/horn       #2e6b58 #f2e8c6  lum  85%  hue   n/a  lum
-  ok   scale/dark          #2f8232 #4a2618  lum  83%  hue 105deg  lum+hue
-  ok   glow/scale          #7dff8c #2f8232  lum  78%  hue  5deg  lum
-  ok   eye/catchlight      #ff9a3c #f8f4ec  lum  51%  hue   n/a  lum
-  ok   eye/pupil           #ff9a3c #1a1418  lum  98%  hue   n/a  lum
-  ok   blush/scale         #ff9ab0 #2f8232  lum  65%  hue 135deg  lum+hue
+  ok   scale/belly         lum 56/55/55/53     hue 55/55/55/54     lum+hue      #2f8232 #a3ad55 -> #558056 #a5aa82
+  ok   scale.sh/belly.sh   lum 54/53/53/51     hue 62/60/59/n/a    lum+hue,lum  #1f5a2f #6c774a -> #38584b #6d756d
+  ok   scale/membrane      lum 30/31/32/35     hue 39/39/39/37     lum          #2f8232 #2e6b58 -> #558056 #4a665c
+  ok   scale.sh/membrane   lum 34/32/32/29     hue 25/23/18/3      lum          #1f5a2f #2e6b58 -> #38584b #4a665c
+  ok   scale/horn          lum 79/79/79/78     hue n/a             lum          #2f8232 #f2e8c6 -> #558056 #f2e8c6
+  ok   scale/marking       lum 80/81/81/82     hue n/a             lum          #2f8232 #173a19 -> #558056 #1f3821
+  ok   scale.sh/marking    lum 58/58/59/61     hue n/a             lum          #1f5a2f #173a19 -> #38584b #1f3821
+  ok   scale.hi/marking    lum 89/89/89/89     hue n/a             lum          #47a539 #173a19 -> #76a262 #1f3821
+  ok   belly/marking       lum 91/91/92/92     hue n/a             lum          #a3ad55 #173a19 -> #a5aa82 #1f3821
+  ok   membrane/horn       lum 85/85/85/85     hue n/a             lum          #2e6b58 #f2e8c6 -> #4a665c #f2e8c6
+  ok   scale/dark          lum 83/83/83/84     hue 105/105/105/105 lum+hue      #2f8232 #4a2618 -> #558056 #4a2618
+  ok   glow/scale          lum 78/78/78/77     hue 5/5/5/6         lum          #7dff8c #2f8232 -> #7dff8c #558056
+  ok   eye/catchlight      lum 51/51/51/51     hue -               lum          #ff9a3c #f8f4ec
+  ok   eye/pupil           lum 98/98/98/98     hue -               lum          #ff9a3c #1a1418
+  ok   blush/scale         lum 65/64/64/62     hue -               lum          #ff9ab0 #2f8232 -> #ff9ab0 #558056
+  ok   muzzle/scale        lum -/-/-/53        hue n/a             lum          #a6a7a2 #558056
+  ok   muzzle/scale.sh     lum -/-/-/78        hue n/a             lum          #a6a7a2 #38584b
+  ok   muzzle/dark         lum -/-/-/92        hue n/a             lum          #a6a7a2 #4a2618
+  ok   muzzle/ink          lum -/-/-/98        hue n/a             lum          #a6a7a2 #1a1018
  rock
-  ok   scale/belly         #d4b67c #fff5cc  lum  46%  hue   n/a  lum
-  ok   scale.sh/belly.sh   #a88a66 #e6d49e  lum  59%  hue 12deg  lum
-  ok   scale/membrane      #d4b67c #4c5670  lum  81%  hue 176deg  lum+hue
-  ok   scale.sh/membrane   #a88a66 #4c5670  lum  66%  hue 169deg  lum+hue
-  ok   scale/horn          #d4b67c #5e4e46  lum  83%  hue 20deg  lum
-  ok   scale/marking       #d4b67c #7e5f44  lum  73%  hue 12deg  lum
-  ok   scale.sh/marking    #a88a66 #7e5f44  lum  53%  hue  5deg  lum
-  ok   scale.hi/marking    #ffe48d #7e5f44  lum  83%  hue 18deg  lum
-  ok   belly/marking       #fff5cc #7e5f44  lum  86%  hue   n/a  lum
-  ok   membrane/horn       #4c5670 #5e4e46  lum  12%  hue 157deg  HUE ONLY
-  ok   scale/dark          #d4b67c #3b2c24  lum  94%  hue   n/a  lum
-  ok   membrane/marking    #4c5670 #7e5f44  lum  28%  hue 165deg  lum+hue
-  ok   glow/marking        #b48cff #7e5f44  lum  63%  hue 127deg  lum+hue
-  ok   horn/dark           #5e4e46 #3b2c24  lum  65%  hue   n/a  lum
-  ok   eye/catchlight      #ffb84a #f8f4ec  lum  38%  hue   n/a  lum
-  ok   eye/pupil           #ffb84a #1a1418  lum  99%  hue   n/a  lum
-  ok   blush/scale         #d8607a #d4b67c  lum  50%  hue 53deg  lum+hue
+  ok   scale/belly         lum 47/47/47/46     hue n/a             lum          #d8b474 #fff5cc -> #d5b57e #faf5df
+  ok   scale.sh/belly.sh   lum 59/59/59/58     hue 12/12/12/n/a    lum          #a88a66 #e6d49e -> #a58b6c #ded4b9
+  ok   scale/membrane      lum 81/81/81/81     hue 175/175/174/174 lum+hue      #d8b474 #4c5670 -> #d5b57e #4e566b
+  ok   scale.sh/membrane   lum 66/66/66/66     hue 169/169/169/169 lum+hue      #a88a66 #4c5670 -> #a58b6c #4e566b
+  ok   scale/horn          lum 83/83/83/83     hue 18/18/18/18     lum          #d8b474 #5e4e46 -> #d5b57e #5e4e46
+  ok   scale/marking       lum 73/73/73/73     hue 10/11/10/12     lum          #d8b474 #7e5f44 -> #d5b57e #79604d
+  ok   scale.sh/marking    lum 53/53/52/53     hue 5/5/5/7         lum          #a88a66 #7e5f44 -> #a58b6c #79604d
+  ok   scale.hi/marking    lum 83/83/83/83     hue 18/18/18/19     lum          #ffe284 #7e5f44 -> #ffe390 #79604d
+  ok   belly/marking       lum 86/86/86/86     hue n/a             lum          #fff5cc #7e5f44 -> #faf5df #79604d
+  ok   membrane/horn       lum 12/11/12/11     hue 157/157/156/157 HUE ONLY     #4c5670 #5e4e46 -> #4e566b #5e4e46
+  ok   scale/dark          lum 94/94/94/94     hue n/a             lum          #d8b474 #3b2c24 -> #d5b57e #3b2c24
+  ok   membrane/marking    lum 28/28/29/28     hue 165/164/164/162 lum+hue      #4c5670 #7e5f44 -> #4e566b #79604d
+  ok   glow/marking        lum 63/64/63/64     hue 127/126/127/125 lum+hue      #b48cff #7e5f44 -> #b48cff #79604d
+  ok   horn/dark           lum 65/65/65/65     hue n/a             lum          #5e4e46 #3b2c24 -> #5e4e46 #3b2c24
+  ok   eye/catchlight      lum 38/38/38/38     hue -               lum          #ffb84a #f8f4ec
+  ok   eye/pupil           lum 99/99/99/99     hue -               lum          #ffb84a #1a1418
+  ok   blush/scale         lum 50/50/50/50     hue -               lum          #d8607a #d8b474 -> #d8607a #d5b57e
+  ok   muzzle/scale        lum -/-/-/32        hue n/a             lum          #dfdcd7 #d5b57e
+  ok   muzzle/scale.sh     lum -/-/-/62        hue n/a             lum          #dfdcd7 #a58b6c
+  ok   muzzle/dark         lum -/-/-/96        hue n/a             lum          #dfdcd7 #3b2c24
+  ok   muzzle/ink          lum -/-/-/99        hue n/a             lum          #dfdcd7 #1a1018
  lightning
-  ok   scale/belly         #2d58cc #9fb4f2  lum  74%  hue  1deg  lum
-  ok   scale.sh/belly.sh   #1e3da7 #697cc5  lum  70%  hue  1deg  lum
-  ok   scale/membrane      #2d58cc #ffcf33  lum  82%  hue 178deg  lum+hue
-  ok   scale.sh/membrane   #1e3da7 #ffcf33  lum  90%  hue 179deg  lum+hue
-  ok   scale/horn          #2d58cc #404a9c  lum  29%  hue 10deg  lum
-  ok   scale/marking       #2d58cc #ffcf33  lum  82%  hue 178deg  lum+hue
-  ok   scale.sh/marking    #1e3da7 #ffcf33  lum  90%  hue 179deg  lum+hue
-  ok   scale.hi/marking    #4571e9 #ffcf33  lum  71%  hue 178deg  lum+hue
-  ok   belly/marking       #9fb4f2 #ffcf33  lum  30%  hue 179deg  lum+hue
-  ok   membrane/horn       #ffcf33 #404a9c  lum  87%  hue 172deg  lum+hue
-  ok   scale/dark          #2d58cc #141a3c  lum  90%  hue   n/a  lum
-  ok   glow/horn           #fff6a0 #404a9c  lum  91%  hue 179deg  lum+hue
-  ok   glow/membrane       #fff6a0 #ffcf33  lum  26%  hue  8deg  lum
-  ok   eye/catchlight      #ffc41f #f8f4ec  lum  33%  hue   n/a  lum
-  ok   eye/pupil           #ffc41f #1a1418  lum  99%  hue   n/a  lum
-  ok   blush/scale         #ff9ab0 #2d58cc  lum  75%  hue 123deg  lum+hue
+  ok   scale/belly         lum 74/74/74/74     hue 1/1/0/2         lum          #2d58cc #9fb4f2 -> #4a5ca7 #aab5d9
+  ok   scale.sh/belly.sh   lum 70/71/71/72     hue 1/0/0/3         lum          #1e3da7 #697cc5 -> #313f8a #707db1
+  ok   scale/membrane      lum 82/82/82/82     hue 178/179/178/174 lum+hue      #2d58cc #ffcf33 -> #4a5ca7 #f6d074
+  ok   scale.sh/membrane   lum 90/90/91/91     hue 179/178/176/172 lum+hue      #1e3da7 #ffcf33 -> #313f8a #f6d074
+  ok   scale/horn          lum 29/30/30/30     hue 10/9/8/5        lum          #2d58cc #404a9c -> #4a5ca7 #404a9c
+  ok   scale/marking       lum 82/82/82/82     hue 178/179/178/174 lum+hue      #2d58cc #ffcf33 -> #4a5ca7 #f6d074
+  ok   scale.sh/marking    lum 90/90/91/91     hue 179/178/176/172 lum+hue      #1e3da7 #ffcf33 -> #313f8a #f6d074
+  ok   scale.hi/marking    lum 71/71/71/70     hue 178/179/178/172 lum+hue      #4571e9 #ffcf33 -> #6876be #f6d074
+  ok   belly/marking       lum 30/30/30/29     hue 179/180/179/177 lum+hue      #9fb4f2 #ffcf33 -> #aab5d9 #f6d074
+  ok   membrane/horn       lum 87/87/87/87     hue 172/172/170/169 lum+hue      #ffcf33 #404a9c -> #f6d074 #404a9c
+  ok   scale/dark          lum 90/90/90/90     hue n/a             lum          #2d58cc #141a3c -> #4a5ca7 #141a3c
+  ok   glow/horn           lum 91/91/91/91     hue 179/179/179/179 lum+hue      #fff6a0 #404a9c -> #fff6a0 #404a9c
+  ok   glow/membrane       lum 26/27/26/26     hue 8/9/10/12       lum          #fff6a0 #ffcf33 -> #fff6a0 #f6d074
+  ok   eye/catchlight      lum 33/33/33/33     hue -               lum          #ffc41f #f8f4ec
+  ok   eye/pupil           lum 99/99/99/99     hue -               lum          #ffc41f #1a1418
+  ok   blush/scale         lum 75/75/75/75     hue -               lum          #ff9ab0 #2d58cc -> #ff9ab0 #4a5ca7
+  ok   muzzle/scale        lum -/-/-/75        hue n/a             lum          #b4b6bc #4a5ca7
+  ok   muzzle/scale.sh     lum -/-/-/87        hue n/a             lum          #b4b6bc #313f8a
+  ok   muzzle/dark         lum -/-/-/97        hue n/a             lum          #b4b6bc #141a3c
+  ok   muzzle/ink          lum -/-/-/99        hue n/a             lum          #b4b6bc #1a1018
  water
-  ok   scale/belly         #20a3ce #85c6ae  lum  36%  hue 37deg  lum
-  ok   scale.sh/belly.sh   #1570a9 #588990  lum  34%  hue 16deg  lum
-  ok   scale/membrane      #20a3ce #1e5f8c  lum  67%  hue 10deg  lum
-  ok   scale.sh/membrane   #1570a9 #1e5f8c  lum  29%  hue  1deg  lum
-  ok   scale/horn          #20a3ce #eaf6f0  lum  65%  hue   n/a  lum
-  ok   scale/marking       #20a3ce #dcfff6  lum  67%  hue   n/a  lum
-  ok   scale.sh/marking    #1570a9 #dcfff6  lum  84%  hue   n/a  lum
-  ok   scale.hi/marking    #35cdeb #dcfff6  lum  46%  hue   n/a  lum
-  ok   belly/marking       #85c6ae #dcfff6  lum  48%  hue   n/a  lum
-  ok   membrane/horn       #1e5f8c #eaf6f0  lum  88%  hue   n/a  lum
-  ok   scale/dark          #20a3ce #0e2a36  lum  93%  hue   n/a  lum
-  ok   glow/scale          #40d8f0 #20a3ce  lum  45%  hue  7deg  lum
-  ok   glow/membrane       #40d8f0 #1e5f8c  lum  82%  hue 16deg  lum
-  ok   eye/catchlight      #ffc64a #f8f4ec  lum  31%  hue   n/a  lum
-  ok   eye/pupil           #ffc64a #1a1418  lum  99%  hue   n/a  lum
-  ok   blush/scale         #feaebe #20a3ce  lum  44%  hue 153deg  lum+hue
+  ok   scale/belly         lum 29/29/29/29     hue 18/18/18/n/a    lum          #28b0a6 #85c6ae -> #67aaa3 #9fc0b3
+  ok   scale.sh/belly.sh   lum 29/27/27/27     hue 1/0/1/6         lum          #1a7989 #588990 -> #447587 #698494
+  ok   scale/membrane      lum 74/74/74/74     hue 2/2/3/2         lum          #28b0a6 #185e5b -> #67aaa3 #3c5a58
+  ok   scale.sh/membrane   lum 43/44/44/43     hue 11/13/14/20     lum          #1a7989 #185e5b -> #447587 #3c5a58
+  ok   scale/horn          lum 62/62/62/62     hue n/a             lum          #28b0a6 #eaf6f0 -> #67aaa3 #eaf6f0
+  ok   scale/marking       lum 63/63/63/63     hue n/a             lum          #28b0a6 #dcfff6 -> #67aaa3 #e3fdf6
+  ok   scale.sh/marking    lum 83/83/83/83     hue n/a             lum          #1a7989 #dcfff6 -> #447587 #e3fdf6
+  ok   scale.hi/marking    lum 40/39/39/39     hue n/a             lum          #3fddbd #dcfff6 -> #8cd5ba #e3fdf6
+  ok   belly/marking       lum 48/48/48/48     hue n/a             lum          #85c6ae #dcfff6 -> #9fc0b3 #e3fdf6
+  ok   membrane/horn       lum 90/90/90/90     hue n/a             lum          #185e5b #eaf6f0 -> #3c5a58 #eaf6f0
+  ok   scale/dark          lum 94/94/94/94     hue n/a             lum          #28b0a6 #0c2a2a -> #67aaa3 #0c2a2a
+  ok   glow/scale          lum 39/39/39/39     hue 13/13/14/14     lum          #40d8f0 #28b0a6 -> #40d8f0 #67aaa3
+  ok   glow/membrane       lum 84/84/84/84     hue 11/11/11/12     lum          #40d8f0 #185e5b -> #40d8f0 #3c5a58
+  ok   eye/catchlight      lum 31/31/31/31     hue -               lum          #ffc64a #f8f4ec
+  ok   eye/pupil           lum 99/99/99/99     hue -               lum          #ffc64a #1a1418
+  ok   blush/scale         lum 44/44/44/44     hue -               lum          #ffbccb #28b0a6 -> #ffbccb #67aaa3
+  ok   muzzle/scale        lum -/-/-/29        hue n/a             lum          #b5bab8 #67aaa3
+  ok   muzzle/scale.sh     lum -/-/-/68        hue n/a             lum          #b5bab8 #447587
+  ok   muzzle/dark         lum -/-/-/96        hue n/a             lum          #b5bab8 #0c2a2a
+  ok   muzzle/ink          lum -/-/-/99        hue n/a             lum          #b5bab8 #1a1018
  slinkwing
-  ok   scale/belly         #5a2f6e #fff5f8  lum  94%  hue   n/a  lum
-  ok   scale.sh/belly.sh   #3b205e #a8a9c9  lum  93%  hue   n/a  lum
-  ok   scale/membrane      #5a2f6e #ff6fae  lum  85%  hue 53deg  lum+hue
-  ok   scale.sh/membrane   #3b205e #ff6fae  lum  92%  hue 68deg  lum+hue
-  ok   scale/horn          #5a2f6e #f0dce6  lum  93%  hue   n/a  lum
-  ok   scale/marking       #5a2f6e #9a6aa8  lum  73%  hue  5deg  lum
-  ok   scale.sh/marking    #3b205e #9a6aa8  lum  86%  hue 20deg  lum
-  ok   scale.hi/marking    #7c3f7d #9a6aa8  lum  53%  hue 13deg  lum
-  ok   belly/marking       #fff5f8 #9a6aa8  lum  79%  hue   n/a  lum
-  ok   membrane/horn       #ff6fae #f0dce6  lum  53%  hue   n/a  lum
-  ok   scale/dark          #5a2f6e #2e1638  lum  73%  hue   n/a  lum
-  ok   membrane/belly      #ff6fae #fff5f8  lum  62%  hue   n/a  lum
-  ok   marking/belly       #9a6aa8 #fff5f8  lum  79%  hue   n/a  lum
-  ok   scale.deep/marking  #2e1a4e #9a6aa8  lum  91%  hue 23deg  lum
-  ok   ink/marking         #1a1018 #9a6aa8  lum  97%  hue   n/a  lum
-  ok   eye/catchlight      #3fe0a0 #f8f4ec  lum  37%  hue   n/a  lum
-  ok   eye/pupil           #3fe0a0 #1a1418  lum  99%  hue   n/a  lum
-  ok   blush/scale         #ff9ab0 #5a2f6e  lum  89%  hue 66deg  lum+hue
+  ok   scale/belly         lum 94/94/94/94     hue n/a             lum          #5a2f6e #fff5f8 -> #50385d #fcf6f8
+  ok   scale.sh/belly.sh   lum 93/93/93/93     hue n/a             lum          #3b205e #a8a9c9 -> #352751 #a6aac9
+  ok   scale/membrane      lum 85/85/85/85     hue 53/54/55/57     lum+hue      #5a2f6e #ff6fae -> #50385d #ee7dab
+  ok   scale.sh/membrane   lum 92/92/92/92     hue 68/69/70/76     lum+hue      #3b205e #ff6fae -> #352751 #ee7dab
+  ok   scale/horn          lum 93/93/93/93     hue n/a             lum          #5a2f6e #f0dce6 -> #50385d #f0dce6
+  ok   scale/marking       lum 73/73/73/73     hue 5/6/7/8         lum          #5a2f6e #9a6aa8 -> #50385d #946e9f
+  ok   scale.sh/marking    lum 86/86/86/86     hue 20/21/22/27     lum          #3b205e #9a6aa8 -> #352751 #946e9f
+  ok   scale.hi/marking    lum 53/53/53/53     hue 13/13/14/23     lum          #7c3f7d #9a6aa8 -> #704a6a #946e9f
+  ok   belly/marking       lum 79/78/78/79     hue n/a             lum          #fff5f8 #9a6aa8 -> #fcf6f8 #946e9f
+  ok   membrane/horn       lum 53/53/53/53     hue n/a             lum          #ff6fae #f0dce6 -> #ee7dab #f0dce6
+  ok   scale/dark          lum 73/73/73/73     hue n/a             lum          #5a2f6e #2e1638 -> #50385d #2e1638
+  ok   membrane/belly      lum 62/62/62/62     hue n/a             lum          #ff6fae #fff5f8 -> #ee7dab #fcf6f8
+  ok   marking/belly       lum 79/78/78/79     hue n/a             lum          #9a6aa8 #fff5f8 -> #946e9f #fcf6f8
+  ok   scale.deep/marking  lum 91/91/91/91     hue 23/24/25/30     lum          #2e1a4e #9a6aa8 -> #291f43 #946e9f
+  ok   ink/marking         lum 97/97/97/97     hue n/a             lum          #1a1018 #9a6aa8 -> #1a1018 #946e9f
+  ok   eye/catchlight      lum 37/37/37/37     hue -               lum          #3fe0a0 #f8f4ec
+  ok   eye/pupil           lum 99/99/99/99     hue -               lum          #3fe0a0 #1a1418
+  ok   blush/scale         lum 89/89/89/89     hue -               lum          #ff9ab0 #5a2f6e -> #ff9ab0 #50385d
+  ok   muzzle/scale        lum -/-/-/87        hue n/a             lum          #afadb0 #50385d
+  ok   muzzle/scale.sh     lum -/-/-/93        hue n/a             lum          #afadb0 #352751
+  ok   muzzle/dark         lum -/-/-/97        hue n/a             lum          #afadb0 #2e1638
+  ok   muzzle/ink          lum -/-/-/98        hue n/a             lum          #afadb0 #1a1018
+  ok   muzzle/marking      lum -/-/-/53        hue n/a             lum          #afadb0 #946e9f
+  ok   frost/membrane      lum -/-/-/44        hue n/a             lum          #d4d1ce #ee7dab
+ dusk
+  ok   scale/belly         lum 72/72/72/72     hue 148/145/145/141 lum+hue      #3d4d91 #c28771 -> #4d5065 #aa8f87
+  ok   scale.sh/belly.sh   lum 67/68/68/70     hue 124/111/n/a/n/a lum+hue,lum  #283579 #805d60 -> #333757 #706371
+  ok   scale/membrane      lum 77/77/76/77     hue n/a             lum          #3d4d91 #98a1b6 -> #4d5065 #98a1b6
+  ok   scale.sh/membrane   lum 88/88/88/88     hue n/a             lum          #283579 #98a1b6 -> #333757 #98a1b6
+  ok   scale/horn          lum 89/90/89/90     hue n/a             lum          #3d4d91 #e2e6f0 -> #4d5065 #e2e6f0
+  ok   scale/marking       lum 87/87/86/87     hue n/a             lum          #3d4d91 #c9cfdd -> #4d5065 #c9cfdd
+  ok   scale.sh/marking    lum 93/93/93/93     hue n/a             lum          #283579 #c9cfdd -> #333757 #c9cfdd
+  ok   scale.hi/marking    lum 78/78/77/77     hue n/a             lum          #5864a5 #c9cfdd -> #6c6873 #c9cfdd
+  ok   belly/marking       lum 52/52/52/52     hue n/a             lum          #c28771 #c9cfdd -> #aa8f87 #c9cfdd
+  ok   membrane/horn       lum 55/55/55/55     hue n/a             lum          #98a1b6 #e2e6f0 -> #98a1b6 #e2e6f0
+  ok   scale/dark          lum 91/91/91/91     hue n/a             lum          #3d4d91 #10142a -> #4d5065 #10142a
+  ok   glow/scale          lum 84/84/84/84     hue 147/145/145/143 lum+hue      #ffa98c #3d4d91 -> #ffa98c #4d5065
+  ok   glow.hi/glow        lum 27/27/27/27     hue 18/18/18/18     lum          #ffd4a0 #ffa98c -> #ffd4a0 #ffa98c
+  ok   horn/glow           lum 35/35/35/35     hue n/a             lum          #e2e6f0 #ffa98c -> #e2e6f0 #ffa98c
+  ok   dark/marking        lum 99/99/99/99     hue n/a             lum          #10142a #c9cfdd -> #10142a #c9cfdd
+  ok   ink/marking         lum 99/99/99/99     hue n/a             lum          #1a1018 #c9cfdd -> #1a1018 #c9cfdd
+  ok   eye/catchlight      lum 49/49/49/49     hue -               lum          #7fb8ff #f8f4ec
+  ok   eye/pupil           lum 98/98/98/98     hue -               lum          #7fb8ff #1a1418
+  ok   blush/scale         lum 82/83/82/83     hue -               lum          #ff9ab0 #3d4d91 -> #ff9ab0 #4d5065
+  ok   muzzle/scale        lum -/-/-/87        hue n/a             lum          #c9cfdd #4d5065
+  ok   muzzle/scale.sh     lum -/-/-/93        hue n/a             lum          #c9cfdd #333757
+  ok   muzzle/dark         lum -/-/-/99        hue n/a             lum          #c9cfdd #10142a
+  ok   muzzle/ink          lum -/-/-/99        hue n/a             lum          #c9cfdd #1a1018
  shared
   ok   mouth/tongue        #5a2030 #f07890  lum  90%  hue  5deg  lum
   ok   mouth/fang          #5a2030 #f8f4ec  lum  96%  hue   n/a  lum
 
-(b) SCALE COLOURS ACROSS ELEMENTS  (B1 hue: both S>=0.30 and >=40deg | B2 value: >=25% | B3 chroma: dS>=0.30 and >=12%)
-  ok   fire/spike             #f04422 #2f8232  lum  26%  hue 112deg  dS 0.22  B1+B2
-  ok   fire/rock              #f04422 #d4b67c  lum  53%  hue 30deg  dS 0.44  B2
-  ok   fire/lightning         #f04422 #2d58cc  lum  48%  hue 146deg  dS 0.08  B1+B2
-  ok   fire/water             #f04422 #20a3ce  lum  26%  hue 175deg  dS 0.01  B1+B2
-  ok   fire/slinkwing       #f04422 #5a2f6e  lum  77%  hue 89deg  dS 0.29  B1+B2
-  ok   spike/rock             #2f8232 #d4b67c  lum  66%  hue 83deg  dS 0.22  B1+B2
-  ok   spike/lightning        #2f8232 #2d58cc  lum  29%  hue 102deg  dS 0.14  B1+B2
-  ok   spike/water            #2f8232 #20a3ce  lum  46%  hue 73deg  dS 0.21  B1+B2
-  ok   spike/slinkwing      #2f8232 #5a2f6e  lum  68%  hue 159deg  dS 0.07  B1+B2
-  ok   rock/lightning         #d4b67c #2d58cc  lum  76%  hue 176deg  dS 0.36  B1+B2
-  ok   rock/water             #d4b67c #20a3ce  lum  37%  hue 155deg  dS 0.43  B1+B2
-  ok   rock/slinkwing       #d4b67c #5a2f6e  lum  89%  hue 119deg  dS 0.16  B1+B2
-  ok   lightning/water        #2d58cc #20a3ce  lum  62%  hue 29deg  dS 0.07  B2
-  ok   lightning/slinkwing  #2d58cc #5a2f6e  lum  55%  hue 57deg  dS 0.21  B1+B2
-  ok   water/slinkwing      #20a3ce #5a2f6e  lum  83%  hue 86deg  dS 0.27  B1+B2
- scale S/V: fire 0.86/0.94  spike 0.64/0.51  rock 0.42/0.83  lightning 0.78/0.80  water 0.84/0.81  slinkwing 0.57/0.43
+(b) SCALE COLOURS ACROSS ELEMENTS, AT EVERY PAIR OF STAGES  (B1 hue: both S>=0.30 and >=40deg | B2 value: >=25% | B3 chroma: dS>=0.30 and >=12%; 16 stage combinations a pair)
+  ok   fire/spike          16/16  same stage lum 26/24/22/14  thinnest baby/elder #f04422 #558056 lum  21% hue 111deg S 0.86/0.34 B1
+  ok   fire/rock           16/16  same stage lum 53/53/55/57  thinnest baby/young #f04422 #d7b476 lum  53% hue 28deg S 0.86/0.45 B2
+  ok   fire/lightning      16/16  same stage lum 48/47/46/43  thinnest adult/elder #e8482d #4a5ca7 lum  46% hue 140deg S 0.81/0.56 B1+B2
+  ok   fire/water          16/16  same stage lum 34/34/36/39  thinnest baby/elder #f04422 #67aaa3 lum  34% hue 164deg S 0.86/0.39 B1+B2
+  ok   fire/slinkwing      16/16  same stage lum 77/76/76/75  thinnest elder/adult #dd4d39 #563368 lum  75% hue 88deg S 0.74/0.51 B1+B2
+  ok   fire/dusk           16/16  same stage lum 63/63/62/61  thinnest elder/adult #dd4d39 #495074 lum  60% hue 137deg S 0.74/0.37 B1+B2
+  ok   spike/rock          16/16  same stage lum 65/65/64/63  thinnest elder/young #558056 #d7b476 lum  63% hue 83deg S 0.34/0.45 B1+B2
+  ok   spike/lightning     16/16  same stage lum 29/30/31/34  thinnest elder/adult #558056 #3a5abe lum  34% hue 104deg S 0.34/0.69 B1+B2
+  ok   spike/water         16/16  same stage lum 51/50/50/47  thinnest elder/baby #558056 #28b0a6 lum  47% hue 54deg S 0.34/0.77 B1+B2
+  ok   spike/slinkwing     16/16  same stage lum 68/69/69/70  thinnest baby/adult #2f8232 #563368 lum  68% hue 157deg S 0.64/0.51 B1+B2
+  ok   spike/dusk          16/16  same stage lum 50/52/51/54  thinnest baby/adult #2f8232 #495074 lum  50% hue 108deg S 0.64/0.37 B1+B2
+  ok   rock/lightning      16/16  same stage lum 75/75/75/76  thinnest young/adult #d7b476 #3a5abe lum  75% hue 173deg S 0.45/0.69 B1+B2
+  ok   rock/water          16/16  same stage lum 29/29/29/30  thinnest baby/elder #d8b474 #67aaa3 lum  29% hue 135deg S 0.46/0.39 B1+B2
+  ok   rock/slinkwing      16/16  same stage lum 89/89/89/89  thinnest young/adult #d7b476 #563368 lum  89% hue 119deg S 0.45/0.51 B1+B2
+  ok   rock/dusk           16/16  same stage lum 83/83/83/83  thinnest young/adult #d7b476 #495074 lum  83% hue 168deg S 0.45/0.37 B1+B2
+  ok   lightning/water     16/16  same stage lum 65/65/65/65  thinnest adult/baby #3a5abe #28b0a6 lum  65% hue 50deg S 0.69/0.77 B1+B2
+  ok   lightning/slinkwing 16/16  same stage lum 55/55/55/55  thinnest baby/adult #2d58cc #563368 lum  55% hue 56deg S 0.78/0.51 B1+B2
+  ok   lightning/dusk      16/16  same stage lum 30/30/29/31  thinnest baby/adult #2d58cc #495074 lum  29% hue  6deg S 0.78/0.37 B2
+  ok   water/slinkwing     16/16  same stage lum 84/84/84/84  thinnest baby/adult #28b0a6 #563368 lum  84% hue 104deg S 0.77/0.51 B1+B2
+  ok   water/dusk          16/16  same stage lum 76/76/76/76  thinnest baby/adult #28b0a6 #495074 lum  75% hue 55deg S 0.77/0.37 B1+B2
+  ok   slinkwing/dusk      16/16  same stage lum 36/36/36/36  thinnest adult/elder #563368 #4d5065 lum  35% hue 47deg S 0.51/0.24 B2
+ baby   value stack (L / S): rock 0.485/0.46 > water 0.343/0.77 > fire 0.228/0.86 > spike 0.168/0.64 > lightning 0.119/0.78 > dusk 0.083/0.58 > slinkwing 0.053/0.57
+ young  value stack (L / S): rock 0.484/0.45 > water 0.343/0.67 > fire 0.225/0.83 > spike 0.171/0.57 > lightning 0.119/0.74 > dusk 0.083/0.48 > slinkwing 0.053/0.54
+ adult  value stack (L / S): rock 0.484/0.44 > water 0.344/0.58 > fire 0.220/0.81 > spike 0.172/0.50 > lightning 0.119/0.69 > dusk 0.084/0.37 > slinkwing 0.053/0.51
+ elder  value stack (L / S): rock 0.487/0.41 > water 0.343/0.39 > fire 0.210/0.74 > spike 0.180/0.34 > lightning 0.119/0.56 > dusk 0.083/0.24 > slinkwing 0.053/0.40
 
-(c) FAR SIDE vs NEAR SCALE  (>= 25% luminance; hue does not count, far parts share the near hue)
+(c) FAR SIDE vs NEAR SCALE  (>= 25% luminance; hue does not count, far parts share the near hue; % b/y/a/e)
  c1  engine default farPalette(p, 0.62, 0.25): far scale and far membrane vs near scale
-        fire         scale #823228  68%   membrane #45182b  91%
-        spike        scale #254b2c  67%   membrane #233f3c  75%
-        rock         scale #7f715c  65%   membrane #313547  93%
-        lightning    scale #233772  64%   membrane #96803d  47%
-        water        scale #23607a  67%   membrane #1a3954  88%
-        slinkwing  scale #342044  59%   membrane #904d70  57%
+        fire       scale #823228 68/68/68/67%   membrane #45182b 91/90/90/89%
+        spike      scale #254b2c 67/66/65/64%   membrane #233f3c 75/75/75/75%
+        rock       scale #817058 65/65/65/65%   membrane #313547 92/92/92/92%
+        lightning  scale #233772 64/64/63/63%   membrane #96803d 47/46/47/48%
+        water      scale #276768 68/67/66/65%   membrane #16373c 91/90/90/90%
+        slinkwing  scale #342044 59/59/59/58%   membrane #904d70 57/57/57/58%
+        dusk       scale #293056 61/60/60/60%   membrane #606474 35/36/35/36%
  c2  rig far LEGS farPalette(p, 0.55, 0.3): far leg vs near leg base, and vs near leg SHADOW band (scale.sh); >= 25% and >= okL 6
-        fire         scale #702d26  76% okL 24.5   scale #702d26 vs #9e2f23  42%  okL 8.2   (engine default:  24%, would fail)
-        spike        scale #224229  74% okL 19.1   scale #224229 vs #1f5a2f  44%  okL 7.1   (engine default:  28%)
-        rock         scale #706554  73% okL 27.7   scale #706554 vs #a88a66  51% okL 14.0   (engine default:  38%)
-        lightning    scale #203063  72% okL 17.6   scale #203063 vs #1e3da7  48%  okL 8.6   (engine default:  33%)
-        water        scale #22546b  75% okL 24.6   scale #22546b vs #1570a9  47% okL 10.2   (engine default:  31%)
-        slinkwing  scale #2e1d3b  67% okL 12.2   (legs flat at every stage: no shadow band to cross)
+        fire       scale #702d26 76/76/75/74% min okL 22.8   scale #702d26 vs sh 42/41/41/39% min  okL 7.4
+        spike      scale #224229 74/73/73/72% min okL 18.8   scale #224229 vs sh 44/42/41/38% min  okL 6.3
+        rock       scale #716451 73/73/73/73% min okL 27.6   scale #716451 vs sh 52/52/52/52% min okL 14.1
+        lightning  scale #203063 72/71/71/70% min okL 16.5   scale #203063 vs sh 48/46/44/41% min  okL 6.8
+        water      scale #265a5c 75/75/74/73% min okL 24.3   scale #265a5c vs sh 46/46/43/41% min  okL 8.7
+        slinkwing  scale #2e1d3b 67/66/66/65% min okL 11.6   (legs flat at every stage: no shadow band to cross)
+        dusk       scale #252b4b 68/69/68/68% min okL 13.9   (legs flat at every stage: no shadow band to cross)
  c3  rig far WING + HEAD features farPalette(p, 0.62, 0.25): far membrane (wing, ear-fan, fin-ear) and far paired horn vs near scale
-        fire         membrane #45182b  91%   horn #433037  84%
-        spike        membrane #233f3c  75%   horn #949086  40%
-        rock         membrane #313547  93%   (no paired horns)
-        lightning    membrane #96803d  47%   horn #2a2f5b  72%
-        water        membrane #1a3954  88%   (no paired horns)
-        slinkwing  membrane #904d70  57%   (no paired horns)
+        fire       membrane #45182b 91/90/90/89%   horn #433037 84/84/84/83%
+        spike      membrane #233f3c 75/75/75/75%   horn #949086 40/39/38/35%
+        rock       membrane #313547 92/92/92/92%   (no paired horns)
+        lightning  membrane #96803d 47/46/47/48%   horn #2a2f5b 72/72/73/72%
+        water      membrane #16373c 91/90/90/90%   (no paired horns)
+        slinkwing  membrane #904d70 57/57/57/58%   (no paired horns)
+        dusk       membrane #606474 35/36/35/36%   (no paired horns)
 
-(d) CEL RAMPS  (engine makeTones, default RAMP: hi 1.22 / sh 0.66 / deep 0.51)
-  ok   fire         8 ramps distinct
-  ok   spike        8 ramps distinct
-  ok   rock         8 ramps distinct
-  ok   lightning    8 ramps distinct
-  ok   water        8 ramps distinct
-  ok   slinkwing  8 ramps distinct
-        weakest highlight step on a banded slot:   7% (water.marking #dcfff6 -> hi #ffffff)
-  ok   rock         hand-set scale.sh #a88a66 (engine #8c7e69)  44% under #d4b67c
-  ok   rock         hand-set belly.sh #e6d49e (engine #a8a9a7)  27% under #fff5cc
+(d) CEL RAMPS  (engine makeTones on each stage's greyed colours, default RAMP: hi 1.22 / sh 0.66 / deep 0.51)
+  ok   fire       32 ramps distinct (8 slots x 4 stages)
+  ok   spike      32 ramps distinct (8 slots x 4 stages)
+  ok   rock       32 ramps distinct (8 slots x 4 stages)
+  ok   lightning  32 ramps distinct (8 slots x 4 stages)
+  ok   water      32 ramps distinct (8 slots x 4 stages)
+  ok   slinkwing  32 ramps distinct (8 slots x 4 stages)
+  ok   dusk       32 ramps distinct (8 slots x 4 stages)
+        weakest highlight step on a banded slot:   6% (water.marking (young) #ddfff6 -> hi #ffffff)
+  ok   rock       hand-set scale.sh #a88a66 (engine #8f7c62) 43/43/43/43% under its base -> elder #a58b6c
+  ok   rock       hand-set belly.sh #e6d49e (engine #a8a9a7) 27/27/27/27% under its base -> elder #ded4b9
 
-(e) INK FLOOR  (far leg scale, far wing membrane and far paired horn vs outline #1a1018: >= 25% and >= okL 6)
-  ok   fire         far leg scale #702d26  88% okL 20.1   far membrane #45182b  69%  okL 9.5   far horn #433037  82% okL 14.4
-  ok   spike        far leg scale #224229  85% okL 15.7   far membrane #233f3c  85% okL 15.4   far horn #949086  98% okL 46.4
-  ok   rock         far leg scale #706554  95% okL 32.2   far membrane #313547  82% okL 14.3
-  ok   lightning    far leg scale #203063  80% okL 13.6   far membrane #96803d  97% okL 41.6   far horn #2a2f5b  80% okL 13.5
-  ok   water        far leg scale #22546b  92% okL 23.2   far membrane #1a3954  83% okL 14.5
-  ok   slinkwing  far leg scale #2e1d3b  63%  okL 7.7   far membrane #904d70  95% okL 32.2
+(e) INK FLOOR  (far leg scale, far wing membrane and far paired horn vs outline #1a1018: >= 25% and >= okL 6; % b/y/a/e, least okL)
+  ok   fire       far leg scale #702d26 88/88/88/88% okL 19.8   far membrane #45182b 69/69/70/71%  okL 9.5   far horn #433037 82/82/82/82% okL 14.4
+  ok   spike      far leg scale #224229 85/86/86/87% okL 15.7   far membrane #233f3c 85/85/85/85% okL 15.4   far horn #949086 98/98/98/98% okL 46.4
+  ok   rock       far leg scale #716451 95/95/95/95% okL 32.0   far membrane #313547 82/82/82/82% okL 14.2
+  ok   lightning  far leg scale #203063 80/81/81/82% okL 13.6   far membrane #96803d 97/97/97/97% okL 41.6   far horn #2a2f5b 80/80/80/80% okL 13.5
+  ok   water      far leg scale #265a5c 92/92/93/93% okL 24.3   far membrane #16373c 80/80/80/81% okL 12.4
+  ok   slinkwing  far leg scale #2e1d3b 63/63/64/64%  okL 7.7   far membrane #904d70 95/95/95/95% okL 32.1
+  ok   dusk       far leg scale #252b4b 75/75/75/75% okL 10.8   far membrane #606474 95/95/95/95% okL 31.6
 
-(f) COLOUR-BLIND SAFETY  (simulated deuteranopia / protanopia, Vienot 1999: 15 scale pairs by RULE_B, blush/scale by the ladder)
+(f) COLOUR-BLIND SAFETY  (simulated deuteranopia / protanopia, Vienot 1999: body pairs by RULE_B at all 16 stage combinations, blush/scale by the ladder)
  deutan
-  ok   fire/spike             #949400 #717136  lum  43%  hue  0deg  S 1.00/0.52  B2
-  ok   fire/rock              #949400 #bfbf7b  lum  45%  hue  0deg  S 1.00/0.36  B2
-  ok   fire/lightning         #949400 #4e4ecc  lum  58%  hue 180deg  S 1.00/0.62  B1+B2
-  ok   fire/water             #949400 #8c8ccf  lum   5%  hue 180deg  S 1.00/0.32  B1
-  ok   fire/slinkwing       #949400 #3f3f6d  lum  79%  hue 180deg  S 1.00/0.42  B1+B2
-  ok   spike/rock             #717136 #bfbf7b  lum  69%  hue  0deg  S 0.52/0.36  B2
-  ok   spike/lightning        #717136 #4e4ecc  lum  27%  hue 180deg  S 0.52/0.62  B1+B2
-  ok   spike/water            #717136 #8c8ccf  lum  46%  hue 180deg  S 0.52/0.32  B1+B2
-  ok   spike/slinkwing      #717136 #3f3f6d  lum  63%  hue 180deg  S 0.52/0.42  B1+B2
-  ok   rock/lightning         #bfbf7b #4e4ecc  lum  77%  hue 180deg  S 0.36/0.62  B1+B2
-  ok   rock/water             #bfbf7b #8c8ccf  lum  42%  hue 180deg  S 0.36/0.32  B1+B2
-  ok   rock/slinkwing       #bfbf7b #3f3f6d  lum  89%  hue 180deg  S 0.36/0.42  B1+B2
-  ok   lightning/water        #4e4ecc #8c8ccf  lum  60%  hue  0deg  S 0.62/0.32  B2
-  ok   lightning/slinkwing  #4e4ecc #3f3f6d  lum  50%  hue  0deg  S 0.62/0.42  B2
-  ok   water/slinkwing      #8c8ccf #3f3f6d  lum  80%  hue  0deg  S 0.32/0.42  B2
-  ok   fire blush/scale       #bfbfad #949400  lum  46%  hue   n/a  lum
-  ok   spike blush/scale      #bfbfad #717136  lum  70%  hue   n/a  lum
-  ok   rock blush/scale       #919176 #bfbf7b  lum  45%  hue   n/a  lum
-  ok   lightning blush/scale  #bfbfad #4e4ecc  lum  78%  hue   n/a  lum
-  ok   water blush/scale      #cacabc #8c8ccf  lum  51%  hue   n/a  lum
-  ok   slinkwing blush/scale #bfbfad #3f3f6d  lum  89%  hue   n/a  lum
+  ok   fire/spike          16/16  same stage lum 43/41/38/30  thinnest elder/adult #8c8c2d #737345 lum  33% hue  0deg S 0.68/0.40 B2
+  ok   fire/rock           16/16  same stage lum 45/45/47/51  thinnest baby/baby #949400 #bfbf72 lum  45% hue  0deg S 1.00/0.40 B2
+  ok   fire/lightning      16/16  same stage lum 58/57/56/53  thinnest elder/elder #8c8c2d #5757a7 lum  53% hue 180deg S 0.68/0.48 B1+B2
+  ok   fire/water          16/16  same stage lum 14/15/19/25  thinnest baby/baby #949400 #9898a8 lum  14% hue 180deg S 1.00/0.10 B3
+  ok   fire/slinkwing      16/16  same stage lum 79/79/78/77  thinnest elder/adult #8c8c2d #404068 lum  77% hue 180deg S 0.68/0.38 B1+B2
+  ok   fire/dusk           16/16  same stage lum 70/70/68/67  thinnest elder/adult #8c8c2d #4e4e74 lum  66% hue 180deg S 0.68/0.33 B1+B2
+  ok   spike/rock          16/16  same stage lum 69/68/67/65  thinnest elder/baby #757557 #bfbf72 lum  65% hue  0deg S 0.26/0.40 B2
+  ok   spike/lightning     16/16  same stage lum 27/28/29/32  thinnest elder/elder #757557 #5757a7 lum  32% hue 180deg S 0.26/0.48 B2
+  ok   spike/water         16/16  same stage lum 51/50/49/47  thinnest elder/baby #757557 #9898a8 lum  46% hue 180deg S 0.26/0.10 B2
+  ok   spike/slinkwing     16/16  same stage lum 63/65/65/68  thinnest baby/adult #717136 #404068 lum  63% hue 180deg S 0.52/0.38 B1+B2
+  ok   spike/dusk          16/16  same stage lum 47/49/49/52  thinnest baby/adult #717136 #4e4e74 lum  47% hue 180deg S 0.52/0.33 B1+B2
+  ok   rock/lightning      16/16  same stage lum 77/77/77/77  thinnest baby/elder #bfbf72 #5757a7 lum  77% hue 180deg S 0.40/0.48 B1+B2
+  ok   rock/water          16/16  same stage lum 36/36/35/34  thinnest baby/elder #bfbf72 #9a9aa4 lum  34% hue 180deg S 0.40/0.06 B2+B3
+  ok   rock/slinkwing      16/16  same stage lum 88/89/88/89  thinnest baby/adult #bfbf72 #404068 lum  88% hue 180deg S 0.40/0.38 B1+B2
+  ok   rock/dusk           16/16  same stage lum 83/84/83/84  thinnest baby/adult #bfbf72 #4e4e74 lum  83% hue 180deg S 0.40/0.33 B1+B2
+  ok   lightning/water     16/16  same stage lum 64/64/64/64  thinnest elder/baby #5757a7 #9898a8 lum  64% hue  0deg S 0.48/0.10 B2+B3
+  ok   lightning/slinkwing 16/16  same stage lum 50/51/50/52  thinnest baby/adult #4e4ecc #404068 lum  50% hue  0deg S 0.62/0.38 B2
+  ok   lightning/dusk      16/16  same stage lum 28/29/28/30  thinnest baby/adult #4e4ecc #4e4e74 lum  27% hue  0deg S 0.62/0.33 B2
+  ok   water/slinkwing     16/16  same stage lum 82/82/82/83  thinnest baby/adult #9898a8 #404068 lum  82% hue  0deg S 0.10/0.38 B2
+  ok   water/dusk          16/16  same stage lum 74/75/74/75  thinnest baby/adult #9898a8 #4e4e74 lum  74% hue  0deg S 0.10/0.33 B2
+  ok   slinkwing/dusk      16/16  same stage lum 31/31/31/32  thinnest adult/young #404068 #4b4b82 lum  29% hue  0deg S 0.38/0.42 B2
+  ok   fire blush/scale       lum 46/47/49/52%  #bfbfad on #949400 -> #8c8c2d
+  ok   spike blush/scale      lum 70/69/68/67%  #bfbfad on #717136 -> #757557
+  ok   rock blush/scale       lum 44/44/44/45%  #919176 on #bfbf72 -> #bfbf7d
+  ok   lightning blush/scale  lum 78/78/78/77%  #bfbfad on #4e4ecc -> #5757a7
+  ok   water blush/scale      lum 51/51/50/49%  #d3d3c9 on #9898a8 -> #9a9aa4
+  ok   slinkwing blush/scale  lum 89/89/89/89%  #bfbfad on #3f3f6d -> #40405d
+  ok   dusk blush/scale       lum 84/84/84/84%  #bfbfad on #494991 -> #4f4f65
  protan
-  ok   fire/spike             #6c6c26 #7c7c31  lum  26%  hue  0deg  S 0.65/0.60  B2
-  ok   fire/rock              #6c6c26 #baba7c  lum  70%  hue  0deg  S 0.65/0.33  B2
-  ok   fire/lightning         #6c6c26 #5454cc  lum  10%  hue 180deg  S 0.65/0.59  B1
-  ok   fire/water             #6c6c26 #9b9bce  lum  60%  hue 180deg  S 0.65/0.25  B2+B3
-  ok   fire/slinkwing       #6c6c26 #36366e  lum  68%  hue 180deg  S 0.65/0.51  B1+B2
-  ok   spike/rock             #7c7c31 #baba7c  lum  60%  hue  0deg  S 0.60/0.33  B2
-  ok   spike/lightning        #7c7c31 #5454cc  lum  33%  hue 180deg  S 0.60/0.59  B1+B2
-  ok   spike/water            #7c7c31 #9b9bce  lum  46%  hue 180deg  S 0.60/0.25  B2+B3
-  ok   spike/slinkwing      #7c7c31 #36366e  lum  76%  hue 180deg  S 0.60/0.51  B1+B2
-  ok   rock/lightning         #baba7c #5454cc  lum  73%  hue 180deg  S 0.33/0.59  B1+B2
-  ok   rock/water             #baba7c #9b9bce  lum  26%  hue 180deg  S 0.33/0.25  B2
-  ok   rock/slinkwing       #baba7c #36366e  lum  90%  hue 180deg  S 0.33/0.51  B1+B2
-  ok   lightning/water        #5454cc #9b9bce  lum  64%  hue  0deg  S 0.59/0.25  B2+B3
-  ok   lightning/slinkwing  #5454cc #36366e  lum  64%  hue  0deg  S 0.59/0.51  B2
-  ok   water/slinkwing      #9b9bce #36366e  lum  87%  hue  0deg  S 0.25/0.51  B2
-  ok   fire blush/scale       #a9a9b0 #6c6c26  lum  65%  hue   n/a  lum
-  ok   spike blush/scale      #a9a9b0 #7c7c31  lum  53%  hue   n/a  lum
-  ok   rock blush/scale       #76767b #baba7c  lum  61%  hue   n/a  lum
-  ok   lightning blush/scale  #a9a9b0 #5454cc  lum  68%  hue   n/a  lum
-  ok   water blush/scale      #b9b9be #9b9bce  lum  28%  hue   n/a  lum
-  ok   slinkwing blush/scale #a9a9b0 #36366e  lum  89%  hue   n/a  lum
+  ok   fire/spike          16/16  same stage lum 26/26/27/28  thinnest young/baby #6c6c2b #7c7c31 lum  26% hue  0deg S 0.60/0.60 B2
+  ok   fire/rock           16/16  same stage lum 70/69/70/70  thinnest young/young #6c6c2b #b8b876 lum  69% hue  0deg S 0.60/0.36 B2
+  ok   fire/lightning      16/16  same stage lum 10/10/9/12   thinnest elder/baby #6b6b3b #5454cc lum  10% hue 180deg S 0.45/0.59 B1
+  ok   fire/water          16/16  same stage lum 64/64/64/62  thinnest young/elder #6c6c2b #a4a4a3 lum  62% hue  0deg S 0.60/0.01 B2+B3
+  ok   fire/slinkwing      16/16  same stage lum 68/67/66/65  thinnest adult/elder #6b6b30 #3b3b5d lum  65% hue 180deg S 0.55/0.37 B1+B2
+  ok   fire/dusk           16/16  same stage lum 39/40/39/40  thinnest adult/adult #6b6b30 #4f4f74 lum  39% hue 180deg S 0.55/0.32 B1+B2
+  ok   spike/rock          16/16  same stage lum 59/59/58/58  thinnest elder/young #7c7c56 #b8b876 lum  58% hue  0deg S 0.31/0.36 B2
+  ok   spike/lightning     16/16  same stage lum 33/33/34/37  thinnest elder/young #7c7c56 #5656c6 lum  34% hue 180deg S 0.31/0.57 B1+B2
+  ok   spike/water         16/16  same stage lum 51/51/50/48  thinnest elder/elder #7c7c56 #a4a4a3 lum  48% hue  0deg S 0.31/0.01 B2+B3
+  ok   spike/slinkwing     16/16  same stage lum 76/76/76/75  thinnest baby/elder #7c7c31 #3b3b5d lum  74% hue 180deg S 0.60/0.37 B1+B2
+  ok   spike/dusk          16/16  same stage lum 55/55/55/57  thinnest baby/baby #7c7c31 #4b4b91 lum  55% hue 180deg S 0.60/0.48 B1+B2
+  ok   rock/lightning      16/16  same stage lum 73/72/73/74  thinnest young/young #b8b876 #5656c6 lum  72% hue 180deg S 0.36/0.57 B1+B2
+  ok   rock/water          16/16  same stage lum 17/16/17/20  thinnest elder/elder #b9b97e #a4a4a3 lum  20% hue  0deg S 0.32/0.01 B3
+  ok   rock/slinkwing      16/16  same stage lum 90/90/90/90  thinnest young/elder #b8b876 #3b3b5d lum  89% hue 180deg S 0.36/0.37 B1+B2
+  ok   rock/dusk           16/16  same stage lum 81/81/81/82  thinnest young/baby #b8b876 #4b4b91 lum  81% hue 180deg S 0.36/0.48 B1+B2
+  ok   lightning/water     16/16  same stage lum 67/67/67/67  thinnest young/elder #5656c6 #a4a4a3 lum  66% hue 180deg S 0.57/0.01 B2+B3
+  ok   lightning/slinkwing 16/16  same stage lum 64/64/63/61  thinnest elder/elder #5a5aa7 #3b3b5d lum  61% hue  0deg S 0.46/0.37 B2
+  ok   lightning/dusk      16/16  same stage lum 32/33/32/32  thinnest elder/baby #5a5aa7 #4b4b91 lum  30% hue  0deg S 0.46/0.48 B2
+  ok   water/slinkwing     16/16  same stage lum 88/88/88/87  thinnest elder/elder #a4a4a3 #3b3b5d lum  87% hue 180deg S 0.01/0.37 B2+B3
+  ok   water/dusk          16/16  same stage lum 78/78/78/77  thinnest elder/baby #a4a4a3 #4b4b91 lum  77% hue 180deg S 0.01/0.48 B2+B3
+  ok   slinkwing/dusk      16/16  same stage lum 47/46/45/42  thinnest elder/elder #3b3b5d #505065 lum  42% hue  0deg S 0.37/0.21 B2
+  ok   fire blush/scale       lum 65/65/65/65%  #a9a9b0 on #6c6c26 -> #6b6b3b
+  ok   spike blush/scale      lum 53/52/52/52%  #a9a9b0 on #7c7c31 -> #7c7c56
+  ok   rock blush/scale       lum 61/60/60/61%  #76767b on #b9b974 -> #b9b97e
+  ok   lightning blush/scale  lum 68/68/69/69%  #a9a9b0 on #5454cc -> #5a5aa7
+  ok   water blush/scale      lum 31/31/32/34%  #c5c5cb on #a7a7a6 -> #a4a4a3
+  ok   slinkwing blush/scale  lum 89/88/88/88%  #a9a9b0 on #36366e -> #3b3b5d
+  ok   dusk blush/scale       lum 79/79/79/79%  #a9a9b0 on #4b4b91 -> #505065
 
-(h) MOOD STATES  (colours a mood swaps between; the ladder, so the change is visible)
+(h) MOOD STATES  (colours a mood swaps between; the ladder, so the change is visible; lum % b/y/a/e)
  fire
-  ok   glow/banked         #ffa21f #a87020  lum  58%  hue  0deg  lum  (asleep, the flame banks to glow.sh)
+  ok   glow/banked         lum 58/58/58/58     lum        #ffa21f #a87020  (asleep, the flame banks to glow.sh)
  rock
-  ok   glow/banked         #b48cff #7761cf  lum  52%  hue  9deg  lum  (lit crystals vs dim crystals (mood <= -0.3))
-  ok   banked/marking      #7761cf #7e5f44  lum  23%  hue 136deg  HUE ONLY  (a dim crystal still reads on the dome)
+  ok   glow/banked         lum 52/52/52/52     lum        #b48cff #7761cf  (lit crystals vs dim crystals (mood <= -0.3))
+  ok   banked/marking      lum 23/24/23/24     HUE ONLY   #7761cf #7e5f44  (a dim crystal still reads on the dome)
  water
-  ok   marking/dimSpot     #dcfff6 #7ed1e2  lum  41%  hue   n/a  lum  (spots dim when dry or sad)
-  ok   marking/glow        #dcfff6 #40d8f0  lum  40%  hue   n/a  lum  (spots light up when happy)
-  ok   dimSpot/scale       #7ed1e2 #20a3ce  lum  44%  hue  5deg  lum  (dim spots still read on the flank)
+  ok   marking/dimSpot     lum 38/37/37/36     lum        #dcfff6 #82d8ce  (spots dim when dry or sad)
+  ok   marking/glow        lum 40/40/39/39     lum        #dcfff6 #40d8f0  (spots light up when happy)
+  ok   dimSpot/scale       lum 41/41/42/42     lum        #82d8ce #28b0a6  (dim spots still read on the flank)
+ dusk
+  ok   glow/banked         lum 57/57/57/57     lum        #ffa98c #a87575  (the lit crescent vs the lamp's dark face (mood <= -0.3, asleep))
+  ok   banked/ink          lum 97/97/97/97     lum        #a87575 #1a1018  (the dark face still reads inside the lamp's ink ring)
+  ok   banked/scale        lum 63/63/62/63     lum+hue    #a87575 #3d4d91  (a turned-down lamp still reads against the stalk and head)
 
-(i) HABITAT FLOOR #e0d6b8  (L 0.67, S 0.18: hue never counts, >= 25% luminance)
-  ok   fire         scale  66%  belly  49%  breath puff outer ring  66%
-  ok   spike        scale  75%  belly  43%  sap streak / sparkle edge  75%
-  ok   rock         scale  27%  belly  26%  dust puff (opaque)  27%  adult roar puff ring  59%  pebble  81%
-  ok   lightning    scale  82%  belly  31%  spark ring  82%
-  ok   water        scale  54%  belly  28%  bubble / drip ring  85%
-  ok   slinkwing  scale  92%  belly  28%  sound arc  47%  sound arc edge  92%
+(i) HABITAT FLOOR #e0d6b8  (L 0.67, S 0.18: hue never counts, >= 25% luminance; % b/y/a/e)
+  ok   fire       scale 66/67/67/69%  belly 49/49/49/49%  breath puff outer ring 66/67/67/69%
+  ok   spike      scale 75/75/74/73%  belly 43/43/43/43%  sap streak / sparkle edge 75/75/74/73%
+  ok   rock       scale 28/28/28/28%  belly 26/26/26/26%  dust puff (opaque) 28/28/28/28%  adult roar puff ring 59/59/59/59%  pebble 81/81/81/81%
+  ok   lightning  scale 82/82/82/82%  belly 31/31/31/31%  spark ring 82/82/82/82%
+  ok   water      scale 49/49/49/49%  belly 28/28/28/28%  bubble / drip ring 87/87/87/87%
+  ok   slinkwing  scale 92/92/92/92%  belly 28/28/28/28%  sound arc 47/47/47/47%  sound arc edge 92/92/92/92%
+  ok   dusk       scale 88/88/88/88%  belly 56/56/56/56%  mist lobe (opaque) 47/47/47/47%  mist ring 88/88/88/88%
+
+(j) IDENTITY THROUGH AGE  (every stage's scale keeps HSV S >= 0.3 (dusk >= 0.2); scale k b/y/a/e from palettes.ts ageK)
+  ok   fire       scale S 0.86/0.83/0.81/0.74  (>= 0.30)  k 0.00/0.02/0.05/0.14  #f04422 #ed4628 #e8482d #dd4d39
+  ok   spike      scale S 0.64/0.57/0.50/0.34  (>= 0.30)  k 0.00/0.07/0.16/0.41  #2f8232 #38823a #418143 #558056
+  ok   rock       scale S 0.46/0.45/0.44/0.41  (>= 0.30)  k 0.00/0.02/0.04/0.11  #d8b474 #d7b476 #d7b478 #d5b57e
+  ok   lightning  scale S 0.78/0.74/0.69/0.56  (>= 0.30)  k 0.00/0.08/0.18/0.45  #2d58cc #3359c6 #3a5abe #4a5ca7
+  ok   water      scale S 0.77/0.67/0.58/0.39  (>= 0.30)  k 0.00/0.06/0.14/0.36  #28b0a6 #3aafa6 #49aea5 #67aaa3
+  ok   slinkwing  scale S 0.57/0.54/0.51/0.40  (>= 0.30)  k 0.00/0.08/0.18/0.45  #5a2f6e #58316b #563368 #50385d
+  ok   dusk       scale S 0.58/0.48/0.37/0.24  (>= 0.20)  k 0.00/0.30/0.55/0.76  #3d4d91 #444e82 #495074 #4d5065
 
 (g) REPORTED, NOT GATED
- scale pairs passing (b) on hue only, so they would merge in greyscale: none
- glow pairs across elements within 40deg hue AND 25% luminance (must differ by effect SHAPE):
-   none
+ scale pairs passing (b) on hue only at the same stage, so they would merge in greyscale: fire/spike (young), fire/spike (adult), fire/spike (elder)
+ glow pairs across elements within 40deg hue AND 25% luminance (must differ by effect SHAPE; the glow never greys):
+   fire/dusk              #ffa21f #ffa98c  lum   8%  hue 20deg
 
-RESULT: PASS  280 of 280 gates passed
+RESULT: PASS  2168 of 2168 gates passed
 ```
 
 ---
@@ -1709,3 +1997,43 @@ Two reviews judged the whole cast again after round 1: a silhouette and readabil
 - Rock: at ÷ 3 the young and adult tails still slope from the rump; the upset's front wall is a solid dark band.
 - Surprised and scared share one eye on every stage; water's happy spots read duller than resting ones (3.6's open proposal).
 - The idle personalities (A5).
+
+### v2 design round
+The user asked for an elder stage, greying with age, holes in elder wings, a spikier spike, the slinkwing rename (done before this round), a dark-blue-to-grey seventh dragon and a sea-green water dragon. Four proposals answered, each prototyped in a scratch copy of the rig (renders in `shots/elder/`, `shots/dusk/`, `shots/dusk_charm/` and `shots/sw/`): **EL** the elder, greying and wing wear; **NA** and **NB** two independent seventh elements; **SW** spike and water. The lead art director took one seventh element and grafted the other onto it, then re-ran every colour through the palette check extended to seven elements, four stages and every pair of stages (2168 gates, 5.8), and built the colour half: `palettes.ts` (the dusk and sea-green palettes, the greying as data and functions), `tools/palette-check.ts`, a first-pass `elements/dusk.ts`, and the gallery's seven-column layouts. `tsc`, the palette check and `npm run smoke` (39 views, the floor and leg-root audits over all seven elements) pass; the lineup was rendered to confirm the sea-green water and the placeholder draw.
+
+| # | Item | From | Verdict | Why, in one line |
+|---|---|---|---|---|
+| V1 | The elder column of 2.1: not bigger, the head low and forward, the chest settled, a paunch, settled legs, the stretched membrane | EL | Applied (design) | Measured on the prototype: 81 floor-audit rows clean with the beard in the floor guard, the far roots ≥ 2.5 px deep; the head top 7 to 9 px lower (rock 4). |
+| V2 | The elder face: the adult eye with no default lid, a 3 px brow ridge, the grey muzzle, the tuft at every face, the beard | EL | Applied (design) | A permanent lid is `sleepy`; the frame around the eye reads "wise" instead (2.5). |
+| V3 | Greying: the luminance-keeping transform, G 0 / 0.08 / 0.18 / 0.45, the slot weights | EL | Applied | Keeps every value gate valid by construction (3.9). |
+| V4 | EL's per-element strengths (fire 0.4 / −0.6, spike +0.2, rock 0.55, dusk s 2.0) and SW's water drift −0.3 | EL, SW | **Changed** | Checked within a stage only. Across stages they failed 10 gates with the sea-green water (the greyed rock against water under protanopia, 6; the elder water against fire under deuteranopia, 4), and dusk at k 0.9 went neutral. Now fire 0.3 / −0.6, spike 0.9 / +0.2, rock 0.25 on a warmer base (D28), water 0.8, dusk its own curve to S 0.24. |
+| V5 | Fire / spike in greyscale | lead | **Accepted as E10** | No strengths keep both the protanopia step and the greyscale step once spike greys visibly (3.9); the protanopia gate is kept. |
+| V6 | Wing wear: tears at `wing` ≥ 0.55, holes only at full spread, cut through the far wing; lightning's chip and tear; none on rock | EL | Applied (design) | The measured clear membrane (2.9). |
+| V7 | The elder anims, the slow and wise breath with its one-ring finale, the gliding flight | EL | Applied (design) | 4.1, 4.2's elder column. |
+| V8 | Each element's elder cue and elder-only extra | EL | Applied, **except** spike's extra tail quill at 0.8 of the tail | The last 12 px of a spike tail stay a plain taper (D5, water's zone); SW's elder comb (one taller, one chipped quill) takes its place, with EL's sap-buds. |
+| V9 | The seventh element | NA, NB | **NB's "Wisp", with NA's grafts** | D24: the same free zone, found independently; NB reads "dark blue → grey" both ways; NA's cap, mist breath, `hush` and elder moth grafted on. |
+| V10 | NB's palette as hand-set per-stage hexes | NB | Applied, **as a curve** | Nearly the same values (within 0.03 of saturation, the same luminance) come from the greying transform on dusk's own curve, so its stages are derived like every other element's (D22). |
+| V11 | Dusk's breath: NB's coral "wisps" or NA's floor mist | NA, NB | NA's Nightfall, with NB's "comes home" mote | Coral teardrops leaving the mouth read as fire's jet; the mist is the only breath that goes down. |
+| V12 | Dusk's markings: NA's crescent moons or NB's smoke tail tip and nose frost | NA, NB | NB's | The crescents risked reading as slinkwing's arcs or as text; the grey tip and frost are "dark blue → grey" along the body, and the frost grows into the elder muzzle. |
+| V13 | Dusk asleep: NA's raised lantern with a moved "z" (`sleep.zDx`), or NB's lamp on the floor | NA, NB | NB's | The lamp on the floor clears the "z"'s spawn, so no new knob. |
+| V14 | NA's three spread holes and a folded hole on dusk | NA | Not taken | EL's measured membrane has room for one, at full spread only (2.9). |
+| V15 | Dusk's build | NB | Applied, body length **1.0** (not 0.95) | At 0.95 the placeholder's baby walk put the far front root 0.2 px inside the chest, under the leg-root audit's 0.25 (5.1 #5); at 1.0 it keeps 0.9. |
+| V16 | Spike's comb: 4 taller back quills, 5 tail quills, the young's second tail quill, taller baby nubs, 4 volley quills, the chipped elder quill | SW | Applied (design; the comb data is spike's own file in the implementation phase) | The overhang rule (3.3): measured deep notches at ÷ 3 up at every mood, the tail's teeth survive. |
+| V17 | Water sea green `#28b0a6` with its membrane, nostril and blush | SW | Applied (built) | D27; jade kept as the alternative. |
+| V18 | Rock's sandstone `#d4b67c` → `#d8b474` | lead | Applied (built) | D28: room for the rock to grey against the sea-green water under protanopia. |
+| V19 | The gallery's six-column layouts | NA | Applied (built) | The lineup, silhouette and mood views take every element in the registry; the cast sheet is 4 × 2. |
+
+**Found while applying.**
+- A within-stage colour check is not enough: an elder shares the habitat with babies, and the first cross-stage run failed pairs that passed at every matched stage. Gates (b) and (f) now run at all 16 stage combinations.
+- Greying that keeps luminance moves a red toward its true luminance under protanopia (its lost red returns as grey), and a green away from it: fire and spike can hold their protanopia step or their greyscale step, not both (3.9).
+- The sea-green water simulates to a near-grey under both dichromacies; its pairs with fire (deuteranopia) and the greyed rock (protanopia) pass by chroma, B3, with the least room in the cast (margins 1.17 and 1.04).
+- `DRAGON_PALETTES` stays the base (hatchling) palette, so every existing import still draws; `dragonTones` gained an optional stage.
+- Engine candidates: none new.
+
+**Known gaps after v2 (the implementation phase).**
+- The elder in the rig: `Stage` and `STAGE_DIMS.elder` (2.1, with `chestLift`), the elder timing (4.1), the elder anims (4.2), the face (2.5), wing wear (2.9), every element's elder column and extra (section 3), the gallery's elder row, and 2.4's elder sizes measured on the drawn rig.
+- The rig drawing each stage through `agedPalette` (build.ts), and water's `DIM` and rock's `PAL` reads moved to the rig's palette.
+- Dusk's element pass: the lamp, the nose frost, the `tip` marking kind, the Nightfall breath and its fizzle, the moths, the lamp-bat fidget, its 4.3 column and its placeholder replaced; its sizes re-measured.
+- Spike's new comb in `spike.ts` (COMB, the elder entry, the chip, the 5 × 10 thrown nub, the volley of 4) and `parts.ts` letting the elder through its adult-only wing thorns.
+- Nothing consumes `event: 'shriek'`, `'call'` or `'hush'`; rock's beg pile is not a prop; the per-pet inputs are fed only by the gallery.
+- Carried over: surprised and scared share one eye; water's happy spots read duller than resting ones (3.6); the idle personalities (cast review round 2, A5).

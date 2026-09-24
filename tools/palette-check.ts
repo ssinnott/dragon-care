@@ -19,9 +19,11 @@
 //                   colours are chromatic (HSV S >= 0.20 and V >= 0.25): the hue angle of a near-grey or a
 //                   near-black is noise, not colour. Pairs include the cel tones a pigment edge crosses: a marking
 //                   runs through the body's shadow and highlight bands, and the belly line runs through the shadow.
-//                   The elder adds its face: the grey muzzle, brow tuft and beard (bible 2.5) against what they touch.
+//                   The elder adds its face: the grey muzzle and brow tuft, and the beard (its own inked hair tuft),
+//                   against what they touch (bible 2.5), and its elder-only extras (section 3).
 //   (b) elements  : the seven SCALE colours (the body, about half of every sprite) are pairwise distinguishable at
-//                   every pair of stages. See RULE_B below for the rule and why.
+//                   every pair of stages. See RULE_B below for the rule and why; a pair that passes on value alone
+//                   (B2) must also clear the dark-pair floor (OKL_MIN, or OKDE_MIN of Oklab dE).
 //   (c) far side  : c1 the engine's farPalette(p, 0.62, 0.25) far scale and far membrane keep >= 25 % luminance
 //                   from the near scale; c2 the rig's own far LEG shading (DRAGON_FAR.legs) keeps >= 25 % AND
 //                   >= OKL_MIN Oklab lightness from the near leg's base AND its shadow band; c3 the rig's far wing /
@@ -35,19 +37,24 @@
 //                   dragons side by side and a player must tell their pets apart by more than the silhouette alone.
 //                   The blush on each cheek is checked the same way (with the ladder), since it carries the happy face.
 //   (h) mood states: every pair of colours a mood swaps between passes the ladder, so the change can be seen.
-//   (i) floor     : every scale, every belly and the outer colour of every effect that lands on the floor keeps
-//                   >= 25 % luminance from the reference habitat floor. Hue cannot help: the floor's S is < 0.20.
-//   (j) identity  : greying never takes a body's hue away: every scale keeps HSV S >= 0.30 at every stage (dusk, the
-//                   element whose growth IS greying, >= 0.20, the chromatic floor of the ladder), so gate (b)'s B1 and
-//                   the neutral ceiling (<= 40 % neutral area) keep holding for elders.
+//   (i) floor     : every scale, every belly, the outer colour of every effect that lands on the floor, every marking
+//                   that runs along the silhouette's edge (dusk's smoke tail tip and its band), dusk's lamp resting
+//                   on the floor asleep, and the elder's beard (a sleeping elder's chin rests on it) keep >= 25 %
+//                   luminance from the reference habitat floor. Hue cannot help: the floor's S is < 0.20.
+//   (j) identity  : greying never takes a body's hue away: every scale keeps HSV S >= 0.30 at every stage, so gate
+//                   (b)'s B1 and the neutral ceiling (<= 40 % neutral area) keep holding for elders.
+//   (k) visible greying: each greying step (young -> adult, adult -> elder) moves the scale or its highlight band
+//                   (the silver back and crown, palettes.ts AGE_SILVER) by >= GREY_STEP Oklab dE, over the ~0.02 a
+//                   player can see, so "a little greyer" is a step anyone sees, not a number.
 // REPORTED, NOT GATED:
-//   (g) any scale pair that passes (b) on hue alone at the same stage (it would merge in greyscale); glow colours
+//   (g) any scale pair that passes (b) on hue alone at the same stage (it would merge in greyscale); any body pair
+//       that passes (f) on simulated value alone under the dark-pair floor (they are told apart by zone); glow colours
 //       close to another element's glow (they must then differ by effect shape).
 import { hexToRgb, farPalette } from '../src/lib/art/palettes.ts';
 import { toneOf, RAMP } from '../src/lib/art/shading.ts';
 import {
-  DRAGON_ELEMENTS, DRAGON_SHARED, DRAGON_FAR, DRAGON_SLOTS, DRAGON_SHADOW, AGE_STAGES, blushOf, moodTones, dragonTones,
-  agedPalette, ageK, muzzleOf, fanFrostOf,
+  DRAGON_ELEMENTS, DRAGON_SHARED, DRAGON_FAR, DRAGON_SLOTS, DRAGON_SHADOW, AGE_STAGES, AGE_SILVER, blushOf, moodTones,
+  dragonTones, agedPalette, ageK, muzzleOf, beardOf, fanFrostOf, smokeBandOf,
 } from '../src/art/dragon/palettes.ts';
 import type { DragonElement, DragonPalette, DragonSlot, AgeStage } from '../src/art/dragon/palettes.ts';
 
@@ -67,6 +74,14 @@ const CHROMA_V = 0.25;
  */
 const OKL_MIN = 6;
 /**
+ * The dark-pair floor for body colours, gate (b): a pair that separates by value alone (B2) must ALSO be >= OKL_MIN
+ * Oklab L apart or >= this Oklab dE apart (hue and chroma counting). Two dark blues 30 % apart in luminance but 5.5
+ * Oklab L and 0.056 dE apart (the first draft's dusk against the greyed lightning) render as one navy.
+ */
+const OKDE_MIN = 0.08;
+/** Gate (k): the least Oklab dE a greying step must move the scale or its highlight band by (a JND is about 0.02). */
+const GREY_STEP = 0.03;
+/**
  * RULE_B, cross-element body colours. A pair passes if ANY of these holds:
  *   B1 hue   : both scales have S >= 0.30 and are >= 40 deg apart. A body colour covers about half the sprite, so a
  *              clearly saturated hue names the element on its own; 0.30 (stricter than the 0.20 ladder floor) is
@@ -80,9 +95,8 @@ const OKL_MIN = 6;
 const B_SAT = 0.3;
 const B_DSAT = 0.3;
 const B_LUM_WITH_DSAT = 0.12;
-/** Gate (j): the least scale saturation any stage may grey to, and dusk's (its greying is its identity: 3.8). */
+/** Gate (j): the least scale saturation any stage may grey to (dusk too: its elder curve is capped to keep it). */
 const ID_SAT = 0.3;
-const ID_SAT_OWN: Readonly<Partial<Record<DragonElement, number>>> = { dusk: 0.2 };
 /** The engine's far-side defaults (rig.ts FAR_SHADE / FAR_DESAT), which gate (c) is written against. */
 const ENGINE_FAR = { shade: 0.62, desat: 0.25 };
 /**
@@ -120,6 +134,16 @@ function okL(hex: string): number {
   return 100 * (0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s);
 }
 const okDiff = (a: string, b: string): number => Math.abs(okL(a) - okL(b));
+/** Oklab (L, a, b), L in 0..1 (Ottosson 2020). */
+function oklab(hex: string): [number, number, number] {
+  const [r, g, b] = hexToRgb(hex).map(lin);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+}
+/** Oklab dE (Euclidean), the perceptual distance: about 0.02 is a just-noticeable difference. */
+function okDE(a: string, b: string): number { const A = oklab(a), B = oklab(b); return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]); }
 interface Hsv { h: number; s: number; v: number; }
 function hsvOf(hex: string): Hsv {
   const [r, g, b] = hexToRgb(hex).map((c) => c / 255);
@@ -160,18 +184,29 @@ function ladder(a: string, b: string): Measure {
   const byLum = lum >= LUM_MIN, byHue = hue != null && hue >= HUE_MIN;
   return { lum, hue, pass: byLum || byHue, by: byLum && byHue ? 'lum+hue' : byLum ? 'lum' : byHue ? 'HUE ONLY' : '' };
 }
-interface BodyMeasure { lum: number; hue: number; dS: number; sa: number; sb: number; pass: boolean; hueOnly: boolean; by: string; margin: number; }
-/** RULE_B between two body colours (gates b and f). `margin` >= 1 passes: the best rule's slack, as a fraction of its bar. */
-function ruleB(a: string, b: string): BodyMeasure {
+interface BodyMeasure {
+  lum: number; hue: number; dS: number; sa: number; sb: number; dL: number; dE: number;
+  pass: boolean; hueOnly: boolean; valueOnly: boolean; underFloor: boolean; by: string; margin: number;
+}
+/**
+ * RULE_B between two body colours (gates b and f). `margin` >= 1 passes: the best rule's slack, as a fraction of its
+ * bar. With `floor` (gate b), B2 also needs the dark-pair floor: >= OKL_MIN Oklab L or >= OKDE_MIN Oklab dE apart.
+ * `underFloor` marks a pair that passes (or would pass) on B2 alone while under that floor (gate f reports it).
+ */
+function ruleB(a: string, b: string, floor = false): BodyMeasure {
   const ha = hsvOf(a), hb = hsvOf(b);
-  const lum = relDiff(a, b), hue = hueDelta(a, b), dS = Math.abs(ha.s - hb.s);
+  const lum = relDiff(a, b), hue = hueDelta(a, b), dS = Math.abs(ha.s - hb.s), dL = okDiff(a, b), dE = okDE(a, b);
   const b1 = ha.s >= B_SAT && hb.s >= B_SAT && hue >= HUE_MIN;
-  const b2 = lum >= LUM_MIN;
+  const clear = dL >= OKL_MIN || dE >= OKDE_MIN;
+  const b2lum = lum >= LUM_MIN, b2 = b2lum && (!floor || clear);
   const low = ha.s < B_SAT || hb.s < B_SAT;
   const b3 = low && dS >= B_DSAT && lum >= B_LUM_WITH_DSAT;
   const by = [b1 ? 'B1' : '', b2 ? 'B2' : '', b3 ? 'B3' : ''].filter(Boolean).join('+');
-  const m1 = Math.min(Math.min(ha.s, hb.s) / B_SAT, hue / HUE_MIN), m2 = lum / LUM_MIN, m3 = low ? Math.min(dS / B_DSAT, lum / B_LUM_WITH_DSAT) : 0;
-  return { lum, hue, dS, sa: ha.s, sb: hb.s, pass: b1 || b2 || b3, hueOnly: b1 && !b2 && !b3, by, margin: Math.max(m1, m2, m3) };
+  const fl = Math.max(dL / OKL_MIN, dE / OKDE_MIN);
+  const m1 = Math.min(Math.min(ha.s, hb.s) / B_SAT, hue / HUE_MIN), m2 = floor ? Math.min(lum / LUM_MIN, fl) : lum / LUM_MIN;
+  const m3 = low ? Math.min(dS / B_DSAT, lum / B_LUM_WITH_DSAT) : 0;
+  const valueOnly = b2lum && !b1 && !b3;
+  return { lum, hue, dS, sa: ha.s, sb: hb.s, dL, dE, pass: b1 || b2 || b3, hueOnly: b1 && !b2lum && !b3, valueOnly, underFloor: valueOnly && !clear, by, margin: Math.max(m1, m2, m3) };
 }
 const pct = (v: number): string => `${Math.round(v * 100)}%`.padStart(4);
 const deg = (v: number | null): string => (v == null ? '  n/a' : `${Math.round(v)}deg`.padStart(5));
@@ -196,10 +231,12 @@ function head(title: string): void { out.push('', title); }
 // ---------- colour references: a slot, a slot's cel tone, or a shared / derived colour ----------
 type Tone = 'hi' | 'sh' | 'deep';
 /**
- * What a pair names: `scale`, `scale.sh`, `ink` (the outline), `blush`, a mood tone (`banked`, `dimSpot`), or an
- * elder face colour (`muzzle`: the grey muzzle, brow tuft and beard; `frost`: slinkwing's frosted fan tips).
+ * What a pair names: `scale`, `scale.sh`, `ink` (the outline), `blush`, a mood tone (`banked`, `dimSpot`), dusk's
+ * `smokeBand` (the slate step of its tail tip's fade), or an elder face colour (`muzzle`: the grey muzzle and brow
+ * tuft; `beard`: the beard; `frost`: slinkwing's frosted fan tips). Tones come from dragonTones, so `scale.hi` is the
+ * silvered highlight of an adult or elder.
  */
-type Ref = DragonSlot | `${DragonSlot}.${Tone}` | 'ink' | 'blush' | 'banked' | 'dimSpot' | 'muzzle' | 'frost';
+type Ref = DragonSlot | `${DragonSlot}.${Tone}` | 'ink' | 'blush' | 'banked' | 'dimSpot' | 'muzzle' | 'beard' | 'frost' | 'smokeBand';
 const PAL = (e: DragonElement, st: AgeStage): Readonly<DragonPalette> => agedPalette(e, st);
 const S = DRAGON_SHARED;
 function colour(e: DragonElement, st: AgeStage, ref: Ref): string {
@@ -207,7 +244,9 @@ function colour(e: DragonElement, st: AgeStage, ref: Ref): string {
   if (ref === 'blush') return blushOf(e);
   if (ref === 'banked' || ref === 'dimSpot') return moodTones(PAL(e, st))[ref];
   if (ref === 'muzzle') return muzzleOf(PAL(e, st), e);
-  if (ref === 'frost') return fanFrostOf(PAL(e, st));
+  if (ref === 'beard') return beardOf(PAL(e, st), e);
+  if (ref === 'frost') return fanFrostOf(PAL(e, st), e);
+  if (ref === 'smokeBand') return smokeBandOf(PAL(e, st));
   const [slot, tone] = ref.split('.') as [DragonSlot, Tone | undefined];
   return tone ? dragonTones(e, slot, RAMP, st)[tone] : PAL(e, st)[slot];
 }
@@ -252,21 +291,39 @@ const EXTRA_PAIRS: Readonly<Record<DragonElement, readonly Pair[]>> = {
     { a: 'ink', b: 'marking', why: 'ink face marks (happy, closed, lids) sit on the eye mask' },
   ],
   dusk: [
-    { a: 'glow', b: 'scale', why: 'the lamp hangs from the scale stalk, ahead of the head and neck' },
-    { a: 'glow.hi', b: 'glow', why: 'the lamp\'s hot core (mood >= +0.5, the idle "breath")' },
-    { a: 'horn', b: 'glow', why: 'the lantern\'s silver cap sits on the lamp' },
+    { a: 'glow', b: 'scale', why: 'the lantern hangs from the scale stalk, ahead of the head and neck' },
+    { a: 'glow.hi', b: 'glow', why: 'the lantern\'s hot core (mood >= +0.5, the idle "breath")' },
+    { a: 'horn', b: 'glow', why: 'the lantern\'s silver cap, bail and finial on the lamp' },
+    { a: 'membrane', b: 'glow', why: 'the moth (moth-grey) visits the lamp; the elder\'s lives on its cap' },
     { a: 'dark', b: 'marking', why: 'the nostril sits on the nose frost' },
     { a: 'ink', b: 'marking', why: 'the mouth line and a closed eye\'s bar reach the nose frost' },
+    { a: 'scale', b: 'smokeBand', why: 'the tail tip fades navy -> slate band -> smoke, flat steps, no ink' },
+    { a: 'scale.sh', b: 'smokeBand', why: 'the tail\'s shadow band runs through the slate band' },
+    { a: 'smokeBand', b: 'marking', why: 'the slate band meets the smoke tip' },
   ],
 };
-/** Pairs only the ELDER has (bible 2.5, the elder face; 3.7's frosted fan tips). */
+/** Pairs only the ELDER has (bible 2.5, the elder face; section 3's elder-only extras). */
 const ELDER_PAIRS: readonly Pair[] = [
-  { a: 'muzzle', b: 'scale', why: 'the grey muzzle, brow tuft and beard on the head' },
-  { a: 'muzzle', b: 'scale.sh', why: 'the muzzle meets the head\'s shadow band at the chin; the beard under it' },
+  { a: 'muzzle', b: 'scale', why: 'the grey muzzle on the snout and the brow tuft on the head' },
+  { a: 'muzzle', b: 'scale.sh', why: 'the muzzle meets the head\'s shadow band at the snout\'s front-bottom' },
   { a: 'muzzle', b: 'dark', why: 'the nostril sits on the muzzle' },
   { a: 'muzzle', b: 'ink', why: 'ink face marks (the mouth line, a closed eye\'s bar) sit on the muzzle' },
+  { a: 'beard', b: 'belly', why: 'the beard sweeps back along the throat stripe (inked, but gated like a horn)' },
+  { a: 'beard', b: 'belly.sh', why: 'the beard over the throat stripe\'s shadow tone' },
+  { a: 'beard', b: 'scale.sh', why: 'the beard\'s root under the closed jaw\'s shadow sliver' },
+  { a: 'beard', b: 'ink', why: 'the beard\'s own outline' },
 ];
 const ELDER_EXTRA: Readonly<Partial<Record<DragonElement, readonly Pair[]>>> = {
+  fire: [
+    { a: 'glow.sh', b: 'glow', why: 'the hearth\'s coal bed, the flame\'s bottom 2 rows (the elder-only extra)' },
+    { a: 'glow.hi', b: 'glow.sh', why: 'the lit specks in the coal bed' },
+  ],
+  spike: [
+    { a: 'glow.sh', b: 'scale', why: 'the sap-buds (the elder-only extra) on the back between quills' },
+    { a: 'glow.sh', b: 'horn', why: 'a sap-bud beside a quill\'s root' },
+    { a: 'glow', b: 'glow.sh', why: 'the bud\'s glint at mood >= 0.5' },
+  ],
+  rock: [{ a: 'muzzle', b: 'horn', why: 'the nose horn rises from the pale stone muzzle' }],
   slinkwing: [
     { a: 'muzzle', b: 'marking', why: 'the muzzle meets the lilac eye mask' },
     { a: 'frost', b: 'membrane', why: 'the frosted tips along the near fan\'s top edge' },
@@ -290,15 +347,24 @@ const MOOD_PAIRS: Readonly<Partial<Record<DragonElement, readonly Pair[]>>> = {
     { a: 'banked', b: 'scale', why: 'a turned-down lamp still reads against the stalk and head' },
   ],
 };
-/** The outer colour of every effect that lands on the floor (gate i), by element. */
-const FLOOR_FX: Readonly<Record<DragonElement, readonly { what: string; ref: Ref }[]>> = {
+/**
+ * The outer colour of every effect that lands on the floor (gate i), by element, plus what else lies on it: a
+ * marking that runs along the silhouette's edge (dusk's smoke tail tip and band: a tail lies on the floor), dusk's
+ * lamp resting on the floor asleep (its dark face), and (`only` elder) the beard a sleeping elder rests its chin on.
+ */
+interface FloorItem { what: string; ref: Ref; only?: AgeStage; }
+const FLOOR_ALL: readonly FloorItem[] = [{ what: 'beard', ref: 'beard', only: 'elder' }];
+const FLOOR_FX: Readonly<Record<DragonElement, readonly FloorItem[]>> = {
   fire: [{ what: 'breath puff outer ring', ref: 'scale' }],
   spike: [{ what: 'sap streak / sparkle edge', ref: 'scale' }],
   rock: [{ what: 'dust puff (opaque)', ref: 'scale' }, { what: 'adult roar puff ring', ref: 'scale.sh' }, { what: 'pebble', ref: 'marking' }],
   lightning: [{ what: 'spark ring', ref: 'scale' }],
   water: [{ what: 'bubble / drip ring', ref: 'membrane' }],
   slinkwing: [{ what: 'sound arc', ref: 'membrane' }, { what: 'sound arc edge', ref: 'scale' }],
-  dusk: [{ what: 'mist lobe (opaque)', ref: 'membrane' }, { what: 'mist ring', ref: 'scale' }],
+  dusk: [
+    { what: 'mist lobe (opaque)', ref: 'membrane' }, { what: 'mist ring', ref: 'scale' }, { what: 'smoke tail tip', ref: 'marking' },
+    { what: 'slate band', ref: 'smokeBand' }, { what: 'nightlight dark face', ref: 'banked' },
+  ],
 };
 
 out.push('DRAGON PALETTE CHECK  (tools/palette-check.ts)');
@@ -351,26 +417,35 @@ for (const [name, a, b] of [['mouth/tongue', S.mouth, S.tongue], ['mouth/fang', 
 }
 
 // (b) and (f) -------------------------------------------------------------------------------------------------
-/** A body pair across all 16 stage combinations: the pass count and the thinnest combination. */
-function bodyPairLine(tag: string, ea: DragonElement, eb: DragonElement, see: (hex: string) => string): string {
+/** Body pairs (gate f) that pass on simulated value alone while under the dark-pair floor: reported in (g). */
+const underFloor: string[] = [];
+/**
+ * A body pair across all 16 stage combinations: the pass count and the thinnest combination. `floor` (gate b) holds a
+ * value-only (B2) pass to the dark-pair floor; without it (gate f) such passes are collected in `underFloor`.
+ */
+function bodyPairLine(tag: string, ea: DragonElement, eb: DragonElement, see: (hex: string) => string, floor: boolean): string {
   let pass = 0, worst: { m: BodyMeasure; sa: AgeStage; sb: AgeStage; a: string; b: string } | null = null;
+  let under: { m: BodyMeasure; sa: AgeStage; sb: AgeStage; a: string; b: string } | null = null;
   const bad: string[] = [];
   for (const sa of STAGES) for (const sb of STAGES) {
-    const a = see(PAL(ea, sa).scale), b = see(PAL(eb, sb).scale), m = ruleB(a, b);
+    const a = see(PAL(ea, sa).scale), b = see(PAL(eb, sb).scale), m = ruleB(a, b, floor);
     if (count(`${tag} ${ea}.${sa}/${eb}.${sb}`, m.pass)) pass++; else bad.push(`${sa[0]}${sb[0]}`);
     if (!worst || m.margin < worst.m.margin) worst = { m, sa, sb, a, b };
+    if (!floor && m.underFloor && (!under || Math.max(m.dL / OKL_MIN, m.dE / OKDE_MIN) < Math.max(under.m.dL / OKL_MIN, under.m.dE / OKDE_MIN))) under = { m, sa, sb, a, b };
   }
-  const w = worst!, same = STAGES.map((st) => ruleB(see(PAL(ea, st).scale), see(PAL(eb, st).scale)));
+  if (under) underFloor.push(`${tag.replace('(f) ', '')} ${ea}/${eb} ${under.sa}/${under.sb} ${under.a} ${under.b} lum ${pct(under.m.lum)} dL ${under.m.dL.toFixed(1)} dE ${under.m.dE.toFixed(3)}`);
+  const w = worst!, same = STAGES.map((st) => ruleB(see(PAL(ea, st).scale), see(PAL(eb, st).scale), floor));
+  const fl = w.m.by === 'B2' && floor ? ` (okL ${w.m.dL.toFixed(1)} dE ${w.m.dE.toFixed(3)})` : '';
   return `${bad.length ? '  FAIL' : '  ok  '} ${(ea + '/' + eb).padEnd(19)} ${String(pass).padStart(2)}/${NS * NS}  same stage lum ${perStage(same.map((m) => m.lum), same.map((m) => m.pass), n100).padEnd(12)}`
-    + ` thinnest ${w.sa}/${w.sb} ${w.a} ${w.b} lum ${pct(w.m.lum)} hue ${deg(w.m.hue)} S ${w.m.sa.toFixed(2)}/${w.m.sb.toFixed(2)} ${w.m.by || 'FAIL'}${bad.length ? '  failing (stage of ' + ea + ', of ' + eb + '): ' + bad.join(' ') : ''}`;
+    + ` thinnest ${w.sa}/${w.sb} ${w.a} ${w.b} lum ${pct(w.m.lum)} hue ${deg(w.m.hue)} S ${w.m.sa.toFixed(2)}/${w.m.sb.toFixed(2)} ${w.m.by || 'FAIL'}${fl}${bad.length ? '  failing (stage of ' + ea + ', of ' + eb + '): ' + bad.join(' ') : ''}`;
 }
-head(`(b) SCALE COLOURS ACROSS ELEMENTS, AT EVERY PAIR OF STAGES  (B1 hue: both S>=0.30 and >=40deg | B2 value: >=25% | B3 chroma: dS>=0.30 and >=12%; ${NS * NS} stage combinations a pair)`);
+head(`(b) SCALE COLOURS ACROSS ELEMENTS, AT EVERY PAIR OF STAGES  (B1 hue: both S>=0.30 and >=40deg | B2 value: >=25% and (okL >= ${OKL_MIN} or dE >= ${OKDE_MIN}) | B3 chroma: dS>=0.30 and >=12%; ${NS * NS} stage combinations a pair)`);
 const hueOnly: string[] = [];
 for (let i = 0; i < DRAGON_ELEMENTS.length; i++) {
   for (let j = i + 1; j < DRAGON_ELEMENTS.length; j++) {
     const ea = DRAGON_ELEMENTS[i], eb = DRAGON_ELEMENTS[j];
-    out.push(bodyPairLine('(b)', ea, eb, (h) => h));
-    for (const st of STAGES) if (ruleB(PAL(ea, st).scale, PAL(eb, st).scale).hueOnly) hueOnly.push(`${ea}/${eb} (${st})`);
+    out.push(bodyPairLine('(b)', ea, eb, (h) => h, true));
+    for (const st of STAGES) if (ruleB(PAL(ea, st).scale, PAL(eb, st).scale, true).hueOnly) hueOnly.push(`${ea}/${eb} (${st})`);
   }
 }
 for (const st of STAGES) {
@@ -471,7 +546,7 @@ head(`(f) COLOUR-BLIND SAFETY  (simulated deuteranopia / protanopia, Vienot 1999
 for (const k of ['deutan', 'protan'] as const) {
   out.push(` ${k}`);
   for (let i = 0; i < DRAGON_ELEMENTS.length; i++) {
-    for (let j = i + 1; j < DRAGON_ELEMENTS.length; j++) out.push(bodyPairLine(`(f) ${k}`, DRAGON_ELEMENTS[i], DRAGON_ELEMENTS[j], (h) => simulate(h, k)));
+    for (let j = i + 1; j < DRAGON_ELEMENTS.length; j++) out.push(bodyPairLine(`(f) ${k}`, DRAGON_ELEMENTS[i], DRAGON_ELEMENTS[j], (h) => simulate(h, k), false));
   }
   for (const e of DRAGON_ELEMENTS) {
     const lums: number[] = [], oks: boolean[] = [];
@@ -504,10 +579,11 @@ head(`(i) HABITAT FLOOR ${FLOOR_REF}  (L ${lumOf(FLOOR_REF).toFixed(2)}, S ${hsv
 for (const e of DRAGON_ELEMENTS) {
   const cells: string[] = [];
   let allOk = true;
-  const items: { what: string; ref: Ref }[] = [{ what: 'scale', ref: 'scale' }, { what: 'belly', ref: 'belly' }, ...FLOOR_FX[e]];
+  const items: FloorItem[] = [{ what: 'scale', ref: 'scale' }, { what: 'belly', ref: 'belly' }, ...FLOOR_FX[e], ...FLOOR_ALL];
   for (const it of items) {
-    const ds: number[] = [], oks: boolean[] = [];
+    const ds: (number | null)[] = [], oks: (boolean | null)[] = [];
     for (const st of STAGES) {
+      if (it.only && st !== it.only) { ds.push(null); oks.push(null); continue; }
       const d = relDiff(colour(e, st, it.ref), FLOOR_REF);
       ds.push(d); oks.push(d >= LUM_MIN);
       if (!count(`(i) ${e} ${st} ${it.what}`, d >= LUM_MIN)) allOk = false;
@@ -518,9 +594,9 @@ for (const e of DRAGON_ELEMENTS) {
 }
 
 // (j) -----------------------------------------------------------------------------------------------------
-head(`(j) IDENTITY THROUGH AGE  (every stage's scale keeps HSV S >= ${ID_SAT} (dusk >= ${ID_SAT_OWN.dusk}); scale k b/y/a/e from palettes.ts ageK)`);
+head(`(j) IDENTITY THROUGH AGE  (every stage's scale keeps HSV S >= ${ID_SAT}; scale k b/y/a/e from palettes.ts ageK)`);
 for (const e of DRAGON_ELEMENTS) {
-  const min = ID_SAT_OWN[e] ?? ID_SAT, ss: number[] = [], oks: boolean[] = [];
+  const min = ID_SAT, ss: number[] = [], oks: boolean[] = [];
   for (const st of STAGES) {
     const s = hsvOf(PAL(e, st).scale).s;
     ss.push(s); oks.push(count(`(j) ${e} ${st} scale S`, s >= min - 1e-9));
@@ -528,9 +604,26 @@ for (const e of DRAGON_ELEMENTS) {
   out.push(`${oks.every(Boolean) ? '  ok  ' : '  FAIL'} ${e.padEnd(10)} scale S ${perStage(ss, oks, (v) => v.toFixed(2))}  (>= ${min.toFixed(2)})  k ${STAGES.map((st) => ageK(e, st, 'scale').toFixed(2)).join('/')}  ${STAGES.map((st) => PAL(e, st).scale).join(' ')}`);
 }
 
+// (k) -----------------------------------------------------------------------------------------------------
+head(`(k) VISIBLE GREYING  (each greying step young -> adult and adult -> elder moves the scale or its silvered highlight band (AGE_SILVER ${STAGES.map((st) => AGE_SILVER[st]).join('/')}) by >= ${GREY_STEP} Oklab dE; dE scale / hi per step)`);
+for (const e of DRAGON_ELEMENTS) {
+  const cells: string[] = [];
+  let allOk = true;
+  for (const [s0, s1] of [['young', 'adult'], ['adult', 'elder']] as const) {
+    const dS = okDE(PAL(e, s0).scale, PAL(e, s1).scale), dH = okDE(dragonTones(e, 'scale', RAMP, s0).hi, dragonTones(e, 'scale', RAMP, s1).hi);
+    const ok = Math.max(dS, dH) >= GREY_STEP;
+    if (!count(`(k) ${e} ${s0}->${s1}`, ok)) allOk = false;
+    cells.push(`${s0[0]}>${s1[0]} ${dS.toFixed(3)} / ${dH.toFixed(3)}${ok ? '' : '!'}`);
+  }
+  const his = STAGES.map((st) => dragonTones(e, 'scale', RAMP, st).hi);
+  out.push(`${allOk ? '  ok  ' : '  FAIL'} ${e.padEnd(10)} ${cells.join('   ')}   hi ${his.join(' ')}`);
+}
+
 // (g) -----------------------------------------------------------------------------------------------------
 head('(g) REPORTED, NOT GATED');
 out.push(` scale pairs passing (b) on hue only at the same stage, so they would merge in greyscale: ${hueOnly.length ? hueOnly.join(', ') : 'none'}`);
+out.push(` body pairs passing (f) on simulated value alone under the dark-pair floor (okL < ${OKL_MIN} and dE < ${OKDE_MIN}; told apart by zone):`);
+if (underFloor.length) for (const u of underFloor) out.push(`   ${u}`); else out.push('   none');
 out.push(' glow pairs across elements within 40deg hue AND 25% luminance (must differ by effect SHAPE; the glow never greys):');
 let glowClose = 0;
 for (let i = 0; i < DRAGON_ELEMENTS.length; i++) {

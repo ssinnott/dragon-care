@@ -40,11 +40,11 @@ export interface DragonPalette extends ColorMap {
    * sound arcs, dusk's mist. Also the 1 px ring on water's bubbles and drips.
    */
   membrane: string;
-  /** Horns, claws (drawn un-inked), spike quills, slinkwing fan ribs, water fin rays, dusk's lantern cap. */
+  /** Horns, claws (drawn un-inked), spike quills, slinkwing fan ribs, water fin rays and elder pearls, dusk's lantern cap and bail. */
   horn: string;
   /**
    * Element markings: flame-licks, tail rings, rock's dome carapace, bolt stripes, pearl spots, slinkwing's eye mask,
-   * dusk's smoke tail tip and nose frost.
+   * dusk's smoke tail tip and nose frost (its elder muzzle).
    */
   marking: string;
   /** Nostrils (2 x 2). The quill and claw tips it once coloured were dropped: at 2 px they were under the mark floor. */
@@ -83,7 +83,8 @@ export const DRAGON_PALETTES: Readonly<Record<DragonElement, Readonly<DragonPale
     marking: '#ffcf33', dark: '#141a3c', glow: '#fff6a0', eye: '#ffc41f',
   }),
   // sea green (v2): "light sea green", hue 176, the greenest a vivid water body can be and still separate from
-  // every other body for dichromats (bible 3.6, D21); the deep sea-green membrane keeps it out of dusk's navy family
+  // every other body for dichromats (bible 3.6, D27; jade and a true sea green are the user's alternatives there);
+  // the deep sea-green membrane sits between spike's leaf green and dusk's blue body
   water: Object.freeze({
     scale: '#28b0a6', belly: '#85c6ae', membrane: '#185e5b', horn: '#eaf6f0',
     marking: '#dcfff6', dark: '#0c2a2a', glow: '#40d8f0', eye: '#ffc64a',
@@ -92,11 +93,14 @@ export const DRAGON_PALETTES: Readonly<Record<DragonElement, Readonly<DragonPale
     scale: '#5a2f6e', belly: '#fff5f8', membrane: '#ff6fae', horn: '#f0dce6',
     marking: '#9a6aa8', dark: '#2e1638', glow: '#ff9ed2', eye: '#3fe0a0',
   }),
-  // dusk "Wisp" (v2, bible 3.8): a navy hatchling that greys to storm slate at a nearly constant value (L ~0.08, the
-  // one free slot of the value stack, between lightning and slinkwing); afterglow belly, moth-grey wings, a coral lamp
+  // dusk "Wick" (v2, bible 3.8): a deep Prussian-blue hatchling that greys to storm slate at a constant value (L 0.083,
+  // the one free slot of the value stack, between lightning and slinkwing). Its hue sits 17 deg (HSV; 19 in Oklab)
+  // toward petrol from lightning's cobalt, so the two dark blues part by Oklab dE >= 0.1 as well as by value (gate b's
+  // dark-pair floor; the first draft's #3d4d91 was 0.056 from the greyed lightning). Afterglow belly, moth-grey wings, a smoke
+  // grey tail tip and nose frost at L 0.47 (the first draft's #c9cfdd sat 8 % from the straw floor), a coral lamp
   dusk: Object.freeze({
-    scale: '#3d4d91', belly: '#c28771', membrane: '#98a1b6', horn: '#e2e6f0',
-    marking: '#c9cfdd', dark: '#10142a', glow: '#ffa98c', eye: '#7fb8ff',
+    scale: '#1f5580', belly: '#c28771', membrane: '#98a1b6', horn: '#e2e6f0',
+    marking: '#b0b7ca', dark: '#10142a', glow: '#ffa98c', eye: '#7fb8ff',
   }),
 });
 
@@ -130,6 +134,12 @@ export const DRAGON_BLUSH: Readonly<Partial<Record<DragonElement, string>>> = Ob
 export function blushOf(e: DragonElement): string { return DRAGON_BLUSH[e] ?? DRAGON_SHARED.blush; }
 
 /**
+ * Dusk's smoke band (bible 3.8): the slate step of its tail tip's flat, stepped fade (navy -> slate band -> smoke tip),
+ * halfway from the scale to the smoke marking. Derived per stage, like `moodTones().dimSpot`; gates a and i measure it.
+ */
+export function smokeBandOf(p: Readonly<DragonPalette>): string { return mix(p.scale, p.marking, 0.5); }
+
+/**
  * Mood-state colours (docs/ART_BIBLE.md sections 3.2, 3.4, 3.6, 3.8). Derived, never stored, like the cel tones.
  * Pass the stage's palette (`agedPalette`), so an old dragon's mood tones follow its greyed colours.
  * `banked`: fire's sleeping flame, rock's dim crystals (mood <= -0.3) and dusk's lamp's dark face, the glow's own
@@ -146,7 +156,7 @@ export function moodTones(p: Readonly<DragonPalette>): { banked: string; dimSpot
  * the engine's cool ramp greys a warm pale colour, the slot's `sh` is set by hand, hue kept, and its `deep` follows
  * from it (x 0.78). Rock: the sandstone's ramp shadow `#8c7e69` split the baby's face into a clean half and a grey,
  * dirty one (the other elements' head shadows keep their hue), and the cream belly's `#a8a9a7` read as a grey diaper
- * on the baby and a metal plate under the adult's chest (the cast reviews). `#a88a66` sits 44 % under the sand and
+ * on the baby and a metal plate under the adult's chest (the cast reviews). `#a88a66` sits 43 % under the sand and
  * `#e6d49e` 27 % under the cream, 59 % over the new scale shadow it meets on the belly line. Older stages grey the
  * hand-set shadow with its slot (`dragonTones`).
  */
@@ -160,6 +170,13 @@ export const DRAGON_SHADOW: Readonly<Partial<Record<DragonElement, Readonly<Part
 // (to one rounding step, times an optional drift 1 + lambda k), every luminance-based gate (the value stack, the
 // ladder, the floor) holds by construction; only hue- and chroma-based passes and the colour-blind gates can move,
 // and palette-check runs every gate at every stage.
+//
+// "As dragons get older they should get a little grayer": the baby and the young (a teenager) are their base colours;
+// the adult is a little grey and the elder clearly grey. What a player SEES grey is put where identity is not carried:
+// the lit band of the body and head (the scale's highlight tone, silvered by AGE_SILVER: a silver back and crown),
+// the belly and wings, and the elder's muzzle, brow tuft and beard. The body colour itself greys little, since it
+// carries the element's colour identity (gates b, f, j). palette-check gate (k) holds every greying step to a visible
+// one: >= 0.03 Oklab dE on the scale or its highlight band.
 // ---------------------------------------------------------------------------------------------------------------
 
 /**
@@ -169,8 +186,19 @@ export const DRAGON_SHADOW: Readonly<Partial<Record<DragonElement, Readonly<Part
 export const AGE_STAGES = ['baby', 'young', 'adult', 'elder'] as const;
 export type AgeStage = typeof AGE_STAGES[number];
 
-/** G[stage]: how grey each stage is, cast-wide (k = G x slot weight). A baby is its base palette. */
-export const AGE_GREY: Readonly<Record<AgeStage, number>> = Object.freeze({ baby: 0, young: 0.08, adult: 0.18, elder: 0.45 });
+/**
+ * G[stage]: how grey each stage is, cast-wide (k = G x slot weight). A baby and a young dragon are their base
+ * palette (the young's old 0.08 moved no colour by more than 0.015 Oklab dE, under what anyone can see, and it cost
+ * fire / spike its greyscale step: bible 3.9).
+ */
+export const AGE_GREY: Readonly<Record<AgeStage, number>> = Object.freeze({ baby: 0, young: 0, adult: 0.18, elder: 0.45 });
+
+/**
+ * How far the scale's HIGHLIGHT tone is pulled on toward its own grey (luminance kept), on top of the scale's own
+ * greying: the lit band on the back and crown silvers first, as a real animal greys (bible 3.9, "the silver back").
+ * The band is where identity is not carried, so it can grey visibly while the base and shadow keep the element's hue.
+ */
+export const AGE_SILVER: Readonly<Record<AgeStage, number>> = Object.freeze({ baby: 0, young: 0, adult: 0.3, elder: 0.6 });
 
 /**
  * s[slot]: which parts grey, and how much. Skin greys (scale, belly, the membrane); pigment greys at half strength;
@@ -191,36 +219,49 @@ export interface AgeRule {
   weight?: Readonly<Partial<Record<DragonSlot, number>>>;
   /** lambda per slot: luminance drifts by (1 + lambda k) as it greys (fire darkens toward brick, spike lightens to lichen). */
   drift?: Readonly<Partial<Record<DragonSlot, number>>>;
+  /** The first stage a slot greys at (it keeps its base colour before it): fire's and spike's scale grey only as elders. */
+  from?: Readonly<Partial<Record<DragonSlot, AgeStage>>>;
 }
 
 /**
  * Per-element greying exceptions (bible 3.9). Each is a measured fix, re-checked by palette-check at every stage:
- * fire   : its red body greys least and darkens a touch toward brick. Greyed fully, luminance-kept, fire and spike
- *          swap simulated luminance under protanopia near k 0.45 (1 % apart as elders); its age shows on the belly,
- *          wings, muzzle, brows and beard instead.
- * spike  : lightens a little toward lichen as it greys (its elder scale is then at the S 0.30 identity floor, gate j).
- * rock   : the sandstone greys at 0.3: under protanopia the greyed sand must keep >= 0.30 more simulated saturation
- *          than the sea-green water (which simulates to a grey) to separate from it (gate f, B3); its slate membrane
- *          at half strength keeps the membrane / horn pair, which passes on hue alone, chromatic.
- * lightning, slinkwing: the membrane is their signal colour, so it greys at half strength.
- * water  : greys at 0.8 and darkens a little as it greys: lighter, its elder meets fire's value under deuteranopia;
- *          darker, it meets the greyed rock under protanopia (gate f; bible 3.9).
- * dusk   : a curve of its own, the steepest in the cast (navy at hatching, storm slate as an elder), on the skin only:
- *          its moth-grey wings are grey from hatching, and its lamp and silver never age.
+ * fire   : its red body greys only as an elder, least of all, and darkens a touch toward brick. Greyed fully,
+ *          luminance-kept, fire and spike swap simulated luminance under protanopia near k 0.45; greyed from the
+ *          adult stage, the two pass on hue alone in greyscale from there (the ledger's E10 is now the elder's only).
+ *          Its belly and wings grey at 0.6: fully, the orange belly went khaki and the wine membrane brown.
+ * spike  : its body greys only as an elder, lightening a little toward lichen (the other half of the fire / spike
+ *          fix); belly and leaf membrane at 0.6 (fully, they went olive-drab).
+ * rock   : the sandstone greys at 0.25: under protanopia the greyed sand must keep >= 0.30 more simulated saturation
+ *          than the sea-green water (which simulates to a grey) to separate from it (gate f, B3). Its age shows on the
+ *          dome (marking at full weight: S 0.46 -> 0.27, still chromatic, so the dim crystals keep their hue pass on
+ *          it), the cream belly (1.5) and the silver crown; its slate membrane at half strength keeps the membrane /
+ *          horn pair, which passes on hue alone, chromatic.
+ * lightning: its cobalt body greys at half strength, so its elder stays well clear of dusk's dark blue (gate b's
+ *          dark-pair floor); its membrane is the signal colour and greys at half strength too.
+ * water  : greys at 0.8, luminance kept: darkened as it greys, its elder meets fire's value under deuteranopia (the
+ *          proposal's -0.3 drift failed there); greyed fully, the rock / water protan margin thins (gate f). Its fins
+ *          at 0.6, so the elder's deep sea green does not grey onto spike's leaf.
+ * slinkwing: the membrane is its signal colour, so it greys at half strength.
+ * dusk   : a curve of its own (navy kept through the young and adult, storm slate as an elder: its blue-to-grey
+ *          journey is its growth, bible 3.8), on the skin only, capped at 0.65 so the elder keeps S >= 0.30 like every
+ *          other body; its belly at half strength (fully, the ash-rose read as bare skin); its moth-grey wings are grey
+ *          from hatching, and its smoke, silver, lamp and iris never age.
  */
 export const AGE_RULES: Readonly<Partial<Record<DragonElement, Readonly<AgeRule>>>> = Object.freeze({
-  fire: { weight: { scale: 0.3 }, drift: { scale: -0.6 } },
-  spike: { weight: { scale: 0.9 }, drift: { scale: 0.2 } },
-  rock: { weight: { scale: 0.3, membrane: 0.5 } },
-  lightning: { weight: { membrane: 0.5 } },
-  water: { weight: { scale: 0.8 }, drift: { scale: -0.15 } },
+  fire: { weight: { scale: 0.3, belly: 0.6, membrane: 0.6 }, drift: { scale: -0.6 }, from: { scale: 'elder' } },
+  spike: { weight: { scale: 0.9, belly: 0.6, membrane: 0.6 }, drift: { scale: 0.2 }, from: { scale: 'elder' } },
+  rock: { weight: { scale: 0.25, belly: 1.5, membrane: 0.5, marking: 1 } },
+  lightning: { weight: { scale: 0.5, membrane: 0.5 } },
+  water: { weight: { scale: 0.8, membrane: 0.6 } },
   slinkwing: { weight: { membrane: 0.5 } },
-  dusk: { curve: { baby: 0, young: 0.3, adult: 0.55, elder: 0.76 }, weight: { belly: 0.75, membrane: 0, marking: 0 } },
+  dusk: { curve: { baby: 0, young: 0.12, adult: 0.3, elder: 0.65 }, weight: { belly: 0.5, membrane: 0, marking: 0 } },
 });
 
 /** k: how far one slot of one element is pulled toward grey at a stage (0 = the base colour). */
 export function ageK(e: DragonElement, stage: AgeStage, slot: DragonSlot): number {
   const r = AGE_RULES[e], g = (r && r.curve ? r.curve : AGE_GREY)[stage];
+  const from = r && r.from ? r.from[slot] : undefined;
+  if (from && AGE_STAGES.indexOf(stage) < AGE_STAGES.indexOf(from)) return 0;
   const w = r && r.weight && r.weight[slot] != null ? r.weight[slot]! : AGE_WEIGHT[slot];
   return Math.min(AGE_K_MAX, g * w);
 }
@@ -252,6 +293,17 @@ export function ageShade(hex: string, k: number, lambda = 0): string {
   return rgbToHex(ch(r), ch(g), ch(b));
 }
 
+/**
+ * `hex` moved to relative luminance `L`, hue kept, in linear light: darker by scaling every channel, lighter by
+ * mixing toward white (so no channel clips and L is exact to one rounding step). The elder face greys use it.
+ */
+export function atLum(hex: string, L: number): string {
+  const [r8, g8, b8] = hexToRgb(hex), c = [linC(r8), linC(g8), linC(b8)];
+  const Y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  const out = L <= Y ? c.map((v) => (Y > 0 ? v * L / Y : L)) : c.map((v) => v + (1 - v) * (L - Y) / (1 - Y));
+  return rgbToHex(unlinC(out[0]), unlinC(out[1]), unlinC(out[2]));
+}
+
 /** A stage's palette: every slot of `p` (the element's base) greyed by its ageK and ageDrift. Allocates: cache it. */
 export function agePalette(p: Readonly<DragonPalette>, e: DragonElement, stage: AgeStage): DragonPalette {
   const o = { ...p } as DragonPalette;
@@ -271,33 +323,59 @@ export function agedPalette(e: DragonElement, stage: AgeStage): Readonly<DragonP
 
 /**
  * One slot's cel tones for an element at a stage: the engine's makeTones on the aged colour, with DRAGON_SHADOW's
- * hand-set shadow (greyed by the same k and lambda) if it has one. `stage` defaults to the base palette.
+ * hand-set shadow (greyed by the same k and lambda) if it has one, and the scale's highlight silvered by AGE_SILVER
+ * (luminance kept). `stage` defaults to the base palette. The rig seeds its tone cache from this for every slot.
  */
 export function dragonTones(e: DragonElement, slot: DragonSlot, ramp: Readonly<Ramp> = RAMP, stage: AgeStage = 'baby'): Tones {
-  const t = makeTones(agedPalette(e, stage)[slot], ramp), o = DRAGON_SHADOW[e], sh0 = o ? o[slot] : undefined;
+  let t = makeTones(agedPalette(e, stage)[slot], ramp);
+  if (slot === 'scale' && AGE_SILVER[stage] > 0) t = { ...t, hi: ageShade(t.hi, AGE_SILVER[stage]) };
+  const o = DRAGON_SHADOW[e], sh0 = o ? o[slot] : undefined;
   if (!sh0) return t;
   const sh = ageShade(sh0, ageK(e, stage, slot), ageDrift(e, slot));
   return { ...t, sh, deep: toneOf(sh, 0.78) };
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// THE ELDER FACE GREYS (bible 2.5). The muzzle (a pigment patch on the front of the snout) and the brow tuft share
+// one grey; the beard is its own inked hair tuft under the chin and may take a grey of its own. Each is the elder's
+// belly pulled 0.85 of the way to its own grey and then set to a LUMINANCE chosen per element, because a grey that
+// keeps the belly's luminance (the first draft) is 0 % from the belly it grows beside. The luminances sit in each
+// element's measured window (palette-check gates a and i):
+//   muzzle / tuft: >= 25 % from the scale, its shadow tone, the nostril and the ink (slinkwing: its mask; rock: its
+//                  nose horn);
+//   beard        : >= 25 % from the belly, the belly's shadow tone, the scale's shadow tone (the closed jaw's sliver),
+//                  the ink and the straw floor (a sleeping elder's chin and beard rest on it).
+// No single grey clears both lists on rock (its muzzle window is light, >= 0.65, its beard window mid, 0.37 to 0.50),
+// so rock's beard is a mid stone grey under a pale stone muzzle; on every other element they are one grey.
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Relative luminance of the elder muzzle and brow tuft, per element (dusk's is its smoke marking: MUZZLE_SLOT). */
+export const MUZZLE_LUM: Readonly<Partial<Record<DragonElement, number>>> = Object.freeze({
+  fire: 0.48, spike: 0.265, rock: 0.72, lightning: 0.315, water: 0.92, slinkwing: 0.285,
+});
+/** Relative luminance of the elder beard, where it differs from the muzzle's (rock). */
+export const BEARD_LUM: Readonly<Partial<Record<DragonElement, number>>> = Object.freeze({ rock: 0.43 });
 /**
- * The elder's grey muzzle, brow tuft and beard colour (bible 2.5, "The elder face"), derived from the elder palette:
- * the belly (or, where the belly is near-white, L > 0.8: rock's cream, slinkwing's white, a mix 0.4 toward the scale,
- * so it never reads as a bandage) pulled 0.85 of the way to its own grey.
- */
-export function muzzleOf(p: Readonly<DragonPalette>, e?: DragonElement): string {
-  const from = e ? MUZZLE_SLOT[e] : undefined;
-  if (from) return p[from];
-  const src = lumOfHex(p.belly) > 0.8 ? mix(p.belly, p.scale, 0.4) : p.belly;
-  return ageShade(src, 0.85);
-}
-/**
- * Elements whose elder muzzle is an existing slot instead of the derived grey: dusk's nose frost (its `marking`, the
- * grey that has crept in from the nose since the young stage, 3.8) simply grows back to the eye line as an elder.
+ * Elements whose elder muzzle, tuft and beard are an existing slot instead of the derived grey: dusk's nose frost
+ * (its `marking`, the smoke grey that has crept in from the nose since the young stage, 3.8) grows back to the eye.
  */
 export const MUZZLE_SLOT: Readonly<Partial<Record<DragonElement, DragonSlot>>> = Object.freeze({ dusk: 'marking' });
-/** Slinkwing's elder-only frosted fan tips (3.7): halfway from the muzzle grey to the catchlight white. */
-export function fanFrostOf(p: Readonly<DragonPalette>): string { return mix(muzzleOf(p), DRAGON_SHARED.catchlight, 0.5); }
+
+/** The elder's grey muzzle and brow tuft (bible 2.5), from the elder palette `p` of element `e`. */
+export function muzzleOf(p: Readonly<DragonPalette>, e: DragonElement): string {
+  const from = MUZZLE_SLOT[e];
+  if (from) return p[from];
+  return atLum(ageShade(p.belly, 0.85), MUZZLE_LUM[e] ?? lumOfHex(p.belly));
+}
+/** The elder's beard (bible 1.2, 2.5): the muzzle grey, or BEARD_LUM's where no one grey clears both (rock). */
+export function beardOf(p: Readonly<DragonPalette>, e: DragonElement): string {
+  const L = BEARD_LUM[e];
+  return L == null ? muzzleOf(p, e) : atLum(ageShade(p.belly, 0.85), L);
+}
+/** Slinkwing's elder-only frosted fan tips (3.7): halfway from its muzzle grey to the catchlight white. */
+export function fanFrostOf(p: Readonly<DragonPalette>, e: DragonElement = 'slinkwing'): string {
+  return mix(muzzleOf(p, e), DRAGON_SHARED.catchlight, 0.5);
+}
 
 /**
  * Far-side shading, as `farPalette(p, shade, desat)` takes it (docs/ART_BIBLE.md, decision D8).
