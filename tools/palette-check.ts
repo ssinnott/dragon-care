@@ -5,7 +5,13 @@
 // It reads only the palette data and the engine's own colour maths (toneOf / makeTones from shading.ts,
 // farPalette from palettes.ts): no canvas, no rig, no browser. That makes it the cheapest check in the art
 // pipeline, in the same spirit as the "palette tier" docs/ART_GENERATOR.md describes, so run it before drawing
-// anything with a new hex. Its report is pasted into docs/ART_BIBLE.md; re-paste it when a value changes.
+// anything with a new hex. Its report is pasted into docs/ART_BIBLE.md 5.8; re-paste it when a value changes.
+//
+// STAGES (v2). Every gate runs on every element's palette at each of the FOUR life stages, baby, young, adult and
+// elder: the base palette greyed by palettes.ts `agedPalette` (bible 3.9), its cel tones, far tones and mood tones
+// derived from the greyed colours. A report line carries one number per stage, "b/y/a/e"; a failing stage's number
+// is marked "!". Each number is one gate. Gates (b) and (f) also run ACROSS stages (an elder shares the habitat with
+// babies): every element pair at all 16 stage combinations.
 //
 // GATES (a failure sets exit code 1):
 //   (a) adjacency : within each dragon, every pair of colours that touch on the sprite separates by
@@ -13,8 +19,9 @@
 //                   colours are chromatic (HSV S >= 0.20 and V >= 0.25): the hue angle of a near-grey or a
 //                   near-black is noise, not colour. Pairs include the cel tones a pigment edge crosses: a marking
 //                   runs through the body's shadow and highlight bands, and the belly line runs through the shadow.
-//   (b) elements  : the six SCALE colours (the body, about half of every sprite) are pairwise distinguishable.
-//                   See RULE_B below for the rule and why.
+//                   The elder adds its face: the grey muzzle, brow tuft and beard (bible 2.5) against what they touch.
+//   (b) elements  : the seven SCALE colours (the body, about half of every sprite) are pairwise distinguishable at
+//                   every pair of stages. See RULE_B below for the rule and why.
 //   (c) far side  : c1 the engine's farPalette(p, 0.62, 0.25) far scale and far membrane keep >= 25 % luminance
 //                   from the near scale; c2 the rig's own far LEG shading (DRAGON_FAR.legs) keeps >= 25 % AND
 //                   >= OKL_MIN Oklab lightness from the near leg's base AND its shadow band; c3 the rig's far wing /
@@ -23,20 +30,26 @@
 //                   a hand-set shadow (palettes.ts DRAGON_SHADOW, rock's) keeps >= 25 % luminance under its base.
 //   (e) ink floor : far leg scale, far membrane and far paired horns stay >= 25 % luminance AND >= OKL_MIN Oklab
 //                   lightness from the outline, so far parts do not sink into the ink.
-//   (f) colour-blind: the same 15 scale pairs still pass RULE_B under simulated deuteranopia and protanopia
-//                   (about 1 player in 16 sees one of those two ways), because the habitat puts several dragons side
-//                   by side and a player must tell their pets apart by more than the silhouette alone. The blush on
-//                   each cheek is checked the same way (with the ladder), since it carries the happy face.
+//   (f) colour-blind: the same body pairs, at every pair of stages, still pass RULE_B under simulated deuteranopia
+//                   and protanopia (about 1 player in 16 sees one of those two ways), because the habitat puts several
+//                   dragons side by side and a player must tell their pets apart by more than the silhouette alone.
+//                   The blush on each cheek is checked the same way (with the ladder), since it carries the happy face.
 //   (h) mood states: every pair of colours a mood swaps between passes the ladder, so the change can be seen.
 //   (i) floor     : every scale, every belly and the outer colour of every effect that lands on the floor keeps
 //                   >= 25 % luminance from the reference habitat floor. Hue cannot help: the floor's S is < 0.20.
+//   (j) identity  : greying never takes a body's hue away: every scale keeps HSV S >= 0.30 at every stage (dusk, the
+//                   element whose growth IS greying, >= 0.20, the chromatic floor of the ladder), so gate (b)'s B1 and
+//                   the neutral ceiling (<= 40 % neutral area) keep holding for elders.
 // REPORTED, NOT GATED:
-//   (g) any scale pair that passes (b) on hue alone (it would merge in greyscale); glow colours close to another
-//       element's glow (they must then differ by effect shape).
+//   (g) any scale pair that passes (b) on hue alone at the same stage (it would merge in greyscale); glow colours
+//       close to another element's glow (they must then differ by effect shape).
 import { hexToRgb, farPalette } from '../src/lib/art/palettes.ts';
 import { toneOf, RAMP } from '../src/lib/art/shading.ts';
-import { DRAGON_ELEMENTS, DRAGON_PALETTES, DRAGON_SHARED, DRAGON_FAR, DRAGON_SLOTS, DRAGON_SHADOW, blushOf, moodTones, dragonTones } from '../src/art/dragon/palettes.ts';
-import type { DragonElement, DragonPalette, DragonSlot } from '../src/art/dragon/palettes.ts';
+import {
+  DRAGON_ELEMENTS, DRAGON_SHARED, DRAGON_FAR, DRAGON_SLOTS, DRAGON_SHADOW, AGE_STAGES, blushOf, moodTones, dragonTones,
+  agedPalette, ageK, muzzleOf, fanFrostOf,
+} from '../src/art/dragon/palettes.ts';
+import type { DragonElement, DragonPalette, DragonSlot, AgeStage } from '../src/art/dragon/palettes.ts';
 
 // ---------- thresholds ----------
 /** House ladder: adjacent parts separate by this relative luminance difference... */
@@ -67,10 +80,13 @@ const OKL_MIN = 6;
 const B_SAT = 0.3;
 const B_DSAT = 0.3;
 const B_LUM_WITH_DSAT = 0.12;
+/** Gate (j): the least scale saturation any stage may grey to, and dusk's (its greying is its identity: 3.8). */
+const ID_SAT = 0.3;
+const ID_SAT_OWN: Readonly<Partial<Record<DragonElement, number>>> = { dusk: 0.2 };
 /** The engine's far-side defaults (rig.ts FAR_SHADE / FAR_DESAT), which gate (c) is written against. */
 const ENGINE_FAR = { shade: 0.62, desat: 0.25 };
 /**
- * Reference habitat floor for gate (i): a pale, low-saturation straw floor. The six bodies span luminance
+ * Reference habitat floor for gate (i): a pale, low-saturation straw floor. The seven bodies span luminance
  * 0.05..0.49 on purpose (see gate (b)), so only a light floor can sit >= 25 % from all of them, and every belly
  * must then sit <= 0.50 or >= 0.90 in luminance.
  */
@@ -79,10 +95,12 @@ const FLOOR_REF = '#e0d6b8';
 const PAIRED_HORNS: readonly DragonElement[] = ['fire', 'spike', 'lightning'];
 /**
  * Elements whose legs are narrower than the engine's FLAT_R (5) at every stage, so no near leg ever gets a shadow band
- * and c2 compares the far leg against the near leg's base only. Slinkwing's leg radius is x0.75 (bible 2.3): its
- * shadow tone sits only ~12 Oklab L above the ink, too narrow a window for a far leg to clear both by OKL_MIN.
+ * and c2 compares the far leg against the near leg's base only. Slinkwing's leg radius is x0.75 and dusk's x0.76
+ * (bible 2.3): their shadow tones sit too near the ink for a far leg to clear both by OKL_MIN.
  */
-const FLAT_LEGS: readonly DragonElement[] = ['slinkwing'];
+const FLAT_LEGS: readonly DragonElement[] = ['slinkwing', 'dusk'];
+const STAGES = AGE_STAGES;
+const NS = STAGES.length;
 
 // ---------- colour maths ----------
 function lin(c: number): number { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }
@@ -142,44 +160,56 @@ function ladder(a: string, b: string): Measure {
   const byLum = lum >= LUM_MIN, byHue = hue != null && hue >= HUE_MIN;
   return { lum, hue, pass: byLum || byHue, by: byLum && byHue ? 'lum+hue' : byLum ? 'lum' : byHue ? 'HUE ONLY' : '' };
 }
-interface BodyMeasure { lum: number; hue: number; dS: number; pass: boolean; hueOnly: boolean; by: string; }
-/** RULE_B between two body colours (gates b and f). */
+interface BodyMeasure { lum: number; hue: number; dS: number; sa: number; sb: number; pass: boolean; hueOnly: boolean; by: string; margin: number; }
+/** RULE_B between two body colours (gates b and f). `margin` >= 1 passes: the best rule's slack, as a fraction of its bar. */
 function ruleB(a: string, b: string): BodyMeasure {
   const ha = hsvOf(a), hb = hsvOf(b);
   const lum = relDiff(a, b), hue = hueDelta(a, b), dS = Math.abs(ha.s - hb.s);
   const b1 = ha.s >= B_SAT && hb.s >= B_SAT && hue >= HUE_MIN;
   const b2 = lum >= LUM_MIN;
-  const b3 = (ha.s < B_SAT || hb.s < B_SAT) && dS >= B_DSAT && lum >= B_LUM_WITH_DSAT;
+  const low = ha.s < B_SAT || hb.s < B_SAT;
+  const b3 = low && dS >= B_DSAT && lum >= B_LUM_WITH_DSAT;
   const by = [b1 ? 'B1' : '', b2 ? 'B2' : '', b3 ? 'B3' : ''].filter(Boolean).join('+');
-  return { lum, hue, dS, pass: b1 || b2 || b3, hueOnly: b1 && !b2 && !b3, by };
+  const m1 = Math.min(Math.min(ha.s, hb.s) / B_SAT, hue / HUE_MIN), m2 = lum / LUM_MIN, m3 = low ? Math.min(dS / B_DSAT, lum / B_LUM_WITH_DSAT) : 0;
+  return { lum, hue, dS, sa: ha.s, sb: hb.s, pass: b1 || b2 || b3, hueOnly: b1 && !b2 && !b3, by, margin: Math.max(m1, m2, m3) };
 }
 const pct = (v: number): string => `${Math.round(v * 100)}%`.padStart(4);
 const deg = (v: number | null): string => (v == null ? '  n/a' : `${Math.round(v)}deg`.padStart(5));
 const okf = (v: number): string => `okL ${v.toFixed(1)}`.padStart(8);
+/** One number per stage, "33/32/31/27", a failing stage marked "!" and a stage the pair does not exist at "-". */
+function perStage(vals: readonly (number | null)[], oks: readonly (boolean | null)[], fmt: (v: number) => string): string {
+  return vals.map((v, i) => (v == null ? '-' : fmt(v) + (oks[i] === false ? '!' : ''))).join('/');
+}
+const n100 = (v: number): string => String(Math.round(v * 100));
 
 // ---------- report plumbing ----------
 const out: string[] = [];
 let gates = 0, failures = 0;
 const failed: string[] = [];
-function gate(label: string, ok: boolean, line: string): void {
+function count(label: string, ok: boolean): boolean {
   gates++;
   if (!ok) { failures++; failed.push(label); }
-  out.push(`${ok ? '  ok  ' : '  FAIL'} ${line}`);
+  return ok;
 }
 function head(title: string): void { out.push('', title); }
 
 // ---------- colour references: a slot, a slot's cel tone, or a shared / derived colour ----------
 type Tone = 'hi' | 'sh' | 'deep';
-/** What a pair names: `scale`, `scale.sh`, `ink` (the outline), `blush`, or a mood tone (`banked`, `dimSpot`). */
-type Ref = DragonSlot | `${DragonSlot}.${Tone}` | 'ink' | 'blush' | 'banked' | 'dimSpot';
-const P = (e: DragonElement): Readonly<DragonPalette> => DRAGON_PALETTES[e];
+/**
+ * What a pair names: `scale`, `scale.sh`, `ink` (the outline), `blush`, a mood tone (`banked`, `dimSpot`), or an
+ * elder face colour (`muzzle`: the grey muzzle, brow tuft and beard; `frost`: slinkwing's frosted fan tips).
+ */
+type Ref = DragonSlot | `${DragonSlot}.${Tone}` | 'ink' | 'blush' | 'banked' | 'dimSpot' | 'muzzle' | 'frost';
+const PAL = (e: DragonElement, st: AgeStage): Readonly<DragonPalette> => agedPalette(e, st);
 const S = DRAGON_SHARED;
-function colour(e: DragonElement, ref: Ref): string {
+function colour(e: DragonElement, st: AgeStage, ref: Ref): string {
   if (ref === 'ink') return S.outline;
   if (ref === 'blush') return blushOf(e);
-  if (ref === 'banked' || ref === 'dimSpot') return moodTones(P(e))[ref];
+  if (ref === 'banked' || ref === 'dimSpot') return moodTones(PAL(e, st))[ref];
+  if (ref === 'muzzle') return muzzleOf(PAL(e, st), e);
+  if (ref === 'frost') return fanFrostOf(PAL(e, st));
   const [slot, tone] = ref.split('.') as [DragonSlot, Tone | undefined];
-  return tone ? dragonTones(e, slot, RAMP)[tone] : P(e)[slot];
+  return tone ? dragonTones(e, slot, RAMP, st)[tone] : PAL(e, st)[slot];
 }
 
 // ---------- adjacency: which colours touch on the sprite ----------
@@ -221,6 +251,26 @@ const EXTRA_PAIRS: Readonly<Record<DragonElement, readonly Pair[]>> = {
     { a: 'scale.deep', b: 'marking', why: 'the brow bar sits on the eye mask' },
     { a: 'ink', b: 'marking', why: 'ink face marks (happy, closed, lids) sit on the eye mask' },
   ],
+  dusk: [
+    { a: 'glow', b: 'scale', why: 'the lamp hangs from the scale stalk, ahead of the head and neck' },
+    { a: 'glow.hi', b: 'glow', why: 'the lamp\'s hot core (mood >= +0.5, the idle "breath")' },
+    { a: 'horn', b: 'glow', why: 'the lantern\'s silver cap sits on the lamp' },
+    { a: 'dark', b: 'marking', why: 'the nostril sits on the nose frost' },
+    { a: 'ink', b: 'marking', why: 'the mouth line and a closed eye\'s bar reach the nose frost' },
+  ],
+};
+/** Pairs only the ELDER has (bible 2.5, the elder face; 3.7's frosted fan tips). */
+const ELDER_PAIRS: readonly Pair[] = [
+  { a: 'muzzle', b: 'scale', why: 'the grey muzzle, brow tuft and beard on the head' },
+  { a: 'muzzle', b: 'scale.sh', why: 'the muzzle meets the head\'s shadow band at the chin; the beard under it' },
+  { a: 'muzzle', b: 'dark', why: 'the nostril sits on the muzzle' },
+  { a: 'muzzle', b: 'ink', why: 'ink face marks (the mouth line, a closed eye\'s bar) sit on the muzzle' },
+];
+const ELDER_EXTRA: Readonly<Partial<Record<DragonElement, readonly Pair[]>>> = {
+  slinkwing: [
+    { a: 'muzzle', b: 'marking', why: 'the muzzle meets the lilac eye mask' },
+    { a: 'frost', b: 'membrane', why: 'the frosted tips along the near fan\'s top edge' },
+  ],
 };
 /** Colours a mood swaps between (gate h). */
 const MOOD_PAIRS: Readonly<Partial<Record<DragonElement, readonly Pair[]>>> = {
@@ -234,6 +284,11 @@ const MOOD_PAIRS: Readonly<Partial<Record<DragonElement, readonly Pair[]>>> = {
     { a: 'marking', b: 'glow', why: 'spots light up when happy' },
     { a: 'dimSpot', b: 'scale', why: 'dim spots still read on the flank' },
   ],
+  dusk: [
+    { a: 'glow', b: 'banked', why: 'the lit crescent vs the lamp\'s dark face (mood <= -0.3, asleep)' },
+    { a: 'banked', b: 'ink', why: 'the dark face still reads inside the lamp\'s ink ring' },
+    { a: 'banked', b: 'scale', why: 'a turned-down lamp still reads against the stalk and head' },
+  ],
 };
 /** The outer colour of every effect that lands on the floor (gate i), by element. */
 const FLOOR_FX: Readonly<Record<DragonElement, readonly { what: string; ref: Ref }[]>> = {
@@ -243,177 +298,245 @@ const FLOOR_FX: Readonly<Record<DragonElement, readonly { what: string; ref: Ref
   lightning: [{ what: 'spark ring', ref: 'scale' }],
   water: [{ what: 'bubble / drip ring', ref: 'membrane' }],
   slinkwing: [{ what: 'sound arc', ref: 'membrane' }, { what: 'sound arc edge', ref: 'scale' }],
+  dusk: [{ what: 'mist lobe (opaque)', ref: 'membrane' }, { what: 'mist ring', ref: 'scale' }],
 };
 
 out.push('DRAGON PALETTE CHECK  (tools/palette-check.ts)');
 out.push(`ladder: >= ${LUM_MIN * 100}% rel. luminance OR >= ${HUE_MIN}deg hue (hue counts only when S >= ${CHROMA_S} and V >= ${CHROMA_V})`);
+out.push(`stages: ${STAGES.join(' / ')} (b/y/a/e), each the base palette greyed by agedPalette (bible 3.9); one number per stage is one gate, "!" marks a failing stage`);
 
 // (a) -----------------------------------------------------------------------------------------------------
-head('(a) ADJACENT COLOURS WITHIN EACH DRAGON');
-function pairLine(e: DragonElement, a: Ref, b: Ref): void {
-  const ca = colour(e, a), cb = colour(e, b), m = ladder(ca, cb);
-  gate(`(a) ${e} ${a}/${b}`, m.pass, `${(a + '/' + b).padEnd(19)} ${ca} ${cb}  lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by}`);
+head('(a) ADJACENT COLOURS WITHIN EACH DRAGON  (lum % b/y/a/e, hue deg b/y/a/e; hexes at baby -> elder)');
+/** One adjacency pair at every stage it exists at (`only`: elder-only pairs). */
+function pairLine(e: DragonElement, a: Ref, b: Ref, only?: AgeStage): void {
+  const lums: (number | null)[] = [], hues: (number | null)[] = [], oks: (boolean | null)[] = [], bys = new Set<string>();
+  let allOk = true;
+  for (const st of STAGES) {
+    if (only && st !== only) { lums.push(null); hues.push(null); oks.push(null); continue; }
+    const ca = colour(e, st, a), cb = colour(e, st, b), m = ladder(ca, cb);
+    lums.push(m.lum); hues.push(m.hue); oks.push(m.pass); bys.add(m.by || 'FAIL');
+    if (!count(`(a) ${e} ${st} ${a}/${b}`, m.pass)) allOk = false;
+  }
+  const s0 = only ?? 'baby', ends = only ? `${colour(e, s0, a)} ${colour(e, s0, b)}` : `${colour(e, 'baby', a)} ${colour(e, 'baby', b)} -> ${colour(e, 'elder', a)} ${colour(e, 'elder', b)}`;
+  const hueTxt = hues.every((h) => h == null) ? 'n/a' : perStage(hues.map((h, i) => (lums[i] == null ? null : h ?? -1)), oks, (v) => (v < 0 ? 'n/a' : String(Math.round(v))));
+  out.push(`${allOk ? '  ok  ' : '  FAIL'} ${(a + '/' + b).padEnd(19)} lum ${perStage(lums, oks, n100).padEnd(15)} hue ${hueTxt.padEnd(15)} ${[...bys].join(',').padEnd(12)} ${ends}`);
 }
 for (const e of DRAGON_ELEMENTS) {
   out.push(` ${e}`);
   for (const pr of [...CORE_PAIRS, ...EXTRA_PAIRS[e]]) pairLine(e, pr.a, pr.b);
-  // the face: iris against the 2x2 catchlight (adult catchlights sit on the iris) and against the pupil,
-  // and the blush, which sits on the cheek scale
-  for (const [name, a, b] of [['eye/catchlight', P(e).eye, S.catchlight], ['eye/pupil', P(e).eye, S.pupil], ['blush/scale', blushOf(e), P(e).scale]] as const) {
-    const m = ladder(a, b);
-    gate(`(a) ${e} ${name}`, m.pass, `${name.padEnd(19)} ${a} ${b}  lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by}`);
+  // the face: iris against the 2x2 catchlight (adult catchlights sit on the iris) and against the pupil (the iris
+  // never greys, so these hold at every stage), and the blush, which sits on the cheek scale
+  for (const [name, get] of [
+    ['eye/catchlight', (st: AgeStage) => [PAL(e, st).eye, S.catchlight]],
+    ['eye/pupil', (st: AgeStage) => [PAL(e, st).eye, S.pupil]],
+    ['blush/scale', (st: AgeStage) => [blushOf(e), PAL(e, st).scale]],
+  ] as const) {
+    const lums: number[] = [], oks: boolean[] = [];
+    let allOk = true;
+    for (const st of STAGES) {
+      const [a, b] = get(st), m = ladder(a, b);
+      lums.push(m.lum); oks.push(m.pass);
+      if (!count(`(a) ${e} ${st} ${name}`, m.pass)) allOk = false;
+    }
+    const [a0, b0] = get('baby'), [a3, b3] = get('elder');
+    out.push(`${allOk ? '  ok  ' : '  FAIL'} ${name.padEnd(19)} lum ${perStage(lums, oks, n100).padEnd(15)} hue ${'-'.padEnd(15)} ${'lum'.padEnd(12)} ${a0} ${b0}${a3 !== a0 || b3 !== b0 ? ` -> ${a3} ${b3}` : ''}`);
   }
+  for (const pr of [...ELDER_PAIRS, ...(ELDER_EXTRA[e] ?? [])]) pairLine(e, pr.a, pr.b, 'elder');
 }
 out.push(' shared');
 for (const [name, a, b] of [['mouth/tongue', S.mouth, S.tongue], ['mouth/fang', S.mouth, S.catchlight]] as const) {
   const m = ladder(a, b);
-  gate(`(a) shared ${name}`, m.pass, `${name.padEnd(19)} ${a} ${b}  lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by}`);
+  count(`(a) shared ${name}`, m.pass);
+  out.push(`${m.pass ? '  ok  ' : '  FAIL'} ${name.padEnd(19)} ${a} ${b}  lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by}`);
 }
 
-// (b) -----------------------------------------------------------------------------------------------------
-head('(b) SCALE COLOURS ACROSS ELEMENTS  (B1 hue: both S>=0.30 and >=40deg | B2 value: >=25% | B3 chroma: dS>=0.30 and >=12%)');
-const hueOnly: [DragonElement, DragonElement][] = [];
+// (b) and (f) -------------------------------------------------------------------------------------------------
+/** A body pair across all 16 stage combinations: the pass count and the thinnest combination. */
+function bodyPairLine(tag: string, ea: DragonElement, eb: DragonElement, see: (hex: string) => string): string {
+  let pass = 0, worst: { m: BodyMeasure; sa: AgeStage; sb: AgeStage; a: string; b: string } | null = null;
+  const bad: string[] = [];
+  for (const sa of STAGES) for (const sb of STAGES) {
+    const a = see(PAL(ea, sa).scale), b = see(PAL(eb, sb).scale), m = ruleB(a, b);
+    if (count(`${tag} ${ea}.${sa}/${eb}.${sb}`, m.pass)) pass++; else bad.push(`${sa[0]}${sb[0]}`);
+    if (!worst || m.margin < worst.m.margin) worst = { m, sa, sb, a, b };
+  }
+  const w = worst!, same = STAGES.map((st) => ruleB(see(PAL(ea, st).scale), see(PAL(eb, st).scale)));
+  return `${bad.length ? '  FAIL' : '  ok  '} ${(ea + '/' + eb).padEnd(19)} ${String(pass).padStart(2)}/${NS * NS}  same stage lum ${perStage(same.map((m) => m.lum), same.map((m) => m.pass), n100).padEnd(12)}`
+    + ` thinnest ${w.sa}/${w.sb} ${w.a} ${w.b} lum ${pct(w.m.lum)} hue ${deg(w.m.hue)} S ${w.m.sa.toFixed(2)}/${w.m.sb.toFixed(2)} ${w.m.by || 'FAIL'}${bad.length ? '  failing (stage of ' + ea + ', of ' + eb + '): ' + bad.join(' ') : ''}`;
+}
+head(`(b) SCALE COLOURS ACROSS ELEMENTS, AT EVERY PAIR OF STAGES  (B1 hue: both S>=0.30 and >=40deg | B2 value: >=25% | B3 chroma: dS>=0.30 and >=12%; ${NS * NS} stage combinations a pair)`);
+const hueOnly: string[] = [];
 for (let i = 0; i < DRAGON_ELEMENTS.length; i++) {
   for (let j = i + 1; j < DRAGON_ELEMENTS.length; j++) {
-    const ea = DRAGON_ELEMENTS[i], eb = DRAGON_ELEMENTS[j], a = P(ea).scale, b = P(eb).scale, m = ruleB(a, b);
-    if (m.hueOnly) hueOnly.push([ea, eb]);
-    gate(`(b) ${ea}/${eb}`, m.pass, `${(ea + '/' + eb).padEnd(22)} ${a} ${b}  lum ${pct(m.lum)}  hue ${deg(m.hue)}  dS ${m.dS.toFixed(2)}  ${m.by}`);
+    const ea = DRAGON_ELEMENTS[i], eb = DRAGON_ELEMENTS[j];
+    out.push(bodyPairLine('(b)', ea, eb, (h) => h));
+    for (const st of STAGES) if (ruleB(PAL(ea, st).scale, PAL(eb, st).scale).hueOnly) hueOnly.push(`${ea}/${eb} (${st})`);
   }
 }
-out.push(' scale S/V: ' + DRAGON_ELEMENTS.map((e) => { const c = hsvOf(P(e).scale); return `${e} ${c.s.toFixed(2)}/${c.v.toFixed(2)}`; }).join('  '));
+for (const st of STAGES) {
+  const stack = [...DRAGON_ELEMENTS].map((e) => ({ e, L: lumOf(PAL(e, st).scale), s: hsvOf(PAL(e, st).scale).s })).sort((x, y) => y.L - x.L);
+  out.push(` ${st.padEnd(6)} value stack (L / S): ${stack.map((x) => `${x.e} ${x.L.toFixed(3)}/${x.s.toFixed(2)}`).join(' > ')}`);
+}
 
 // (c) -----------------------------------------------------------------------------------------------------
-head(`(c) FAR SIDE vs NEAR SCALE  (>= ${LUM_MIN * 100}% luminance; hue does not count, far parts share the near hue)`);
-/** One far-side comparison: far[slot] from farPalette(p, shade, desat) against a near-side tone of the scale. */
+head(`(c) FAR SIDE vs NEAR SCALE  (>= ${LUM_MIN * 100}% luminance; hue does not count, far parts share the near hue; % b/y/a/e)`);
+/** One far-side comparison at every stage: far[slot] from farPalette(p, shade, desat) against a near tone of the scale. */
 function farGate(e: DragonElement, tag: string, shade: number, desat: number, slot: DragonSlot, near: 'base' | 'sh', ok = false): string {
-  const pal = P(e), far = farPalette(pal, shade, desat)[slot];
-  const ref = near === 'base' ? pal.scale : dragonTones(e, 'scale', RAMP).sh;
-  const d = relDiff(far, ref), o = okDiff(far, ref), pass = d >= LUM_MIN && (!ok || o >= OKL_MIN);
-  gates++;
-  if (!pass) { failures++; failed.push(`(c) ${e} ${tag} far ${slot} vs near scale.${near}`); }
-  return `${slot} ${far}${near === 'sh' ? ' vs ' + ref : ''} ${pct(d)}${ok ? ' ' + okf(o) : ''}${pass ? '' : ' FAIL'}`;
+  const ds: number[] = [], oks: boolean[] = [];
+  let minO = 99;
+  for (const st of STAGES) {
+    const pal = PAL(e, st), far = farPalette(pal, shade, desat)[slot];
+    const ref = near === 'base' ? pal.scale : dragonTones(e, 'scale', RAMP, st).sh;
+    const d = relDiff(far, ref), o = okDiff(far, ref), pass = d >= LUM_MIN && (!ok || o >= OKL_MIN);
+    ds.push(d); oks.push(pass); minO = Math.min(minO, o);
+    count(`(c) ${e} ${st} ${tag} far ${slot} vs near scale.${near}`, pass);
+  }
+  const far0 = farPalette(PAL(e, 'baby'), shade, desat)[slot];
+  return `${slot} ${far0}${near === 'sh' ? ' vs sh' : ''} ${perStage(ds, oks, n100)}%${ok ? ' min ' + okf(minO) : ''}${oks.every(Boolean) ? '' : ' FAIL'}`;
 }
 const L = DRAGON_FAR.legs, W = DRAGON_FAR.wingAndHead;
 out.push(` c1  engine default farPalette(p, ${ENGINE_FAR.shade}, ${ENGINE_FAR.desat}): far scale and far membrane vs near scale`);
 for (const e of DRAGON_ELEMENTS) {
-  out.push(`        ${e.padEnd(12)} ${farGate(e, 'c1', ENGINE_FAR.shade, ENGINE_FAR.desat, 'scale', 'base')}   ${farGate(e, 'c1', ENGINE_FAR.shade, ENGINE_FAR.desat, 'membrane', 'base')}`);
+  out.push(`        ${e.padEnd(10)} ${farGate(e, 'c1', ENGINE_FAR.shade, ENGINE_FAR.desat, 'scale', 'base')}   ${farGate(e, 'c1', ENGINE_FAR.shade, ENGINE_FAR.desat, 'membrane', 'base')}`);
 }
 out.push(` c2  rig far LEGS farPalette(p, ${L.shade}, ${L.desat}): far leg vs near leg base, and vs near leg SHADOW band (scale.sh); >= ${LUM_MIN * 100}% and >= okL ${OKL_MIN}`);
 for (const e of DRAGON_ELEMENTS) {
-  const engineSh = relDiff(farPalette(P(e), ENGINE_FAR.shade, ENGINE_FAR.desat).scale, dragonTones(e, 'scale', RAMP).sh);
   const base = farGate(e, 'c2', L.shade, L.desat, 'scale', 'base', true);
-  const sh = FLAT_LEGS.includes(e) ? '(legs flat at every stage: no shadow band to cross)'
-    : `${farGate(e, 'c2', L.shade, L.desat, 'scale', 'sh', true)}   (engine default: ${pct(engineSh)}${engineSh < LUM_MIN ? ', would fail' : ''})`;
-  out.push(`        ${e.padEnd(12)} ${base}   ${sh}`);
+  const sh = FLAT_LEGS.includes(e) ? '(legs flat at every stage: no shadow band to cross)' : farGate(e, 'c2', L.shade, L.desat, 'scale', 'sh', true);
+  out.push(`        ${e.padEnd(10)} ${base}   ${sh}`);
 }
 out.push(` c3  rig far WING + HEAD features farPalette(p, ${W.shade}, ${W.desat}): far membrane (wing, ear-fan, fin-ear) and far paired horn vs near scale`);
 for (const e of DRAGON_ELEMENTS) {
   const cells = [farGate(e, 'c3', W.shade, W.desat, 'membrane', 'base')];
   if (PAIRED_HORNS.includes(e)) cells.push(farGate(e, 'c3', W.shade, W.desat, 'horn', 'base'));
-  out.push(`        ${e.padEnd(12)} ${cells.join('   ')}${PAIRED_HORNS.includes(e) ? '' : '   (no paired horns)'}`);
+  out.push(`        ${e.padEnd(10)} ${cells.join('   ')}${PAIRED_HORNS.includes(e) ? '' : '   (no paired horns)'}`);
 }
 
 // (d) -----------------------------------------------------------------------------------------------------
-head('(d) CEL RAMPS  (engine makeTones, default RAMP: hi 1.22 / sh 0.66 / deep 0.51)');
+head('(d) CEL RAMPS  (engine makeTones on each stage\'s greyed colours, default RAMP: hi 1.22 / sh 0.66 / deep 0.51)');
 let weakest = { step: 9, where: '' };
 for (const e of DRAGON_ELEMENTS) {
-  const pal = P(e), bad: string[] = [];
-  for (const s of DRAGON_SLOTS) {
-    const t = dragonTones(e, s, RAMP);
+  const bad: string[] = [];
+  for (const st of STAGES) for (const s of DRAGON_SLOTS) {
+    const t = dragonTones(e, s, RAMP, st);
     const collapsed = t.sh === t.base || t.hi === t.base || t.sh === t.hi || t.deep === t.sh;
-    gates++;
-    if (collapsed) { failures++; failed.push(`(d) ${e} ${s}`); bad.push(s); }
+    if (!count(`(d) ${e} ${st} ${s}`, !collapsed)) bad.push(`${st} ${s}`);
     if (s !== 'glow' && s !== 'eye' && s !== 'dark') {
       const step = relDiff(t.hi, t.base);
-      if (step < weakest.step) weakest = { step, where: `${e}.${s} ${t.base} -> hi ${t.hi}` };
+      if (step < weakest.step) weakest = { step, where: `${e}.${s} (${st}) ${t.base} -> hi ${t.hi}` };
     }
   }
-  out.push(`${bad.length ? '  FAIL' : '  ok  '} ${e.padEnd(12)} 8 ramps distinct${bad.length ? '; collapsed: ' + bad.join(', ') : ''}`);
+  out.push(`${bad.length ? '  FAIL' : '  ok  '} ${e.padEnd(10)} ${DRAGON_SLOTS.length * NS} ramps distinct (8 slots x ${NS} stages)${bad.length ? '; collapsed: ' + bad.join(', ') : ''}`);
 }
 out.push(`        weakest highlight step on a banded slot: ${pct(weakest.step)} (${weakest.where})`);
 for (const e of DRAGON_ELEMENTS) {
   const o = DRAGON_SHADOW[e];
   if (!o) continue;
   for (const s of DRAGON_SLOTS) {
-    const sh = o[s];
-    if (!sh) continue;
-    const d = relDiff(sh, P(e)[s]), ok = d >= LUM_MIN;
-    gates++;
-    if (!ok) { failures++; failed.push(`(d) ${e} ${s} hand-set shadow`); }
-    out.push(`${ok ? '  ok  ' : '  FAIL'} ${e.padEnd(12)} hand-set ${s}.sh ${sh} (engine ${toneOf(P(e)[s], RAMP.sh)}) ${pct(d)} under ${P(e)[s]}`);
+    if (!o[s]) continue;
+    const ds: number[] = [], oks: boolean[] = [];
+    for (const st of STAGES) {
+      const sh = dragonTones(e, s, RAMP, st).sh, d = relDiff(sh, PAL(e, st)[s]);
+      ds.push(d); oks.push(count(`(d) ${e} ${st} ${s} hand-set shadow`, d >= LUM_MIN));
+    }
+    out.push(`${oks.every(Boolean) ? '  ok  ' : '  FAIL'} ${e.padEnd(10)} hand-set ${s}.sh ${o[s]} (engine ${toneOf(PAL(e, 'baby')[s], RAMP.sh)}) ${perStage(ds, oks, n100)}% under its base -> elder ${dragonTones(e, s, RAMP, 'elder').sh}`);
   }
 }
 
 // (e) -----------------------------------------------------------------------------------------------------
-head(`(e) INK FLOOR  (far leg scale, far wing membrane and far paired horn vs outline ${S.outline}: >= ${LUM_MIN * 100}% and >= okL ${OKL_MIN})`);
+head(`(e) INK FLOOR  (far leg scale, far wing membrane and far paired horn vs outline ${S.outline}: >= ${LUM_MIN * 100}% and >= okL ${OKL_MIN}; % b/y/a/e, least okL)`);
 for (const e of DRAGON_ELEMENTS) {
-  const legs = farPalette(P(e), L.shade, L.desat), wing = farPalette(P(e), W.shade, W.desat);
-  const parts: [string, string][] = [['far leg scale', legs.scale], ['far membrane', wing.membrane]];
-  if (PAIRED_HORNS.includes(e)) parts.push(['far horn', wing.horn]);
+  const parts: [string, (p: DragonPalette) => string][] = [
+    ['far leg scale', (p) => farPalette(p, L.shade, L.desat).scale],
+    ['far membrane', (p) => farPalette(p, W.shade, W.desat).membrane],
+  ];
+  if (PAIRED_HORNS.includes(e)) parts.push(['far horn', (p) => farPalette(p, W.shade, W.desat).horn]);
   const cells: string[] = [];
   let allOk = true;
-  for (const [name, hex] of parts) {
-    const d = relDiff(hex, S.outline), o = okDiff(hex, S.outline), ok = d >= LUM_MIN && o >= OKL_MIN;
-    gates++;
-    if (!ok) { failures++; failed.push(`(e) ${e} ${name}`); allOk = false; }
-    cells.push(`${name} ${hex} ${pct(d)} ${okf(o)}${ok ? '' : ' FAIL'}`);
+  for (const [name, get] of parts) {
+    const ds: number[] = [], oks: boolean[] = [];
+    let minO = 99;
+    for (const st of STAGES) {
+      const hex = get({ ...PAL(e, st) }), d = relDiff(hex, S.outline), o = okDiff(hex, S.outline), ok = d >= LUM_MIN && o >= OKL_MIN;
+      ds.push(d); oks.push(ok); minO = Math.min(minO, o);
+      if (!count(`(e) ${e} ${st} ${name}`, ok)) allOk = false;
+    }
+    cells.push(`${name} ${get({ ...PAL(e, 'baby') })} ${perStage(ds, oks, n100)}% ${okf(minO)}`);
   }
-  out.push(`${allOk ? '  ok  ' : '  FAIL'} ${e.padEnd(12)} ${cells.join('   ')}`);
+  out.push(`${allOk ? '  ok  ' : '  FAIL'} ${e.padEnd(10)} ${cells.join('   ')}`);
 }
 
 // (f) -----------------------------------------------------------------------------------------------------
-head('(f) COLOUR-BLIND SAFETY  (simulated deuteranopia / protanopia, Vienot 1999: 15 scale pairs by RULE_B, blush/scale by the ladder)');
+head(`(f) COLOUR-BLIND SAFETY  (simulated deuteranopia / protanopia, Vienot 1999: body pairs by RULE_B at all ${NS * NS} stage combinations, blush/scale by the ladder)`);
 for (const k of ['deutan', 'protan'] as const) {
   out.push(` ${k}`);
   for (let i = 0; i < DRAGON_ELEMENTS.length; i++) {
-    for (let j = i + 1; j < DRAGON_ELEMENTS.length; j++) {
-      const ea = DRAGON_ELEMENTS[i], eb = DRAGON_ELEMENTS[j];
-      const a = simulate(P(ea).scale, k), b = simulate(P(eb).scale, k), m = ruleB(a, b);
-      gate(`(f) ${k} ${ea}/${eb}`, m.pass, `${(ea + '/' + eb).padEnd(22)} ${a} ${b}  lum ${pct(m.lum)}  hue ${deg(m.hue)}  S ${hsvOf(a).s.toFixed(2)}/${hsvOf(b).s.toFixed(2)}  ${m.by}`);
-    }
+    for (let j = i + 1; j < DRAGON_ELEMENTS.length; j++) out.push(bodyPairLine(`(f) ${k}`, DRAGON_ELEMENTS[i], DRAGON_ELEMENTS[j], (h) => simulate(h, k)));
   }
   for (const e of DRAGON_ELEMENTS) {
-    const a = simulate(blushOf(e), k), b = simulate(P(e).scale, k), m = ladder(a, b);
-    gate(`(f) ${k} ${e} blush/scale`, m.pass, `${(e + ' blush/scale').padEnd(22)} ${a} ${b}  lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by}`);
+    const lums: number[] = [], oks: boolean[] = [];
+    for (const st of STAGES) {
+      const m = ladder(simulate(blushOf(e), k), simulate(PAL(e, st).scale, k));
+      lums.push(m.lum); oks.push(count(`(f) ${k} ${e} ${st} blush/scale`, m.pass));
+    }
+    out.push(`${oks.every(Boolean) ? '  ok  ' : '  FAIL'} ${(e + ' blush/scale').padEnd(22)} lum ${perStage(lums, oks, n100)}%  ${simulate(blushOf(e), k)} on ${simulate(PAL(e, 'baby').scale, k)} -> ${simulate(PAL(e, 'elder').scale, k)}`);
   }
 }
 
 // (h) -----------------------------------------------------------------------------------------------------
-head('(h) MOOD STATES  (colours a mood swaps between; the ladder, so the change is visible)');
+head('(h) MOOD STATES  (colours a mood swaps between; the ladder, so the change is visible; lum % b/y/a/e)');
 for (const e of DRAGON_ELEMENTS) {
   const pairs = MOOD_PAIRS[e];
   if (!pairs) continue;
   out.push(` ${e}`);
   for (const pr of pairs) {
-    const ca = colour(e, pr.a), cb = colour(e, pr.b), m = ladder(ca, cb);
-    gate(`(h) ${e} ${pr.a}/${pr.b}`, m.pass, `${(pr.a + '/' + pr.b).padEnd(19)} ${ca} ${cb}  lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by}  (${pr.why})`);
+    const lums: number[] = [], oks: boolean[] = [], bys = new Set<string>();
+    for (const st of STAGES) {
+      const m = ladder(colour(e, st, pr.a), colour(e, st, pr.b));
+      lums.push(m.lum); oks.push(count(`(h) ${e} ${st} ${pr.a}/${pr.b}`, m.pass)); bys.add(m.by || 'FAIL');
+    }
+    out.push(`${oks.every(Boolean) ? '  ok  ' : '  FAIL'} ${(pr.a + '/' + pr.b).padEnd(19)} lum ${perStage(lums, oks, n100).padEnd(15)} ${[...bys].join(',').padEnd(10)} ${colour(e, 'baby', pr.a)} ${colour(e, 'baby', pr.b)}  (${pr.why})`);
   }
 }
 
 // (i) -----------------------------------------------------------------------------------------------------
-head(`(i) HABITAT FLOOR ${FLOOR_REF}  (L ${lumOf(FLOOR_REF).toFixed(2)}, S ${hsvOf(FLOOR_REF).s.toFixed(2)}: hue never counts, >= ${LUM_MIN * 100}% luminance)`);
+head(`(i) HABITAT FLOOR ${FLOOR_REF}  (L ${lumOf(FLOOR_REF).toFixed(2)}, S ${hsvOf(FLOOR_REF).s.toFixed(2)}: hue never counts, >= ${LUM_MIN * 100}% luminance; % b/y/a/e)`);
 for (const e of DRAGON_ELEMENTS) {
   const cells: string[] = [];
   let allOk = true;
   const items: { what: string; ref: Ref }[] = [{ what: 'scale', ref: 'scale' }, { what: 'belly', ref: 'belly' }, ...FLOOR_FX[e]];
   for (const it of items) {
-    const hex = colour(e, it.ref), d = relDiff(hex, FLOOR_REF), ok = d >= LUM_MIN;
-    gates++;
-    if (!ok) { failures++; failed.push(`(i) ${e} ${it.what}`); allOk = false; }
-    cells.push(`${it.what} ${pct(d)}${ok ? '' : ' FAIL'}`);
+    const ds: number[] = [], oks: boolean[] = [];
+    for (const st of STAGES) {
+      const d = relDiff(colour(e, st, it.ref), FLOOR_REF);
+      ds.push(d); oks.push(d >= LUM_MIN);
+      if (!count(`(i) ${e} ${st} ${it.what}`, d >= LUM_MIN)) allOk = false;
+    }
+    cells.push(`${it.what} ${perStage(ds, oks, n100)}%`);
   }
-  out.push(`${allOk ? '  ok  ' : '  FAIL'} ${e.padEnd(12)} ${cells.join('  ')}`);
+  out.push(`${allOk ? '  ok  ' : '  FAIL'} ${e.padEnd(10)} ${cells.join('  ')}`);
+}
+
+// (j) -----------------------------------------------------------------------------------------------------
+head(`(j) IDENTITY THROUGH AGE  (every stage's scale keeps HSV S >= ${ID_SAT} (dusk >= ${ID_SAT_OWN.dusk}); scale k b/y/a/e from palettes.ts ageK)`);
+for (const e of DRAGON_ELEMENTS) {
+  const min = ID_SAT_OWN[e] ?? ID_SAT, ss: number[] = [], oks: boolean[] = [];
+  for (const st of STAGES) {
+    const s = hsvOf(PAL(e, st).scale).s;
+    ss.push(s); oks.push(count(`(j) ${e} ${st} scale S`, s >= min - 1e-9));
+  }
+  out.push(`${oks.every(Boolean) ? '  ok  ' : '  FAIL'} ${e.padEnd(10)} scale S ${perStage(ss, oks, (v) => v.toFixed(2))}  (>= ${min.toFixed(2)})  k ${STAGES.map((st) => ageK(e, st, 'scale').toFixed(2)).join('/')}  ${STAGES.map((st) => PAL(e, st).scale).join(' ')}`);
 }
 
 // (g) -----------------------------------------------------------------------------------------------------
 head('(g) REPORTED, NOT GATED');
-out.push(` scale pairs passing (b) on hue only, so they would merge in greyscale: ${hueOnly.length ? hueOnly.map((p) => p.join('/')).join(', ') : 'none'}`);
-out.push(' glow pairs across elements within 40deg hue AND 25% luminance (must differ by effect SHAPE):');
+out.push(` scale pairs passing (b) on hue only at the same stage, so they would merge in greyscale: ${hueOnly.length ? hueOnly.join(', ') : 'none'}`);
+out.push(' glow pairs across elements within 40deg hue AND 25% luminance (must differ by effect SHAPE; the glow never greys):');
 let glowClose = 0;
 for (let i = 0; i < DRAGON_ELEMENTS.length; i++) {
   for (let j = i + 1; j < DRAGON_ELEMENTS.length; j++) {
-    const ea = DRAGON_ELEMENTS[i], eb = DRAGON_ELEMENTS[j], m = ladder(P(ea).glow, P(eb).glow);
-    if (!m.pass) { glowClose++; out.push(`   ${(ea + '/' + eb).padEnd(22)} ${P(ea).glow} ${P(eb).glow}  lum ${pct(m.lum)}  hue ${deg(m.hue)}`); }
+    const ea = DRAGON_ELEMENTS[i], eb = DRAGON_ELEMENTS[j], ga = PAL(ea, 'baby').glow, gb = PAL(eb, 'baby').glow, m = ladder(ga, gb);
+    if (!m.pass) { glowClose++; out.push(`   ${(ea + '/' + eb).padEnd(22)} ${ga} ${gb}  lum ${pct(m.lum)}  hue ${deg(m.hue)}`); }
   }
 }
 if (!glowClose) out.push('   none');

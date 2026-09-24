@@ -322,7 +322,7 @@ function lineupScene(P: GalleryParams): Scene {
     pets.push(makePet(el, st, P.seed + c * 7 + r * 131, P.anim, x, y, { mood: P.mood, scale: sc }));
   }));
   return {
-    w: cellW * 6, h: 540 * sc, pets,
+    w: cellW * ELEMENT_IDS.length, h: 540 * sc, pets,
     draw(ctx) {
       ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
       drawPets(ctx, pets);
@@ -382,17 +382,18 @@ function zoomScene(P: GalleryParams): Scene {
 }
 
 /**
- * view=cast&stage=: all six elements of one stage drawn at game scale 1 and blown up `scale` times (default 4) with
- * nearest neighbour, 3 x 2: the pixel-level contact sheet for one stage.
+ * view=cast&stage=: every element of one stage drawn at game scale 1 and blown up `scale` times (default 4) with
+ * nearest neighbour, 3 x 2 for six, 4 x 2 for seven: the pixel-level contact sheet for one stage.
  */
 function castScene(P: GalleryParams): Scene {
   const k = Math.max(1, Math.round(P.scale || 4));
   const cw = P.stage === 'adult' ? 150 : P.stage === 'young' ? 116 : 70, ch = P.stage === 'adult' ? 84 : P.stage === 'young' ? 68 : 52;
-  const pets = ELEMENT_IDS.map((el, i) => makePet(el, P.stage, P.seed + i * 7, P.anim, (i % 3) * cw + Math.round(cw * 0.6), Math.floor(i / 3) * ch + ch - 7, { mood: P.mood }));
+  const cols = Math.ceil(ELEMENT_IDS.length / 2), rows = Math.ceil(ELEMENT_IDS.length / cols);
+  const pets = ELEMENT_IDS.map((el, i) => makePet(el, P.stage, P.seed + i * 7, P.anim, (i % cols) * cw + Math.round(cw * 0.6), Math.floor(i / cols) * ch + ch - 7, { mood: P.mood }));
   const off = document.createElement('canvas');
-  off.width = cw * 3; off.height = ch * 2;
+  off.width = cw * cols; off.height = ch * rows;
   return {
-    w: cw * 3 * k, h: ch * 2 * k, pets,
+    w: cw * cols * k, h: ch * rows * k, pets,
     draw(ctx) {
       const g = off.getContext('2d')!;
       g.fillStyle = P.bg || STRAW; g.fillRect(0, 0, off.width, off.height);
@@ -425,14 +426,14 @@ function moodScene(P: GalleryParams): Scene {
   });
   const all = pets.concat(asleep);
   const off = document.createElement('canvas');
-  off.width = cw * 3 + aw; off.height = ch * 6 + 12;
+  off.width = cw * 3 + aw; off.height = ch * ELEMENT_IDS.length + 12;
   return {
     w: off.width * k, h: off.height * k, pets: all,
     draw(ctx) {
       const g = off.getContext('2d')!;
       g.fillStyle = P.bg || STRAW; g.fillRect(0, 0, off.width, off.height);
       drawPets(g, all);
-      ['MOOD -1', 'MOOD 0', 'MOOD +1', 'ASLEEP'].forEach((t, i) => label(g, t, i * cw + (i < 3 ? cw : aw) / 2, ch * 6 + 3, LABEL, 1));
+      ['MOOD -1', 'MOOD 0', 'MOOD +1', 'ASLEEP'].forEach((t, i) => label(g, t, i * cw + (i < 3 ? cw : aw) / 2, ch * ELEMENT_IDS.length + 3, LABEL, 1));
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(off, 0, 0, off.width * k, off.height * k);
     },
@@ -716,11 +717,11 @@ function rootsScene(P: GalleryParams): Scene {
 /**
  * view=silhouette: 5.1 #1. Every dragon flat #1a1018 on a light ground, then the /3 area-coverage reduction at 3
  * sub-pixel phases. `set=all` stacks the sheets 5.1 #1 asks for on one page -- idle at the query's mood, idle at
- * the lowest mood, and asleep (the cue must still name the element) -- each a block of 18; the walk keys join it
+ * the lowest mood, and asleep (the cue must still name the element) -- each a block of every look; the walk keys join it
  * once the walk is authored.
  */
 function silhouetteScene(P: GalleryParams): Scene {
-  const cellW = 160, cellH = 110, W = cellW * 6;
+  const cellW = 160, cellH = 110, W = cellW * ELEMENT_IDS.length;
   const ALL: { name: string; mood: number; sleep: boolean; walk?: boolean; key: string }[] = [
     { name: `IDLE, MOOD ${P.mood}`, mood: P.mood, sleep: false, key: 'idle' }, { name: 'IDLE, MOOD -1', mood: -1, sleep: false, key: 'low' },
     { name: 'ASLEEP, MOOD -1', mood: -1, sleep: true, key: 'asleep' },
@@ -738,9 +739,9 @@ function silhouetteScene(P: GalleryParams): Scene {
     if (b.walk) seekPet(p, Math.round(p.rig.tune.walk.cycle * 2.5 / 8));
     pets.push(p);
   })));
-  const RW = W / 3, RH = H / 3;
+  const RW = Math.ceil(W / 3), RH = H / 3;
   return {
-    w: 960, h: H + 18 + RH + 44, pets,
+    w: Math.max(960, 3 * RW), h: H + 18 + RH + 44, pets,
     draw(ctx) {
       const light = P.bg || '#f4efe2';
       ctx.fillStyle = light; ctx.fillRect(0, 0, this.w, this.h);
@@ -751,7 +752,7 @@ function silhouetteScene(P: GalleryParams): Scene {
       g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
       for (const p of pets) drawDragon(g, p.rig, p.player.pose, petOpts(p, { still: true, silhouette: true }));
       ctx.drawImage(sheet, 0, 0);
-      blocks.forEach((b, k) => label(ctx, b.name, 480, k * cellH * 3 + 4, LABEL, 1));
+      blocks.forEach((b, k) => label(ctx, b.name, this.w / 2, k * cellH * 3 + 4, LABEL, 1));
       // the /3 area-coverage reductions: a reduced pixel is ink when >= 50 % of its 3 x 3 source box is covered
       const src = g.getImageData(0, 0, W, H).data;
       const y0 = H + 18;
@@ -771,7 +772,7 @@ function silhouetteScene(P: GalleryParams): Scene {
         label(ctx, `/3 PHASE ${ph}`, ph * RW + RW / 2, y0 + RH + 6, LABEL, 1);
       }
       // (a row above the live HUD line, which sits at h - 10: on it the two lines overprinted into garble)
-      label(ctx, 'SILHOUETTE: FLAT INK, THEN /3 AREA COVERAGE (INK >= 50 %) AT 3 SUB-PIXEL PHASES', 480, this.h - 22, LABEL, 1);
+      label(ctx, 'SILHOUETTE: FLAT INK, THEN /3 AREA COVERAGE (INK >= 50 %) AT 3 SUB-PIXEL PHASES', this.w / 2, this.h - 22, LABEL, 1);
     },
   };
 }

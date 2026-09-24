@@ -268,6 +268,8 @@ export const TAIL_REST: Readonly<Record<DragonElement, Readonly<Record<Stage, Re
   lightning: { baby: { first: -12, bend: 0 }, young: { first: -5, bend: 0 }, adult: { first: -5, bend: 0 } },
   water: { baby: { first: 0, bend: 0 }, young: { first: 0, bend: 0 }, adult: { first: 0, bend: 0 } },
   slinkwing: { baby: { first: -5, bend: -15 }, young: { first: 15, bend: -4 }, adult: { first: 15, bend: -4 } },
+  // dusk (v2, 3.8): long and gently drooping, "trailing like smoke", never above the back line (fire's zone)
+  dusk: { baby: { first: 4, bend: 0 }, young: { first: 7, bend: 2 }, adult: { first: 8, bend: 2 } },
 });
 
 /** 4.1 tail chain (secondary.ts getChain options) per stage. `maxAng` 30 keeps a tail from folding through the body. */
