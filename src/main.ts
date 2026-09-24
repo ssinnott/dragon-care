@@ -1,9 +1,7 @@
-// Placeholder entry; replaced by the dragon gallery.
-import { drawText } from './lib/engine/text.ts';
+// Entry point: the dragon gallery (src/gallery.ts). The query string is the page's to interpret (tools/shot.ts
+// contract): which view, which anim, a frozen time `t`; `ready` is set only once that frame has been drawn.
+import { startGallery } from './gallery.ts';
 
 const el = document.getElementById('stage');
 if (!(el instanceof HTMLCanvasElement)) throw new Error('index.html: no <canvas id="stage">');
-const ctx = el.getContext('2d')!;
-ctx.fillStyle = '#16141c'; ctx.fillRect(0, 0, el.width, el.height);
-drawText(ctx, 'DRAGON CARE', 10, 10, { size: 2, color: '#e8d8c0' });
-if (window.__dragonCare) window.__dragonCare.ready = true;
+startGallery(el, location.search, () => { if (window.__dragonCare) window.__dragonCare.ready = true; });

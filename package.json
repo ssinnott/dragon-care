@@ -9,7 +9,9 @@
     "build": "node tools/build.ts",
     "typecheck": "tsc -p tsconfig.json",
     "palette": "node tools/palette-check.ts",
-    "check": "npm run typecheck && npm run palette"
+    "shots": "node tools/shots.ts",
+    "smoke": "node tools/smoke.ts",
+    "check": "npm run typecheck && npm run palette && npm run smoke"
   },
   "license": "MIT",
   "devDependencies": {

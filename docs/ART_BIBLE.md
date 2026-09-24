@@ -16,7 +16,7 @@
 
 **Where this came from.** Three art directors proposed designs independently, from three lenses: readability (R), charm (C) and growth (G). This bible takes the strongest idea for each decision rather than averaging, and says where each one came from. Readability constraints are **hard rules**. No decision below trades one away.
 
-**Status.** This is the design. The quadruped rig is not written yet. The palette exists as code: `src/art/dragon/palettes.ts` holds the values, and `tools/palette-check.ts` validates them (report in section 5.8). Every hex below comes from that module and passed that check. The bible has been through one review round (a readability critique and a care-game critique); what changed, and what was turned down, is in the **Review log** at the end.
+**Status.** This is the design, and the rig now draws it: the quadruped rig, the shared features and a first pass of all six elements live in `src/art/dragon/` (file list in 1.1), with the idle loop per stage; the rest of the core animation set (4.2) comes next. The palette is code too: `src/art/dragon/palettes.ts` holds the values, and `tools/palette-check.ts` validates them (report in section 5.8). `npm run shots` renders the standard sheets of 5.5 and `npm run smoke` checks every gallery view. Every hex below comes from that module and passed that check. The bible has been through one review round (a readability critique and a care-game critique); what changed, and what was turned down, is in the **Review log** at the end.
 
 ---
 
@@ -108,10 +108,21 @@ Section 5 lists each rule with the failure it prevents.
   - `enter`, `leave` and `setLight` are typed on the humanoid `Rig`. `stepChains` is private to rig.ts.
   - The dragon rig therefore gets its own small `enter` / `leave` (3 lines) and a chain stepper (about 12 lines) built on the exported `getChain` / `stepChain` / `resetChain`.
   - **The vendored engine is never edited.**
-- **Files.**
-  - `src/art/dragon/palettes.ts` exists now.
-  - To come: `dragonBuild.ts` (`dragonBuild({ element, stage })` returns a complete build), `dragonRig.ts`, `dragonParts.ts`, `dragonAnims.ts` and `dragonFx.ts`.
-  - Element features are **part kinds with parameters** (horn, back row, tail tip, wing style, head accessory), never per-element hooks, so a renderer fix reaches all 18 looks at once.
+- **Files** (all under `src/art/dragon/`):
+  - `palettes.ts`: the 6 x 8 palette, shared colours, `blushOf`, `moodTones`, `DRAGON_FAR`.
+  - `pose.ts`: `DragonPose` (the 4.1 channels, plus the stepped `sleep` and `tuck` of the tuck branch), `DFACE`, make / copy / lerp / add and the `DP()` shorthand.
+  - `anim.ts`: `DragonAnimPlayer`, the engine `AnimPlayer`'s semantics over `DragonPose`, with runtime blinks and desync.
+  - `anims.ts`: the animation table per stage (the idle loops today).
+  - `stages.ts`: the 2.1 / 2.2 tables, the 2.3 modifiers, the tail rest shapes, the 4.1 chain parameters and timing rules.
+  - `build.ts`: `dragonBuild({ element, stage, seed })` resolves a complete build (modifiers, the seeded variant of 2.8, the solved body height); `buildDragonFor(element, stage)`.
+  - `rig.ts`: `buildDragon`, `computeDragonJoints`, `stepDragon` and `drawDragon` in the draw order of 1.4.
+  - `parts.ts`: body, neck, skull, jaw, legs and paws, the n-node tube, bat / leaf / fin wings, nubs, the ground shadow.
+  - `faces.ts`: the stage eye, lids in rows, brow, blush, nostril, mouth marks and teeth (2.5).
+  - `features.ts`: the shared, parameterised features: paired horns, markings, the dorsal row, emitter helpers.
+  - `fx.ts`: deterministic particle schedules, the top pass (1.4 step 14) and the ambient caps (5.4).
+  - `element.ts`: **the seam**, `ElementSpec`. `elements/<id>.ts`: one file per element; `elements/index.ts`: the registry.
+  - Shared features are **part kinds with parameters** (horns, markings, wing style, tail rest shape, dorsal row), drawn by one renderer for all 18 looks. What only one element has (a flame, a quill comb, a dome, bolt wings, a fluke, ear-fans) is a renderer at a **fixed anchor** of the draw order, declared in that element's `ElementSpec`; each element artist owns exactly one `elements/<id>.ts`.
+  - The gallery is `src/gallery.ts` (views: lineup, silhouette, stages, grey, cvd, strip, habitat, plus zoom, cast, mood and faces for close review).
 
 ### 1.2 Parts and the primitive each one uses
 Every part is **one outlined path**, stroked once and filled once (the `drawLimbSegs` lesson). Any colour change inside a part is a clipped fill.
