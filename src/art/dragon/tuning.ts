@@ -15,15 +15,15 @@ import type { DFaceName } from './pose.ts';
 
 /** The walk (4.2, 4.3 "Walk"): a lateral-sequence gait NH -> NF -> FH -> FF, stance 60 % / swing 40 %. */
 export interface WalkTuning {
-  /** Cycle length, frames (8 keys): adult 48, young 40, baby 24; rock's adult 60, lightning 20 % faster. */
+  /** Cycle length, frames (8 keys): adult 48, young 40, baby 24, elder 64; rock's adult 60, lightning 20 % faster. */
   cycle: number;
   /**
-   * World speed along facing, px/f: adult 0.45, young 0.5, baby 0.3; spike creeps at 0.35. The stance stroke is
+   * World speed along facing, px/f: adult 0.45, young 0.5, baby 0.3, elder 0.34; spike creeps at 0.35. The stance stroke is
    * solved from it (stride = speed x stance frames), so a paw on the floor moves back at exactly this speed and
    * never skates when the owner moves the pet by the frames' `move`.
    */
   speed: number;
-  /** Paw lift at passing, px: adult 3, young 2, baby 1.5; fire's strut 5. */
+  /** Paw lift at passing, px: adult 3, young 2, baby 1.5, elder 2; fire's strut 5. */
   lift: number;
   /** Head pitch held through the walk, deg (+ = snout down): fire's strut -4 (head up), spike's creep +8. */
   head: number;
@@ -35,11 +35,11 @@ export interface WalkTuning {
 
 /** Sleep (4.2 lie-down -> loop -> wake, 4.3 "Sleep pose"). */
 export interface SleepTuning {
-  /** Lie-down frames: adult 40, young 34, baby 24. */
+  /** Lie-down frames: adult 40, young 34, baby 24, elder 52 (in two stages: 4.2). */
   lieDown: number;
-  /** One sleeping breath (the loop), frames: adult 180, young 150, baby 120; rock 240. */
+  /** One sleeping breath (the loop), frames: adult 180, young 150, baby 120, elder 216; rock 240. */
   breath: number;
-  /** Frames between "z" glyphs (the rig's top pass): adult 120, young 100, baby 90. */
+  /** Frames between "z" glyphs (the rig's top pass): adult 120, young 100, baby 90, elder 150. */
   z: number;
   /**
    * The tuck branch of bible 1.4 while asleep: 0 = the head drawn last (young, adult; rock's sleep tuck too, whose
@@ -85,7 +85,7 @@ export interface SleepTuning {
 
 /** The signature breath (4.2): wind-up, snap, sustain, recover; the baby always fizzles. */
 export interface BreathTuning {
-  /** Jaw at the snap, deg: adult 30, young 22, baby 20; rock's gravel roar 25, slinkwing's shriek 40. */
+  /** Jaw at the snap, deg: adult 30, young 22, baby 20, elder 28; rock's gravel roar 25, slinkwing's shriek 40. */
   jaw: number;
   /** The face after a baby's fizzle: dazed (fire, lightning, spike), happy (rock's proud "ptoo", water's pop). */
   fizzleFace: DFaceName;
@@ -158,6 +158,16 @@ const BASE: Readonly<Record<Stage, AnimTuning>> = {
     breath: { jaw: 30, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
     eat: { tailDroop: 0 },
     beg: { mood: -0.5, tilt: 12 },
+  },
+  // the elder (4.2's Elder column): a 64 f walk at 0.34 px/f (the adult's 13 px stride, so the leg-spacing results
+  // carry over) with a 2 px paw lift; a 52 f lie-down in two stages and a 216 f sleeping breath, a "z" every 150 f;
+  // a slow, wise breath that never fails, jaw 28; the beg's tilt 10
+  elder: {
+    walk: { cycle: 64, speed: 0.34, lift: 2, head: 0, sway: 0, wave: 0 },
+    sleep: { lieDown: 52, breath: 216, z: 150, tuck: 0, bodyRot: 0, tailCurl: 18, tailLift: 8, nubFold: 0, chin: 1.5, frontTuck: -2 },
+    breath: { jaw: 28, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
+    eat: { tailDroop: 0 },
+    beg: { mood: -0.5, tilt: 10 },
   },
 };
 

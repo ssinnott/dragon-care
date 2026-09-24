@@ -37,9 +37,10 @@ export type DFaceRef = DFaceName | number;
  * beg, water's nostril bubble asleep, the breath stream. `cue` is that act's clock (DragonPose.cue). The acts past
  * `variant` are element anims the shared table has no builder for (fire's bath, rock's upset tuck, slinkwing's
  * lonely call): one id each here, so no two elements' local numbers collide and no shared act triggers another's
- * flourish.
+ * flourish. `airing` is the elder's idle variant that spreads its wings full so their holes show at home (4.2): its
+ * own id, since lightning's bolts never spread and flex to 95 deg instead.
  */
-export const ACT = Object.freeze({ none: 0, walk: 1, happy: 2, eat: 3, sleep: 4, wake: 5, breath: 6, pet: 7, beg: 8, fidget: 9, variant: 10, bath: 11, upset: 12, call: 13 });
+export const ACT = Object.freeze({ none: 0, walk: 1, happy: 2, eat: 3, sleep: 4, wake: 5, breath: 6, pet: 7, beg: 8, fidget: 9, variant: 10, bath: 11, upset: 12, call: 13, airing: 14 });
 export type ActName = keyof typeof ACT;
 
 /** Resolve a face name or index to an index (unknown names = neutral). */
@@ -129,7 +130,9 @@ export type DragonPose = {
    *   pet    frames into the loop
    *   beg    frames into the loop (the stomach growl sits at a fixed frame of it)
    *   fidget frames into the element's idle fidget (ElementAnimHooks.fidget: its flourish keys on it)
-   *   variant frames into a shared idle variant (look-around, yawn, scratch, topple, plop-sit)
+   *   variant frames into a shared idle variant (look-around, yawn, scratch, topple, plop-sit; the elder's back
+   *          stretch and reminisce)
+   *   airing frames into the elder's airing variant (0 = the spread begins; held full from 12)
    *   bath   frames since the bath began (fire's hiss and shake; the element's own one-shot)
    *   upset  frames into rock's upset tuck (its intro counts up from 0 as the hood swings down)
    *   call   frames since the note starts (slinkwing's lonely call; the wind-up is negative)

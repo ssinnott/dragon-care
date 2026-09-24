@@ -1,4 +1,4 @@
-// The dragon rig: one parameterised quadruped that draws all 18 looks (docs/ART_BIBLE.md sections 1-2).
+// The dragon rig: one parameterised quadruped that draws all 28 looks (docs/ART_BIBLE.md sections 1-2).
 //
 // LOCAL SPACE: authored facing right, origin on the ground under the body centre, y negative = up. The body centre
 // sits `bodyY` above the ground, solved at build time from the hind leg so the paws plant on y = 0 (2.1 note).
@@ -19,6 +19,12 @@
 //   - the humanoid rig's patterns, not its code: device-grid snapping (round(v * sc) / sc), allocation-free drawing
 //     (every joint, the info object and the transform are rewritten in place), enter / leave light rotation and the
 //     offscreen flash / tint pass.
+//
+// AGE (v2). Every stage draws through its greyed palette (build.palette = palettes.ts agedPalette), and the tone cache
+// is seeded from dragonTones for every slot, so the cel tones on screen, the silvered highlight band included, are
+// the ones tools/palette-check.ts measured (3.9). The elder's own parts are shared, drawn here and in parts.ts /
+// faces.ts: the settled chest and the paunch, the grey muzzle and brow tuft, the inked beard (which the head's floor
+// guard counts), the worn fangs, and the wing wear's whole-pixel hole (2.9: stampWingHole).
 import { rad, clamp } from '../../lib/engine/math.ts';
 import { farPalette } from '../../lib/art/palettes.ts';
 import type { Palette } from '../../lib/art/palettes.ts';
@@ -28,9 +34,9 @@ import type { PartRig, Point } from '../../lib/art/rigParts.ts';
 import { pathTaperedCapsule } from '../../lib/art/shapes.ts';
 import { getChain, stepChain, resetChain } from '../../lib/art/secondary.ts';
 import type { Chain, ChainRig } from '../../lib/art/secondary.ts';
-import { DRAGON_FAR, DRAGON_SHADOW, DRAGON_SHARED, DRAGON_SLOTS, dragonTones } from './palettes.ts';
+import { DRAGON_FAR, DRAGON_SHARED, DRAGON_SLOTS, dragonTones, moodTones, muzzleOf, beardOf, fanFrostOf } from './palettes.ts';
 import type { DragonElement, DragonPalette } from './palettes.ts';
-import { TAIL_CHAIN } from './stages.ts';
+import { TAIL_CHAIN, grown } from './stages.ts';
 import type { LegDims, Stage } from './stages.ts';
 import { makeDragonPose, copyDragonPose, DFACE, ACT } from './pose.ts';
 import type { DragonPose, PartialDragonPose } from './pose.ts';
@@ -38,10 +44,11 @@ import type { DragonBuild, DragonDims } from './build.ts';
 import type { AnchorName, DragonInfo, ElementSpec, ElementStageParams, MarkingSpec } from './element.ts';
 import {
   drawBody, pathBody, pathBelly, drawLeg, drawBatWing, drawNub, drawGroundShadow, drawTube, drawNeck,
-  drawSkull, pathSkull, drawJaw, drawMouthInterior, mouthCorner, legRadii, jawTopAt,
+  drawSkull, pathSkull, drawJaw, drawMouthInterior, mouthCorner, legRadii, jawTopAt, drawBeard, beardLow, fitBeard, wingHoleAt,
+  armPanelHas, pathWingTears, HOLE_PX, HOLE_RING,
 } from './parts.ts';
-import { drawEye, drawBrow, drawBlush, faceBlushes, drawNostril, drawMouthMark, drawEggTooth, drawFangs } from './faces.ts';
-import { drawHorn, hornOverlap, hornRise, hornRefClamped, drawDorsalRow, drawTailRing, drawMarkingPixels, markingPixel } from './features.ts';
+import { drawEye, drawBrow, drawBlush, faceBlushes, drawNostril, drawMouthMark, drawEggTooth, drawFangs, drawMuzzle } from './faces.ts';
+import { drawHorn, hornOverlap, hornRise, hornRefClamped, drawDorsalRow, drawTailRing, drawMarkingPixels, markingPixel, backLineY } from './features.ts';
 import { AmbientBudget, SOLO_BUDGET, drawZGlyph, drawStarGlyph, crumbAt, stepAlpha, Z_W, Z_H } from './fx.ts';
 import type { TopPass } from './fx.ts';
 import { animTuning } from './tuning.ts';
@@ -142,7 +149,10 @@ export interface DragonRig extends PartRig, ChainRig {
   sp: ElementStageParams;
   element: DragonElement;
   stage: Stage;
-  /** Near palette, far-leg palette (DRAGON_FAR.legs) and far wing / far head palette (DRAGON_FAR.wingAndHead). */
+  /**
+   * Near palette (the stage's, greyed for its age: build.palette), far-leg palette (DRAGON_FAR.legs) and far wing /
+   * far head palette (DRAGON_FAR.wingAndHead), both derived from it.
+   */
   pal: Readonly<DragonPalette>;
   palLegFar: Readonly<DragonPalette>;
   palWingFar: Readonly<DragonPalette>;
@@ -152,10 +162,28 @@ export interface DragonRig extends PartRig, ChainRig {
   hairStyle: string;
   scale: number;
   pxScale: number;
-  /** Body-space constants: ball centres and the belly line. */
+  /** Body-space constants: ball centres (the chest dims.chestLift px higher) and the belly line. */
   hipB: Point;
   chestB: Point;
   bellyY: number;
+  /**
+   * The belly-sag ellipse's y radius THIS frame (parts.ts pathBody): the baby's pot belly as authored; the elder's
+   * paunch flattened where it meets the floor, and to its flat radius asleep (2.1: paunchRy).
+   */
+  sagRy: number;
+  /** The stage's mood tones (palettes.ts moodTones of `pal`): the banked glow, water's dim spot. */
+  moodT: Readonly<{ banked: string; dimSpot: string }>;
+  /**
+   * The elder face greys (2.5, palettes.ts muzzleOf / beardOf, of `pal`): the muzzle and brow tuft, the beard; and
+   * slinkwing's frosted fan tips (fanFrostOf). Derived for every stage, drawn on the elder.
+   */
+  greys: Readonly<{ muzzle: string; beard: string; fanFrost: string }>;
+  /**
+   * How much deeper the elder's beard hangs below its BEARD_UV shape on this head, px (parts.ts fitBeard, at build): so
+   * a skull that hangs lower than the jaw (rock's boxy snout, dusk's short one) leaves 3 x 3 px of tuft in view. 0
+   * before the elder.
+   */
+  beardDv: number;
   /**
    * The IK plant (pose leg `plant`), per leg in LEG_KEYS order, solved once at build: the rest ankle in ROOT space
    * (x, y pairs: where each paw stands), the rest FK reach of the two bones from the joint (x only: a pose's
@@ -249,10 +277,14 @@ export function buildDragon(build: DragonBuild): DragonRig {
     pal, palLegFar: legFar, palWingFar: wingFar,
     palette: adapt(pal), paletteFar: adapt(wingFar), hairStyle: 'bald',
     scale: build.scale, pxScale: build.scale,
-    hipB: { x: -d.gap / 2, y: 0 }, chestB: { x: d.gap / 2, y: -1 },
+    hipB: { x: -d.gap / 2, y: 0 }, chestB: { x: d.gap / 2, y: -d.chestLift },
     // the belly line on a whole pixel (the body centre is snapped), so at rest the pigment edge is one crisp step
     // instead of a row of anti-aliased in-between tone
-    bellyY: Math.round((-1 + d.chestR) - d.bellyFrac * d.chestR * 2),
+    bellyY: Math.round((-d.chestLift + d.chestR) - d.bellyFrac * d.chestR * 2),
+    sagRy: d.sag ? d.sag.ry : 0,
+    moodT: moodTones(pal),
+    greys: { muzzle: muzzleOf(pal, build.element), beard: beardOf(pal, build.element), fanFrost: fanFrostOf(pal, build.element) },
+    beardDv: 0,
     legRest: f32(8), legReachX: f32(4), legBend: new Int8Array(4),
     markBX: f32(build.sp.markings.length).fill(NaN), markBY: f32(build.sp.markings.length).fill(NaN),
     markT: f32(build.sp.markings.length).fill(NaN), markDY: f32(build.sp.markings.length).fill(NaN), markVis: f32(build.sp.markings.length), markFitted: false, mouthC: pt(),
@@ -292,11 +324,14 @@ export function buildDragon(build: DragonBuild): DragonRig {
     const side = L.restUpper - Math.atan2(rx, ry) * 180 / Math.PI;
     rig.legBend[i] = Math.abs(side) > 0.5 ? (side > 0 ? 1 : -1) : front ? -1 : 1;
   }
-  // an element's hand-set shadow tones (palettes.ts DRAGON_SHADOW: rock's warm sand and cream) seed the tone cache,
-  // so every shaded part (celPath, the belly band, the head) takes them through tones() like any derived ramp
-  const shadow = DRAGON_SHADOW[build.element];
-  if (shadow) for (const s of DRAGON_SLOTS) if (shadow[s]) rig.tones.set(pal[s], dragonTones(build.element, s, rig.ramp));
+  // every slot's cel tones seed the tone cache from dragonTones at the rig's stage (3.9): the aged colours' ramp, the
+  // scale's highlight silvered (the silver back and crown of an adult and an elder) and an element's hand-set shadow
+  // tones (palettes.ts DRAGON_SHADOW: rock's warm sand and cream) greyed with their slot, so every shaded part
+  // (celPath, the belly band, the head) takes them through tones() and the check's colours are the ones on screen
+  for (const s of DRAGON_SLOTS) rig.tones.set(pal[s], dragonTones(build.element, s, rig.ramp, build.stage));
   mouthCorner(rig, rig.mouthC);
+  // the elder's beard hangs deep enough to show 3 x 3 px of tuft under this head's skull (2.5, 5.2)
+  if (build.stage === 'elder') rig.beardDv = fitBeard(rig);
   const tc = TAIL_CHAIN[build.stage];
   rig.tailChain = getChain(rig, 'tail', tn, { joint: 'rump', rest: [-1, 0], stiffness: tc.stiffness, damping: tc.damping, gain: tc.gain, follow: tc.follow, maxAng: tc.maxAng });
   return rig;
@@ -353,10 +388,16 @@ export function solveTwoBone(lg: DLegJoints, rx: number, ry: number, tx: number,
 function headSink(rig: DragonRig, hc: number, hs: number): number {
   const J = rig.j, H = rig.dims.head, s = H.snout, jw = H.jaw, cx = J.cran.x, cy = J.cran.y, f = J.headFlip;
   const ja = rad(J.jaw), tx = jw.tx - jw.hx, ty = jw.ty - jw.hy, hy = jw.hy + (J.jaw ? jw.drop : 0);
-  return Math.max(cy + clr(H.cranR) - floorY(cx), sinkAt(cx, cy, hc, hs, s.x0, f * s.y0, s.r0), sinkAt(cx, cy, hc, hs, s.x1, f * s.y1, s.r1),
+  const sink = Math.max(cy + clr(H.cranR) - floorY(cx), sinkAt(cx, cy, hc, hs, s.x0, f * s.y0, s.r0), sinkAt(cx, cy, hc, hs, s.x1, f * s.y1, s.r1),
     sinkAt(cx, cy, hc, hs, jw.hx, f * hy, jw.r0),
     sinkAt(cx, cy, hc, hs, jw.hx + tx * Math.cos(ja) - ty * Math.sin(ja), f * (hy + tx * Math.sin(ja) + ty * Math.cos(ja)), jw.r1));
+  // the elder's beard hangs under the chin (1.2): the head lifts by its lowest point too, and a sleeping elder rests
+  // its chin on its beard (without it EL's prototype sank 2 to 4 px in the sleep, the wake and the eat)
+  if (rig.stage !== 'elder') return sink;
+  beardLow(rig, J.jaw, BL);
+  return Math.max(sink, sinkAt(cx, cy, hc, hs, BL.x, f * BL.y, 0.5));
 }
+const BL: Point = { x: 0, y: 0 };
 /** How far a circle (x, y, r) of cranium space (centre cx, cy; head angle cos / sin hc, hs) is under the floor. */
 function sinkAt(cx: number, cy: number, hc: number, hs: number, x: number, y: number, r: number): number {
   const X = cx + x * hc - y * hs, Y = cy + x * hs + y * hc;
@@ -459,12 +500,30 @@ function solveLegs(rig: DragonRig, pose: DragonPose, byU: number, bc: number, bs
     sink = Math.max(sink, ry + ky / kl * sk + clr(LRS[0]) - floorY(rx + kx / kl * sk));
     // snapped to the device grid (never down through the floor), except under a root rotation: the whole sprite is
     // turned off the grid then, and a snapped ankle would land up to half a pixel off the floor once rotated
+    // (the ankle's limit is the sole's lowest corner, the tilted toe's too: floorLeg's `dip`. Held to the flat paw's
+    // height, a swing's hanging toe on the elder's low 2 px lift rounded half a pixel into the floor)
     if (!pose.root.rot) {
+      const ta = rad(lg.paw), dip = L.pawH * Math.cos(ta) + Math.max(0, L.pawW * Math.sin(ta));
       lg.knee.x = S(lg.knee.x); lg.knee.y = snapAbove(lg.knee.y, floorY(lg.knee.x) - clr(LRS[1]));
-      lg.ankle.x = S(lg.ankle.x); lg.ankle.y = snapAbove(lg.ankle.y, floorY(lg.ankle.x) - L.pawH);
+      lg.ankle.x = S(lg.ankle.x); lg.ankle.y = snapAbove(lg.ankle.y, floorY(lg.ankle.x) - dip);
     }
   }
   return sink;
+}
+
+/**
+ * The belly-sag ellipse's y radius this frame, into rig.sagRy. The baby's pot belly keeps its authored radius (its bun
+ * rests ON it). The elder's PAUNCH (2.1) is soft: where it would meet the floor it flattens against it, down to
+ * `flatRy`, before the floor guard lifts the body, and asleep it lies flat (`flatRy`, 1.5): an old dragon's belly
+ * settles on the straw, it does not stand the body up on a ball. Reads J.body.y (unlifted), the pitch's cos / sin.
+ */
+function paunchRy(rig: DragonRig, pose: DragonPose, bc: number, bs: number): void {
+  const sag = rig.dims.sag;
+  if (!sag) return;
+  if (sag.flatRy == null) { rig.sagRy = sag.ry; return; }
+  // room between the paunch's centre and the floor, less the 1 px a resting belly keeps off it (sleep's settle)
+  const room = floorY(-sag.cy * bs) - (rig.j.body.y + sag.cy * bc) - 1;
+  rig.sagRy = Math.max(sag.flatRy, Math.min(pose.sleep >= 0.5 ? sag.flatRy : sag.ry, room));
 }
 
 /** Solve every joint for a fully populated pose into rig.j (root space, device-grid snapped). */
@@ -475,13 +534,14 @@ export function computeDragonJoints(rig: DragonRig, pose: DragonPose): DragonJoi
   J.body.x = 0; J.body.y = S(-d.bodyY + pose.body.y);
   const bc = Math.cos(rad(J.bodyAng)), bs = Math.sin(rad(J.bodyAng));
   setFloor(pose);
+  paunchRy(rig, pose, bc, bs);
   // the floor: a settled body (a sleeper's belly, the baby's pot belly in its bun) rests ON it -- the lowest of the
   // hip ball, the chest ball and the belly sag, pitched; rounding the body onto the grid must not sink it either
   const hb = J.body.y + rig.hipB.x * bs + rig.hipB.y * bc + clr(d.hipR) - floorY(rig.hipB.x * bc);
   const cb = J.body.y + rig.chestB.x * bs + rig.chestB.y * bc + clr(d.chestR) - floorY(rig.chestB.x * bc);
   // (the sag is an ellipse: pitched, and on a tilted floor, its extent along the floor's normal grows toward rx)
   const sa = rad(J.bodyAng + pose.root.rot), sag = d.sag;
-  const sb = sag ? J.body.y + sag.cy * bc + clr(Math.hypot(sag.rx * Math.sin(sa), sag.ry * Math.cos(sa))) - floorY(-sag.cy * bs) : -1e9;
+  const sb = sag ? J.body.y + sag.cy * bc + clr(Math.hypot(sag.rx * Math.sin(sa), rig.sagRy * Math.cos(sa))) - floorY(-sag.cy * bs) : -1e9;
   const bodySink = Math.max(hb, cb, sb), bodyLift = bodySink > 0.01 ? Math.ceil(bodySink * G - 0.01) / G : 0;
   J.body.y -= bodyLift;
   toRoot(rig, rig.hipB.x, rig.hipB.y, J.hip); toRoot(rig, rig.chestB.x, rig.chestB.y, J.chest);
@@ -924,6 +984,8 @@ function drawParts(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPose)
   const J = rig.j, d = rig.dims, sp = rig.sp, R = rig.spec.render, pal = rig.pal;
   const fold = P.wing.fold, custom = sp.wing.style === 'custom';
   const tuck = P.tuck | 0;
+  // the elder's hole this frame (2.9): where its window lands, or none -- it is cut through BOTH wings
+  holeFrame(rig, P);
   // 2. far wing: only when spread >= 0.25 (a folded far wing is a sliver: D19); a custom (cocked) wing always
   if (custom || fold >= 0.25) drawWing(ctx, rig, P, true);
   // 3. far head features
@@ -1176,6 +1238,7 @@ function fitMarkings(rig: DragonRig): void {
   setTransform(rig, P, { x: MOX, y: MOY, scale: 1 / (rig.scale || 1) });
   rig.mood = 0; rig.top = null;
   computeDragonJoints(rig, P);
+  HOLE.on = false;
   if (tail) fitTailMarkings(rig, g, P);
   if (body) fitBodyMarkings(rig, g, P);
   rig.mood = keepMood; rig.top = keepTop; rig.pxScale = keepPx; rig.ow = keepOw;
@@ -1377,8 +1440,93 @@ function markingTone(rig: DragonRig, pal: Readonly<DragonPalette>, P: DragonPose
   return f ? f(fillInfo(rig, 'bodyOver', false, pal, rig.dims.hipR, rig.dims.bodyLen, rig.j.bodyAng), P, rig) : pal.marking;
 }
 
-/** Steps 2 / 11: one wing (near or far) in wing space. */
+// ---------- the elder's wing hole (2.9) ----------
+
+/** This frame's hole: drawn or not, and the root-space point its window's centre pixel rounds from. */
+const HOLE = { on: false, x: 0, y: 0 };
+const HP: Point = { x: 0, y: 0 }, HQ: Point = { x: 0, y: 0 };
+
+/**
+ * Decide this frame's elder wing hole (2.9): the near wing's window at its full-spread wing-space spot (WingParams.hole,
+ * from `wing` >= its `from`), mapped to root space, where its centre pixel rounds to a whole device pixel. It is drawn
+ * only where the WHOLE window has its ring and 2 px of membrane round it inside the arm panel (the forearm bone may be
+ * one border) and lies above the back line + 1 px; otherwise it is skipped this frame, never shrunk (a partial hole is
+ * a speck). Face space runs along root space here (no head flip), so a window pixel's centre is its offset in root px.
+ */
+function holeFrame(rig: DragonRig, P: DragonPose): void {
+  HOLE.on = false;
+  const wp = rig.sp.wing, J = rig.j;
+  if (rig.dims.nub || !wingHoleAt(rig, wp, P.wing.fold, HP)) return;
+  localToRootPt(J.wingN.x, J.wingN.y, J.wingAngN, HP.x, HP.y, HQ);
+  const t = rig.tf, sc = rig.pxScale || 1, kx = sc / Math.abs(t.fs || 1), ky = sc / Math.abs(t.ss || 1);
+  // the root point of the rounded pixel's centre (faceTransform rounds the screen point; a face pixel is kx / ky root
+  // px, 1 but for a squash)
+  const ox = Math.round(t.fs * (t.rx + HQ.x)) / t.fs - t.rx, oy = Math.round(t.ss * (t.ry + HQ.y)) / t.ss - t.ry;
+  const cx = ox + 0.5 * kx, cy = oy + 0.5 * ky;
+  const wc = Math.cos(rad(-J.wingAngN)), ws = Math.sin(rad(-J.wingAngN)), bc = Math.cos(rad(-J.bodyAng)), bs = Math.sin(rad(-J.bodyAng));
+  for (let i = 0; i < HOLE_PX.length; i += 2) {
+    const X = cx + HOLE_PX[i] * kx, Y = cy + HOLE_PX[i + 1] * ky;
+    // on the membrane: the ring (1 px) and 2 px of membrane beyond the window pixel's own half pixel
+    const dx = X - J.wingN.x, dy = Y - J.wingN.y;
+    if (!armPanelHas(dx * wc - dy * ws, dx * ws + dy * wc, 3)) return;
+    // above the back line + 1 px (body space)
+    const ex = X - J.body.x, ey = Y - J.body.y, bx = ex * bc - ey * bs, by = ex * bs + ey * bc;
+    if (by + 0.5 > backLineY(rig, bx) - 1) return;
+  }
+  HOLE.on = true; HOLE.x = HQ.x; HOLE.y = HQ.y;
+}
+
+/**
+ * Clip (root space in, root space out) to everything but this frame's hole window, so a wing drawn under it leaves the
+ * window empty: the far wing too, so the window shows the background, not the far wing's darker membrane (a rivet).
+ * Built in face space at the rounded pixel, walked back by hand. Wrap in save / restore.
+ */
+function clipOffHole(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
+  faceTransform(ctx, rig, HOLE.x, HOLE.y);
+  ctx.beginPath(); ctx.rect(-400, -400, 800, 800);
+  for (let i = 0; i < HOLE_PX.length; i += 2) ctx.rect(HOLE_PX[i], HOLE_PX[i + 1], 1, 1);
+  ctx.clip('evenodd');
+  leaveFaceKeepClip(ctx, rig, HOLE.x, HOLE.y);
+}
+
+/** The window's 4-neighbour ink ring, whole pixels in face space, over the near wing (2.9). */
+function stampHoleRing(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
+  enterFace(ctx, rig, HOLE.x, HOLE.y);
+  ctx.fillStyle = rig.col(rig.outline);
+  for (let i = 0; i < HOLE_RING.length; i += 2) ctx.fillRect(HOLE_RING[i], HOLE_RING[i + 1], 1, 1);
+  ctx.restore();
+}
+
+/**
+ * Clip (root space in, root space out) to everything but the NEAR wing's tear cuts this frame (parts.ts pathWingTears),
+ * for the far wing drawn under it: a near tear then shows the room or the body behind the wings, never the far wing's
+ * darker membrane (2.9). Built in the near wing's space and walked back by hand. False (and no clip) when no tear
+ * shows. Wrap in save / restore.
+ */
+function clipOffTears(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPose): boolean {
+  const J = rig.j, a = rad(J.wingAngN);
+  ctx.translate(J.wingN.x, J.wingN.y); ctx.rotate(a);
+  ctx.beginPath(); ctx.rect(-400, -400, 800, 800);
+  const on = pathWingTears(ctx, rig, rig.sp.wing, P.wing.fold);
+  if (on) ctx.clip('evenodd');
+  ctx.rotate(-a); ctx.translate(-J.wingN.x, -J.wingN.y);
+  return on;
+}
+
+/**
+ * Steps 2 / 11: one wing (near or far) in wing space; an elder's hole cut through it where holeFrame put one, and the
+ * far wing cut under the near wing's tears.
+ */
 function drawWing(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPose, far: boolean): void {
+  const cut = far && rig.stage === 'elder' && !rig.dims.nub && rig.sp.wing.style !== 'custom';
+  ctx.save();
+  if (cut) clipOffTears(ctx, rig, P);
+  if (HOLE.on) clipOffHole(ctx, rig);
+  drawWingIn(ctx, rig, P, far);
+  ctx.restore();
+  if (HOLE.on && !far) stampHoleRing(ctx, rig);
+}
+function drawWingIn(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPose, far: boolean): void {
   const J = rig.j, wp = rig.sp.wing, pal = far ? rig.palWingFar : rig.pal;
   const root = far ? J.wingF : J.wingN, ang = far ? J.wingAngF : J.wingAngN;
   if (wp.style === 'custom') {
@@ -1420,7 +1568,7 @@ function drawHeadFeatures(ctx: CanvasRenderingContext2D, rig: DragonRig, P: Drag
   const ref = hp ? hornRefClamped(hp, H.cranR, J.neckRef, up) : 0;
   if (hp && !far) drawHorn(ctx, rig, hp, H.cranR, pal, ref);
   else if (hp && rig.stage !== 'baby') {
-    const tilt = hp.farTilt ?? (rig.stage === 'adult' ? 28 : 8);
+    const tilt = hp.farTilt ?? (grown(rig.stage) ? 28 : 8);
     const b = rad(ref - hp.sweep), fx = -Math.sin(b) * 2, fy = -Math.cos(b) * 2;
     if (hornOverlap(hp, H.cranR, ref, tilt, fx, fy) <= 0.7 && hornRise(hp, H.cranR, ref, up, tilt, fx, fy) <= 3) {
       drawHorn(ctx, rig, hp, H.cranR, pal, ref, tilt, fx, fy);
@@ -1448,11 +1596,25 @@ function drawHeadGroup(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonP
   enterCranium(ctx, rig);
   if (J.jaw > 0) drawMouthInterior(ctx, rig, J.jaw, DRAGON_SHARED.mouth);
   drawJaw(ctx, rig, J.jaw, pal);
+  // 12.2: the elder's beard, its own inked tuft in jaw space, right after the jaw (1.2)
+  const elder = rig.stage === 'elder';
+  if (elder) drawBeard(ctx, rig, J.jaw, rig.greys.beard);
   drawSkull(ctx, rig, pal);
   if (R.headMarkings && !rig.override) {
     ctx.save();
     pathSkull(ctx, rig); ctx.clip();
     R.headMarkings(ctx, rig, P, fillInfo(rig, 'headMarkings', false, pal, H.cranR, rig.dims.headLen, J.headAng));
+    ctx.restore();
+  }
+  // 12.4, after the element's face markings: the elder's grey muzzle (pigment), clipped to the skull path and drawn in
+  // face space, so the eye, nostril and mouth marks sit on it and it meets the skull's ink with no rim of scale
+  if (elder && !rig.override) {
+    ctx.save();
+    pathSkull(ctx, rig); ctx.clip();
+    FACE_FLIP = hf;
+    enterFaceFromCranium(ctx, rig, J.eye.x, J.eye.y);
+    drawMuzzle(ctx, rig, rig.greys.muzzle);
+    ctx.restore();
     ctx.restore();
   }
   leave(ctx, rig);
@@ -1471,7 +1633,8 @@ function drawHeadGroup(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonP
   enterFace(ctx, rig, ex, ey);
   if (faceBlushes(face)) drawBlush(ctx, rig);
   drawEye(ctx, rig, blink === 2 ? DFACE.closed : blink === 1 ? DFACE.sleepy : face, P.pupil >= 0.5);
-  drawBrow(ctx, rig, face, tones(rig, pal.scale).deep);
+  // (the elder's brow is its grey tuft, at every face: faces.ts drawBrow)
+  drawBrow(ctx, rig, face, elder ? rig.greys.muzzle : tones(rig, pal.scale).deep);
   // nostril near the snout tip, top side, and >= 2 px clear of the eye's ring ALONG THE SNOUT (cranium space),
   // whatever the head's pitch: the baby's button snout leaves ~5 px between ring and tip, and at 1 px the nostril
   // read as a smudge on the eye; clamped in face-space x instead, a head pitched down into the bowl pushed it off

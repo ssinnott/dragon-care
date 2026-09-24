@@ -4,14 +4,14 @@
 // allocates nothing: scratch arrays live at module scope. Each part is ONE outlined silhouette, stroked once and
 // filled once (the drawLimbSegs lesson); any colour change inside a part is a clipped fill with no line (D13).
 import { rad } from '../../lib/engine/math.ts';
-import { celPath, outlinePath, tones, wantSh, pathCap } from '../../lib/art/shading.ts';
+import { celPath, outlinePath, tones, wantSh, pathCap, flat } from '../../lib/art/shading.ts';
 import type { ShadeTarget } from '../../lib/art/shading.ts';
 import type { Point } from '../../lib/art/rigParts.ts';
 import { pathTaperedCapsule } from '../../lib/art/shapes.ts';
 import type { DragonPalette } from './palettes.ts';
 import type { DragonRig } from './rig.ts';
-import type { WingParams } from './element.ts';
-import { WING_ANGLES } from './stages.ts';
+import type { WingParams, WingTear } from './element.ts';
+import { WING_ANGLES, grown } from './stages.ts';
 
 const R = Math.round;
 
@@ -107,13 +107,14 @@ function pathBulge(ctx: CanvasRenderingContext2D, b: Readonly<Bulge> | null): vo
 // ---------- body ----------
 
 /**
- * Body space path: hip ball + chest ball as one tapered capsule, plus the baby belly-sag ellipse (same path).
+ * Body space path: hip ball + chest ball as one tapered capsule, plus the belly-sag ellipse (same path): the baby's
+ * pot belly, the elder's paunch at this frame's radius (rig.sagRy: flattened on the floor and asleep, rig.ts).
  */
 export function pathBody(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
   const d = rig.dims, h = rig.hipB, c = rig.chestB;
   ctx.beginPath();
   pathTaperedCapsule(ctx, h.x, h.y, c.x, c.y, d.hipR, d.chestR, true);
-  if (d.sag) { ctx.moveTo(d.sag.rx, d.sag.cy); ctx.ellipse(0, d.sag.cy, d.sag.rx, d.sag.ry, 0, 0, Math.PI * 2); }
+  if (d.sag) { ctx.moveTo(d.sag.rx, d.sag.cy); ctx.ellipse(0, d.sag.cy, d.sag.rx, rig.sagRy, 0, 0, Math.PI * 2); }
 }
 
 /**
@@ -250,7 +251,73 @@ export function drawLeg(ctx: CanvasRenderingContext2D, rig: DragonRig, root: Poi
 
 /** Scratch polygon for membranes (x, y pairs). */
 const MEM = new Float32Array(64);
-const SPX = new Float32Array(6), SPY = new Float32Array(6);
+/** Spar tips (bones), and the membrane's tips (pulled back along a spar by its thorn). */
+const SPX = new Float32Array(6), SPY = new Float32Array(6), TPX = new Float32Array(6), TPY = new Float32Array(6);
+/**
+ * The last solved wing (solveWing), in the wing space drawBatWing draws in: the fold's shift from the root (sx, sy:
+ * the translate drawBatWing enters), the spread f and its complement g, the elbow (ex, ey), the wrist (wx, wy), the
+ * membrane's body attach (ax, ay), the root's drop, the trailing edge's scallop depth, the spar count and the
+ * humerus angle (radians).
+ */
+const W = { sx: 0, sy: 0, f: 0, g: 1, ex: 0, ey: 0, wx: 0, wy: 0, ax: 0, ay: 0, drop: 0, depth: 0, n: 0, eh: 0, thorn: 0 };
+/** The ARM PANEL of the last solved wing (root, elbow, wrist, trail tip, its edge to the attach), unshifted wing space. */
+const ARM = new Float32Array(48);
+let armN = 0;
+
+/**
+ * Solve a bat / leaf / fin wing's geometry at spread `fold` into W, SPX / SPY and TPX / TPY (no drawing): drawBatWing
+ * draws from it, and the rig's hole stamp tests its arm panel (armPanelHas).
+ */
+function solveWing(rig: DragonRig, wp: Readonly<WingParams>, fold: number): void {
+  const wd = rig.dims.wing!;
+  // (the elder uses the adult's bones and angles: 2.2; only its membrane attach, wd.attach, moves)
+  const A = WING_ANGLES[rig.stage === 'young' ? 'young' : 'adult'];
+  const spars = wp.plus ? wd.sparsPlus : wd.spars, ang = wp.plus ? A.sparsPlus : A.spars;
+  const f = Math.max(0, Math.min(1, fold)), g = 1 - f, span = wp.span, adult = grown(rig.stage) ? 1 : 0;
+  const drop = (3 - wp.foldRise) * g;
+  // (a low fold -- foldRise < 3: spike's under its quills, rock's under its dome rim -- takes the drop instead)
+  const shy = FOLD_ROOT[adult][1] * g * wp.foldRise / 3;
+  W.sx = FOLD_ROOT[adult][0] * g * span; W.sy = shy; W.f = f; W.g = g; W.drop = drop;
+  // the folded lower edge's floor, wing-space y: >= 5 px above the belly line, so the flank colour always shows (1.3)
+  // (wing space is body space moved to the root while folded: the flap is 0 there), a convex edge's bulge included
+  const low = rig.bellyY - 5 - wd.root[1] - (wp.rootDy || 0) - shy - Math.max(0, -wp.scallop * 0.35);
+  const eh = angAt(A.humerus, f), ef = angAt(A.forearm, f);
+  const ex = Math.cos(eh) * wd.humerus * span, ey = -Math.sin(eh) * wd.humerus * span + drop;
+  const wx = ex + Math.cos(ef) * wd.forearm * span, wy = ey - Math.sin(ef) * wd.forearm * span;
+  const n = spars.length;
+  // the thorns poke past the membrane on the adult and the elder (spike's: parts.ts lets the elder through, 3.3)
+  const thorn = wp.thorn * adult;
+  for (let i = 0; i < n; i++) {
+    const a = angAt(ang[i], f), L = spars[i] * span;
+    SPX[i] = wx + Math.cos(a) * L; SPY[i] = wy - Math.sin(a) * L;
+    // (a finger tip the fan would drop below that floor -- a deep body, a low fold -- is lifted onto it)
+    SPY[i] -= Math.max(0, SPY[i] - low) * g;
+    // pull each membrane tip back along its spar by the thorn length: the spar pokes past the membrane
+    TPX[i] = SPX[i] - Math.cos(a) * thorn; TPY[i] = SPY[i] + Math.sin(a) * thorn;
+  }
+  // the membrane's body attach: spread, the stage's point far back on the flank (the elder's further back, the old
+  // membrane stretched: 2.9); FOLDED, just under the root, so the folded panel's lower edge runs from the trail tip
+  // forward to the shoulder (at the spread attach the folded membrane was a 1-2 px sliver under the arm, and the wing
+  // read as a strap)
+  const ax = (wd.attach[0] * f + FOLD_ATTACH[0] * g) * span;
+  let ay = wd.attach[1] * f + FOLD_ATTACH[1] * g + drop * 0.5;
+  ay -= Math.max(0, ay - low) * g;
+  // the trailing edge's scallops (x the fold, 1.2) keep a shallow cut folded, where the fanned tips land 4-6 px apart:
+  // the folded wing's lower edge reads as a wing's, lobed between the finger tips
+  const depth = wp.scallop > 0 ? wp.scallop * f + Math.min(wp.scallop, FOLD_SCALLOP[adult]) * g : wp.scallop * Math.max(0.35, f);
+  W.ex = ex; W.ey = ey; W.wx = wx; W.wy = wy; W.ax = ax; W.ay = ay; W.depth = depth; W.n = n; W.eh = eh; W.thorn = thorn;
+  // the arm panel (2.9: the rear panel, where an elder's hole goes): root, elbow, wrist, trail tip, then its trailing
+  // edge to the attach sampled along the same curve edgeTo draws
+  let k = 0;
+  ARM[k++] = 0; ARM[k++] = drop * 0.5; ARM[k++] = ex; ARM[k++] = ey; ARM[k++] = wx; ARM[k++] = wy;
+  const tx = TPX[n - 1], ty = TPY[n - 1], d = depth * f;
+  edgeCtl(tx, ty, ax, ay, wx, wy, d);
+  for (let i = 0; i <= 8; i++) {
+    const t = i / 8, u = 1 - t;
+    ARM[k++] = u * u * tx + 2 * u * t * EC.x + t * t * ax; ARM[k++] = u * u * ty + 2 * u * t * EC.y + t * t * ay;
+  }
+  armN = k >> 1;
+}
 
 /**
  * Wing space: a bat / leaf / fin wing as ONE silhouette (arm capsules + membrane polygon, unioned, stroked once),
@@ -260,59 +327,38 @@ const SPX = new Float32Array(6), SPY = new Float32Array(6);
  * line, the lead spar lying along the forearm as one leading edge to the rump, and under it a flat triangular panel
  * of membrane down to the fanned finger tips on a lobed lower edge, attached under the shoulder. (The old fold put
  * every tip on one line under a 3 px bar, the membrane attached far back: a bar over a 1-2 px dark sliver.)
+ * An ELDER's wing carries its TEARS (2.9, wp.tears) as notches of the same membrane polygon, so the one stroke inks
+ * them, growing in from `wing` 0.35 to full at 0.55 (wearOf): folded they are closed, and the lobed edge stays clean.
+ * Its hole is the rig's (a whole-pixel window stamped after the wing: rig.ts stampWingHole).
  */
 export function drawBatWing(ctx: CanvasRenderingContext2D, rig: DragonRig, wp: Readonly<WingParams>, fold: number, pal: Readonly<DragonPalette>): void {
   const wd = rig.dims.wing;
   if (!wd) return;
-  const A = WING_ANGLES[rig.stage === 'adult' ? 'adult' : 'young'];
-  const spars = wp.plus ? wd.sparsPlus : wd.spars, ang = wp.plus ? A.sparsPlus : A.spars;
-  const f = Math.max(0, Math.min(1, fold)), g = 1 - f, span = wp.span, adult = rig.stage === 'adult' ? 1 : 0;
-  const drop = (3 - wp.foldRise) * g;
-  // (a low fold -- foldRise < 3: spike's under its quills, rock's under its dome rim -- takes the drop instead)
-  const shy = FOLD_ROOT[adult][1] * g * wp.foldRise / 3;
+  solveWing(rig, wp, fold);
+  const { f, g, ex, ey, wx, wy, ax, ay, drop, depth, n, eh, thorn } = W;
+  const adult = grown(rig.stage) ? 1 : 0;
+  const A = WING_ANGLES[rig.stage === 'young' ? 'young' : 'adult'], ang = wp.plus ? A.sparsPlus : A.spars;
   ctx.save();
-  ctx.translate(FOLD_ROOT[adult][0] * g * span, shy);
-  // the folded lower edge's floor, wing-space y: >= 5 px above the belly line, so the flank colour always shows (1.3)
-  // (wing space is body space moved to the root while folded: the flap is 0 there), a convex edge's bulge included
-  const low = rig.bellyY - 5 - wd.root[1] - (wp.rootDy || 0) - shy - Math.max(0, -wp.scallop * 0.35);
-  const eh = angAt(A.humerus, f), ef = angAt(A.forearm, f);
-  const ex = Math.cos(eh) * wd.humerus * span, ey = -Math.sin(eh) * wd.humerus * span + drop;
-  const wx = ex + Math.cos(ef) * wd.forearm * span, wy = ey - Math.sin(ef) * wd.forearm * span;
-  const n = spars.length;
-  for (let i = 0; i < n; i++) {
-    const a = angAt(ang[i], f), L = spars[i] * span;
-    SPX[i] = wx + Math.cos(a) * L; SPY[i] = wy - Math.sin(a) * L;
-    // (a finger tip the fan would drop below that floor -- a deep body, a low fold -- is lifted onto it)
-    SPY[i] -= Math.max(0, SPY[i] - low) * g;
-  }
-  // the membrane's body attach: spread, the stage's point far back on the flank; FOLDED, just under the root, so the
-  // folded panel's lower edge runs from the trail tip forward to the shoulder (at the spread attach the folded
-  // membrane was a 1-2 px sliver under the arm, and the wing read as a strap)
-  const ax = (wd.attach[0] * f + FOLD_ATTACH[0] * g) * span;
-  let ay = wd.attach[1] * f + FOLD_ATTACH[1] * g + drop * 0.5;
-  ay -= Math.max(0, ay - low) * g;
+  ctx.translate(W.sx, W.sy);
   // membrane: root -> elbow -> wrist -> lead tip -> (edge) -> ... -> trail tip -> (edge) -> attach
-  const thorn = wp.thorn * (rig.stage === 'adult' ? 1 : 0);
   let m = 0;
   MEM[m++] = 0; MEM[m++] = drop * 0.5;
   // (folded, the elbow vertex slides up the forearm to the wrist: the panel's front edge runs from the root straight
   // up to the knuckle, and the membrane fills everything under the leading edge)
   MEM[m++] = ex + (wx - ex) * g; MEM[m++] = ey + (wy - ey) * g;
   MEM[m++] = wx; MEM[m++] = wy;
-  // the trailing edge's scallops (x the fold, 1.2) keep a shallow cut folded, where the fanned tips land 4-6 px apart:
-  // the folded wing's lower edge reads as a wing's, lobed between the finger tips
-  const depth = wp.scallop > 0 ? wp.scallop * f + Math.min(wp.scallop, FOLD_SCALLOP[adult]) * g : wp.scallop * Math.max(0.35, f);
+  const tears = rig.stage === 'elder' ? wp.tears : undefined, wear = tears ? wearOf(f) : 0;
   ctx.beginPath();
   ctx.moveTo(MEM[0], MEM[1]); ctx.lineTo(MEM[2], MEM[3]); ctx.lineTo(MEM[4], MEM[5]);
   for (let i = 0; i < n; i++) {
-    // pull each tip back along its spar by the thorn length: the spar pokes past the membrane
-    const a = angAt(ang[i], f);
-    const tx = SPX[i] - Math.cos(a) * thorn, ty = SPY[i] + Math.sin(a) * thorn;
+    const tx = TPX[i], ty = TPY[i];
     if (i === 0) ctx.lineTo(tx, ty);
-    const an = i + 1 < n ? angAt(ang[i + 1], f) : 0;
-    const nx = i + 1 < n ? SPX[i + 1] - Math.cos(an) * thorn : ax;
-    const ny = i + 1 < n ? SPY[i + 1] + Math.sin(an) * thorn : ay;
-    edgeTo(ctx, tx, ty, nx, ny, wx, wy, i + 1 < n ? depth : depth * f);
+    const nx = i + 1 < n ? TPX[i + 1] : ax, ny = i + 1 < n ? TPY[i + 1] : ay, dep = i + 1 < n ? depth : depth * f;
+    // (an elder's tear in this panel -- panel i + 1 -- cuts the edge where it lies)
+    let tear: Readonly<WingTear> | null = null;
+    if (wear > 0 && tears) for (let k = 0; k < tears.length; k++) if (tears[k].panel === i + 1) { tear = tears[k]; break; }
+    if (tear) edgeTornTo(ctx, tx, ty, nx, ny, wx, wy, dep, tear, wear);
+    else edgeTo(ctx, tx, ty, nx, ny, wx, wy, dep);
   }
   ctx.lineTo(MEM[0], MEM[1]);
   ctx.closePath();
@@ -333,12 +379,12 @@ export function drawBatWing(ctx: CanvasRenderingContext2D, rig: DragonRig, wp: R
   // (only the bones painted below join it: a capsule winds against the membrane polygon, so where one lies inside
   // the membrane it cuts a hole the bone paint then covers; an unpainted one -- the folded humerus and inner
   // fingers -- left its ink showing through the panel as scribbles)
-  const open = f >= 0.3, bones = open ? n : 1;
+  const open = f >= 0.3, bones = open ? n : 1, wrist = wp.wristThorn && adult;
   if (open) pathCapA(ctx, 0, drop * 0.5, ex, ey, ar);
   pathCapA(ctx, ex, ey, wx, wy, ar);
   for (let i = 0; i < bones; i++) pathCapA(ctx, wx, wy, SPX[i], SPY[i], sr * (i === 0 ? 1 : 0.8));
   ctx.moveTo(wx + kr, wy); ctx.arc(wx, wy, kr, 0, Math.PI * 2);
-  if (wp.wristThorn && rig.stage === 'adult') pathThorn(ctx, wx, wy, eh, wp.wristThorn);
+  if (wrist) pathThorn(ctx, wx, wy, eh, wp.wristThorn);
   // membrane: matte, 2 tones (hi 0)
   let minx = 0, maxx = 0, miny = 0, maxy = 0;
   for (let i = 0; i < n; i++) { minx = Math.min(minx, SPX[i]); maxx = Math.max(maxx, SPX[i]); miny = Math.min(miny, SPY[i]); maxy = Math.max(maxy, SPY[i]); }
@@ -360,10 +406,185 @@ export function drawBatWing(ctx: CanvasRenderingContext2D, rig: DragonRig, wp: R
   pathCapA(ctx, ex, ey, wx, wy, ar);
   for (let i = 0; i < bones; i++) pathCapA(ctx, wx, wy, SPX[i], SPY[i], sr * (i === 0 ? 1 : 0.8));
   ctx.moveTo(wx + kr, wy); ctx.arc(wx, wy, kr, 0, Math.PI * 2);
-  if (wp.wristThorn && rig.stage === 'adult') pathThorn(ctx, wx, wy, eh, wp.wristThorn);
+  if (wrist) pathThorn(ctx, wx, wy, eh, wp.wristThorn);
   ctx.fill();
   ctx.restore();
 }
+
+// ---------- elder wing wear (2.9) ----------
+
+/**
+ * How much of an elder's wear shows at spread `fold` (0..1): clamp((wing - 0.35) / 0.2, 0, 1). Folded a tear is
+ * closed (a 1-2 px nick would read as one more lobe); it is full from 0.55, so it shows in the elder's preen (0.6),
+ * the wake stretch, the airing and flight. A 'custom' wing (lightning's bolt) scales its own tears by it.
+ */
+export function wearOf(fold: number): number { return Math.max(0, Math.min(1, (fold - 0.35) / 0.2)); }
+
+/** The tear's mouth, px (2.9: 5, so >= 3 px of background shows between its ink lines). */
+const TEAR_MOUTH = 5;
+/** Edge a tear's mouth keeps clear of each spar tip, px: the spar's cap (1.5) and 1.5 px of membrane beside it. */
+const TEAR_CLEAR = 3;
+
+/**
+ * Append a trailing edge from (x0, y0) (the current point) to (x1, y1) as edgeTo does, with an elder's TEAR cut into
+ * it (2.9): the curve is split round the tear's fraction `at` so its mouth is TEAR_MOUTH px wide (tearMouth), and
+ * between the two halves the notch runs `depth` x `wear` px into the membrane, square to the mouth (tearMouth):
+ * a slot with one side stepped 1 px halfway down (pathTearNotch); or, `bite`, a round bite (spike's nibbled leaf).
+ */
+function edgeTornTo(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, wx: number, wy: number,
+  depth: number, tear: Readonly<WingTear>, wear: number): void {
+  tearMouth(x0, y0, x1, y1, wx, wy, depth, tear.at);
+  const cx = EC.x, cy = EC.y, t0 = TM.t0, t1 = TM.t1;
+  ctx.quadraticCurveTo(x0 + (cx - x0) * t0, y0 + (cy - y0) * t0, TM.ax, TM.ay);
+  pathTearNotch(ctx, TM.ax, TM.ay, TM.bx, TM.by, TM.nx, TM.ny, tear.depth * wear, !!tear.bite);
+  ctx.quadraticCurveTo(cx + (x1 - cx) * t1, cy + (y1 - cy) * t1, x1, y1);
+}
+/**
+ * A tear's mouth on the trailing edge: its two points (ax, ay), (bx, by), their curve fractions t0, t1, and the notch's
+ * inward direction (nx, ny).
+ */
+const TM = { ax: 0, ay: 0, bx: 0, by: 0, t0: 0, t1: 0, nx: 0, ny: 0 };
+/**
+ * Where a tear at fraction `at` opens on the trailing edge (x0, y0) -> (x1, y1) that edgeTo draws (`depth` toward the
+ * wrist): the curve split round `at` so the mouth is TEAR_MOUTH px wide, into TM, and the curve's control into EC. The
+ * notch runs SQUARE to the mouth, into the membrane (the side the wrist is on): aimed at the wrist, a tear near a spar
+ * tip ran along that spar under its bone, and at the resting spread its cut was an ink line, not a notch.
+ */
+function tearMouth(x0: number, y0: number, x1: number, y1: number, wx: number, wy: number, depth: number, at: number): void {
+  edgeCtl(x0, y0, x1, y1, wx, wy, depth);
+  const cx = EC.x, cy = EC.y, L = Math.hypot(x1 - x0, y1 - y0) || 1;
+  // the mouth keeps TEAR_CLEAR px of edge from each tip, sliding toward the panel's middle where the spread leaves it
+  // too little (the middle of all on a panel too short for both): at the resting spread fire's first panel is an
+  // 11 px edge, and its tear at 0.35 opened 1.3 px from the lead tip, cut along under the bone and showed an ink line
+  const h = TEAR_MOUTH / 2 / L, m = h + TEAR_CLEAR / L, c = m > 0.5 ? 0.5 : Math.max(m, Math.min(1 - m, at));
+  const t0 = Math.max(0.05, c - h), t1 = Math.min(0.95, c + h);
+  // the two halves of the quadratic (de Casteljau): [0, t0] and [t1, 1] (inline: no closures in a renderer)
+  const u0 = 1 - t0, u1 = 1 - t1;
+  TM.ax = u0 * u0 * x0 + 2 * t0 * u0 * cx + t0 * t0 * x1; TM.ay = u0 * u0 * y0 + 2 * t0 * u0 * cy + t0 * t0 * y1;
+  TM.bx = u1 * u1 * x0 + 2 * t1 * u1 * cx + t1 * t1 * x1; TM.by = u1 * u1 * y0 + 2 * t1 * u1 * cy + t1 * t1 * y1;
+  TM.t0 = t0; TM.t1 = t1;
+  const w = Math.hypot(TM.bx - TM.ax, TM.by - TM.ay) || 1;
+  let nx = -(TM.by - TM.ay) / w, ny = (TM.bx - TM.ax) / w;
+  if (nx * (wx - (TM.ax + TM.bx) / 2) + ny * (wy - (TM.ay + TM.by) / 2) < 0) { nx = -nx; ny = -ny; }
+  TM.nx = nx; TM.ny = ny;
+}
+
+/**
+ * Append the elder's TEAR CUTS of a bat / leaf / fin wing at spread `fold` to the current path, as closed regions in the
+ * space the rig enters for the wing (the fold's shift included): each notch closed across its mouth. The rig clips
+ * them off the FAR wing (rig.ts clipOffTears), so a near tear shows what lies behind the wings -- the room, or the
+ * body -- and not the far wing's own darker membrane, which filled every near cut at the resting spread and left an
+ * ink-lined dark slot in dark membrane (the elder core review). False when no tear shows (not an elder, none, folded).
+ */
+export function pathWingTears(ctx: CanvasRenderingContext2D, rig: DragonRig, wp: Readonly<WingParams>, fold: number): boolean {
+  const tears = rig.stage === 'elder' && rig.dims.wing && wp.style !== 'custom' ? wp.tears : undefined;
+  const wear = tears ? wearOf(fold) : 0;
+  if (!tears || wear <= 0) return false;
+  solveWing(rig, wp, fold);
+  const n = W.n, sx = W.sx, sy = W.sy;
+  for (let k = 0; k < tears.length; k++) {
+    const tr = tears[k], i = tr.panel - 1;
+    if (i < 0 || i >= n) continue;
+    const last = i + 1 >= n, x1 = last ? W.ax : TPX[i + 1], y1 = last ? W.ay : TPY[i + 1];
+    tearMouth(TPX[i], TPY[i], x1, y1, W.wx, W.wy, last ? W.depth * W.f : W.depth, tr.at);
+    ctx.moveTo(TM.ax + sx, TM.ay + sy);
+    pathTearNotch(ctx, TM.ax + sx, TM.ay + sy, TM.bx + sx, TM.by + sy, TM.nx, TM.ny, tr.depth * wear, !!tr.bite);
+    ctx.closePath();
+  }
+  return true;
+}
+const EC = { x: 0, y: 0 };
+/** The control point edgeTo uses for a trailing edge (x0, y0) -> (x1, y1) of `depth` toward the wrist, into EC. */
+function edgeCtl(x0: number, y0: number, x1: number, y1: number, wx: number, wy: number, depth: number): void {
+  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+  let dx = wx - mx, dy = wy - my;
+  const L = Math.hypot(dx, dy) || 1;
+  dx /= L; dy /= L;
+  const k = Math.abs(depth) < 0.3 ? 0 : depth * 2;
+  EC.x = mx + dx * k; EC.y = my + dy * k;
+}
+
+/**
+ * Append a tear's notch from mouth point A (the current point) to mouth point B, `d` px deep along (nx, ny): the
+ * ragged notch or a round `bite`. The notch is a SLOT, its sides running straight in from the mouth: A's side steps
+ * 1 px toward B halfway down (it reads torn, not as one more smooth scallop), B's runs straight to the bottom. The
+ * engine inks 1 px outside every fill, into the cut, so a 5 px mouth shows 3 px of background over the top half and
+ * 2 over the bottom half, the whole depth. (A V, or a slot narrowed to a 1.5 px flat bottom, showed 2 rows of
+ * 2-3 px at the mouth tapering to nothing under the ink: at the resting spread it could not be told from a scallop,
+ * the elder core review.)
+ */
+function pathTearNotch(ctx: CanvasRenderingContext2D, ax: number, ay: number, bx: number, by: number, nx: number, ny: number, d: number, bite: boolean): void {
+  if (d < 0.5) { ctx.lineTo(bx, by); return; }
+  const mx = (ax + bx) / 2, my = (ay + by) / 2, w = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / w, uy = (by - ay) / w;
+  if (bite) { ctx.quadraticCurveTo(mx + nx * d * 2, my + ny * d * 2, bx, by); return; }
+  // A down half the depth, a 1 px step toward B, down to the bottom, across it to under B, and straight back up to B
+  const hx = ax + nx * d * 0.5, hy = ay + ny * d * 0.5;
+  ctx.lineTo(hx, hy);
+  ctx.lineTo(hx + ux, hy + uy);
+  ctx.lineTo(ax + ux + nx * d, ay + uy + ny * d);
+  ctx.lineTo(bx + nx * d, by + ny * d);
+  ctx.lineTo(bx, by);
+}
+
+/**
+ * For a CUSTOM wing's own renderer (lightning's bolt, 2.9): a straight edge from the current point (x0, y0) to
+ * (x1, y1), appended to the current path, with an elder's tear cut into it at fraction `at` (a TEAR_MOUTH px mouth),
+ * `depth` px along the inward normal (nx, ny: pointing into the membrane). Scale the depth by wearOf, or keep it
+ * whole on a wing that never folds. The path's one stroke inks it.
+ */
+export function pathTearEdge(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, at: number, depth: number, nx: number, ny: number): void {
+  const L = Math.hypot(x1 - x0, y1 - y0) || 1, h = TEAR_MOUTH / 2 / L, t0 = Math.max(0, at - h), t1 = Math.min(1, at + h);
+  const ax = x0 + (x1 - x0) * t0, ay = y0 + (y1 - y0) * t0, bx = x0 + (x1 - x0) * t1, by = y0 + (y1 - y0) * t1;
+  ctx.lineTo(ax, ay);
+  pathTearNotch(ctx, ax, ay, bx, by, nx, ny, depth, false);
+  ctx.lineTo(x1, y1);
+}
+
+/**
+ * The elder's hole centre (2.9, wp.hole) at spread `fold`, in the space the rig ENTERS for the wing (wing space, the
+ * fold's shift included), into `out`; false when no hole is drawn at this spread (not an elder, no hole, under
+ * `from`). Solves the wing, so armPanelHas tests the same one.
+ */
+export function wingHoleAt(rig: DragonRig, wp: Readonly<WingParams>, fold: number, out: Point): boolean {
+  const h = wp.hole;
+  if (rig.stage !== 'elder' || !h || !rig.dims.wing || wp.style === 'custom' || fold < h.from) return false;
+  solveWing(rig, wp, fold);
+  out.x = h.x * wp.span + W.sx; out.y = h.y * wp.span + W.sy;
+  return true;
+}
+
+/**
+ * The elder's hole as face-space pixels (x, y pairs) round the pixel its centre rounds to (2.9): the 3 x 3 window with
+ * its top-back corner notched (8 px of background: an irregular, torn hole; EL's round 2 x 2 window in an ink ring read
+ * as a rivet or a grommet), and its 4-neighbour 1 px ink ring, left OPEN at the notch: the notch pixel is membrane, not
+ * ink, so the window breaks its outline there like a torn edge (closed all round, the 3 x 3 window in its ring was a
+ * pale dot on dark membrane at game scale, a rivet or an eyespot: the elder core review).
+ */
+export const HOLE_PX: readonly number[] = [0, -1, 1, -1, -1, 0, 0, 0, 1, 0, -1, 1, 0, 1, 1, 1];
+export const HOLE_RING: readonly number[] = [0, -2, 1, -2, 2, -1, -2, 0, 2, 0, -2, 1, 2, 1, -1, 2, 0, 2, 1, 2];
+
+/**
+ * Is wing-space point (x, y) (the space the rig enters: the fold's shift included) inside the arm panel of the wing
+ * wingHoleAt last solved, with `pad` px of it all round? The bones along the leading edge count as panel: the hole
+ * may take the forearm as one border (2.9).
+ */
+export function armPanelHas(x: number, y: number, pad: number): boolean {
+  const px = x - W.sx, py = y - W.sy;
+  let inside = false;
+  for (let i = 0, j = armN - 1; i < armN; j = i++) {
+    const xi = ARM[i * 2], yi = ARM[i * 2 + 1], xj = ARM[j * 2], yj = ARM[j * 2 + 1];
+    if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  if (!inside || pad <= 0) return inside;
+  // the distance to every edge but the leading one (root -> elbow -> wrist: the bone borders the hole there)
+  for (let j = 2; j < armN; j++) {
+    const a = (j + 1) % armN, xi = ARM[a * 2], yi = ARM[a * 2 + 1], xj = ARM[j * 2], yj = ARM[j * 2 + 1];
+    const ex = xi - xj, ey = yi - yj, l2 = ex * ex + ey * ey || 1, t = Math.max(0, Math.min(1, ((px - xj) * ex + (py - yj) * ey) / l2));
+    if (Math.hypot(px - xj - ex * t, py - yj - ey * t) < pad) return false;
+  }
+  return true;
+}
+
 /**
  * The folded wing's shift from the wing root, px [young, adult]: back along the back and down (the down part x
  * foldRise / 3), so the knuckle stands clear behind the neck's root, its top about 3 px over the back line.
@@ -633,6 +854,107 @@ export function drawJaw(ctx: CanvasRenderingContext2D, rig: DragonRig, jawDeg: n
     ctx.restore();
   }
   ctx.restore();
+}
+
+/**
+ * The elder's BEARD (1.2, 2.5) in the jaw's own axis frame: u along the jaw from its hinge, v down from its axis. A
+ * small rounded tuft SET BACK under the chin, its root along the jaw's underside from u = tip - 8 to tip - 3 (so it
+ * never lengthens the chin's point), 5 px wide and 3 px deep below the jaw (its lower points deeper where the skull
+ * hangs below the jaw: rig.beardDv, fitBeard), its bottom round, its lowest point swept
+ * back >= 3 px toward the throat: a teardrop pointing back along the throat, never down (EL's pointed goatee under
+ * the jaw tip read as a tusk or a drip, and open it grew out of the chin stripe into one long pointed chin).
+ * BEARD_UV: [front root, round front, lowest point, back point, back root], (u from the tip, v below the underside).
+ */
+const BEARD_UV: readonly number[] = [-3, -0.6, -3.2, 2.6, -6.2, 3, -9.2, 1.4, -8, -0.6];
+/**
+ * The beard's (u from the jaw tip, v below its underside) of BEARD_UV point `i` (0..4) on this rig: the three LOWER
+ * points (the round front, the lowest, the back point) hang rig.beardDv px deeper (fitBeard), the root stays on the jaw.
+ */
+function beardV(rig: DragonRig, i: number): number { return BEARD_UV[i * 2 + 1] + (i >= 1 && i <= 3 ? rig.beardDv : 0); }
+/** Map the beard's (u from the jaw tip, v below its underside) into cranium space at jaw opening `jawDeg`, into `out`. */
+function beardPt(rig: DragonRig, jawDeg: number, u: number, v: number, out: Point): Point {
+  const j = rig.dims.head.jaw, tx = j.tx - j.hx, ty = j.ty - j.hy, L = Math.hypot(tx, ty) || 1;
+  const uu = L + u, r = j.r0 + (j.r1 - j.r0) * Math.max(0, Math.min(1, uu / L)), vv = r + v;
+  // jaw-axis frame -> jaw space (the axis turned by atan2(ty, tx)) -> cranium space (dropped and turned open)
+  const ca = tx / L, sa = ty / L, lx = uu * ca - vv * sa, ly = uu * sa + vv * ca;
+  const a = rad(jawDeg), c = Math.cos(a), s = Math.sin(a);
+  out.x = j.hx + lx * c - ly * s; out.y = j.hy + (jawDeg ? j.drop : 0) + lx * s + ly * c;
+  return out;
+}
+const BP: Point = { x: 0, y: 0 }, BQ: Point = { x: 0, y: 0 };
+
+/**
+ * Cranium space: the elder's beard, drawn right after the jaw (1.4 step 12.2) so it moves with the jaw: its own
+ * object with its own 1 px ink (hair, like a quill), flat in `hex` (rig.greys.beard: palettes.ts beardOf, >= 25 %
+ * from the belly, its shadow tone, the closed jaw's sliver and the straw floor). Its root lies a little inside the
+ * jaw's underside, so the jaw's ink under it is covered and the tuft grows from the chin, not beside it.
+ */
+export function drawBeard(ctx: CanvasRenderingContext2D, rig: DragonRig, jawDeg: number, hex: string): void {
+  const B = BEARD_UV;
+  ctx.beginPath();
+  beardPt(rig, jawDeg, B[0], beardV(rig, 0), BP); ctx.moveTo(BP.x, BP.y);
+  // the round front and bottom, then the sweep back and up to the point, and back along the jaw to the root
+  beardPt(rig, jawDeg, B[2], beardV(rig, 1), BP); beardPt(rig, jawDeg, B[4], beardV(rig, 2), BQ); ctx.quadraticCurveTo(BP.x, BP.y, BQ.x, BQ.y);
+  beardPt(rig, jawDeg, B[6], beardV(rig, 3), BP); ctx.lineTo(BP.x, BP.y);
+  beardPt(rig, jawDeg, B[8], beardV(rig, 4), BP); ctx.lineTo(BP.x, BP.y);
+  ctx.closePath();
+  flat(ctx, rig, hex);
+}
+
+/** Cranium space, into `out`: the beard's lowest point at jaw opening `jawDeg` (rig.ts headSink's floor guard). */
+export function beardLow(rig: DragonRig, jawDeg: number, out: Point): Point {
+  // the round bottom's lowest point, and the back point, whichever the head's pitch puts lower is the floor's; the
+  // cranium-space lowest (+y) serves: the guard maps both through the head angle, so take the bottom
+  return beardPt(rig, jawDeg, BEARD_UV[4], beardV(rig, 2) + 0.5, out);
+}
+
+/**
+ * How much deeper the beard's lower points hang on this head (rig.beardDv, px; build time): the least drop, in 0.25 px
+ * steps, that shows at least 3 x 3 px of the tuft's fill below the skull's ink with the jaw shut (5.2: the beard is
+ * the elder's face signal, 2.5). The one BEARD_UV shape sits under the jaw, and on a head whose skull hangs lower
+ * than its jaw -- rock's boxy snout, dusk's short one under the cranium's round bottom -- the skull drawn after it
+ * covered all but a 2 x 2 speck or a 2-row sliver. On fire's snout it drops about a pixel, so every elder shows the
+ * same tuft under its chin whatever the snout. Allocates: call it once per rig.
+ */
+export function fitBeard(rig: DragonRig): number {
+  const keep = rig.beardDv, poly: number[] = [];
+  for (let dv = 0; dv <= 4; dv += 0.25) {
+    rig.beardDv = dv;
+    poly.length = 0;
+    const B = BEARD_UV;
+    beardPt(rig, 0, B[0], beardV(rig, 0), BP); const x0 = BP.x, y0 = BP.y;
+    beardPt(rig, 0, B[2], beardV(rig, 1), BP); beardPt(rig, 0, B[4], beardV(rig, 2), BQ);
+    for (let i = 0; i <= 12; i++) {
+      const t = i / 12, u = 1 - t;
+      poly.push(u * u * x0 + 2 * u * t * BP.x + t * t * BQ.x, u * u * y0 + 2 * u * t * BP.y + t * t * BQ.y);
+    }
+    beardPt(rig, 0, B[6], beardV(rig, 3), BP); poly.push(BP.x, BP.y);
+    beardPt(rig, 0, B[8], beardV(rig, 4), BP); poly.push(BP.x, BP.y);
+    let minx = 1e9, maxx = -1e9;
+    for (let i = 0; i < poly.length; i += 2) { minx = Math.min(minx, poly[i]); maxx = Math.max(maxx, poly[i]); }
+    // the widest run of columns (0.25 px apart) each showing >= 3.4 px of fill under the skull's 1 px of ink
+    let run = 0, best = 0;
+    for (let x = minx; x <= maxx; x += 0.25) {
+      let vis = 0, most = 0;
+      for (let y = -12; y <= 20; y += 0.1) {
+        if (inPoly(poly, x, y) && !inSkull(rig, x, y, -1)) { vis += 0.1; most = Math.max(most, vis); } else vis = 0;
+      }
+      run = most >= 3.4 ? run + 0.25 : 0;
+      best = Math.max(best, run);
+    }
+    if (best >= 3.25) return dv;
+  }
+  rig.beardDv = keep;
+  return 4;
+}
+/** Is (x, y) inside the closed polygon `p` (x, y pairs)? Even-odd. */
+function inPoly(p: readonly number[], x: number, y: number): boolean {
+  let inside = false;
+  for (let i = 0, j = p.length - 2; i < p.length; j = i, i += 2) {
+    const xi = p[i], yi = p[i + 1], xj = p[j], yj = p[j + 1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
 }
 
 /**

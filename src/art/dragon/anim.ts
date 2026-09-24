@@ -102,6 +102,12 @@ export interface BlinkTiming {
 }
 export const ADULT_BLINK: Readonly<BlinkTiming> = Object.freeze({ half: 2, closed: 4, min: 180, max: 300, double: 0 });
 export const BABY_BLINK: Readonly<BlinkTiming> = Object.freeze({ half: 3, closed: 4, min: 180, max: 300, double: 0.3 });
+/** The elder's slower blink (2.5): 3 half-lid, 5 closed, 3 half-lid frames, every 200 to 340 f. */
+export const ELDER_BLINK: Readonly<BlinkTiming> = Object.freeze({ half: 3, closed: 5, min: 200, max: 340, double: 0 });
+/** The blink timing of a stage: the baby's (with its double blinks), the elder's slower one, or the young / adult's. */
+export function blinkFor(stage: 'baby' | 'young' | 'adult' | 'elder'): Readonly<BlinkTiming> {
+  return stage === 'baby' ? BABY_BLINK : stage === 'elder' ? ELDER_BLINK : ADULT_BLINK;
+}
 
 /** Faces with open eyes: only these blink. Happy, closed, surprised, scared and dazed never do. */
 const BLINKS: Readonly<Record<number, true | undefined>> = Object.freeze({

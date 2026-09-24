@@ -11,7 +11,7 @@
 //   - its anims: the shriek with its 'shriek' flinch event, the chirping beg, the echo-ping fidget and the lonely
 //     call ('call', an anim of its own).
 import { DRAGON_PALETTES } from '../palettes.ts';
-import { STAGE_TIMING, TAIL_REST } from '../stages.ts';
+import { STAGE_TIMING, FIDGET_TIMING, TAIL_REST, grown } from '../stages.ts';
 import type { Stage } from '../stages.ts';
 import { wingParams } from '../element.ts';
 import type { ElementSpec, ElementDraw, DragonInfo } from '../element.ts';
@@ -111,6 +111,15 @@ const FANS: Readonly<Record<Stage, FanSpec>> = {
     ribs: [[-2, 7.5], [18, 10.4], [38, 7.5]], scal: [[18, 38], [38, 60]],
     // the rib lines are the pleats' edges: front rib to middle rib, and back rib to the back edge, in shadow; each
     // edge runs out to a scallop's cusp, a bat wing's spar to its point
+    pleats: [[-2, 18], [38, 90]],
+  },
+  // FIRST PASS (elder): the adult's fans. 3.7's elder fans grow to 19 px with 3 pleats, whole (other head features
+  // may then reach 9.5 px), and carry its elder-only extra, the FROSTED FAN TIPS: a 2 px pigment band along the near
+  // fan's top edge in rig.greys.fanFrost (palettes.ts fanFrostOf), at every mood
+  elder: {
+    h: 17, pz: 4, root: 2, depth: 3, mid: 24, at: 128, rr: 0.88, lean0: 0, spread: 1.35, grow: 1,
+    env: [-20, 0.6, -6, 0.94, 6, 1, 18, 0.97, 32, 0.93, 46, 0.86, 58, 0.78, 68, 0.66],
+    ribs: [[-2, 7.5], [18, 10.4], [38, 7.5]], scal: [[18, 38], [38, 60]],
     pleats: [[-2, 18], [38, 90]],
   },
 };
@@ -301,7 +310,7 @@ function drowse(rig: DragonRig, pose: DragonPose, st: Stage): number {
   const c = pose.cue;
   let u = 0;
   if (pose.act === ACT.wake) {
-    const open = Math.round(3 * (st === 'baby' ? 24 / 30 : st === 'young' ? 26 / 30 : 1));
+    const open = Math.round(3 * (st === 'baby' ? 24 / 30 : st === 'young' ? 26 / 30 : st === 'elder' ? 36 / 30 : 1));
     u = 1 - (c - open) / DROWSE;
   } else if (pose.act === ACT.sleep && c < 0) {
     const L = Math.round(rig.tune.sleep.lieDown), shut = Math.round(24 * L / 40) - L;
@@ -317,7 +326,8 @@ function drowse(rig: DragonRig, pose: DragonPose, st: Stage): number {
  * back as the head rises and forward as it drops, one frame after it: floppy, not bolted on.
  */
 function walkBob(rig: DragonRig, cue: number, st: Stage): number {
-  const C = Math.max(1, Math.round(rig.tune.walk.cycle)), lagF = st === 'baby' ? STAGE_TIMING.baby.headLag : 4;
+  // (the elder's head nods 10 f late, the baby's 6: anims.ts walkAnim)
+  const C = Math.max(1, Math.round(rig.tune.walk.cycle)), lagF = st === 'baby' || st === 'elder' ? STAGE_TIMING[st].headLag : 4;
   const u = (cue - lagF - 1) / C, dip = 0.5 + 0.5 * Math.cos(4 * Math.PI * (u - 0.4));
   return (st === 'baby' ? 12 : 9) * (dip - 0.5);
 }
@@ -384,7 +394,7 @@ function fan(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, in
   const pleats = far ? null : F.pleats;
   // the adult's rattle through the shriek's sustain (its adult-only extra): each rib steps to and fro every 2 f,
   // neighbours in counter-phase; pleats by 3 deg, stamps by 1 px
-  const rattle = st === 'adult' && act === ACT.breath && c >= 0 && pose.fx > 0.5;
+  const rattle = grown(st) && act === ACT.breath && c >= 0 && pose.fx > 0.5;
   if (pleats) drawPleats(ctx, rig, F, pleats, H, spread, curl, info.pal.membrane, rattle ? Math.floor(c / 2) : -1);
   else celPath(ctx, rig, info.pal.membrane, 0, -H / 2, H / 2, 0.36, 0);
   if (!far && !pleats && !rig.override) {
@@ -449,7 +459,7 @@ const nearHead: ElementDraw = (ctx, rig, pose, info) => fan(ctx, rig, pose, info
 // ---------- the eye mask ----------
 
 /** Eye-mask height per stage (3.7 table). */
-const MASK: Readonly<Record<Stage, number>> = { baby: 6, young: 6, adult: 7 };
+const MASK: Readonly<Record<Stage, number>> = { baby: 6, young: 6, adult: 7, elder: 7 };
 
 /**
  * Bible 3.7 table "Eye mask": a pale lilac "spectacles" patch from the snout base to behind the eye (the mint iris
@@ -471,13 +481,15 @@ const headMarkings: ElementDraw = (ctx, rig, _pose, info) => {
 
 /** Stage duration factor (4.1: baby 0.6, young 0.85). */
 const durOf = (st: Stage): number => STAGE_TIMING[st].dur;
+/** The echo-ping fidget's stage factor (the elder's x 1.3, not its x 1.25: FIDGET_TIMING, 4.2), its arcs' too. */
+const fidK = (st: Stage): number => FIDGET_TIMING[st].dur;
 /** The call, adult frames: the wind-up (head up, the sac filling), the call itself, the sad settle. */
 const CALL_WIND = 20, CALL_SING = 50, CALL_REST = 30;
 
 // ---------- the throat sac ----------
 
 /** Throat-sac swell per stage (3.7 table), px. */
-const SAC: Readonly<Record<Stage, number>> = { baby: 3, young: 5, adult: 7 };
+const SAC: Readonly<Record<Stage, number>> = { baby: 3, young: 5, adult: 7, elder: 7 };
 /** Where on the neck the sac sits, a fraction of the neck from its root (the gulp's head-end ball: 0.7). */
 const SAC_AT = 0.6;
 
@@ -632,8 +644,9 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
   if (rig.override) return;
   if (act === ACT.breath) {
     if (c < 0) return;
-    const n = st === 'adult' ? 3 : st === 'young' ? 2 : 1, life = st === 'baby' ? 12 : 24;
-    const r0 = st === 'baby' ? 4 : 6, r1 = st === 'adult' ? 34 : st === 'young' ? 24 : 14;
+    // (FIRST PASS (elder): the adult's shriek; its finale is one echo circle, 4.2, cue 32 to 44)
+    const n = grown(st) ? 3 : st === 'young' ? 2 : 1, life = st === 'baby' ? 12 : 24;
+    const r0 = st === 'baby' ? 4 : 6, r1 = grown(st) ? 34 : st === 'young' ? 24 : 14;
     for (let k = 0; k < n; k++) {
       const age = c - 8 * k;
       if (age < 0 || age >= life) continue;
@@ -651,16 +664,16 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
     return;
   }
   if (act === ACT.call) {
-    const life = Math.round(CALL_SING * durOf(st)), R = st === 'adult' ? 40 : st === 'young' ? 30 : 20;
+    const life = Math.round(CALL_SING * durOf(st)), R = grown(st) ? 40 : st === 'young' ? 30 : 20;
     if (c < 0 || c >= life) return;
     const f = c / life;
     soundArc(ctx, rig, info, mx, my, ma, mx, my, ma + rig.tf.rot, Math.round(5 + (R - 5) * f), spanAt(f, 35, 28, 22));
     return;
   }
   if (act === ACT.fidget) {
-    const k = durOf(st), t1 = Math.round(PING_OUT * k), out = Math.round(PING_OUT_LIFE * k);
+    const k = fidK(st), t1 = Math.round(PING_OUT * k), out = Math.round(PING_OUT_LIFE * k);
     const t2 = Math.round(PING_BACK * k), back = Math.round(PING_BACK_LIFE * k);
-    const reach = st === 'adult' ? 30 : st === 'young' ? 26 : 20, dir = noseDir(rig);
+    const reach = grown(st) ? 30 : st === 'young' ? 26 : 20, dir = noseDir(rig);
     snoutFront(rig, SN);
     if (c >= t1 && c < t1 + out) {
       // going out: ")" then a second ")" PING_PAIR px behind it, r 8 -> 60 % of the reach
@@ -770,12 +783,14 @@ const K = (v: number): Key[] => [[0, v]];
  * small arc each way, it read as "looks up, smiles".)
  */
 function fidget(stage: Stage): DragonAnim {
-  const k = durOf(stage), L = Math.round(64 * k), t = (f: number) => Math.round(f * k);
+  // (the elder's at x 1.3, its lift, lean and nod at 0.8x; the fans' flare is the cue, kept: FIDGET_TIMING, 4.2)
+  const k = fidK(stage), g = FIDGET_TIMING[stage].amp, L = Math.round(64 * k), t = (f: number) => Math.round(f * k);
+  const G = (keys: [number, number][]): Key[] => keys.map(([f, v]) => [t(f), v * g] as const);
   return bake({
-    'neck.a0': [[0, 0], [t(10), -7], [t(26), -7], [t(34), -3], [t(42), -3], [t(48), -2], [t(58), 0]],
-    'head.rot': [[0, 0], [t(10), -15], [t(26), -15], [t(34), -10], [t(42), -10], [t(45), 5], [t(50), 3], [t(60), 0]],
-    'body.rot': [[0, 0], [t(10), -2], [t(26), -2], [t(34), 1], [t(44), 1], [t(56), 0]],
-    'root.x': [[0, 0], [t(26), 0], [t(34), 2], [t(44), 2], [t(56), 0]],
+    'neck.a0': G([[0, 0], [10, -7], [26, -7], [34, -3], [42, -3], [48, -2], [58, 0]]),
+    'head.rot': G([[0, 0], [10, -15], [26, -15], [34, -10], [42, -10], [45, 5], [50, 3], [60, 0]]),
+    'body.rot': G([[0, 0], [10, -2], [26, -2], [34, 1], [44, 1], [56, 0]]),
+    'root.x': G([[0, 0], [26, 0], [34, 2], [44, 2], [56, 0]]),
     flare: [[0, 0], [t(8), 1], [t(40), 1], [t(43), 1.25, 'out'], [t(47), 1], [t(54), 0.5], [L, 0]],
     face: [[0, DFACE.neutral], [t(45), DFACE.happy], [t(56), DFACE.neutral]],
     act: K(ACT.fidget), cue: [[0, 0], [L, L]],
@@ -829,7 +844,7 @@ function overrides(stage: Stage, dims: DragonDims | null): Partial<Record<string
   return { breath: br, beg, call: callAnim(stage) };
 }
 /** The open jaw's stage minimum (1.2), deg, for a dims-less table (the build's `head.jawMin` otherwise). */
-const STAGE_JAW_MIN: Readonly<Record<Stage, number>> = { baby: 20, young: 20, adult: 16 };
+const STAGE_JAW_MIN: Readonly<Record<Stage, number>> = { baby: 20, young: 20, adult: 16, elder: 16 };
 
 /**
  * A "volume-bar" chevron on the tail (3.7 table), a chunky filled caret (5.2). The adult's pair steps DOWN in size
@@ -865,6 +880,23 @@ export const SLINKWING: ElementSpec = {
       wing: wingParams({ style: 'bat', plus: true, scallop: 3, wristThorn: 3 }), dorsal: null,
       skullBumps: [{ x: 14, y: -1.5, r: 2 }],
     },
+    // the elder (3.7's Elder column): the adult's tail LENGTH (2.3: 6 x 7, for the 1.10 length cap), the jaw's 36 deg,
+    // the adult's chevrons and nose-leaf, the wing worn (2.9: tears in panels 1 and 3, the notched hole at full
+    // spread). Its fans: the FIRST PASS note on FANS
+    elder: {
+      tailRest: TAIL_REST.slinkwing.elder, tailLen: 7 / 7.4, jawMax: 36, horns: null, markings: [chevron(0.3, 6, 5), chevron(0.5)],
+      wing: wingParams({
+        style: 'bat', plus: true, scallop: 3, wristThorn: 3,
+        tears: [{ panel: 1, at: 0.35, depth: 5 }, { panel: 3, at: 0.45, depth: 5 }],
+        // (2.9's spot re-measured for the notched window AND the airing: at 2.9's (-9.5, -5) its bottom row met the back
+        // line + 1 px at the elder's settled chest even at full spread, and leaned back for the tip rule (1.3) it lay
+        // on the back; here, up the arm panel toward the forearm, it keeps the ring and 2 px of membrane round it and
+        // clears the back line at the airing's 20 deg sit-back, anims.ts airingFit)
+        hole: { x: -7, y: -11.5, from: 0.95 },
+      }),
+      dorsal: null,
+      skullBumps: [{ x: 14, y: -1.5, r: 2 }],
+    },
   },
   render: { farHead, nearHead, headMarkings, breath, ambient },
   anims: {
@@ -876,10 +908,10 @@ export const SLINKWING: ElementSpec = {
     // and wing. The shriek opens the jaw to 40 deg (the young too: the element's jawMax 40 replaces the stage's 34);
     // the baby's squeak ends in the fan flop over its eyes, 24 f (ledger E8), then a blink.
     tuning: (st) => ({
-      breath: { jaw: st === 'baby' ? 24 : 40, flop: st === 'baby' ? 24 : 0, fizzleFace: st === 'baby' ? 'sheepish' : 'dazed' },
+      breath: { jaw: st === 'baby' ? 24 : st === 'elder' ? 36 : 40, flop: st === 'baby' ? 24 : 0, fizzleFace: st === 'baby' ? 'sheepish' : 'dazed' },
       // (the head held up over forepaws slid 10 px forward: at the shared sphinx fold's -2 the raised head floated in
       // front of the chest over nothing)
-      sleep: st === 'baby' ? {} : { chin: st === 'adult' ? 10 : 8, frontTuck: 10 },
+      sleep: st === 'baby' ? {} : { chin: grown(st) ? 10 : 8, frontTuck: 10 },
     }),
     overrides: (st, dims) => overrides(st, dims),
     fidget: (st) => fidget(st),

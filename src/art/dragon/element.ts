@@ -1,7 +1,7 @@
-// THE SEAM between the shared dragon rig and the six elements.
+// THE SEAM between the shared dragon rig and the seven elements.
 //
-// One parameterised quadruped rig draws all 18 looks (ART_GENERATOR lesson 49: a renderer fix reaches the whole
-// cast). What differs per element arrives through ONE object, an ElementSpec, which each element file
+// One parameterised quadruped rig draws all 28 looks, 7 elements x 4 stages (ART_GENERATOR lesson 49: a renderer fix
+// reaches the whole cast). What differs per element arrives through ONE object, an ElementSpec, which each element file
 // (elements/<id>.ts) exports and nothing else. An element artist owns exactly that file and may touch nothing else,
 // so everything they can change is reachable from here:
 //
@@ -21,6 +21,33 @@
 //   - pigment (markings, masks, spots) is clipped and never inked; separate objects are inked (bible 1.6);
 //   - emitters (flame, crystals, bolts, sparks) are flat, never cel-banded (D20); features.ts has the helpers;
 //   - the cue is the mood gauge (D7): read info.mood (-1..1) and keep >= 60 % of the cue's silhouette at -1.
+//
+// THE ELDER (v2: bible 2.1, 2.5, 2.9, 3.9, 4.1, 4.2; D21 to D23). The fourth and final stage, permanent. What the
+// shared rig already does for every element, and what the seam hands an element artist for the elder's own cue:
+//   - `Stage` has 'elder'; stages.ts `grown(stage)` is true for the adult and the elder (the adult's eye, wing bones,
+//     claws, thorns, fangs and adult-only extras). Branch on it rather than on stage === 'adult', or an elder falls
+//     through to the baby's branch of a three-way ternary.
+//   - COLOUR: every stage draws through palettes.ts agedPalette (3.9), so info.pal / info.near / rig.pal ARE the
+//     greyed colours, and tones(rig, hex) of them are seeded from dragonTones (the silvered highlight band included).
+//     Colour a renderer only from those, never from DRAGON_PALETTES at runtime (a module-level base hex would draw an
+//     elder in its hatchling's colours); rig.moodT holds the stage's mood tones (the banked glow, water's dim spot)
+//     and rig.greys the elder face greys (muzzle, beard: 2.5) and slinkwing's fan frost (fanFrostOf), ready-made.
+//   - POSTURE and FACE are shared (rig.ts, parts.ts, faces.ts): the settled chest, the paunch, the level head, the grey
+//     muzzle and brow tuft, the inked beard (with the floor guard), the worn fangs, the elder blink. An element's own
+//     elder posture numbers go in its `elder` ElementStageParams: `neckAngle` (rock's -33, water's +2), `neckLen`
+//     (water's 0.92), `tailLen` (slinkwing's adult length), `jawMax` (slinkwing's 36), `brow` (rock's 4), `bellyFrac`
+//     (rock's adult 38 %). The beard's depth is fitted to each head by the rig (parts.ts fitBeard).
+//   - WING WEAR: WingParams.tears / .hole on the elder stage (2.9's table), drawn by the shared bat / leaf / fin wing
+//     (parts.ts drawBatWing) and the rig's whole-pixel hole stamp. A 'custom' wing (lightning's bolt) draws its own
+//     tear from the same data with parts.ts pathTearEdge and wearOf.
+//   - ANIMS: the shared set has an elder column (anims.ts: x 1.25 tempo, the soft ease, no key holds, the 10 f head
+//     lag), the elder's idle variants (the back stretch, reminisce and AIRING THE WINGS, act = ACT.airing, the one
+//     spread at idle: lightning flexes its bolts instead) and its breath (never fails; cue 0 = the snap at f 28, the
+//     stream to cue 32 with fx 1, then the finale ring's window, cue 32 to 44, fx 0: the element draws its ring).
+//     STAGE_TIMING.elder.dur scales an element's own anims.
+//   - The element's ELDER CUE and ELDER-ONLY EXTRA (section 3: the hearth and coal bed, sap-buds, the fourth crystal,
+//     the third tooth, the pearls, the frosted fans, the resident moth) are the element's renderers' work; each file
+//     marks the spots where its elder still draws as its adult with "FIRST PASS (elder):".
 import type { DragonElement, DragonPalette } from './palettes.ts';
 import type { ElementModifiers, Stage, TailRest } from './stages.ts';
 import type { DragonPose } from './pose.ts';
@@ -75,6 +102,27 @@ export interface HornParams {
 /** Wing construction. `style` picks the renderer in parts.ts; 'custom' means ElementRenderers.wing replaces it. */
 export type WingStyle = 'bat' | 'leaf' | 'fin' | 'custom';
 
+/**
+ * One ragged TEAR in an elder's trailing edge (2.9): a notch of the membrane polygon itself, so the wing's one stroke
+ * inks it. `panel` counts the trailing-edge panels from the lead tip, 1-based (1 = lead tip -> the next tip; the arm
+ * panel, trail tip -> body attach, is the spar count); `at` is the fraction along it from its leading tip. `depth`,
+ * px into the membrane from the edge, is deeper than the wing's scallops by >= 2 px (fire's, slinkwing's and dusk's
+ * 3 px scallops: 5; water's smooth fin 4, rock's 3); the mouth is 5 px, >= 3 px of background between its ink lines,
+ * and one side is stepped 1 px halfway down so it reads torn, not as one more scallop. `bite`: a round bite instead,
+ * 5 wide (spike's nibbled leaf, 3 deep).
+ */
+export interface WingTear { panel: number; at: number; depth: number; bite?: boolean }
+
+/**
+ * The elder's see-through HOLE (2.9): a whole-pixel 3 x 3 window with one corner notched (8 px of background) inside a
+ * 4-neighbour 1 px ink ring, in the arm panel, at wing-space (x, y) of the FULL spread (it moves with the membrane:
+ * fire and dusk (-9.5, -8.5), slinkwing (-9.5, -5), spike (-10.5, -6), water (-10.5, -7)). Drawn from `wing` >= `from`
+ * (0.95 bat, 0.90 leaf and fin), stamped by the rig at the ROUNDED position in face space (rotated, a 2 px window
+ * anti-aliased to 1 px and shimmered) and cut through the far wing too, so it shows the background. Never shrunk: a
+ * frame where the window is not wholly on the membrane and above the back line + 1 px skips it.
+ */
+export interface WingHole { x: number; y: number; from: number }
+
 export interface WingParams {
   style: WingStyle;
   /** Use the stage's "+1 spar" set (water, slinkwing: 3 young / 4 adult) instead of the standard 2 / 3. */
@@ -94,6 +142,13 @@ export interface WingParams {
   /** Wing root offset from the stage table's root, body space px (lightning's bolt sits 3 px back). */
   rootDx?: number;
   rootDy?: number;
+  /**
+   * Elder wing wear (2.9; the elder stage only, the same on every pet of an element: no seed reads "more worn"): the
+   * trailing-edge tears, shown from `wing` 0.55 (parts.ts wearOf), and the full-spread hole. None on a baby, young or
+   * adult; no hole on rock's stubby wing or lightning's bolt (no room: 2.9).
+   */
+  tears?: readonly WingTear[];
+  hole?: WingHole;
 }
 
 export type MarkingKind = 'chevron' | 'ring' | 'zstripe' | 'spot';
@@ -178,8 +233,23 @@ export interface ElementStageParams {
    * the one skull path, never new outlined objects (1.2).
    */
   skullBumps?: readonly { x: number; y: number; r: number }[];
-  /** Brow-ridge bump in px, replacing the stage table's 0 / 1 / 2 (rock's heavier 0 / 2 / 3). */
+  /** Brow-ridge bump in px, replacing the stage table's 0 / 1 / 2 / 3 (rock's heavier 0 / 2 / 3 / 4). */
   brow?: number;
+  /**
+   * Degrees replacing the 2.3 neck-angle modifier at this stage (ElementModifiers.neckAngle; rock's elder -33: half the
+   * elder's lowering, so its head drops about 2 px and stays 6 px under the dome's top, 2.3). Omitted = the modifier.
+   */
+  neckAngle?: number;
+  /** Multiplier on this stage's neck length after the 2.3 modifier (water's elder 0.92: the 1.10 length cap, 2.3). */
+  neckLen?: number;
+  /** The jaw's maximum opening, deg, replacing the stage table's and the modifier's (slinkwing's elder 36). */
+  jawMax?: number;
+  /**
+   * The belly band's fraction of the chest depth, replacing the stage table's (38 %, babies 45 %, the elder's 42 %):
+   * rock's elder keeps its adult's 38 %, since its pale cream band over the elder's paunch read as a nappy between
+   * the legs (the elder core review).
+   */
+  bellyFrac?: number;
   /**
    * The pet's seeded length variant, -1 / 0 / +1 px (2.8), set by build.ts on every stage (the seed survives
    * stage-ups). Shared horns already carry it; element renderers add it to their OWN length features -- spike's
@@ -356,11 +426,14 @@ export interface ElementAnimHooks {
 /** Everything one element is. elements/<id>.ts exports exactly one of these. */
 export interface ElementSpec {
   id: DragonElement;
-  /** The bible nickname: 'Ember', 'Bramble', 'Cobble', 'Zap', 'Ripple', 'Echo'. */
+  /** The bible nickname: 'Ember', 'Bramble', 'Cobble', 'Zap', 'Ripple', 'Echo', 'Wick'. */
   name: string;
   /** One line of identity, for tooltips and the care panel. */
   blurb: string;
-  /** The element palette (palettes.ts DRAGON_PALETTES[id]; never per stage). */
+  /**
+   * The element's BASE palette (palettes.ts DRAGON_PALETTES[id]: the hatchling's colours). Never per stage: the build
+   * draws each stage through agedPalette(id, stage), the derived greying of 3.9, which renderers receive as info.pal.
+   */
   palette: Readonly<DragonPalette>;
   /** 2.3 proportion modifiers (full strength; build.ts halves them on babies). */
   modifiers: Readonly<ElementModifiers>;

@@ -6,10 +6,17 @@
 // device-aligned: origin snapped to a whole device pixel at the eye centre, one unit = one sprite pixel, mirrored
 // by facing but never rotated with the head nor scaled by squash. Every function here draws there, in whole px.
 // Everything goes through rig.col so the flash and silhouette overrides reach the face too.
+//
+// THE ELDER FACE (2.5, v2). The elder keeps the adult's 8 x 6 almond, its slit, catchlight and lid rows, and NO lid by
+// default (a permanent lid is `sleepy`, a care signal). It reads "wise" from the frame round the eye: the 3 px brow
+// ridge (the skull's contour, parts.ts), the grey MUZZLE (drawMuzzle: pigment, clipped to the skull, under the eye,
+// nostril and mouth marks), the level grey brow TUFT at every face (drawBrow), the inked beard (parts.ts drawBeard)
+// and fangs worn to 2 x 2. Its greys are rig.greys (palettes.ts muzzleOf / beardOf, set per element by luminance).
 import { DRAGON_SHARED, blushOf } from './palettes.ts';
 import { DFACE } from './pose.ts';
 import type { DragonRig } from './rig.ts';
-import { inSkull } from './parts.ts';
+import { inSkull, skullBands } from './parts.ts';
+import { grown } from './stages.ts';
 
 export { DFACE };
 
@@ -122,10 +129,13 @@ function openEye(ctx: CanvasRenderingContext2D, rig: DragonRig, b: EyeBox, round
  * 1 x 1 pixels beside the slit (under the mark floor); at 2 it leaves 2 rows of iris | slit | iris. Its sad wedge
  * goes one row deeper over column 1 for the same reason: 3 rows there left a lone iris pixel beside the cut corner.
  */
+const ADULT_LIDS = { sleepy: [2, 2, 2, 2, 2, 2], sad: [3, 4, 3, 2, 2, 2], grumpy: [2, 2, 2, 2, 2, 2], sheepish: [2, 2, 2, 2, 2, 2] } as const;
 const LIDS = {
   baby: { sleepy: [4, 4, 4, 4, 4], sad: [3, 3, 2, 2, 2], grumpy: [2, 2, 2, 2, 2], sheepish: [3, 3, 3, 3, 3] },
   young: { sleepy: [3, 3, 3, 3, 3], sad: [3, 3, 2, 2, 2], grumpy: [2, 2, 2, 2, 2], sheepish: [2, 2, 2, 2, 2] },
-  adult: { sleepy: [2, 2, 2, 2, 2, 2], sad: [3, 4, 3, 2, 2, 2], grumpy: [2, 2, 2, 2, 2, 2], sheepish: [2, 2, 2, 2, 2, 2] },
+  adult: ADULT_LIDS,
+  // the elder has the adult's eye, so the adult's lids, row for row (2.5)
+  elder: ADULT_LIDS,
 } as const;
 
 /**
@@ -134,7 +144,7 @@ const LIDS = {
  */
 export function drawEye(ctx: CanvasRenderingContext2D, rig: DragonRig, face: number, pinned = false): void {
   const L = LIDS[rig.stage], ink = rig.col(rig.outline);
-  const adult = rig.stage === 'adult';
+  const adult = grown(rig.stage);
   switch (face) {
     case DFACE.happy: {
       // "^" arc: 2 px ink, the eye's width, 3 tall. Upside down (rock's roll onto its back, face space flipped with
@@ -208,14 +218,14 @@ export function drawEye(ctx: CanvasRenderingContext2D, rig: DragonRig, face: num
  * at the eye (rig.ts drawHeadGroup), so the pixel is walked back to cranium space through the head's angle. A face
  * mark drawn only on such pixels never crosses the skull's contour, whatever the head's pitch.
  */
-export function facePixelInSkull(rig: DragonRig, fx: number, fy: number): boolean {
+export function facePixelInSkull(rig: DragonRig, fx: number, fy: number, pad = 0.5): boolean {
   const J = rig.j, t = rig.tf, sc = t.fs || 1;
   // the face origin as faceTransform snaps it (to a whole device pixel), back in root space
   const X0 = Math.round(sc * (t.rx + J.eye.x)) / sc - t.rx, Y0 = Math.round(t.ss * (t.ry + J.eye.y)) / t.ss - t.ry;
   // (a head that looks back runs its face mirrored and its cranium space flipped in y: rig.ts J.headFlip)
   const a = J.headAng * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), hf = J.headFlip;
   const dx = X0 + hf * (fx + 0.5) - J.cran.x, dy = Y0 + (t.ss < 0 ? -1 : 1) * (fy + 0.5) - J.cran.y;
-  return inSkull(rig, dx * c + dy * s, hf * (-dx * s + dy * c), 0.5);
+  return inSkull(rig, dx * c + dy * s, hf * (-dx * s + dy * c), pad);
 }
 
 /**
@@ -232,13 +242,18 @@ export function facePixelInSkull(rig: DragonRig, fx: number, fy: number): boolea
  * a speck). Babies show one only in expressions (2.1). Face space.
  */
 export function drawBrow(ctx: CanvasRenderingContext2D, rig: DragonRig, face: number, deep: string): void {
-  const hd = rig.dims.head;
+  const hd = rig.dims.head, elder = rig.stage === 'elder';
   let len = hd.browLen;
   // (upside down, the brow would lie under the screen-upright "^" and read as a mouth line)
-  if (face === DFACE.dazed || face === DFACE.closed || rig.tf.ss < 0) return;
-  // no bar at neutral on ANY stage (2.5 amendment): on young and adult the brow-ridge bump in the skull contour
+  if (rig.tf.ss < 0) return;
+  // THE ELDER'S TUFT (2.5): the same bar, as pigment in the muzzle grey (`deep` is rig.greys.muzzle), at EVERY face --
+  // neutral, and shut (closed, dazed: relaxed, level) as well, since it is hair on the hide, not an expression mark.
+  // 7 px from 1 px behind the ring, its top edge LEVEL: a bar lower at the back is the `sad` tilt and put a worried
+  // brow on every neutral elder (the v2 review). Its length and colour carry the age, never its tilt.
+  if (!elder && (face === DFACE.dazed || face === DFACE.closed)) return;
+  // no bar at neutral on the other stages (2.5 amendment): on young and adult the brow-ridge bump in the skull contour
   // already carries the stage, and a flat dark bar over a resting eye read as a visor; the bar is for expressions
-  if (face === DFACE.neutral) return;
+  if (!elder && face === DFACE.neutral) return;
   if (!len) {
     if (face === DFACE.happy || face === DFACE.sleepy) return;
     len = 5;
@@ -249,8 +264,11 @@ export function drawBrow(ctx: CanvasRenderingContext2D, rig: DragonRig, face: nu
   const L = LIDS[rig.stage], lidRows = face === DFACE.sleepy ? L.sleepy : face === DFACE.sad ? L.sad
     : face === DFACE.grumpy ? L.grumpy : face === DFACE.sheepish ? L.sheepish : null;
   const b = eyeBox(rig, grow);
+  // (shut, the elder's tuft keeps its open-eye place: the closed line and the ">" sit mid-eye, and a tuft lowered onto
+  // them read as a heavy lid)
   const top = face === DFACE.happy ? b.y + Math.floor(b.h / 2) - 1 : lidRows ? b.y + minOf(lidRows) : b.y + grow;
-  const x0 = b.x + Math.max(0, Math.floor((b.w - len) / 2));
+  // (the elder's tuft runs from 1 px behind the ring forward; the bar is centred over the eye)
+  const x0 = elder ? b.x - 1 : b.x + Math.max(0, Math.floor((b.w - len) / 2));
   // the bar's top row at its back end and front end (+x is the snout side): 1 px clear = top - 3
   let yb = top - 3, yf = top - 3;
   switch (face) {
@@ -279,7 +297,74 @@ export function drawBrow(ctx: CanvasRenderingContext2D, rig: DragonRig, face: nu
   }
   if (bestN < 3) return;
   ctx.fillStyle = rig.col(deep);
-  for (let i = best0; i < best0 + bestN; i++) rect(ctx, x0 + i, browRow(dyB, dyF, len, i), 1, 2);
+  for (let i = best0; i < best0 + bestN; i++) {
+    const x = x0 + i, y = browRow(dyB, dyF, len, i);
+    if (!elder || rig.override) { rect(ctx, x, y, 1, 2); continue; }
+    // the tuft is pigment: a pixel in the skull's highlight cap, or 4-adjacent to it, is dropped (a silvered cap and
+    // a pale tuft need not clear each other: 2.5), so the tuft never smears the silver crown
+    for (let k = 0; k < 2; k++) if (!nearHiCap(rig, x, y + k)) rect(ctx, x, y + k, 1, 1);
+  }
+}
+
+/**
+ * Is face-space pixel (fx, fy) in the skull's HIGHLIGHT cap, or 4-adjacent to it? The cap is celPath's (parts.ts
+ * drawSkull): the part of the skull within 0.3 of the head's extent from its lit edge, toward the light in cranium
+ * space, drawn only on a head long enough for a highlight (ext >= 10: young, adult, elder).
+ */
+function nearHiCap(rig: DragonRig, fx: number, fy: number): boolean {
+  const b = skullBands(rig);
+  if (b.ext < 10 || rig.tonesN === 2) return false;
+  return inHiCap(rig, fx, fy, b.cx, b.ext) || inHiCap(rig, fx - 1, fy, b.cx, b.ext) || inHiCap(rig, fx + 1, fy, b.cx, b.ext)
+    || inHiCap(rig, fx, fy - 1, b.cx, b.ext) || inHiCap(rig, fx, fy + 1, b.cx, b.ext);
+}
+function inHiCap(rig: DragonRig, fx: number, fy: number, cx: number, ext: number): boolean {
+  if (!facePixelInSkull(rig, fx, fy)) return false;
+  faceToCranium(rig, fx, fy, FC);
+  // the root-space light (up-left; mirrored with the sprite, so a facing never changes it), turned into cranium space
+  const J = rig.j, a = J.headAng * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), ly0 = rig.tf.ss < 0 ? 0.7071 : -0.7071;
+  const lx = -0.7071 * c + ly0 * s, ly = (0.7071 * s + ly0 * c) * J.headFlip;
+  return (FC.x - cx) * lx + FC.y * ly >= ext * 0.7;
+}
+const FC = { x: 0, y: 0 };
+
+/** Face-space pixel (fx, fy)'s centre -> cranium space (the inverse facePixelInSkull walks), into `out`. */
+function faceToCranium(rig: DragonRig, fx: number, fy: number, out: { x: number; y: number }): void {
+  const J = rig.j, t = rig.tf, sc = t.fs || 1;
+  const X0 = Math.round(sc * (t.rx + J.eye.x)) / sc - t.rx, Y0 = Math.round(t.ss * (t.ry + J.eye.y)) / t.ss - t.ry;
+  const a = J.headAng * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), hf = J.headFlip;
+  const dx = X0 + hf * (fx + 0.5) - J.cran.x, dy = Y0 + (t.ss < 0 ? -1 : 1) * (fy + 0.5) - J.cran.y;
+  out.x = dx * c + dy * s; out.y = hf * (-dx * s + dy * c);
+}
+
+/**
+ * The elder's grey MUZZLE (2.5): a face-space bitmap of every pixel on the skull whose cranium x >= x0 - 0.3 y (its back
+ * edge slanting back 1 px for every 3 px down), about 8 x 6 px over the front of the snout, the nostril on it. Pigment:
+ * never inked, drawn before the eye, nostril and mouth marks so they sit on it (1.4 step 12.4, after slinkwing's mask
+ * and dusk's frost), and CLIPPED TO THE SKULL PATH by the caller (rig.ts drawHeadGroup): the bitmap takes every pixel
+ * the skull touches and the clip trims it to the fill, so the grey meets the skull's ink as the scale does. (Taking
+ * only pixels whose centre lay 0.5 px inside left a 1 px rim of scale and its shadow tone between the muzzle and the
+ * ink along the snout's top and round its tip, under the mark floor: the elder core review.) It never meets the belly
+ * (the closed jaw's sliver or the open mouth lies between them) nor the head's highlight cap on the top-back of the
+ * cranium. x0 is 11 on fire's snout, and on a shorter snout keeps the same size from its tip, never closer than 2.5 px
+ * to the eye's ring. Face space.
+ */
+export function drawMuzzle(ctx: CanvasRenderingContext2D, rig: DragonRig, hex: string): void {
+  const H = rig.dims.head, tip = H.snout.x1 + H.snout.r1, x0 = Math.max(H.eye.x + H.eye.w / 2 + 2.5, Math.min(11, tip - 8.3));
+  ctx.fillStyle = rig.col(hex);
+  // the snout's box in face space, generously: the eye is face (0, 0), the snout runs forward and a little down
+  const R = Math.ceil(tip - H.eye.x + 3);
+  for (let fy = -R; fy <= R; fy++) {
+    let run = 0;
+    for (let fx = -R; fx <= R + 1; fx++) {
+      let on = false;
+      if (fx <= R && facePixelInSkull(rig, fx, fy, -0.75)) {
+        faceToCranium(rig, fx, fy, FC);
+        on = FC.x >= x0 - 0.3 * FC.y;
+      }
+      if (on) run++;
+      else if (run) { rect(ctx, fx - run, fy, run, 1); run = 0; }
+    }
+  }
 }
 /** The smallest entry of a lid table row (allocation-free). */
 function minOf(a: readonly number[]): number { let m = a[0]; for (let i = 1; i < a.length; i++) m = Math.min(m, a[i]); return m; }
@@ -338,11 +423,14 @@ export function drawEggTooth(ctx: CanvasRenderingContext2D, rig: DragonRig, x: n
   ctx.fillStyle = rig.col(DRAGON_SHARED.catchlight); rect(ctx, x, y, 2, 2);
 }
 
-/** Fangs hanging from the upper jaw line (jaw open only): young 1 x (2 x 2), adult 2 x (2 x 3). Face space. */
+/**
+ * Fangs hanging from the upper jaw line (jaw open only): young 1 x (2 x 2), adult 2 x (2 x 3), the elder's worn to
+ * 2 x (2 x 2) (still the mark floor: 2.1). Face space.
+ */
 export function drawFangs(ctx: CanvasRenderingContext2D, rig: DragonRig, x: number, y: number): void {
   const t = rig.dims.head.teeth;
   if (t === 'egg') return;
   ctx.fillStyle = rig.col(DRAGON_SHARED.catchlight);
   if (t === 'fang1') rect(ctx, x, y, 2, 2);
-  else { rect(ctx, x, y, 2, 3); rect(ctx, x - 5, y, 2, 3); }
+  else { const h = t === 'worn' ? 2 : 3; rect(ctx, x, y, 2, h); rect(ctx, x - 5, y, 2, h); }
 }

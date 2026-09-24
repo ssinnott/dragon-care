@@ -10,7 +10,7 @@
 //   - the ANIMS: the strut and the sigh laid over the shared walk and beg, the rekindle marked on the shared wake,
 //     the bath, and the tail-chase fidget.
 import { DRAGON_PALETTES, DRAGON_SHARED } from '../palettes.ts';
-import { NO_MODIFIERS, TAIL_REST, STAGE_TIMING } from '../stages.ts';
+import { NO_MODIFIERS, TAIL_REST, FIDGET_TIMING, grown } from '../stages.ts';
 import type { Stage } from '../stages.ts';
 import { hornParams, wingParams } from '../element.ts';
 import type { ElementSpec, ElementDraw, DragonInfo } from '../element.ts';
@@ -38,6 +38,10 @@ const FLAME: Readonly<Record<Stage, { w: number; h: number; tongues: number }>> 
   baby: { w: 5, h: 7, tongues: 1 },
   young: { w: 7, h: 10, tongues: 2 },
   adult: { w: 10, h: 14, tongues: 3 },
+  // FIRST PASS (elder): the adult's signature flame. 3.2's elder column is THE HEARTH -- 12 x 14 (wider, not
+  // taller), the middle tongue tallest, a 65 % core, the flicker 2 f slower, 9 x 9 at mood -1 with 3 tongues -- and
+  // its elder-only extra, the COAL BED (the bottom 2 rows in glow.sh with two 2 x 2 glow.hi specks, at every mood)
+  elder: { w: 10, h: 14, tongues: 3 },
 };
 /**
  * The smallest flame box awake, per stage: the width never drops a stage's tongues (3 need >= 9 px, 2 need >= 6:
@@ -45,7 +49,7 @@ const FLAME: Readonly<Record<Stage, { w: number; h: number; tongues: number }>> 
  * through the height and the core; the baby's seed never under 4 x 5 (at 3 x 4 it left a 2 x 3 speck of glow
  * inside its ink). Banked, one tongue, never under 4 x 5 either.
  */
-const FLAME_MIN: Readonly<Record<Stage, { w: number; h: number }>> = { baby: { w: 4, h: 5 }, young: { w: 6, h: 6 }, adult: { w: 9, h: 9 } };
+const FLAME_MIN: Readonly<Record<Stage, { w: number; h: number }>> = { baby: { w: 4, h: 5 }, young: { w: 6, h: 6 }, adult: { w: 9, h: 9 }, elder: { w: 9, h: 9 } };
 const BANKED_MIN = { w: 4, h: 5 };
 
 /**
@@ -288,7 +292,7 @@ const ambient: ElementDraw = (ctx, rig, pose, info) => {
  * colour steps down with the same age (breath): hot to step 2, orange to 4, red at 5, smoke at 6.
  */
 const PUFF_R: Readonly<Record<Stage, readonly number[]>> = {
-  baby: [2, 3, 3, 3, 3, 3, 3], young: [2, 3, 4, 4, 4, 3, 3], adult: [3, 4, 5, 6, 6, 5, 4],
+  baby: [2, 3, 3, 3, 3, 3, 3], young: [2, 3, 4, 4, 4, 3, 3], adult: [3, 4, 5, 6, 6, 5, 4], elder: [3, 4, 5, 6, 6, 5, 4],
 };
 /**
  * The jet per stage: puffs, frames between them, how many of the last are all smoke, and its speed (px/f). Adult
@@ -297,9 +301,12 @@ const PUFF_R: Readonly<Record<Stage, readonly number[]>> = {
  */
 const STREAM: Readonly<Record<Stage, { n: number; every: number; smoke: number; v: number }>> = {
   baby: { n: 1, every: 3, smoke: 0, v: 1 }, young: { n: 5, every: 3, smoke: 2, v: 1 }, adult: { n: 10, every: 3, smoke: 2, v: 5 / 3 },
+  // FIRST PASS (elder): the adult's jet over the elder's 32 f sustain (4.2: "the adult stream at 1.1x reach"); the
+  // finale's one smoke RING (cue 32 to 44, fx 0: anims.ts elderBreath) is not drawn yet
+  elder: { n: 11, every: 3, smoke: 2, v: 5 / 3 },
 };
 /** The breath wind-up per stage, frames (anims.ts breathAnim): the tell's puffs are timed inside it. */
-const WINDUP: Readonly<Record<Stage, number>> = { baby: 10, young: 14, adult: 18 };
+const WINDUP: Readonly<Record<Stage, number>> = { baby: 10, young: 14, adult: 18, elder: 22 };
 /** A jet puff's life: 6 fire steps and a smoke step, 3 f each. */
 const PUFF_LIFE = 21, FIRE_LIFE = 18;
 
@@ -539,7 +546,7 @@ function eachFrame(a: DragonAnim, fn: (t: number, p: PartialDragonPose, f: Drago
 function strutAnim(stage: Stage, dims: DragonDims | null): DragonAnim {
   const a = walkAnim(stage, animTuning(stage, FIRE).walk, dims);
   if (stage === 'baby') return a;
-  const lift = stage === 'adult' ? -6 : -5;
+  const lift = grown(stage) ? -6 : -5;
   return eachFrame(a, (_t, p) => {
     const b = (p.body ??= {}), tl = (p.tail ??= {});
     b.rot = (b.rot ?? 0) - 2;
@@ -626,7 +633,7 @@ function bathAnim(stage: Stage): DragonAnim {
  * baby -88.
  */
 function plumbPitch(d: DragonDims | null, stage: Stage): number {
-  if (!d) return stage === 'adult' ? -100 : stage === 'young' ? -92 : -88;
+  if (!d) return grown(stage) ? -100 : stage === 'young' ? -92 : -88;
   const H = d.head, sn = H.snout, ringR = H.eye.w - 1 - (H.eye.w >> 1);
   const ax = Math.max(sn.x1 + sn.r1 * 0.1 - 1, H.eye.x + ringR + 4) - H.eye.x, ay = sn.y1 - sn.r1 * 0.55 - H.eye.y;
   return Math.atan2(ax, ay) / D2R - 180;
@@ -639,6 +646,7 @@ function plumbPitch(d: DragonDims | null, stage: Stage): number {
  */
 const CHASE: Readonly<Record<Stage, { aim: number; a0: number; a1: number }>> = {
   baby: { aim: -140, a0: -24, a1: 0 }, young: { aim: -145, a0: -30, a1: -30 }, adult: { aim: -150, a0: -30, a1: -30 },
+  elder: { aim: -150, a0: -30, a1: -30 },
 };
 /** A paper turn's width on the frame either side of its flip (60 %) and the frame beyond that (80 %). */
 const TURN_NARROW = 0.6, TURN_EASE = 0.8;
@@ -651,6 +659,9 @@ const TURN_NARROW = 0.6, TURN_EASE = 0.8;
  * a mirror flip, so each half-turn is a paper turn -- the sprite narrows to 80 % and 60 % over 2 f, flips, and
  * opens out over 2 f facing the other way -- the flame always just behind it. Then it stops, dizzy (`dazed`, the
  * stars circling, a wobble), shakes it off, pleased with itself (`happy`). Adult 72 f, young 61, baby 43.
+ * The ELDER (4.2: x 1.3 and 0.8x, FIDGET_TIMING; D21) plays it as a gentle game: 2 half-turns, not 4, at the chase's
+ * first and third beats, with no hops (its paws stay planted) and its eyes `happy`, the tail and the look back at
+ * 0.8x; it stops content, never dizzy (no `dazed`, no stars, no wobble: a confused old dragon is banned, VC14). 94 f.
  * The turns are laid over the baked tracks (bake clamps squash to the stage's range): a turn frame keys its own
  * stretch (the volume-preserving 1 / |squash| would stretch a 60 % sprite to 1.7x its height). The face marks
  * mirror with the sprite but are never squashed (rig.ts faceTransform), so on each turn's narrow frames the head
@@ -658,37 +669,42 @@ const TURN_NARROW = 0.6, TURN_EASE = 0.8;
  * aims back at the flame.
  */
 function fidget(stage: Stage, dims: DragonDims | null): DragonAnim {
-  const k = STAGE_TIMING[stage].dur, t = (f: number) => Math.round(f * k), L = t(72), baby = stage === 'baby';
-  const flips = [t(18), t(28), t(37), t(44)], hh = Math.max(2, Math.round(3 * k));
+  const FT = FIDGET_TIMING[stage], k = FT.dur, g = FT.amp, t = (f: number) => Math.round(f * k), L = t(72);
+  const baby = stage === 'baby', elder = stage === 'elder';
+  const flips = elder ? [t(18), t(37)] : [t(18), t(28), t(37), t(44)], hh = Math.max(2, Math.round(3 * k));
   const hops: Key[] = [[0, 0]], lifts: Key[] = [[0, 0]];
-  for (const a of flips) {
+  // (the elder turns with its paws on the floor: no hop)
+  if (!elder) for (const a of flips) {
     hops.push([a - hh, 0, 'out'], [a, -3, 'in'], [a + hh, 0]);
     lifts.push([a - hh, 0], [a, 2], [a + hh, 0]);
   }
   const look = t(12), stop = t(50), done = t(64), C = CHASE[stage];
-  const pitch = dims ? dims.neck.headPitch : stage === 'adult' ? 10 : stage === 'young' ? 4 : 0;
+  const pitch = dims ? dims.neck.headPitch : grown(stage) ? (elder ? 0 : 10) : stage === 'young' ? 4 : 0;
   // head.rot is on top of the neck's arch and the head's rest pitch (rig.ts: headAng); the body stays level
-  const off = pitch + C.a0 + (baby ? 0 : C.a1), aim = C.aim - off, plumb = plumbPitch(dims, stage) - off;
-  const curl = baby ? -10 : -18;
+  const off = pitch + C.a0 + (baby ? 0 : C.a1), aim = C.aim * g - off, plumb = plumbPitch(dims, stage) - off;
+  const curl = (baby ? -10 : -18) * g, lift = -30 * g;
+  const N = DFACE.neutral, face: Key[] = elder
+    ? [[0, N], [flips[0] - 2, DFACE.happy], [L - 2, N]]
+    : [[0, N], [flips[0] - 2, DFACE.closed], [stop, DFACE.dazed], [done, DFACE.happy], [L - 2, N]];
   const tracks: Tracks = {
-    'tail.lift': [[0, 0], [look, -30], [stop, -30], [done, 0]],
+    'tail.lift': [[0, 0], [look, lift], [stop, lift], [done, 0]],
     'tail.curl': [[0, 0], [look, curl], [stop, curl], [done, 0]],
     'tail.stiff': [[0, 0], [t(8), 1], [stop + t(4), 1], [L, 0]],
     'neck.a0': [[0, 0], [look, C.a0], [stop, C.a0], [done, 0]],
     'neck.a1': [[0, 0], [look, C.a1], [stop, C.a1], [done, 0]],
-    'head.rot': [[0, 0], [look, aim], [stop, aim], [stop + t(4), -10], [done, 0]],
+    'head.rot': [[0, 0], [look, aim], [stop, aim], [stop + t(4), -10 * g], [done, 0]],
     'body.y': [[0, 0], [look, 0], [t(16), 1], [flips[0], 0]],
     squash: [[0, 1], [look, 1], [t(16), 0.97], [flips[0], 1]],
     'root.y': hops,
     'legNH.lift': lifts, 'legNF.lift': lifts, 'legFH.lift': lifts, 'legFF.lift': lifts,
-    // dizzy: a wobble about the ground point once it stops
-    'root.rot': [[0, 0], [stop, 0], [stop + t(3), 4], [stop + t(7), -4], [stop + t(11), 3], [done, 0]],
-    face: [[0, DFACE.neutral], [flips[0] - 2, DFACE.closed], [stop, DFACE.dazed], [done, DFACE.happy], [L - 2, DFACE.neutral]],
+    // dizzy: a wobble about the ground point once it stops (never the elder's: it stops content)
+    'root.rot': elder ? [[0, 0]] : [[0, 0], [stop, 0], [stop + t(3), 4], [stop + t(7), -4], [stop + t(11), 3], [done, 0]],
+    face,
     mood: [[0, 0], [t(6), 2], [stop, 2], [L, 0]],
     act: [[0, ACT.fidget]], cue: [[0, 0], [L, L]],
   };
   const a = bake(tracks, { stage, len: L, next: 'idle', res: 1 });
-  // facing right until the first flip, then each one mirrors the sprite (4 in all: it ends facing right)
+  // facing right until the first flip, then each one mirrors the sprite (4 in all, the elder's 2: it ends facing right)
   const side = (tt: number): number => { let s = 1; for (const f of flips) if (tt >= f) s = -s; return s; };
   // the turn's width by frames from its flip (the flip frame f is the first mirrored one): 0 = not turning
   const turn = (tt: number): number => {
@@ -740,6 +756,24 @@ export const FIRE: ElementSpec = {
       wing: wingParams({ style: 'bat', scallop: 3 }),
       dorsal: null,
     },
+    // the elder (3.2's Elder column): the adult's horns and flame-licks (greyed at half strength by the palette), the
+    // bat wing worn (2.9: tears in panels 1 and 2, a notched hole in the arm panel at full spread); its posture,
+    // muzzle, tuft and beard are the shared rig's
+    elder: {
+      tailRest: TAIL_REST.fire.elder,
+      horns: hornParams({ len: 8, bend: 20, sweep: -4 }),
+      markings: [{ kind: 'chevron', at: 'tail', t: 0.16, size: 6, solid: true }, { kind: 'chevron', at: 'haunch', size: 6, solid: true }, { kind: 'chevron', at: 'shoulder', size: 6, solid: true }],
+      wing: wingParams({
+        style: 'bat', scallop: 3,
+        tears: [{ panel: 1, at: 0.35, depth: 5 }, { panel: 2, at: 0.6, depth: 5 }],
+        // (2.9's spot re-measured for the notched window AND the airing: at 2.9's (-9.5, -8.5) the window lay on the back once
+        // the airing leaned the spread back far enough for the tip rule (1.3); here, up the arm panel toward the
+        // forearm, it keeps the ring and 2 px of membrane round it and clears the back line at the airing's 20 deg
+        // sit-back, anims.ts airingFit)
+        hole: { x: -7, y: -12, from: 0.95 },
+      }),
+      dorsal: null,
+    },
   },
   render: { tailTip, ambient, breath },
   anims: {
@@ -750,8 +784,10 @@ export const FIRE: ElementSpec = {
     fidget,
     overrides: (st, dims) => ({ walk: strutAnim(st, dims), beg: sighAnim(st), wake: rekindleAnim(st, dims), bath: bathAnim(st) }),
     tuning: (st) => ({
-      walk: { lift: st === 'adult' ? 5 : st === 'young' ? 4 : 2.5, head: st === 'baby' ? -2 : -4 },
-      sleep: st === 'baby' ? { tailCurl: 0, tailLift: 0 } : { tailLift: 72, tailCurl: st === 'adult' ? -21 : -24 },
+      // FIRST PASS (elder): a 3 px strut on the elder's slower 64 f walk (4.3: an elder keeps its element's column at
+      // the elder's timing; the adult's 5 px at that tempo lifted each paw high and slow, a stalk, not a strut)
+      walk: { lift: st === 'adult' ? 5 : st === 'elder' ? 3 : st === 'young' ? 4 : 2.5, head: st === 'baby' ? -2 : -4 },
+      sleep: st === 'baby' ? { tailCurl: 0, tailLift: 0 } : { tailLift: 72, tailCurl: grown(st) ? -21 : -24 },
       // the baby holds its breath before the hiccup: puffed up round, 1.10 wide, until the puff pops out; and its
       // comma keeps riding the eating bow (no tail droop, tuning.eat): the flame above the tail tip is fire's zone
       ...(st === 'baby' ? { breath: { puff: 1.1 }, eat: { tailDroop: 0 } } : {}),

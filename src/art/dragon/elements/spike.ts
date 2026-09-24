@@ -16,7 +16,7 @@
 //     20 deg back from the world's upright, settling on each exhale.
 import { DRAGON_PALETTES } from '../palettes.ts';
 import type { DragonPalette } from '../palettes.ts';
-import { TAIL_REST } from '../stages.ts';
+import { TAIL_REST, FIDGET_TIMING } from '../stages.ts';
 import type { Stage } from '../stages.ts';
 import { hornParams, wingParams } from '../element.ts';
 import type { ElementSpec, ElementDraw } from '../element.ts';
@@ -64,6 +64,13 @@ const COMB: Readonly<Record<Stage, Comb>> = {
   young: { back: [[0.04, 7, 6], [0.48, 10, 6], [0.92, 8, 6]], tail: [[0.22, 5, 5]], sleepBack: [8, 7, 6], sleepTail: [6], blunt: false },
   // the bible lists the back quills neck base -> rump, [7, 11, 12, 10, 7]; this list runs rump (0) -> neck base (1)
   adult: {
+    back: [[0.0, 7, 8], [0.25, 10, 8], [0.5, 12, 8], [0.75, 11, 8], [1.0, 7, 8]], tail: [[0.14, 6, 6], [0.32, 5, 5], [0.5, 4, 4]],
+    sleepBack: [12, 5, 11, 5, 10], sleepTail: [7, 6, 5], blunt: false,
+  },
+  // FIRST PASS (elder): the adult's comb, unworn (3.3: the elder keeps the adult's comb exactly). Its elder-only
+  // extra, the SAP-BUDS (two 3 x 3 glow.sh buds, inked, between the rump quill and its neighbour and between the
+  // first two tail quills, with a 2 x 2 glow glint at mood >= 0.5), and v2's spikier comb (D26) are spike's own pass
+  elder: {
     back: [[0.0, 7, 8], [0.25, 10, 8], [0.5, 12, 8], [0.75, 11, 8], [1.0, 7, 8]], tail: [[0.14, 6, 6], [0.32, 5, 5], [0.5, 4, 4]],
     sleepBack: [12, 5, 11, 5, 10], sleepTail: [7, 6, 5], blunt: false,
   },
@@ -147,8 +154,12 @@ function idleWave(rig: DragonRig, seed: number, tick: number, n: number): number
   return k ? RIP_AGES[0] : -1;
 }
 
-/** The fidget's stage duration factor (fidget(): the adult's 44 f x 1 / 0.85 / 0.6). */
-const fidK = (st: Stage): number => (st === 'adult' ? 1 : st === 'young' ? 0.85 : 0.6);
+/**
+ * The fidget's stage duration factor (fidget(): the adult's 44 f x 1 / 0.85 / 0.6, the elder's x 1.3: FIDGET_TIMING,
+ * 4.2). The elder's 0.8x amplitude takes the body's lean only: the arched neck and the look back put the snout on the
+ * comb, a reach the grooming needs.
+ */
+const fidK = (st: Stage): number => FIDGET_TIMING[st].dur;
 /** The grooming pecks' period, frames (adult 4; x the stage factor, never under 3). */
 const peckP = (st: Stage): number => Math.max(3, Math.round(4 * fidK(st)));
 /**
@@ -161,7 +172,7 @@ function peckAt(st: Stage, c: number): number {
   return Math.floor(2 * (c - a) / peckP(st)) % 2 ? -1 : 1;
 }
 /** The creep's stop-and-look, frames (4.3: 24 f, x the stage's 0.85 young, 0.6 baby), clocked on past the cycle. */
-const STOP: Readonly<Record<Stage, number>> = { baby: 14, young: 20, adult: 24 };
+const STOP: Readonly<Record<Stage, number>> = { baby: 14, young: 20, adult: 24, elder: 30 };
 
 /**
  * Back quill i's height factor through the breath (3.3 Quill Volley): the front quill fires first, at the snap
@@ -480,7 +491,7 @@ function fidget(stage: Stage): ReturnType<typeof bake> {
     'neck.a0': [[0, 0], [t(8), -34], [t(32), -34, 'inout'], [t(44), 0]],
     'neck.a1': [[0, 0], [t(8), -34], [t(32), -34, 'inout'], [t(44), 0]],
     'head.rot': head,
-    'body.rot': [[0, 0], [t(8), -3], [t(32), -3, 'inout'], [t(44), 0]],
+    'body.rot': [[0, 0], [t(8), -3 * FIDGET_TIMING[stage].amp], [t(32), -3 * FIDGET_TIMING[stage].amp, 'inout'], [t(44), 0]],
     face: [[0, DFACE.neutral], [t(3), DFACE.closed], [t(40), DFACE.neutral]],
     act: [[0, ACT.fidget]], cue: [[0, 0], [L, L]],
   }, { stage, len: L, next: 'idle' });
@@ -587,6 +598,24 @@ export const SPIKE: ElementSpec = {
       wing: wingParams({ style: 'leaf', scallop: -3, foldRise: 0, thorn: 3, wristThorn: 4 }),
       dorsal: null,
     },
+    // the elder (3.3's Elder column): the adult's thorns, rings and leaf, the thorns kept (parts.ts lets the elder
+    // through the adult-only thorn test), the leaf worn: a round BITE 5 x 3 in panel 1 (a nibbled leaf) and the
+    // notched hole in the arm panel from `wing` 0.90 (2.9)
+    elder: {
+      tailRest: TAIL_REST.spike.elder,
+      horns: hornParams({ len: 6, at: 145, sink: 1, sweep: 12, farTilt: 8, r1: 0.5, worldClamp: THORN_CLAMP }),
+      markings: [{ kind: 'ring', at: 'tail', t: 0.15, size: 3 }, { kind: 'ring', at: 'tail', t: 0.4, size: 3 }, { kind: 'ring', at: 'tail', t: 0.62, size: 3 }],
+      wing: wingParams({
+        style: 'leaf', scallop: -3, foldRise: 0, thorn: 3, wristThorn: 4,
+        tears: [{ panel: 1, at: 0.5, depth: 3, bite: true }],
+        // (2.9's spot re-measured for the notched window AND the airing: at 2.9's (-10.5, -6) the window lay on the back once
+        // the airing leaned the spread back far enough for the tip rule (1.3); here, up the arm panel toward the
+        // forearm, it keeps the ring and 2 px of membrane round it and clears the back line at the airing's 20 deg
+        // sit-back, anims.ts airingFit)
+        hole: { x: -5, y: -13, from: 0.9 },
+      }),
+      dorsal: null,
+    },
   },
   render: { backRow, breath },
   anims: {
@@ -598,7 +627,8 @@ export const SPIKE: ElementSpec = {
     overrides: (st, dims) => (st === 'baby' ? { walk: creepWalk(st, dims), breath: sneezeBreath() } : { walk: creepWalk(st, dims) }),
     tuning: (st) => ({
       breath: { puff: st === 'baby' ? 1.15 : 1 },
-      walk: { speed: st === 'adult' ? 0.35 : st === 'young' ? 0.4 : 0.24, head: st === 'baby' ? 4 : 8 },
+      // FIRST PASS (elder): the creep slowed as the shared walk slows (0.35 x 0.34 / 0.45) on the elder's 64 f cycle
+      walk: { speed: st === 'adult' ? 0.35 : st === 'young' ? 0.4 : st === 'elder' ? 0.26 : 0.24, head: st === 'baby' ? 4 : 8 },
       // young and adult sleep LONG AND LOW: the body level, the tail dropped to the floor behind the rump and laid
       // straight back along it top side up (a J round the rump: lift 30, curl -8 a segment levels it), so its quills
       // stand (the 37 deg gate) and the comb runs nape -> tail, leaning SLEEP_LEAN back (backRow): a low saw on a bar

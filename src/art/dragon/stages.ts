@@ -5,10 +5,24 @@
 // baby is a different body plan (pot belly, head on the chest, nub wings), not a small adult. Every number below
 // is the fire reference; build.ts multiplies in the element's modifiers (half strength on babies) and solves the
 // body height from the hind leg so the paws plant on y = 0.
+//
+// The ELDER (v2, D21) is the fourth and final stage, permanent: nothing comes after it. It is not bigger than the
+// adult (<= 1.10x its length, 1.02x its height); it reads as older through its posture (the head a little lower and
+// forward with the nose level, the chest settled level over a small paunch, a wider stance: 2.1's Elder column),
+// its greyed palette (palettes.ts agedPalette, 3.9), its framed face (2.5), its worn wings (2.9) and slower,
+// steadier motion (4.1). It keeps the adult's feature set -- the eye, the lids, the wing bones, claws and thorns --
+// which `grown` names for every table that branches on it.
 import type { DragonElement } from './palettes.ts';
 
-export const STAGES = ['baby', 'young', 'adult'] as const;
+export const STAGES = ['baby', 'young', 'adult', 'elder'] as const;
 export type Stage = typeof STAGES[number];
+
+/**
+ * The adult's feature set: true for the adult and the elder, which keeps the adult's 8 x 6 eye and its lids, the
+ * adult wing bones and angles, claws, spar and wrist thorns, the adult fangs (worn) and every adult-only extra
+ * (2.5, 2.9, section 3). Branch on it, never on `stage === 'adult'`, wherever the elder should draw as an adult does.
+ */
+export function grown(stage: Stage): boolean { return stage === 'adult' || stage === 'elder'; }
 
 /** One leg pair's dimensions (bible 2.1). Angles in the engine convention: 0 = down, + forward, lower RELATIVE. */
 export interface LegDims {
@@ -58,9 +72,13 @@ export interface HeadDims {
   jawMin: number;
   /** Eye: outer size including the ink ring, centre in cranium space. */
   eye: { w: number; h: number; x: number; y: number };
-  /** Brow bar length (2 px thick, 1 px above the ring); 0 = only in expressions. */
+  /**
+   * Brow bar length (2 px thick, 1 px above the ring); 0 = only in expressions. The elder's 7 is its grey brow TUFT,
+   * drawn at every face, neutral included (2.5: faces.ts drawBrow).
+   */
   browLen: number;
-  teeth: 'egg' | 'fang1' | 'fang2';
+  /** Egg tooth (baby), one 2 x 2 fang (young), two 2 x 3 fangs (adult), two worn to 2 x 2 (elder: `worn`). */
+  teeth: 'egg' | 'fang1' | 'fang2' | 'worn';
 }
 
 /** Bat-wing bones (2.1 / 2.2). Babies have none: a nub (NubDims). */
@@ -103,11 +121,17 @@ export interface StageDims {
   // ---- body (body space: origin at the body centre, y down) ----
   hipR: number;
   chestR: number;
-  /** Ball gap, centre to centre: hip at -gap/2, chest at +gap/2 and 1 px higher (a proud chest). */
+  /** Ball gap, centre to centre: hip at -gap/2, chest at +gap/2 and `chestLift` px higher. */
   gap: number;
-  /** The baby belly-sag ellipse, part of the same body path. */
-  sag: { rx: number; ry: number; cy: number } | null;
-  /** Belly band: the lower fraction of the chest depth (38 %, babies 45 %). */
+  /** How much higher the chest ball sits than the hip ball, px: 1 (a proud chest), the elder's 0 (settled level). */
+  chestLift: number;
+  /**
+   * The belly-sag ellipse, part of the same body path: the baby's pot belly, and the elder's small PAUNCH (2.1: rx 12,
+   * ry 3.5, about 2 px under the belly line). The paunch flattens where it meets the floor, and asleep to `flatRy`
+   * (rig.ts paunchRy): a sleeping elder's belly lies on the straw instead of standing it up on a ball.
+   */
+  sag: { rx: number; ry: number; cy: number; flatRy?: number } | null;
+  /** Belly band: the lower fraction of the chest depth (38 %, babies 45 %, the elder's 42 %). */
   bellyFrac: number;
   // ---- neck ----
   neck: {
@@ -138,7 +162,7 @@ export interface StageDims {
 
 const B: StageDims = {
   stage: 'baby',
-  hipR: 6.5, chestR: 7.5, gap: 5, sag: { rx: 10, ry: 4, cy: 3.5 }, bellyFrac: 0.45,
+  hipR: 6.5, chestR: 7.5, gap: 5, chestLift: 1, sag: { rx: 10, ry: 4, cy: 3.5 }, bellyFrac: 0.45,
   neck: { n: 1, len: 3, r0: 5.5, r1: 5, root: [5, -5], sink: 2, rest: [70], headPitch: 0, hidden: true },
   head: {
     cranR: 8.5, fromNeck: [1, -3],
@@ -157,7 +181,7 @@ const B: StageDims = {
 
 const Y: StageDims = {
   stage: 'young',
-  hipR: 7, chestR: 8.5, gap: 14, sag: null, bellyFrac: 0.38,
+  hipR: 7, chestR: 8.5, gap: 14, chestLift: 1, sag: null, bellyFrac: 0.38,
   neck: { n: 2, len: 6, r0: 5, r1: 4, root: [10, -5], sink: 2, rest: [70, 45], headPitch: 4, hidden: false },
   head: {
     cranR: 9, fromNeck: [1.5, -2],
@@ -176,7 +200,7 @@ const Y: StageDims = {
 
 const A: StageDims = {
   stage: 'adult',
-  hipR: 9, chestR: 11, gap: 19, sag: null, bellyFrac: 0.38,
+  hipR: 9, chestR: 11, gap: 19, chestLift: 1, sag: null, bellyFrac: 0.38,
   neck: { n: 2, len: 9, r0: 6.5, r1: 4.5, root: [13, -7], sink: 3, rest: [65, 35], headPitch: 10, hidden: false },
   head: {
     cranR: 9.5, fromNeck: [2, -2],
@@ -193,10 +217,37 @@ const A: StageDims = {
   shadow: { extra: 10, h: 4 },
 };
 
-/** The 2.1 proportion tables (fire reference). */
-export const STAGE_DIMS: Readonly<Record<Stage, Readonly<StageDims>>> = Object.freeze({ baby: B, young: Y, adult: A });
+/**
+ * The ELDER (2.1's Elder column, v2): the adult's size, settled. The chest ball level with the hip (chestLift 0), a
+ * small paunch 2 px under the belly line (flat asleep), the band 42 %; the neck a little lower and forward with the
+ * head LEVEL (52 / 22 deg, pitch 0: EL's 38 / 10 pitched 8 down was the cast's low-mood carriage), the head top 3 to 5
+ * px under the adult's; a 3 px brow ridge, a slightly longer snout and deeper jaw with the beard under it; settled
+ * knees and elbows (+40 / -82, -12 / +24) and a wider stance (X 3.75, paws 1 px longer); a longer, fuller tail; the
+ * wing's membrane attached further back (-19, +2: the old membrane has stretched, the room for its hole, 2.9).
+ */
+const E: StageDims = {
+  stage: 'elder',
+  hipR: 9.5, chestR: 11, gap: 20, chestLift: 0, sag: { rx: 12, ry: 3.5, cy: 9.2, flatRy: 1.5 }, bellyFrac: 0.42,
+  neck: { n: 2, len: 8.5, r0: 7, r1: 5, root: [13.5, -6], sink: 3, rest: [52, 22], headPitch: 0, hidden: false },
+  head: {
+    cranR: 9.5, fromNeck: [2, -2],
+    snout: { x0: 3, y0: 1, x1: 15.5, y1: 2.5, r0: 6, r1: 3.8 }, brow: 3,
+    jaw: { hx: -1, hy: 5.2, tx: 13.5, ty: 6, r0: 3.6, r1: 2.2, drop: 3 }, jawMax: 28, jawMin: 16,
+    eye: { w: 8, h: 6, x: 3, y: -2 }, browLen: 7, teeth: 'worn',
+  },
+  hind: { X: 3.75, y: 3.5, upper: 10, lower: 9, restUpper: 40, restLower: -82, r1: 5.8, r2: 4.1, bulge: 0.8, pawW: 10, pawH: 4 },
+  front: { X: 3.75, y: 3.5, upper: 9, lower: 8.5, restUpper: -12, restLower: 24, r1: 4.7, r2: 4, bulge: 0.5, pawW: 9, pawH: 4 },
+  claws: { w: 2, h: 3 },
+  tail: { n: 6, len: 7.4, r0: 6, r1: 1.5, sink: 2 },
+  wing: { root: [5, -8.5], humerus: 9, forearm: 12, armR: 1.5, sparR: 1.5, spars: [20, 17, 13], sparsPlus: [20, 17, 14, 11], attach: [-19, 2] },
+  nub: null,
+  shadow: { extra: 12, h: 4 },
+};
 
-/** 2.2 bone angles, [folded, spread]. */
+/** The 2.1 proportion tables (fire reference). */
+export const STAGE_DIMS: Readonly<Record<Stage, Readonly<StageDims>>> = Object.freeze({ baby: B, young: Y, adult: A, elder: E });
+
+/** 2.2 bone angles, [folded, spread]. The elder uses the adult's (2.2: only its membrane attach point moves). */
 export const WING_ANGLES: Readonly<Record<'young' | 'adult', Readonly<WingAngles>>> = Object.freeze({
   // spread, the fan opens over ~100 deg, the trail spar reaching level back: over 70 deg (lead 95 -> trail 165) the
   // spread wing was a narrow upright sail, 16 x 40 px, and with its spars poking out, a rake
@@ -246,7 +297,10 @@ export const NO_MODIFIERS: Readonly<ElementModifiers> = Object.freeze({
   bodyLength: 1, bodyDepth: 1, legLength: 1, legR: 1, neckLength: 1, neckAngle: 0, tailLength: 1, tailR: 1, snout: 1,
 });
 
-/** A modifier as a stage sees it: full strength, or half on a baby. */
+/**
+ * A modifier as a stage sees it: full strength, or half on a baby. The elder takes it at full strength, as the adult
+ * does (2.3), and its own posture (the neck, the chest, the membrane) is in its column of STAGE_DIMS, applied after.
+ */
 export function stageMod(m: number, stage: Stage): number { return stage === 'baby' ? 1 + (m - 1) / 2 : m; }
 
 /** Tail rest shape: first-segment angle and bend added per segment (degrees; + droops, - lifts; 1.1). */
@@ -258,18 +312,19 @@ export interface TailRest {
 /**
  * The tail rest shapes of 2.3 (adult column and the young note) and the baby rest shapes below the table. Young
  * adults other than fire's and rock's are not listed in the bible and take the adult shape (rock's young curls a
- * little sooner, so its adult stays >= 1.29x as long: 5.1 #3). Element files read these, and an element artist may
- * override their own row there.
+ * little sooner, so its adult stays >= 1.29x as long: 5.1 #3). The ELDER keeps the adult's shape exactly (2.3,
+ * "Elder tail rest shapes"): EL's drooped elder rests read as a lower mood on a pet (the v2 review); its slower sway
+ * is the chain's (TAIL_CHAIN.elder). Element files read these, and an element artist may override their own row there.
  */
 export const TAIL_REST: Readonly<Record<DragonElement, Readonly<Record<Stage, Readonly<TailRest>>>>> = Object.freeze({
-  fire: { baby: { first: -10, bend: -25 }, young: { first: 0, bend: -10 }, adult: { first: 0, bend: -9 } },
-  spike: { baby: { first: -5, bend: -15 }, young: { first: 5, bend: 0 }, adult: { first: 5, bend: 0 } },
-  rock: { baby: { first: 30, bend: 12 }, young: { first: 14, bend: 9 }, adult: { first: 10, bend: 7 } },
-  lightning: { baby: { first: -12, bend: 0 }, young: { first: -5, bend: 0 }, adult: { first: -5, bend: 0 } },
-  water: { baby: { first: 0, bend: 0 }, young: { first: 0, bend: 0 }, adult: { first: 0, bend: 0 } },
-  slinkwing: { baby: { first: -5, bend: -15 }, young: { first: 15, bend: -4 }, adult: { first: 15, bend: -4 } },
+  fire: { baby: { first: -10, bend: -25 }, young: { first: 0, bend: -10 }, adult: { first: 0, bend: -9 }, elder: { first: 0, bend: -9 } },
+  spike: { baby: { first: -5, bend: -15 }, young: { first: 5, bend: 0 }, adult: { first: 5, bend: 0 }, elder: { first: 5, bend: 0 } },
+  rock: { baby: { first: 30, bend: 12 }, young: { first: 14, bend: 9 }, adult: { first: 10, bend: 7 }, elder: { first: 10, bend: 7 } },
+  lightning: { baby: { first: -12, bend: 0 }, young: { first: -5, bend: 0 }, adult: { first: -5, bend: 0 }, elder: { first: -5, bend: 0 } },
+  water: { baby: { first: 0, bend: 0 }, young: { first: 0, bend: 0 }, adult: { first: 0, bend: 0 }, elder: { first: 0, bend: 0 } },
+  slinkwing: { baby: { first: -5, bend: -15 }, young: { first: 15, bend: -4 }, adult: { first: 15, bend: -4 }, elder: { first: 15, bend: -4 } },
   // dusk (v2, 3.8): long and gently drooping, "trailing like smoke", never above the back line (fire's zone)
-  dusk: { baby: { first: 4, bend: 0 }, young: { first: 7, bend: 2 }, adult: { first: 8, bend: 2 } },
+  dusk: { baby: { first: 4, bend: 0 }, young: { first: 7, bend: 2 }, adult: { first: 8, bend: 2 }, elder: { first: 8, bend: 2 } },
 });
 
 /** 4.1 tail chain (secondary.ts getChain options) per stage. `maxAng` 30 keeps a tail from folding through the body. */
@@ -284,6 +339,8 @@ export const TAIL_CHAIN: Readonly<Record<Stage, Readonly<TailChainParams>>> = Ob
   baby: { stiffness: 0.20, damping: 0.65, gain: 2.6, follow: 0.15, maxAng: 30 },
   young: { stiffness: 0.14, damping: 0.70, gain: 2.2, follow: 0.35, maxAng: 30 },
   adult: { stiffness: 0.10, damping: 0.78, gain: 1.6, follow: 0.5, maxAng: 30 },
+  // a slow, damped sway: the adult's heavy wave, settled
+  elder: { stiffness: 0.12, damping: 0.84, gain: 1.2, follow: 0.55, maxAng: 30 },
 });
 
 /** 4.1 stage timing rules, for anims.ts to author every stage from one adult table. */
@@ -295,11 +352,28 @@ export interface StageTiming {
   /** Head lag behind the body: frames, and amplitude multiplier. */
   headLag: number;
   headAmp: number;
-  /** Default easing: babies bounce out, adults move with weight, young adults overshoot. */
-  ease: 'out' | 'inout' | 'overshoot';
+  /**
+   * Default easing: babies bounce out, adults move with weight, young adults overshoot, elders `soft`: a longer,
+   * softer inout, its middle stretch spread over half the key (anims.ts easeKey), unhurried and never stiff.
+   */
+  ease: 'out' | 'inout' | 'overshoot' | 'soft';
 }
 export const STAGE_TIMING: Readonly<Record<Stage, Readonly<StageTiming>>> = Object.freeze({
   baby: { dur: 0.6, squash: [0.85, 1.15], headLag: 6, headAmp: 2, ease: 'out' },
   young: { dur: 0.85, squash: [0.94, 1.06], headLag: 7, headAmp: 1.5, ease: 'overshoot' },
   adult: { dur: 1, squash: [0.96, 1.04], headLag: 8, headAmp: 1, ease: 'inout' },
+  // x 1.25 tempo, a narrower squash, the head 10 f late at 0.8x, the soft ease; NO key holds (4.1: EL's 3 f hold at
+  // every key read as stiffness, a frailty signal, and skated the walk's planted paws)
+  elder: { dur: 1.25, squash: [0.97, 1.03], headLag: 10, headAmp: 0.8, ease: 'soft' },
+});
+
+/**
+ * The element FIDGET's timing per stage (4.2; section 3): its duration against the adult's -- the stage's own rule,
+ * but the elder's x 1.3, not x 1.25 -- and the amplitude its gestures play at: the elder's 0.8x (its head turns, tail
+ * lifts and leans; never a contact or a reach the fidget needs, like the snout on a groomed quill or the belly on the
+ * floor). Unhurried and smaller, never stiff (D21: fire's elder makes 2 half-turns, not 4, with no hops and no dizzy
+ * stop). Each element's fidget and the renderer that keys its flourish on the fidget's clock read it.
+ */
+export const FIDGET_TIMING: Readonly<Record<Stage, Readonly<{ dur: number; amp: number }>>> = Object.freeze({
+  baby: { dur: 0.6, amp: 1 }, young: { dur: 0.85, amp: 1 }, adult: { dur: 1, amp: 1 }, elder: { dur: 1.3, amp: 0.8 },
 });

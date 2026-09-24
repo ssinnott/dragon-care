@@ -4,9 +4,12 @@
 // element's modifiers (2.3, half strength on babies) and the element's per-stage feature parameters (element.ts),
 // plus the seeded per-pet variant of 2.8. Everything the rig needs per frame is solved here so drawing is pure
 // arithmetic: the body height from the hind leg (the paws plant on y = 0), the front-leg nudge that plants the front
-// paws exactly, the tail radii, the neck rest angles.
+// paws exactly, the tail radii, the neck rest angles. And the stage's PALETTE: the element's base greyed for its age
+// (palettes.ts agedPalette, 3.9: a baby and a young dragon keep their colours, an adult is a little grey, an elder
+// clearly grey), so the rig, every element renderer and the palette check see the same colours.
 import { makeRng } from '../../lib/engine/rng.ts';
 import { rad } from '../../lib/engine/math.ts';
+import { agedPalette } from './palettes.ts';
 import type { DragonElement, DragonPalette } from './palettes.ts';
 import { STAGE_DIMS, stageMod } from './stages.ts';
 import type { Stage, StageDims, LegDims, TailRest } from './stages.ts';
@@ -42,6 +45,7 @@ export interface DragonBuild {
   spec: ElementSpec;
   /** This stage's feature params, after the seeded variant (2.8). */
   sp: ElementStageParams;
+  /** The stage's palette: the element's base greyed for its age (palettes.ts agedPalette, 3.9). */
   palette: Readonly<DragonPalette>;
   dims: DragonDims;
   /** Enlarged views only (a 2x care-panel portrait); every stage renders at 1 in play (1.1). */
@@ -75,12 +79,18 @@ export function dragonBuild(o: DragonBuildOpts): DragonBuild {
   const hipR = S.hipR * depth, chestR = S.chestR * depth;
   const legLen = m(M.legLength), legR = m(M.legR);
   const hind = legOf(S.hind, legLen, legR), front = legOf(S.front, legLen, legR);
-  const neckAng = stage === 'baby' ? M.neckAngle / 2 : M.neckAngle;
+  // (an element's own elder posture numbers replace or scale the modifier at that stage: rock's elder neck -33, water's
+  // +2 and its capped neck x 0.92: ElementStageParams.neckAngle / neckLen, 2.3)
+  const base0 = spec.stages[stage];
+  const neckAng = base0.neckAngle != null ? base0.neckAngle : stage === 'baby' ? M.neckAngle / 2 : M.neckAngle;
   const neckDrop = (M.neckDrop || 0) * (stage === 'baby' ? 0.5 : 1);
-  const neck = { ...S.neck, len: S.neck.len * m(M.neckLength), rest: S.neck.rest.map((a) => a + neckAng), root: [S.neck.root[0], S.neck.root[1] + neckDrop] as const };
+  const neck = {
+    ...S.neck, len: S.neck.len * m(M.neckLength) * (base0.neckLen ?? 1), rest: S.neck.rest.map((a) => a + neckAng),
+    root: [S.neck.root[0], S.neck.root[1] + neckDrop] as const,
+  };
 
-  // Snout: the modifier scales the length BEYOND the cranium (2 / 6.5 / 9), the jaw tip follows the snout tip.
-  const H = S.head, sn = H.snout, base0 = spec.stages[stage];
+  // Snout: the modifier scales the length BEYOND the cranium (2 / 6.5 / 9 / 9.8), the jaw tip follows the snout tip.
+  const H = S.head, sn = H.snout;
   const beyond0 = sn.x1 + sn.r1 - H.cranR;
   const r1 = M.snoutTaper != null ? sn.r0 * M.snoutTaper : sn.r1;
   const x1 = H.cranR + beyond0 * m(M.snout) - r1;
@@ -90,7 +100,7 @@ export function dragonBuild(o: DragonBuildOpts): DragonBuild {
     brow: base0.brow ?? H.brow,
     snout: { ...sn, x1, r1 },
     jaw: { ...H.jaw, tx: H.jaw.tx + (x1 - sn.x1), r0: H.jaw.r0 * jd, r1: H.jaw.r1 * jd },
-    jawMax: M.jawMax != null ? M.jawMax : H.jawMax,
+    jawMax: base0.jawMax != null ? base0.jawMax : M.jawMax != null ? M.jawMax : H.jawMax,
   };
 
   // ---- 2.8 seeded variant (inside the 2.7 invariants) ----
@@ -147,14 +157,14 @@ export function dragonBuild(o: DragonBuildOpts): DragonBuild {
 
   const snoutLen = x1 + r1 - H.cranR;
   const dims: DragonDims = {
-    ...S, gap, hipR, chestR,
-    sag: S.sag ? { rx: S.sag.rx * m(M.bodyLength), ry: S.sag.ry * depth, cy: S.sag.cy * depth } : null,
+    ...S, gap, hipR, chestR, bellyFrac: base.bellyFrac ?? S.bellyFrac,
+    sag: S.sag ? { ...S.sag, rx: S.sag.rx * m(M.bodyLength), ry: S.sag.ry * depth, cy: S.sag.cy * depth } : null,
     neck, head, hind, front, tail,
     bodyY, bodyLen: gap + hipR + chestR, frontFix, tailR0, tailR1, tailRest,
     snoutLen, headLen: H.cranR * 2 + snoutLen,
   };
   return {
-    element: o.element, stage, seed, spec, sp, palette: spec.palette, dims, scale: o.scale ?? 1,
+    element: o.element, stage, seed, spec, sp, palette: agedPalette(o.element, stage), dims, scale: o.scale ?? 1,
     phase, speed,
   };
 }

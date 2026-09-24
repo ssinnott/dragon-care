@@ -12,8 +12,8 @@
 //              pebble crumb that rolls off the dome.
 // And the anims of 4.3: the weight-shifting idle, the roll-over happy, the gravel roar, the pebble-licking beg, the
 // sunbathe fidget, the upset tuck ('upset', a loop), plus the tuning of walk, sleep and breath.
-import { DRAGON_PALETTES, DRAGON_SHARED, moodTones } from '../palettes.ts';
-import { STAGE_TIMING, TAIL_REST } from '../stages.ts';
+import { DRAGON_PALETTES, DRAGON_SHARED } from '../palettes.ts';
+import { STAGE_TIMING, FIDGET_TIMING, TAIL_REST, grown } from '../stages.ts';
 import type { Stage } from '../stages.ts';
 import { wingParams } from '../element.ts';
 import type { DragonInfo, ElementSpec, ElementDraw } from '../element.ts';
@@ -22,7 +22,7 @@ import { cranToRootPt, enterFaceFromLocal, localToRootPt } from '../rig.ts';
 import { backLineY, disc, mouthToRoot } from '../features.ts';
 import { ACT, DFACE } from '../pose.ts';
 import type { DragonPose } from '../pose.ts';
-import { bake, lag } from '../anims.ts';
+import { bake, lag, stretchKeys } from '../anims.ts';
 import type { Key, Tracks } from '../anims.ts';
 import type { DragonAnim } from '../anim.ts';
 import type { DragonDims } from '../build.ts';
@@ -30,7 +30,6 @@ import { liveSpawns, stepShrink } from '../fx.ts';
 import { celTaper, outlinePath, tones } from '../../../lib/art/shading.ts';
 
 const PAL = DRAGON_PALETTES.rock;
-const BANKED = moodTones(PAL).banked;
 const RAD = Math.PI / 180;
 
 /** Dome width x rise above the back and facet count (3.4 table). */
@@ -38,6 +37,8 @@ const DOME: Readonly<Record<Stage, { w: number; rise: number; facets: number }>>
   baby: { w: 12, rise: 5, facets: 1 },
   young: { w: 22, rise: 9, facets: 3 },
   adult: { w: 34, rise: 11, facets: 5 },
+  // FIRST PASS (elder): the adult's dome. 3.4's elder dome grows to 36 x 12 with 6 facets, whole (never chipped)
+  elder: { w: 34, rise: 11, facets: 5 },
 };
 
 /**
@@ -74,12 +75,19 @@ const CRYSTALS: Readonly<Record<Stage, readonly Crystal[]>> = {
     { u: 0.11, sweep: 0, ox: -2, rows: ['.a..', 'aaa.', '###.', '.###', '.###', '.###'] },
     { u: 0.43, sweep: 2, ox: -1, rows: ['..a.', '.aaa', '.###', '###.', '###.', '###.'] },
   ],
+  // FIRST PASS (elder): the adult's cluster of 3 (ceil(bond x 3)). 3.4's elder grows the big crystal to 4 x 8 and
+  // adds its elder-only extra, THE FOURTH CRYSTAL (3 x 4 at u 0.55: ceil(bond x 3) + 1, always one more than an adult)
+  elder: [
+    { u: 0.27, sweep: 1, ox: -2, rows: ['.A..', 'AA..', 'AA##', 'ff##', 'BB##', 'BB##', '####', '####'] },
+    { u: 0.11, sweep: 0, ox: -2, rows: ['.a..', 'aaa.', '###.', '.###', '.###', '.###'] },
+    { u: 0.43, sweep: 2, ox: -1, rows: ['..a.', '.aaa', '.###', '###.', '###.', '###.'] },
+  ],
 };
 /** A crystal's pixels, compiled once: x (from its centre column), y (0 = the sunk row, up is -), class (1..8: '#fabcABC'). */
 const CRYSTAL_PX: Readonly<Record<Stage, readonly Int8Array[]>> = (() => {
   const cls = '#fabcABC';
   const out = {} as Record<Stage, Int8Array[]>;
-  for (const st of ['baby', 'young', 'adult'] as const) {
+  for (const st of ['baby', 'young', 'adult', 'elder'] as const) {
     out[st] = CRYSTALS[st].map((c) => {
       const px: number[] = [];
       c.rows.forEach((row, r) => {
@@ -99,18 +107,21 @@ const NOSE: Readonly<Record<Stage, { len: number; r0: number; r1: number }>> = {
   baby: { len: 2, r0: 1.5, r1: 1.2 },
   young: { len: 4, r0: 2, r1: 1.5 },
   adult: { len: 5, r0: 3, r1: 1.5 },
+  elder: { len: 5, r0: 3, r1: 1.5 },
 };
 
 /** The breath's wind-up / snap / sustain / recover per stage (4.2), which the renderers key their beats on. */
+// FIRST PASS (elder): the elder's beats (anims.ts elderBreath: 22 / 6 / 32 / 24, never failing) with the adult's
+// roar in them; the finale's one ring of rock dust (4.2, cue 32 to 44) is not drawn yet
 const BREATH_BEATS: Readonly<Record<Stage, readonly [number, number, number, number]>> = {
-  baby: [10, 4, 8, 14], young: [14, 5, 22, 15], adult: [18, 6, 30, 16],
+  baby: [10, 4, 8, 14], young: [14, 5, 22, 15], adult: [18, 6, 30, 16], elder: [22, 6, 32, 24],
 };
 /** The roar's jaw at the snap (3.4: 25; young 22; the baby's "ptoo" at its 20 minimum), and the proud chin after it. */
-const ROAR_JAW: Readonly<Record<Stage, number>> = { baby: 20, young: 22, adult: 25 };
+const ROAR_JAW: Readonly<Record<Stage, number>> = { baby: 20, young: 22, adult: 25, elder: 25 };
 const PROUD_CHIN = -6;
 /** The tell's two glow.hi flashes of the crystals (3.4: 4 f, twice), cue windows [from, to) before the snap. */
 const FLASH: Readonly<Record<Stage, readonly number[]>> = {
-  baby: [-9, -6, -4, -1], young: [-12, -8, -6, -2], adult: [-16, -12, -8, -4],
+  baby: [-9, -6, -4, -1], young: [-12, -8, -6, -2], adult: [-16, -12, -8, -4], elder: [-20, -15, -10, -5],
 };
 // ---------- ground space: where floor-level effects live ----------
 
@@ -176,7 +187,7 @@ const DUST_RISE: readonly number[] = [1, 1, 2, 2, 3, 3, 3, 3, 2, 2, 1, 1];
 function kickDust(ctx: CanvasRenderingContext2D, rig: DragonRig, gx: number, half: number, age: number, n: number, bits: number): void {
   if (age < 0 || age >= DUST_LIFE) return;
   const a = age | 0, out = half + 1 + (a >> 1);
-  ctx.fillStyle = rig.col(PAL.scale);
+  ctx.fillStyle = rig.col(rig.pal.scale);
   for (let i = 0; i < n && bits > 0; i++) {
     const dx = out + i * 3, y = -2 - DUST_RISE[a] + i;
     ctx.fillRect(Math.round(gx - dx) - 2, y, 2, 2);
@@ -332,13 +343,13 @@ const bodyOver: ElementDraw = (ctx, rig, pose, info) => {
 // ---------- the upset tuck's hood ----------
 
 /** The corner the hood rolls forward from: the dome's ridge vertex (its crest). */
-const HOOD_FROM: Readonly<Record<Stage, number>> = { baby: 0, young: 2, adult: 3 };
+const HOOD_FROM: Readonly<Record<Stage, number>> = { baby: 0, young: 2, adult: 3, elder: 3 };
 /** The dome's first shaded corner (TONE3's front third): where its shade starts before the hood rolls over. */
-const SHADE_FROM: Readonly<Record<Stage, number>> = { baby: 0, young: 3, adult: 4 };
+const SHADE_FROM: Readonly<Record<Stage, number>> = { baby: 0, young: 3, adult: 4, elder: 4 };
 /** The hood's shoulder: the outer arc's point where the lit top turns into the shaded front (an HX index). */
 const HOOD_SHOULDER = 4;
 /** Frames of the tuck's intro over which the hood rolls forward (upsetTuck's intro). */
-const HOOD_GROW: Readonly<Record<Stage, number>> = { baby: 1, young: 13, adult: 16 };
+const HOOD_GROW: Readonly<Record<Stage, number>> = { baby: 1, young: 13, adult: 16, elder: 20 };
 /** How far (deg) the hood is swung up about the crest when it starts to roll forward (hoodPoints). */
 const HOOD_SWING = 45;
 /** Where along the dome (u, -1 rear .. 1 front) the hood's own rim hands over to the dome's rim. */
@@ -500,7 +511,7 @@ function drawCrystals(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: Drago
   const tell = pose.act === ACT.breath && ((c >= fl[0] && c < fl[1]) || (c >= fl[2] && c < fl[3]));
   const upset = pose.act === ACT.upset;
   const lit = !tell && (upset ? Math.floor(info.tick / 12) % 2 === 1 : m > -0.3 && !info.asleep);
-  const col = rig.col(tell ? T.hi : lit ? info.pal.glow : BANKED);
+  const col = rig.col(tell ? T.hi : lit ? info.pal.glow : rig.moodT.banked);
   // which crystal glints now, and where: the happy sweep, else the ambient twinkle (-1 = none)
   let glint = -1, spot = 1;
   if (lit && !upset && !rig.override) {
@@ -566,7 +577,7 @@ function drawCrystals(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: Drago
 
 /** The beg crouch per stage: body pitch and settle; the stare's and the lick's head (see begRock). */
 const BEG: Readonly<Record<Stage, { rot: number; settle: number }>> = {
-  baby: { rot: 20, settle: 3 }, young: { rot: 6, settle: 2 }, adult: { rot: 6, settle: 2.5 },
+  baby: { rot: 20, settle: 3 }, young: { rot: 6, settle: 2 }, adult: { rot: 6, settle: 2.5 }, elder: { rot: 6, settle: 2.5 },
 };
 /** The baby's beg head poses (no neck to fit: it bows): [body rot, a0, head] for the stare and the lick. */
 const BABY_STARE = [16, 10, 8] as const, BABY_LICK = [22, 12, 13] as const;
@@ -694,6 +705,7 @@ const PUFF_RAY: readonly number[] = [2, -10, 11, -4, 16];
  */
 const PUFFS: Readonly<Record<Stage, { n: number; every: number; reach: number; r1: number }>> = {
   baby: { n: 0, every: 1, reach: 0, r1: 0 }, young: { n: 3, every: 6, reach: 20, r1: 5 }, adult: { n: 5, every: 5, reach: 26, r1: 7 },
+  elder: { n: 5, every: 5, reach: 26, r1: 7 },
 };
 /** Frames a roar puff lives: it grows over 18, holds, and shrinks away in 3 steps over the last 9. */
 const PUFF_LIFE = 30;
@@ -746,7 +758,7 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
     const P = PUFFS[st];
     // each puff ringed 1 px in the sand's shadow tone (under the disc, drawn 1 px larger): the cloud's lobes
     // overlap into a lumpy billow, and plain sand discs were a pale smudge 27 % from the straw floor
-    const ring = tones(rig, hex).sh, adult = st === 'adult';
+    const ring = tones(rig, hex).sh, adult = grown(st);
     for (let k = P.n - 1; k >= 0; k--) {
       const age = c - P.every * k;
       if (age < 0 || age >= PUFF_LIFE) continue;
@@ -771,7 +783,9 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
 // ---------- ambient: dust and the pebble crumb ----------
 
 /** The idle's weight shifts (idleRock): the frames the near front paw sets down, per stage (the baby has none). */
-const SHUFFLE: Readonly<Record<Stage, readonly number[]>> = { baby: [], young: [127, 178], adult: [152, 212] };
+// (FIRST PASS (elder): none -- the elder breathes the shared elder idle, its "hmm" every third loop; its weight shift
+// is rock's to lay over it)
+const SHUFFLE: Readonly<Record<Stage, readonly number[]>> = { baby: [], young: [127, 178], adult: [152, 212], elder: [] };
 
 /** Frames the pebble crumb lives: rolling down the dome, dropping off its rear end, one bounce, lying a while. */
 const CRUMB_LIFE = 80, CRUMB_ROLL = 22;
@@ -805,8 +819,7 @@ const ambient: ElementDraw = (ctx, rig, pose, info) => {
     rootToGround(rig, legNF.ankle.x, legNF.ankle.y, PG); gx = PG.x + Fr.pawW / 2 - 2; half = Fr.pawW / 2;
   } else if (act === ACT.sleep && c < 0 || act === ACT.fidget) {
     // the belly lands: the lie-down's settle (sleepAnim: body.y reaches it at 32 / 40 of the lie-down), the sunbathe's
-    const k = STAGE_TIMING[st].dur;
-    age = act === ACT.fidget ? c - Math.round(16 * k) : c - (Math.round(32 * rig.tune.sleep.lieDown / 40) - Math.round(rig.tune.sleep.lieDown));
+    age = act === ACT.fidget ? c - Math.round(16 * FIDGET_TIMING[st].dur) : c - (Math.round(32 * rig.tune.sleep.lieDown / 40) - Math.round(rig.tune.sleep.lieDown));
     rootToGround(rig, J.body.x, 0, PG); gx = PG.x; half = rig.dims.bodyLen / 2 - 2; pairs = st === 'baby' ? 1 : 2;
   } else if (act === ACT.happy) {
     // the roll-over (rollOver): the shell lands at f 24, the paws come back down at f 84 (cue from f 14)
@@ -863,7 +876,7 @@ function settleOf(d: DragonDims | null, extra = 1): number {
  * The baby keeps the shared bob: a weight shift under a 4 px leg is a wobble.
  */
 function idleRock(stage: Stage): DragonAnim | null {
-  if (stage === 'baby') return null;
+  if (stage === 'baby' || stage === 'elder') return null;
   const young = stage === 'young', B = young ? 100 : 120, L = 2 * B, [c1, c2] = SHUFFLE[stage];
   const kf = young ? [0, 7, 47, 54] : [0, 8, 56, 64];
   const two = (v: readonly number[]): Key[] => [0, B].flatMap((o) => kf.map((f, i) => [o + f, v[i], 'inout'] as const));
@@ -891,17 +904,18 @@ function idleRock(stage: Stage): DragonAnim | null {
  * the sun up (mood +1: lit, glinting); no "z". Then it pushes itself up. Dust puffs as the belly lands (ambient).
  */
 function sunbathe(stage: Stage, d: DragonDims | null): DragonAnim {
-  const k = durOf(stage), L = Math.round(120 * k), t = (f: number) => Math.round(f * k), baby = stage === 'baby';
-  const settle = settleOf(d), sp = baby ? 1 : stage === 'young' ? 3 : 4;
+  // (the elder's at x 1.3, its sprawl, chin and tail at 0.8x, its belly still flat on the floor: FIDGET_TIMING, 4.2)
+  const FT = FIDGET_TIMING[stage], k = FT.dur, g = FT.amp, L = Math.round(120 * k), t = (f: number) => Math.round(f * k), baby = stage === 'baby';
+  const settle = settleOf(d), sp = (baby ? 1 : stage === 'young' ? 3 : 4) * g;
   const hold = (v: number, a: number, b: number): Key[] => [[0, 0], [t(a), v, 'inout'], [t(100), v, 'inout'], [t(b), 0]];
   return bake({
     'body.y': hold(settle, 16, 116),
     squash: [[0, 1], [t(16), 1], [t(40), 1.03, 'inout'], [t(62), 1, 'inout'], [t(84), 1.03, 'inout'], [t(100), 1], [L, 1]],
     'legNH.slide': hold(-sp, 14, 112), 'legFH.slide': hold(-sp, 14, 112),
-    'legNF.slide': hold(sp + 1, 14, 112), 'legFF.slide': hold(sp + 1, 14, 112),
-    'neck.a0': hold(baby ? 0 : -12, 18, 114),
-    'head.rot': hold(baby ? -14 : -16, 20, 114),
-    'tail.lift': hold(-6, 16, 112),
+    'legNF.slide': hold(sp + g, 14, 112), 'legFF.slide': hold(sp + g, 14, 112),
+    'neck.a0': hold(baby ? 0 : -12 * g, 18, 114),
+    'head.rot': hold((baby ? -14 : -16) * g, 20, 114),
+    'tail.lift': hold(-6 * g, 16, 112),
     'tail.stiff': [[0, 0], [t(16), 1], [t(100), 1], [L, 0]],
     face: [[0, DFACE.neutral], [t(18), DFACE.happy], [t(102), DFACE.neutral]],
     mood: [[0, 0], [t(20), 2], [t(100), 2], [L, 0]],
@@ -1030,7 +1044,9 @@ function gravelRoar(stage: Stage): DragonAnim {
  * the pile (lickPose), the stare hovers 5 px over it. The baby, with no neck to lower, bows its body instead.
  */
 function begRock(stage: Stage, d: DragonDims | null): DragonAnim {
-  const L = 120, baby = stage === 'baby', B = BEG[stage], hg = DFACE.hungry;
+  // (the elder's loop is 4.2's 140 f: every beat x 140 / 120 but the growl, which lands where the shared beg's does)
+  const L = stage === 'elder' ? 140 : 120, q = L / 120, baby = stage === 'baby', B = BEG[stage], hg = DFACE.hungry;
+  const s = (keys: Key[]): Key[] => stretchKeys(keys, q);
   // [body rot, body y, a0, a1, head] of the stare, the lick and the plea
   let stare: readonly number[], lick: readonly number[];
   if (baby || !d) {
@@ -1044,18 +1060,20 @@ function begRock(stage: Stage, d: DragonDims | null): DragonAnim {
     stare = [B.rot, B.settle, HP.a0, HP.a1, HP.head];
   }
   const plea = baby ? [-8, 1, -6, 0, -12] : [-4, 1, -8, 0, -12];
-  const ch = (i: number): Key[] => [[0, stare[i]], [20, stare[i]], [28, lick[i]], [50, lick[i]], [58, stare[i]], [64, stare[i]],
-    [74, plea[i]], [98, plea[i]], [108, stare[i]]];
+  const ch = (i: number): Key[] => s([[0, stare[i]], [20, stare[i]], [28, lick[i]], [50, lick[i]], [58, stare[i]], [64, stare[i]],
+    [74, plea[i]], [98, plea[i]], [108, stare[i]]]);
   const jmin = d ? d.head.jawMin : 20;
+  // (each lick's open jaw is held whole frames, stepped: stretched, its open and shut keys stay 1 f apart)
+  const lk = (a: number, b: number): Key[] => { const A = Math.round(a * q), Bq = Math.round(b * q); return [[A - 1, 0], [A, jmin], [Bq, jmin], [Bq + 1, 0]]; };
   return bake({
     'body.rot': ch(0), 'body.y': ch(1), 'neck.a0': ch(2), 'neck.a1': ch(3), 'head.rot': ch(4),
-    jaw: [[0, 0], [29, 0], [30, jmin], [36, jmin], [37, 0], [40, 0], [41, jmin], [47, jmin], [48, 0]],
-    squash: [[0, 1], [64, 1], [72, 1.02], [98, 1.02], [106, 1]],
+    jaw: [[0, 0], ...lk(30, 36), ...lk(41, 47)],
+    squash: s([[0, 1], [64, 1], [72, 1.02], [98, 1.02], [106, 1]]),
     'root.x': [[0, 0], [80, 0, 'linear'], [81, 1, 'linear'], [83, -1, 'linear'], [85, 1, 'linear'], [87, -1, 'linear'], [88, 0]],
     // (the baby draws its front paws back under its chest, so its pile lies clear of them under its bowed snout)
     'legNF.slide': [[0, baby ? -3 : 0]], 'legFF.slide': [[0, baby ? -3 : 0]],
-    'tail.sway': [[0, -4], [60, 4]],
-    face: [[0, hg], [29, DFACE.closed], [49, hg]],
+    'tail.sway': s([[0, -4], [60, 4]]),
+    face: s([[0, hg], [29, DFACE.closed], [49, hg]]),
     mood: [[0, -0.5]],
     act: [[0, ACT.beg]], cue: (t) => t,
   }, { stage, len: L, loop: true, ease: 'inout' });
@@ -1085,6 +1103,7 @@ function fitHeadFolded(d: DragonDims, settle: number, rot: number, e0: number, h
 /** The upset tuck's pose per stage: body pitch, the neck's first segment (world deg), the head's world pitch. */
 const UPSET: Readonly<Record<Stage, { rot: number; e0: number; head: number }>> = {
   baby: { rot: 0, e0: 0, head: 14 }, young: { rot: 7, e0: -55, head: 2 }, adult: { rot: 7, e0: -55, head: 2 },
+  elder: { rot: 7, e0: -55, head: 2 },
 };
 
 /**
@@ -1162,6 +1181,14 @@ export const ROCK: ElementSpec = {
       tailRest: TAIL_REST.rock.adult, horns: null, markings: [], brow: 3, tailStiff: 0.7,
       wing: wingParams({ style: 'bat', scallop: 1, span: 0.7, foldRise: 0 }), dorsal: null,
     },
+    // the elder (3.4's Elder column): a 4 px brow ridge, half the elder's neck lowering (-33 for -40: the head drops
+    // about 2 px and stays under the dome's top, 2.3), the adult's 38 % belly band (at the elder's 42 %, over the
+    // paunch and between the legs, the pale cream band read as a nappy: the elder core review), the stubby wing torn
+    // once where its panel has room (2.9: no hole on rock). Its dome, crystals and nose horn: the FIRST PASS notes above
+    elder: {
+      tailRest: TAIL_REST.rock.elder, horns: null, markings: [], brow: 4, tailStiff: 0.7, neckAngle: -33, bellyFrac: 0.38,
+      wing: wingParams({ style: 'bat', scallop: 1, span: 0.7, foldRise: 0, tears: [{ panel: 1, at: 0.5, depth: 3 }] }), dorsal: null,
+    },
   },
   render: { bodyOver, nearHead, breath, ambient },
   wingUnderBodyOver: true,
@@ -1178,11 +1205,13 @@ export const ROCK: ElementSpec = {
     },
     tuning: (st) => ({
       // (a lumber: the shell pitches +-1.5 deg with the stride and the head plods 2 deg low)
-      walk: { cycle: st === 'adult' ? 60 : st === 'young' ? 50 : 30, speed: st === 'adult' ? 0.3 : st === 'young' ? 0.32 : 0.2,
+      // (the elder: 72 f at 0.26 px/f, 4.2)
+      walk: { cycle: st === 'adult' ? 60 : st === 'young' ? 50 : st === 'elder' ? 72 : 30, speed: st === 'adult' ? 0.3 : st === 'young' ? 0.32 : st === 'elder' ? 0.26 : 0.2,
         sway: st === 'baby' ? 0 : 1.5, head: st === 'baby' ? 0 : 2 },
       // the SLEEP tuck (3.4) rests the head on the ground OUTSIDE the rim, so it draws in the normal order (the head
       // last); tuck 1, the head under the dome, is the upset tuck's
-      sleep: { tuck: st === 'baby' ? 2 : 0, nubFold: 0, breath: st === 'adult' ? 240 : st === 'young' ? 200 : 160 },
+      // FIRST PASS (elder): the adult's 240 f breath at the elder's x 1.2 (the shared 180 -> 216)
+      sleep: { tuck: st === 'baby' ? 2 : 0, nubFold: 0, breath: st === 'adult' ? 240 : st === 'young' ? 200 : st === 'elder' ? 288 : 160 },
       // (gravelRoar replaces the shared breath; these are its numbers, for anything that reads the tuning)
       breath: { jaw: ROAR_JAW[st], fizzleFace: 'happy', fizzleChin: PROUD_CHIN },
     }),

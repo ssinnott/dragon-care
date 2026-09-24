@@ -50,6 +50,26 @@ export const DUSK: ElementSpec = {
       tailRest: TAIL_REST.dusk.adult, horns: null, markings: [smokeTip(0.8, 11)],
       wing: wingParams({ style: 'bat', scallop: -1.5 }), dorsal: null,
     },
+    // the elder (3.8's Elder column): the elder's posture with dusk's +6 deg on top (2.3: net 58 / 28), the storm
+    // slate of its greying curve (palettes.ts), the moth wing worn as fire's is (2.9: tears in panels 1 and 2, the
+    // notched hole from full spread, re-measured for the airing; its fit on the lobed edge is re-measured in the
+    // element pass).
+    // FIRST PASS (elder): the adult's stand-in smoke ring (3.8: the elder's smoke tip runs 22 px back from the tip);
+    // the shared grey muzzle in its smoke grey (palettes.ts MUZZLE_SLOT) stands in for its NOSE FROST grown back to
+    // the eye line; the adult's crook lamp and the elder-only RESIDENT MOTH on its cap wait for the lamp itself
+    elder: {
+      tailRest: TAIL_REST.dusk.elder, horns: null, markings: [smokeTip(0.8, 11)],
+      wing: wingParams({
+        style: 'bat', scallop: -1.5,
+        tears: [{ panel: 1, at: 0.35, depth: 5 }, { panel: 2, at: 0.6, depth: 5 }],
+        // (2.9's spot re-measured for the notched window AND the airing: at 2.9's (-9.5, -8.5) the window lay on the back once
+        // the airing leaned the spread back far enough for the tip rule (1.3); here, up the arm panel toward the
+        // forearm, it keeps the ring and 2 px of membrane round it and clears the back line at the airing's 20 deg
+        // sit-back, anims.ts airingFit)
+        hole: { x: -5.5, y: -13, from: 0.95 },
+      }),
+      dorsal: null,
+    },
   },
   render: {},
 };

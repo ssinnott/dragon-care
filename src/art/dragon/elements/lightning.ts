@@ -16,7 +16,7 @@
 //   - the anims of its own: the zoomies fidget, the sleep loop with its dream-twitch every 6 breaths, the baby
 //     breath's hair-on-end jolt, the adult breath's shorter sustain.
 import { DRAGON_PALETTES } from '../palettes.ts';
-import { TAIL_REST } from '../stages.ts';
+import { TAIL_REST, grown } from '../stages.ts';
 import type { Stage } from '../stages.ts';
 import { hornParams, wingParams } from '../element.ts';
 import type { ElementSpec, ElementDraw, DragonInfo } from '../element.ts';
@@ -67,10 +67,15 @@ const BOLT: Readonly<Record<Stage, BoltShape>> = {
   baby: { pts: [0, 0, -1.5, -6, -3, -12, -5.5, -5.4, -3.5, -5.4, -5, 0], spar: [], at: 105, sparR: 0, farDx: -1, farDy: 1 },
   young: { pts: YOUNG, spar: sparTo(YOUNG, 0.7), at: 115, sparR: 1, farDx: -2.5, farDy: 0 },
   adult: { pts: ADULT, spar: sparTo(ADULT, 0.7), at: 115, sparR: 1.5, farDx: -4, farDy: 0 },
+  // FIRST PASS (elder): the adult's bolt at the adult's 115 deg rest cock. 3.5's elder bolt keeps the adult's height
+  // and leading edge and grows 1.1x as wide, 28 x 16.5, with its elder-only extra, the THIRD TOOTH (its trailing edge
+  // stepping three times), and one ragged tear on each bolt's upper trailing edge (2.9: parts.ts pathTearEdge, with
+  // sp.wing.tears; no hole); the elder AMBIENT arc (a 3-segment spark from bolt tip to bolt tip at mood >= 0.5) too
+  elder: { pts: ADULT, spar: sparTo(ADULT, 0.7), at: 115, sparR: 1.5, farDx: -4, farDy: 0 },
 };
 
-/** The shared breath's wind-up, frames (anims.ts breathAnim: 18 / 14 / 10): cue runs from -WINDUP to the snap. */
-const WINDUP: Readonly<Record<Stage, number>> = { baby: 10, young: 14, adult: 18 };
+/** The shared breath's wind-up, frames (anims.ts breathAnim: 18 / 14 / 10, the elder's 22): cue runs from -WINDUP to the snap. */
+const WINDUP: Readonly<Record<Stage, number>> = { baby: 10, young: 14, adult: 18, elder: 22 };
 
 /** Cock angle (1.1 convention: from +x, + up): sad 140 (baby 125) -> rest 115 (105) -> excited 95. */
 function cockOf(stage: Stage, mood: number, asleep: boolean, spread: number): number {
@@ -344,7 +349,7 @@ const TRIP = 18;
 function idleSparks(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, info: DragonInfo): void {
   const hot = info.mood > 0.5, st = rig.budget.stretch, every = hot ? 30 : 120 - 80 * Math.max(0, Math.min(1, info.charge));
   const n = liveSpawns(info.seed * 13 + 5, info.tick, every * st, every / 3, 8, AG, ID);
-  const m = info.stage === 'adult' && hot ? liveSpawns(info.seed * 19 + 7, info.tick, 90 * st, 30, TRIP, AG2, ID2) : 0;
+  const m = grown(info.stage) && hot ? liveSpawns(info.seed * 19 + 7, info.tick, 90 * st, 30, TRIP, AG2, ID2) : 0;
   let ok = rig.budget.take(rig.slot, n + m);
   for (let i = 0; i < n && ok > 0; i++, ok--) {
     const h = hash01(info.seed + 3, ID[i]);
@@ -364,7 +369,7 @@ function idleSparks(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonP
  * each flying SHOWER_LIFE f, so no more than 3 are ever in the air; LIE is how long a landed spark (the dream's,
  * the skid's) lies on the floor.
  */
-const SHOWER: Readonly<Record<Stage, number>> = { baby: 3, young: 4, adult: 6 };
+const SHOWER: Readonly<Record<Stage, number>> = { baby: 3, young: 4, adult: 6, elder: 6 };
 const SHOWER_GAP = 5, SHOWER_LIFE = 14, LIE = 8;
 /**
  * The shower's fan, deg from straight forward (+ up): each spark leaves along the next heading, up and back, away
@@ -483,9 +488,9 @@ const BX = new Float32Array(6), BY = new Float32Array(6), OUT = new Float32Array
  * (3.5's "2 segments", one kink, was a pale bent stick with a knob on it: a pipe or a bone in the mouth, and no
  * zigzag; at 5 / 4 / 5, 40 deg kinks, a 14 px pale stick with a pip still read as a bone); the baby pop's 2.
  */
-const SEGS: Readonly<Record<Stage, readonly number[]>> = { baby: [5, 4], young: [6, 5, 6], adult: [10, 8, 10, 8] };
+const SEGS: Readonly<Record<Stage, readonly number[]>> = { baby: [5, 4], young: [6, 5, 6], adult: [10, 8, 10, 8], elder: [10, 8, 10, 8] };
 /** Each segment's kink off the bolt's line, radians: the least, and the seeded spread on top (young >= 45 deg). */
-const KINK: Readonly<Record<Stage, readonly [number, number]>> = { baby: [0.7, 0.15], young: [0.79, 0.1], adult: [0.7, 0.15] };
+const KINK: Readonly<Record<Stage, readonly [number, number]>> = { baby: [0.7, 0.15], young: [0.79, 0.1], adult: [0.7, 0.15], elder: [0.7, 0.15] };
 
 /**
  * The bolt's polyline into BX / BY[0..n] (mouth space) for re-roll `roll`, returning n: from the mouth (the baby's
@@ -605,7 +610,9 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
     }
     return;
   }
-  const adult = st === 'adult';
+  // FIRST PASS (elder): the adult's bolt and fork, drawn at 1.1x reach nowhere yet (4.2); its finale is 4 sparks on
+  // a circle (cue 32 to 44), and its elder breath's jaw still hangs open past the bolt's life (adultBreath's cut)
+  const adult = grown(st);
   if (c < BOLT_LIFE) {
     const n = boltNodes(info.seed, Math.floor(c / 4), st);
     if (adult) {
@@ -655,16 +662,17 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
  */
 interface ZoomTiming { len: number; dash0: number; dashEnd: number; skidEnd: number; dist: number; cycle: number; lift: number; air: number }
 const zoomTiming = (stage: Stage): ZoomTiming => {
-  const k = stage === 'adult' ? 1 : stage === 'young' ? 0.85 : 0.6, t = (f: number) => Math.round(f * k);
+  // (the elder's zoomies go 28 px in 60 f, 4.2: FIRST PASS (elder) its gallop cycle, paw lift and rise are the young's)
+  const elder = stage === 'elder', k = stage === 'adult' ? 1 : stage === 'young' ? 0.85 : elder ? 1.2 : 0.6, t = (f: number) => Math.round(f * k);
   return {
     len: t(50), dash0: t(5), dashEnd: t(23), skidEnd: t(29),
-    dist: stage === 'adult' ? 40 : stage === 'young' ? 32 : 18,
-    cycle: stage === 'adult' ? 10 : stage === 'young' ? 9 : 6,
-    lift: stage === 'adult' ? 6 : stage === 'young' ? 4 : 2.5,
-    air: stage === 'adult' ? 2 : stage === 'young' ? 1.5 : 1,
+    dist: stage === 'adult' ? 40 : stage === 'young' ? 32 : elder ? 28 : 18,
+    cycle: stage === 'adult' ? 10 : stage === 'young' || elder ? 9 : 6,
+    lift: stage === 'adult' ? 6 : stage === 'young' || elder ? 4 : 2.5,
+    air: stage === 'adult' ? 2 : stage === 'young' || elder ? 1.5 : 1,
   };
 };
-const ZOOM: Readonly<Record<Stage, ZoomTiming>> = { baby: zoomTiming('baby'), young: zoomTiming('young'), adult: zoomTiming('adult') };
+const ZOOM: Readonly<Record<Stage, ZoomTiming>> = { baby: zoomTiming('baby'), young: zoomTiming('young'), adult: zoomTiming('adult'), elder: zoomTiming('elder') };
 
 /**
  * The zoomies' ROTARY GALLOP, phase 0 = that leg's lift-off: the hinds a tenth apart, the fronts a tenth apart a
@@ -772,7 +780,7 @@ const KICK: readonly (readonly number[])[] = [
   [0, 0, 0, 0, 0], [-5, 3, 0, -10, -1], [-5, 3, 1.5, -10, 0], [0, 0, 0.5, 0, 0],
   [-5, 3, 1.5, 0, 0], [-5, 3, 0, 0, 0], [0, 0, 1.5, 0, 0], [0, 0, 0, 0, 0],
 ];
-const KICK_K: Readonly<Record<Stage, number>> = { baby: 0.5, young: 0.8, adult: 1 };
+const KICK_K: Readonly<Record<Stage, number>> = { baby: 0.5, young: 0.8, adult: 1, elder: 0.8 };
 
 /**
  * SLEEP (4.2 / 4.3 "Lightning"): the shared lie-down and breathing loop, the loop run 6 breaths long so the
@@ -882,6 +890,16 @@ export const LIGHTNING: ElementSpec = {
       wing: wingParams({ style: 'custom', rootDx: -3 }),
       dorsal: null,
     },
+    // the elder (3.5's Elder column): its tail straight, stepped and at the adult's rest (2.3: EL's level 0 deg read
+    // as a lower mood), the adult's horns and Zs; the bolt's tear is the data here (2.9: 55 % down from the tip,
+    // 5 px x 2 deep) for its renderer to cut (FIRST PASS: BOLT above)
+    elder: {
+      tailRest: TAIL_REST.lightning.elder, tailR: [4.7, 0.5],
+      horns: hornParams({ len: 8, kinkAt: 0.6, bend: 35, sweep: -6 }),
+      markings: [{ kind: 'zstripe', at: 'tail', t: 0.14, size: 5, h: 7 }, { kind: 'zstripe', at: 'haunch', size: 6, h: 8 }, { kind: 'zstripe', at: 'shoulder', size: 6, h: 8 }],
+      wing: wingParams({ style: 'custom', rootDx: -3, tears: [{ panel: 1, at: 0.55, depth: 2 }] }),
+      dorsal: null,
+    },
   },
   render: { wing, breath, ambient },
   // the Spark Bolt's flash (3.5 "Tint"): the whole dragon flat in `glow.hi` (the rig's opaque flash, tint 1) on the
@@ -897,7 +915,8 @@ export const LIGHTNING: ElementSpec = {
     fidget,
     overrides: (st, dims) => ({ sleep: sleepOverride(st, dims), ...(st === 'baby' ? { breath: babyBreath() } : st === 'adult' ? { breath: adultBreath() } : {}) }),
     tuning: (st) => ({
-      walk: st === 'adult' ? { cycle: 40, speed: 0.54 } : st === 'young' ? { cycle: 34, speed: 0.6 } : { cycle: 20, speed: 0.36 },
+      // (the elder's 54 f at 0.38 px/f: 4.2)
+      walk: st === 'adult' ? { cycle: 40, speed: 0.54 } : st === 'young' ? { cycle: 34, speed: 0.6 } : st === 'elder' ? { cycle: 54, speed: 0.38 } : { cycle: 20, speed: 0.36 },
       // the Spark Bolt's wind-up contracts the pupil (3.5); the baby's static pop keeps its dark baby eye
       ...(st === 'baby' ? {} : { breath: { pupil: true } }),
     }),

@@ -12,8 +12,8 @@
 //   ambient   the drip, the shake's droplets and the happy flourish's bubbles (top pass).
 // Every bubble, drop and dot is a whole-pixel construction in face space (rig.ts enterFace): an anti-aliased 2-4 px
 // ring dissolved into a grey smudge at game scale.
-import { DRAGON_PALETTES, DRAGON_SHARED, moodTones } from '../palettes.ts';
-import { TAIL_REST } from '../stages.ts';
+import { DRAGON_PALETTES, DRAGON_SHARED } from '../palettes.ts';
+import { TAIL_REST, FIDGET_TIMING, grown } from '../stages.ts';
 import type { Stage } from '../stages.ts';
 import { wingParams } from '../element.ts';
 import type { ElementSpec, ElementDraw, DragonInfo } from '../element.ts';
@@ -31,7 +31,6 @@ import { celPath, outlinePath } from '../../../lib/art/shading.ts';
 import { pathTaperedCapsule } from '../../../lib/art/shapes.ts';
 
 const PAL = DRAGON_PALETTES.water;
-const DIM = moodTones(PAL).dimSpot;
 const INK = DRAGON_SHARED.outline, PEARL = DRAGON_SHARED.catchlight, TONGUE = DRAGON_SHARED.tongue;
 const D2R = Math.PI / 180;
 
@@ -54,13 +53,17 @@ const FLUKE: Readonly<Record<Stage, { h: number; d: number; rays: number; round:
   baby: { h: 10, d: 6, rays: 0, round: true, flare: 1 },
   young: { h: 11, d: 6, rays: 2, round: false, flare: 1 },
   adult: { h: 16, d: 8, rays: 2, round: false, flare: 1.5 },
+  // FIRST PASS (elder): the adult's crescent and its 2 x 2 glow dots. 3.6's elder fluke grows to 18 x 9, whole, and
+  // the dots grow into its elder-only extra, the PEARLS (3 x 3 in `horn`, >= 2 px in from each lobe tip); tipBox
+  // follows FLUKE, so it will grow with it
+  elder: { h: 16, d: 8, rays: 2, round: false, flare: 1.5 },
 };
 /** Notch depth, px from the lobe tips (3.6: >= 3, so both lobes read). */
 const NOTCH = 3.5;
 /** Droop at the low end of the gauge, deg (3.6: 15; the fluke keeps its full size). */
 const DROOP = 15;
 /** How far forward of the tail's tip the fluke's edges leave its contour: the paddle wraps further along the tail. */
-const JOIN: Readonly<Record<Stage, number>> = { baby: 6, young: 2.5, adult: 2.5 };
+const JOIN: Readonly<Record<Stage, number>> = { baby: 6, young: 2.5, adult: 2.5, elder: 2.5 };
 
 let RC = 1, RS = 0;
 /** A fluke point (tail-tip space) turned by the droop about the tail tip, into FP. */
@@ -142,7 +145,7 @@ const tailTip: ElementDraw = (ctx, rig, pose, info) => {
   celPath(ctx, rig, info.pal.membrane, -D / 2, 0, Math.max(F.h, F.d) / 2, F.round ? 0 : 0.4, 0);
   if (!rig.override && F.rays) {
     ctx.save(); flukePath(ctx, F.round, H, D, jx, rJ); ctx.clip();
-    const ox = J.tailX[tn], oy = J.tailY[tn], adult = st === 'adult';
+    const ox = J.tailX[tn], oy = J.tailY[tn], adult = grown(st);
     for (let k = -1; k <= 1; k += 2) {
       // one ray down the middle of each lobe, radiating from the tail's end just clear of its contour (the clip off
       // the tail is anti-aliased; a ray starting 2.5 px out was a 2 x 3 stub by the lobe's back edge) toward the lobe
@@ -175,6 +178,7 @@ const FIN: Readonly<Record<Stage, { l: number; h: number; ray: boolean; k0: numb
   baby: { l: 4.5, h: 4, ray: false, k0: 4 },
   young: { l: 5, h: 4, ray: false, k0: 3 },
   adult: { l: 7, h: 6, ray: true, k0: 3 },
+  elder: { l: 7, h: 6, ray: true, k0: 3 },
 };
 /** The ear's root runs this far inside the skull's contour, px: hidden behind it (drawn before the skull). */
 const EAR_SINK = 3;
@@ -377,6 +381,7 @@ const DORSAL: Readonly<Record<Stage, { h: number; n: number; from: number; to: n
   baby: null,
   young: { h: 2, n: 2, from: -12, to: -3 },
   adult: { h: 3, n: 3, from: -17, to: -3 },
+  elder: { h: 3, n: 3, from: -17, to: -3 },
 };
 
 /**
@@ -428,7 +433,8 @@ function markingTone(info: DragonInfo, P: DragonPose, rig: DragonRig): string {
     const B = rig.tune.sleep.breath;
     if (P.act === ACT.sleep && P.cue >= B * 0.28 && P.cue < B * 0.56) s = Math.min(2, s + 1);
   } else if (info.mood >= 0 && s === 1 && (info.tick + info.seed * 37) % 240 < 30) s = 2;
-  return s === 2 ? info.pal.glow : s === 0 ? DIM : info.pal.marking;
+  // (the dim spot is the stage's: rig.moodT, from the rig's greyed palette)
+  return s === 2 ? info.pal.glow : s === 0 ? rig.moodT.dimSpot : info.pal.marking;
 }
 
 // Pearl spots along the lateral line: the first low on the rear flank (it shows at every stage: 2.7), the rest
@@ -521,16 +527,18 @@ function drawDrop(ctx: CanvasRenderingContext2D, rig: DragonRig, info: DragonInf
  * alternating so neighbours never merge. The adult's 9 fill the sustain (the last leaves at cue 35, the jaw open to
  * 36); its 8 of r 2-5 were a few small bubbles beside fire's flame (the cast review, round 2).
  */
-const BUB_R: Readonly<Record<Stage, readonly number[]>> = { baby: [2], young: [2, 3, 2, 3], adult: [3, 2, 4, 2, 6, 2, 5, 3, 4] };
+// FIRST PASS (elder): the adult's stream over the elder's longer sustain; its finale is one bubble ring (4.2, cue
+// 32 to 44), not drawn yet
+const BUB_R: Readonly<Record<Stage, readonly number[]>> = { baby: [2], young: [2, 3, 2, 3], adult: [3, 2, 4, 2, 6, 2, 5, 3, 4], elder: [3, 2, 4, 2, 6, 2, 5, 3, 4] };
 /**
  * Stream: frames between bubbles per stage, the first bubble's cue, px/f out of the mouth, life before the pop and
  * the pop's frames. Spread over the whole sustain (the jaw is open cue 0-36 adult, 0-27 young): every 3 f, all 4 of
  * the young's were out in the first 9 f and the open mouth then blew nothing. 4 f at 2.5 px/f puts neighbours 10 px
  * apart, >= 2 px of air between their rings with the cone (streamPos); the last pops before the anim hands back.
  */
-const STREAM = { every: { baby: 0, young: 6, adult: 4 } as Readonly<Record<Stage, number>>, first: 3, speed: 2.5, life: 18, pop: 2 };
+const STREAM = { every: { baby: 0, young: 6, adult: 4, elder: 4 } as Readonly<Record<Stage, number>>, first: 3, speed: 2.5, life: 18, pop: 2 };
 /** Droplets shed off the jaw under the stream: adult 4 (3.6), young 2 (half strength). */
-const DROPS: Readonly<Record<Stage, number>> = { baby: 0, young: 2, adult: 4 };
+const DROPS: Readonly<Record<Stage, number>> = { baby: 0, young: 2, adult: 4, elder: 4 };
 /** The baby's bubble: it grows r 2 -> 6 over 30 f from the snap (3.6), wobbles a moment at full size, pops. */
 const BABY_GROW = 30, BABY_POP = 34;
 /**
@@ -766,9 +774,12 @@ const ambient: ElementDraw = (ctx, rig, pose, info) => {
 
 // ---------- anims ----------
 
-/** The shake's timing scale per stage (3.6: 36 f, young x 0.85, baby x 0.6) and its droplets (8 on a baby: a rash). */
-const SHAKE_K: Readonly<Record<Stage, number>> = { baby: 0.6, young: 0.85, adult: 1 };
-const SHAKE_DROPS: Readonly<Record<Stage, number>> = { baby: 4, young: 6, adult: 8 };
+/**
+ * The shake's timing scale per stage (3.6: 36 f, young x 0.85, baby x 0.6; the elder's x 1.3, its whips at 0.8x:
+ * FIDGET_TIMING, 4.2) and its droplets (8 on a baby: a rash).
+ */
+const SHAKE_K: Readonly<Record<Stage, number>> = { baby: FIDGET_TIMING.baby.dur, young: FIDGET_TIMING.young.dur, adult: FIDGET_TIMING.adult.dur, elder: FIDGET_TIMING.elder.dur };
+const SHAKE_DROPS: Readonly<Record<Stage, number>> = { baby: 4, young: 6, adult: 8, elder: 8 };
 /** The fidget's length: the shake, scaled, plus a 10 f settle that is never scaled (the last drops land in it). */
 function shakeLen(stage: Stage): number { return Math.round(36 * SHAKE_K[stage]) + 10; }
 
@@ -780,11 +791,11 @@ function shakeLen(stage: Stage): number { return Math.round(36 * SHAKE_K[stage])
  * a pleased `happy` face. ambient() flings the droplets.
  */
 function fidget(stage: Stage): DragonAnim {
-  const k = SHAKE_K[stage], L = shakeLen(stage), t = (f: number) => Math.round(f * k);
+  const k = SHAKE_K[stage], g = FIDGET_TIMING[stage].amp, L = shakeLen(stage), t = (f: number) => Math.round(f * k);
   const hd: [number, number][] = [[0, 0], [t(3), 4]], sq: [number, number][] = [[0, 1], [t(3), 0.97]];
   const rot: [number, number][] = [[0, 0]], tl: [number, number][] = [[0, 0]];
-  for (let f = 4, i = 0; f < 26; f += 2, i++) { hd.push([t(f), i % 2 ? -10 : 10]); sq.push([t(f + 4), i % 2 ? 0.97 : 1.03]); }
-  for (let f = 6, i = 0; f < 28; f += 3, i++) { rot.push([t(f), i % 2 ? -2 : 2]); tl.push([t(f + 3), i % 2 ? -14 : 14]); }
+  for (let f = 4, i = 0; f < 26; f += 2, i++) { hd.push([t(f), (i % 2 ? -10 : 10) * g]); sq.push([t(f + 4), i % 2 ? 0.97 : 1.03]); }
+  for (let f = 6, i = 0; f < 28; f += 3, i++) { rot.push([t(f), (i % 2 ? -2 : 2) * g]); tl.push([t(f + 3), (i % 2 ? -14 : 14) * g]); }
   hd.push([t(28), 0]); sq.push([t(30), 1]); rot.push([t(29), 0]); tl.push([t(32), 0]);
   return bake({
     'head.rot': hd, squash: sq, 'root.rot': rot, 'tail.sway': tl,
@@ -841,6 +852,25 @@ export const WATER: ElementSpec = {
       markings: [spot(-0.1), spot(0.3), spot(0.7), tailSpot(0.2), tailSpot(0.45, -2)],
       wing: wingParams({ style: 'fin', plus: true, scallop: -3 }), dorsal: null,
     },
+    // the elder (3.6's Elder column): the neck capped x 0.92 (<= 1.08x the adult's length, 2.3) and carried 4 deg
+    // higher (the long neck at 52 / 22 set the head 6 px under the adult's on the silhouette sheet, past 2.1's 3 to 5:
+    // the elder core review), the adult's spots
+    // (greyed at half strength), the fin worn: ragged 5 x 4 notches in panels 2 and 3 and the notched hole at full
+    // spread (2.9). Its fluke: the FIRST PASS note on FLUKE
+    elder: {
+      tailRest: TAIL_REST.water.elder, tipBox: tipBox('elder'), horns: null, neckLen: 0.92, neckAngle: 4,
+      markings: [spot(-0.1), spot(0.3), spot(0.7), tailSpot(0.2), tailSpot(0.45, -2)],
+      wing: wingParams({
+        style: 'fin', plus: true, scallop: -3,
+        tears: [{ panel: 2, at: 0.5, depth: 4 }, { panel: 3, at: 0.4, depth: 4 }],
+        // (2.9's spot re-measured for the notched window AND the airing: at 2.9's (-10.5, -7) the window lay on the back once
+        // the airing leaned the spread back far enough for the tip rule (1.3); here, up the arm panel toward the
+        // forearm, it keeps the ring and 2 px of membrane round it and clears the back line at the airing's 20 deg
+        // sit-back, anims.ts airingFit)
+        hole: { x: -7.5, y: -10, from: 0.9 },
+      }),
+      dorsal: null,
+    },
   },
   render: { tailTip, farHead, nearHead, backRow, breath, ambient },
   markingTone,
@@ -853,7 +883,8 @@ export const WATER: ElementSpec = {
     fidget,
     overrides: (st) => (st === 'baby' ? { breath: babyBreath() } : {}),
     tuning: (st) => ({
-      walk: { sway: st === 'baby' ? 1 : 2, wave: st === 'adult' ? 8 : st === 'young' ? 7 : 4 },
+      // (FIRST PASS (elder): the S-wave 10 f behind the legs on its 64 f cycle, the adult's 8 on 48 stretched)
+      walk: { sway: st === 'baby' ? 1 : 2, wave: st === 'adult' ? 8 : st === 'young' ? 7 : st === 'elder' ? 10 : 4 },
       // asleep the long tail lies out along the floor, so the fluke (the cue) stands clear of it (the baby too: not
       // the bun's default wrap under the body, which would hide its paddle)
       sleep: st === 'baby' ? { tailCurl: 3, tailLift: 14 } : { tailCurl: 3 },

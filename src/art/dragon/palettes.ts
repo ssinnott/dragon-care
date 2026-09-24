@@ -180,8 +180,8 @@ export const DRAGON_SHADOW: Readonly<Partial<Record<DragonElement, Readonly<Part
 // ---------------------------------------------------------------------------------------------------------------
 
 /**
- * The palette's own names for the life stages, the elder included (bible 2.1). The rig's `Stage` (stages.ts) does
- * not have the elder yet; it is a subset of this.
+ * The palette's own names for the life stages, the elder included (bible 2.1): the same four as the rig's `Stage`
+ * (stages.ts), kept here so this module and tools/palette-check.ts need nothing of the rig.
  */
 export const AGE_STAGES = ['baby', 'young', 'adult', 'elder'] as const;
 export type AgeStage = typeof AGE_STAGES[number];
@@ -221,6 +221,12 @@ export interface AgeRule {
   drift?: Readonly<Partial<Record<DragonSlot, number>>>;
   /** The first stage a slot greys at (it keeps its base colour before it): fire's and spike's scale grey only as elders. */
   from?: Readonly<Partial<Record<DragonSlot, AgeStage>>>;
+  /**
+   * The weight a slot's HAND-SET shadow (DRAGON_SHADOW) greys at, where it differs from the slot's own: rock's cream
+   * belly greys at 1.5 but its warm shadow at 0.5, or the elder's belly band shaded to a neutral grey panel between the
+   * legs (the grey diaper the hand-set shadow was made to cure: the elder core review).
+   */
+  shadow?: Readonly<Partial<Record<DragonSlot, number>>>;
 }
 
 /**
@@ -235,7 +241,9 @@ export interface AgeRule {
  *          than the sea-green water (which simulates to a grey) to separate from it (gate f, B3). Its age shows on the
  *          dome (marking at full weight: S 0.46 -> 0.27, still chromatic, so the dim crystals keep their hue pass on
  *          it), the cream belly (1.5) and the silver crown; its slate membrane at half strength keeps the membrane /
- *          horn pair, which passes on hue alone, chromatic.
+ *          horn pair, which passes on hue alone, chromatic. The belly's hand-set warm shadow greys at 0.5 only: at
+ *          the belly's 1.5 the elder's shadow went a neutral #dbd5c5, and with the elder's paunch the belly read as a
+ *          grey nappy between the legs.
  * lightning: its cobalt body greys at half strength, so its elder stays well clear of dusk's dark blue (gate b's
  *          dark-pair floor); its membrane is the signal colour and greys at half strength too.
  * water  : greys at 0.8, luminance kept: darkened as it greys, its elder meets fire's value under deuteranopia (the
@@ -250,7 +258,7 @@ export interface AgeRule {
 export const AGE_RULES: Readonly<Partial<Record<DragonElement, Readonly<AgeRule>>>> = Object.freeze({
   fire: { weight: { scale: 0.3, belly: 0.6, membrane: 0.6 }, drift: { scale: -0.6 }, from: { scale: 'elder' } },
   spike: { weight: { scale: 0.9, belly: 0.6, membrane: 0.6 }, drift: { scale: 0.2 }, from: { scale: 'elder' } },
-  rock: { weight: { scale: 0.25, belly: 1.5, membrane: 0.5, marking: 1 } },
+  rock: { weight: { scale: 0.25, belly: 1.5, membrane: 0.5, marking: 1 }, shadow: { belly: 0.5 } },
   lightning: { weight: { scale: 0.5, membrane: 0.5 } },
   water: { weight: { scale: 0.8, membrane: 0.6 } },
   slinkwing: { weight: { membrane: 0.5 } },
@@ -264,6 +272,14 @@ export function ageK(e: DragonElement, stage: AgeStage, slot: DragonSlot): numbe
   if (from && AGE_STAGES.indexOf(stage) < AGE_STAGES.indexOf(from)) return 0;
   const w = r && r.weight && r.weight[slot] != null ? r.weight[slot]! : AGE_WEIGHT[slot];
   return Math.min(AGE_K_MAX, g * w);
+}
+/** k for a slot's hand-set shadow (DRAGON_SHADOW): its AgeRule `shadow` weight where it has one, else the slot's k. */
+export function ageKShadow(e: DragonElement, stage: AgeStage, slot: DragonSlot): number {
+  const r = AGE_RULES[e], w = r && r.shadow ? r.shadow[slot] : undefined;
+  if (w == null) return ageK(e, stage, slot);
+  const from = r && r.from ? r.from[slot] : undefined;
+  if (from && AGE_STAGES.indexOf(stage) < AGE_STAGES.indexOf(from)) return 0;
+  return Math.min(AGE_K_MAX, (r && r.curve ? r.curve : AGE_GREY)[stage] * w);
 }
 /** lambda: the slot's luminance drift as it greys (0 = luminance kept). */
 export function ageDrift(e: DragonElement, slot: DragonSlot): number {
@@ -323,7 +339,7 @@ export function agedPalette(e: DragonElement, stage: AgeStage): Readonly<DragonP
 
 /**
  * One slot's cel tones for an element at a stage: the engine's makeTones on the aged colour, with DRAGON_SHADOW's
- * hand-set shadow (greyed by the same k and lambda) if it has one, and the scale's highlight silvered by AGE_SILVER
+ * hand-set shadow (greyed by its own k, ageKShadow, and the slot's lambda) if it has one, and the scale's highlight silvered by AGE_SILVER
  * (luminance kept). `stage` defaults to the base palette. The rig seeds its tone cache from this for every slot.
  */
 export function dragonTones(e: DragonElement, slot: DragonSlot, ramp: Readonly<Ramp> = RAMP, stage: AgeStage = 'baby'): Tones {
@@ -331,7 +347,7 @@ export function dragonTones(e: DragonElement, slot: DragonSlot, ramp: Readonly<R
   if (slot === 'scale' && AGE_SILVER[stage] > 0) t = { ...t, hi: ageShade(t.hi, AGE_SILVER[stage]) };
   const o = DRAGON_SHADOW[e], sh0 = o ? o[slot] : undefined;
   if (!sh0) return t;
-  const sh = ageShade(sh0, ageK(e, stage, slot), ageDrift(e, slot));
+  const sh = ageShade(sh0, ageKShadow(e, stage, slot), ageDrift(e, slot));
   return { ...t, sh, deep: toneOf(sh, 0.78) };
 }
 
@@ -346,15 +362,21 @@ export function dragonTones(e: DragonElement, slot: DragonSlot, ramp: Readonly<R
 //   beard        : >= 25 % from the belly, the belly's shadow tone, the scale's shadow tone (the closed jaw's sliver),
 //                  the ink and the straw floor (a sleeping elder's chin and beard rest on it).
 // No single grey clears both lists on rock (its muzzle window is light, >= 0.65, its beard window mid, 0.37 to 0.50),
-// so rock's beard is a mid stone grey under a pale stone muzzle; on every other element they are one grey.
+// so rock's beard is a mid stone grey under a pale stone muzzle; water's muzzle window is a near-white frost, which as a
+// beard read as a buck tooth, so its beard is a mid sea-slate; on every other element they are one grey.
 // ---------------------------------------------------------------------------------------------------------------
 
 /** Relative luminance of the elder muzzle and brow tuft, per element (dusk's is its smoke marking: MUZZLE_SLOT). */
 export const MUZZLE_LUM: Readonly<Partial<Record<DragonElement, number>>> = Object.freeze({
   fire: 0.48, spike: 0.265, rock: 0.72, lightning: 0.315, water: 0.92, slinkwing: 0.285,
 });
-/** Relative luminance of the elder beard, where it differs from the muzzle's (rock). */
-export const BEARD_LUM: Readonly<Partial<Record<DragonElement, number>>> = Object.freeze({ rock: 0.43 });
+/**
+ * Relative luminance of the elder beard, where it differs from the muzzle's: rock's mid stone grey (its muzzle window
+ * is pale, its beard window mid), and water's mid sea-slate (0.32, in its 0.29 to 0.36 window: belly 34 %, belly shadow
+ * 33 %, floor 53 %): its near-white frost muzzle as a beard, `#f5f6f6` beside the fangs' `#f8f4ec` under a white snout,
+ * read as a buck tooth (the elder core review).
+ */
+export const BEARD_LUM: Readonly<Partial<Record<DragonElement, number>>> = Object.freeze({ rock: 0.43, water: 0.32 });
 /**
  * Elements whose elder muzzle, tuft and beard are an existing slot instead of the derived grey: dusk's nose frost
  * (its `marking`, the smoke grey that has crept in from the nose since the young stage, 3.8) grows back to the eye.
