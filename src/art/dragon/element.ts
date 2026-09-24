@@ -118,12 +118,14 @@ export type WingStyle = 'bat' | 'leaf' | 'fin' | 'custom';
 export interface WingTear { panel: number; at: number; depth: number; bite?: boolean }
 
 /**
- * The elder's see-through HOLE (2.9): a whole-pixel 3 x 3 window with one corner notched (8 px of background) inside a
- * 4-neighbour 1 px ink ring, in the arm panel, at wing-space (x, y) of the FULL spread (it moves with the membrane:
- * fire and dusk (-9.5, -8.5), slinkwing (-9.5, -5), spike (-10.5, -6), water (-10.5, -7)). Drawn from `wing` >= `from`
- * (0.95 bat, 0.90 leaf and fin), stamped by the rig at the ROUNDED position in face space (rotated, a 2 px window
- * anti-aliased to 1 px and shimmered) and cut through the far wing too, so it shows the background. Never shrunk: a
- * frame where the window is not wholly on the membrane and above the back line + 1 px skips it.
+ * The elder's see-through HOLE (2.9): a whole-pixel 4 x 3 window with its top-back corner notched (11 px of background,
+ * parts.ts HOLE_PX), in the arm panel. (x, y) is its SPOT, wing space of the FULL spread (it moves with the membrane:
+ * fire (-7, -12), dusk (-5.5, -13), slinkwing (-7, -11.5), spike (-5, -13), water (-7.5, -10)); the rig seats the
+ * window from there against the leading-edge bone, within 3 px, and inks its ring only on the sides away from the bone
+ * (rig.ts holeFrame). Drawn from `wing` >= `from` (0.95 bat, 0.90 leaf and fin), stamped at the ROUNDED position in face
+ * space (rotated, a 2 px window anti-aliased to 1 px and shimmered) and cut through the far wing too, so it shows the
+ * background. Never shrunk: a frame where no seat has the whole window on the membrane and above the back line + 1 px
+ * skips it.
  */
 export interface WingHole { x: number; y: number; from: number }
 

@@ -132,7 +132,7 @@ export type DragonPose = {
    *   fidget frames into the element's idle fidget (ElementAnimHooks.fidget: its flourish keys on it)
    *   variant frames into a shared idle variant (look-around, yawn, scratch, topple, plop-sit; the elder's back
    *          stretch and reminisce)
-   *   airing frames into the elder's airing variant (0 = the spread begins; held full from 12)
+   *   airing frames into the elder's airing variant (0 = the spread begins, 20 f into the sit-back; held full from 12)
    *   bath   frames since the bath began (fire's hiss and shake; the element's own one-shot)
    *   upset  frames into rock's upset tuck (its intro counts up from 0 as the hood swings down)
    *   call   frames since the note starts (slinkwing's lonely call; the wind-up is negative)

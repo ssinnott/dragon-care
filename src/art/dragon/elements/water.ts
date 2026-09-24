@@ -855,8 +855,9 @@ export const WATER: ElementSpec = {
     // the elder (3.6's Elder column): the neck capped x 0.92 (<= 1.08x the adult's length, 2.3) and carried 4 deg
     // higher (the long neck at 52 / 22 set the head 6 px under the adult's on the silhouette sheet, past 2.1's 3 to 5:
     // the elder core review), the adult's spots
-    // (greyed at half strength), the fin worn: ragged 5 x 4 notches in panels 2 and 3 and the notched hole at full
-    // spread (2.9). Its fluke: the FIRST PASS note on FLUKE
+    // (greyed at half strength), the fin worn: ragged 5 x 4 notches in panels 1 and 3 and the notched hole at full
+    // spread (2.9: panel 1, the fin's rounded back end at the resting spread, opens 8 px of the room there; panel 2,
+    // like 3, lay over the back and opened none, the elder core review, round 2). Its fluke: the FIRST PASS note on FLUKE
     elder: {
       tailRest: TAIL_REST.water.elder, tipBox: tipBox('elder'), horns: null, neckLen: 0.92, neckAngle: 4,
       markings: [spot(-0.1), spot(0.3), spot(0.7), tailSpot(0.2), tailSpot(0.45, -2)],

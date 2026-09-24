@@ -733,8 +733,8 @@ function rootsScene(P: GalleryParams): Scene {
 
 /**
  * view=wings: every elder's wing wear (2.9) at game scale 1 blown up `scale` times (default 3), seven columns and three
- * rows: FULL SPREAD (wing 1, flap 0: the flight's spread, where the notched 3 x 3 hole shows the straw through both
- * wings), the AIRING's hold (the elder's idle variant: the hole seen at home, where the look can sit back far enough)
+ * rows: FULL SPREAD (wing 1, flap 0: the flight's spread, where the notched 4 x 3 hole, seated against the forearm, shows
+ * the straw through both wings), the AIRING's hold (the elder's idle variant: the hole seen at home, where the look can sit back far enough)
  * and the RESTING SPREAD of the preen (0.6 leaning back 48: the tears). Lightning's bolts and rock's stubby wings have
  * no hole (no room: 2.9); their tears are the element's (lightning) or one small notch (rock).
  */

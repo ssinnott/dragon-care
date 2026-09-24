@@ -882,7 +882,10 @@ export const SLINKWING: ElementSpec = {
     },
     // the elder (3.7's Elder column): the adult's tail LENGTH (2.3: 6 x 7, for the 1.10 length cap), the jaw's 36 deg,
     // the adult's chevrons and nose-leaf, the wing worn (2.9: tears in panels 1 and 3, the notched hole at full
-    // spread). Its fans: the FIRST PASS note on FANS
+    // spread). FIRST PASS (elder, 2.9): its tears read at the airing and at full spread but not at the resting spread
+    // (the preen, the wake): there its four finger bones stand 3-3.5 px apart and close any notch between them (0-2 px
+    // of the room at 0.6-0.8 / 40-48 deg); a slinkwing-only resting spread or tear shape is this file's to find, inside
+    // the tip rule (1.3). Its fans: the FIRST PASS note on FANS
     elder: {
       tailRest: TAIL_REST.slinkwing.elder, tailLen: 7 / 7.4, jawMax: 36, horns: null, markings: [chevron(0.3, 6, 5), chevron(0.5)],
       wing: wingParams({
