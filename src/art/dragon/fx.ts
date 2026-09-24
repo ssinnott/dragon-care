@@ -149,8 +149,15 @@ export const SOLO_BUDGET = new AmbientBudget();
 
 // ---------- the shared act effects (the rig schedules them: rig.ts drawActEffects) ----------
 
-/** The 6 x 6 "z" of the sleep loop (4.2): rows 0-1 full, row 2 at columns 3-4, row 3 at 1-2, rows 4-5 full. */
-const Z_ROWS: readonly number[] = [0b111111, 0b111111, 0b000110, 0b011000, 0b111111, 0b111111];
+/**
+ * The 7 x 8 "z" of the sleep loop (4.2): 2-row bars top and bottom, and a diagonal of 2 px runs stepping 1 px a row
+ * from under the top bar's right end down to the bottom bar's left end, so each counter keeps 3 px of background
+ * inside the glyph's ink edge. (At 6 x 6 the 1-row counters could hold no edge: inked, they filled in and the glyph
+ * read as a dark tile, a crate, with a "z" in it.)
+ */
+const Z_ROWS: readonly number[] = [0b1111111, 0b1111111, 0b0000110, 0b0001100, 0b0011000, 0b0110000, 0b1111111, 0b1111111];
+/** The "z" glyph's size in sprite px (without its 1 px edge). */
+export const Z_W = 7, Z_H = 8;
 /**
  * A 5 x 5 four-point star (the dazed face's pair, 2.5): a solid body tapering to its four points, the centre 3 px
  * across. The 3 x 3 "+" it replaces had 1 px arms in an ink ring and read as a first-aid icon (5.2: no "+" sparkles
@@ -160,21 +167,19 @@ const STAR_ROWS: readonly number[] = [0b00100, 0b01110, 0b11111, 0b01110, 0b0010
 
 /**
  * Draw a small bitmap (rows as bit masks, the high bit on the left) at screen (x, y), `sc` device px per sprite px,
- * filled in `fill` with a 1 px `ink` ring round it (the mark floor's "inked" glyphs, 5.2). `counters` false rings
- * only OUTSIDE the glyph's w x h box (the "z": its 1-row counters stay open -- the 8-neighbour ring filled them and
- * the "z" read as a solid tile, a crate); true rings every off cell next to an on cell (a star). Never mirrored: a
- * "z" read backwards is not a "z".
+ * filled in `fill` with a 1 px `ink` edge on every off cell next to an on cell (the mark floor's "inked" glyphs,
+ * 5.2): with `diag` false only the 4-neighbours count, so the edge hugs the strokes and leaves its corners and a
+ * glyph's inner counters open; true rings the 8-neighbours too (the star's solid points). Never mirrored: a "z"
+ * read backwards is not a "z".
  */
-function drawGlyph(ctx: CanvasRenderingContext2D, rows: readonly number[], w: number, x: number, y: number, sc: number, fill: string, ink: string, counters: boolean): void {
+function drawGlyph(ctx: CanvasRenderingContext2D, rows: readonly number[], w: number, x: number, y: number, sc: number, fill: string, ink: string, diag: boolean): void {
   const h = rows.length;
   ctx.fillStyle = ink;
   for (let r = -1; r <= h; r++) for (let c = -1; c <= w; c++) {
-    if (glyphOn(rows, w, c, r) || (!counters && r >= 0 && r < h && c >= 0 && c < w)) continue;
-    // (the "z" rings its box's outside edge with 4-neighbours only: the 8-neighbour ring closed its corners into a
-    // full cream frame, an 8 x 8 tile at game scale)
+    if (glyphOn(rows, w, c, r)) continue;
     let near = false;
     for (let dr = -1; dr <= 1 && !near; dr++) for (let dc = -1; dc <= 1 && !near; dc++) {
-      if (!counters && dr && dc) continue;
+      if (!diag && dr && dc) continue;
       near = glyphOn(rows, w, c + dc, r + dr);
     }
     if (near) ctx.fillRect(x + c * sc, y + r * sc, sc, sc);
@@ -188,12 +193,12 @@ function glyphOn(rows: readonly number[], w: number, c: number, r: number): bool
 }
 
 /**
- * Top-pass draw: the sleeping "z" (it.x, it.y = its top-left; c0 = the dragon's `belly`, c1 = ink), its strokes in
- * INK and the ring round its box in `belly`. The other way round, a belly-light "z" on the straw floor inside an ink
- * frame read as an empty box: the 1-row counters cannot hold a ring, and cream on straw is too faint to carry the
- * diagonal. Dark strokes carry it; the light ring keeps it off a dark neighbour.
+ * Top-pass draw: the sleeping "z" (it.x, it.y = its top-left; c0 = its fill, the shared `#f8f4ec`; c1 = ink): a LIGHT
+ * "z" with a thin ink edge hugging its strokes (4-neighbours), its counters open, so it floats as a letter. Inked
+ * strokes in a pale ring (the round-4 glyph) read at game scale as a dark block with a "z" in it, and a pale "z"
+ * inside an ink frame round its box read as an empty box.
  */
-export function drawZGlyph(ctx: CanvasRenderingContext2D, it: TopItem): void { drawGlyph(ctx, Z_ROWS, 6, it.x, it.y, it.sc, it.c1, it.c0, false); }
+export function drawZGlyph(ctx: CanvasRenderingContext2D, it: TopItem): void { drawGlyph(ctx, Z_ROWS, Z_W, it.x, it.y, it.sc, it.c0, it.c1, false); }
 /** Top-pass draw: one dazed star (it.x, it.y = its top-left; c0 = fill `#f8f4ec`, c1 = ink). */
 export function drawStarGlyph(ctx: CanvasRenderingContext2D, it: TopItem): void { drawGlyph(ctx, STAR_ROWS, 5, it.x, it.y, it.sc, it.c0, it.c1, true); }
 

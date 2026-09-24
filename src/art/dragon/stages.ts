@@ -202,13 +202,13 @@ export const WING_ANGLES: Readonly<Record<'young' | 'adult', Readonly<WingAngles
   // spread wing was a narrow upright sail, 16 x 40 px, and with its spars poking out, a rake
   young: {
     humerus: [165, 110], forearm: [18, 80],
-    spars: [[204, 88], [210, 178]],
-    sparsPlus: [[204, 88], [207, 133], [211, 180]],
+    spars: [[198, 88], [212, 178]],
+    sparsPlus: [[198, 88], [208, 133], [218, 180]],
   },
   adult: {
     humerus: [165, 110], forearm: [18, 80],
-    spars: [[204, 85], [208, 133], [212, 182]],
-    sparsPlus: [[204, 85], [207, 118], [210, 150], [213, 184]],
+    spars: [[198, 85], [212, 133], [226, 182]],
+    sparsPlus: [[198, 85], [208, 118], [218, 150], [228, 184]],
   },
 });
 
@@ -257,14 +257,15 @@ export interface TailRest {
 
 /**
  * The tail rest shapes of 2.3 (adult column and the young note) and the baby rest shapes below the table. Young
- * adults other than fire's are not listed in the bible and take the adult shape. Element files read these, and an
- * element artist may override their own row there.
+ * adults other than fire's and rock's are not listed in the bible and take the adult shape (rock's young curls a
+ * little sooner, so its adult stays >= 1.29x as long: 5.1 #3). Element files read these, and an element artist may
+ * override their own row there.
  */
 export const TAIL_REST: Readonly<Record<DragonElement, Readonly<Record<Stage, Readonly<TailRest>>>>> = Object.freeze({
   fire: { baby: { first: -10, bend: -25 }, young: { first: 0, bend: -10 }, adult: { first: 0, bend: -9 } },
   spike: { baby: { first: -5, bend: -15 }, young: { first: 5, bend: 0 }, adult: { first: 5, bend: 0 } },
-  rock: { baby: { first: 25, bend: 5 }, young: { first: 30, bend: 6 }, adult: { first: 30, bend: 6 } },
-  lightning: { baby: { first: 0, bend: 0 }, young: { first: 0, bend: 0 }, adult: { first: 0, bend: 0 } },
+  rock: { baby: { first: 30, bend: 12 }, young: { first: 14, bend: 9 }, adult: { first: 10, bend: 7 } },
+  lightning: { baby: { first: -12, bend: 0 }, young: { first: -5, bend: 0 }, adult: { first: -5, bend: 0 } },
   water: { baby: { first: 0, bend: 0 }, young: { first: 0, bend: 0 }, adult: { first: 0, bend: 0 } },
   shriekscale: { baby: { first: -5, bend: -15 }, young: { first: 15, bend: -4 }, adult: { first: 15, bend: -4 } },
 });

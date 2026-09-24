@@ -11,18 +11,22 @@
 //   view=grey | view=cvd       the lineup in greyscale / simulated deuteranopia (post-processed)
 //   view=strip&el=&stage=&anim=&n=   n evenly spaced frames of one anim, numbered, scale 2; from= / span= pick the
 //                              frames (a walk defaults to one cycle, over ground ticks that scroll with its `move`)
-//   view=habitat               640 x 360, straw floor, 8 mixed dragons, y-sorted, top-pass particles; walkers roam;
-//                              anim=mix plays every act at once
-//   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES); one-shots replay after a pause,
-//   an eating pet gets a bowl drawn after it
-//   params: anim, mood (-1..1), t, scale, bg, seed; a static pose overlay: face, jaw, wing, flap, sleep, tuck, fx,
-//   gulp, flare, bristle, body=<rot>,<y>, head
+//   view=habitat               640 x 360, straw floor, 8 mixed dragons, y-sorted, top-pass particles; walkers roam
+//                              (two overlapping pairs hold their places); anim=mix plays every act at once
+//   view=floor | view=roots    the floor audit (nothing sinks through y = 0) and the leg-root audit (no far leg floats
+//                              free of the body); els= / stages= / anims= narrow them
+//   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
+//   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
+//   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
+//   charge (0..1); a static pose overlay: face, jaw, wing, flap, sleep, tuck, fx, gulp, flare, bristle,
+//   body=<rot>,<y>, head, pupil
 import { drawText } from './lib/engine/text.ts';
 import { dragonBuild } from './art/dragon/build.ts';
-import { buildDragon, drawDragon, stepDragon, solveDragon } from './art/dragon/rig.ts';
+import { buildDragon, drawDragon, stepDragon, solveDragon, rootToScreen } from './art/dragon/rig.ts';
+import { legRadii } from './art/dragon/parts.ts';
 import type { DragonRig, DrawDragonOpts } from './art/dragon/rig.ts';
 import { DragonAnimPlayer, ADULT_BLINK, BABY_BLINK } from './art/dragon/anim.ts';
-import { dragonAnims, ANIM_NAMES, ONE_SHOTS, VARIANT_NAMES, idleVariants } from './art/dragon/anims.ts';
+import { dragonAnims, ANIM_NAMES, ONE_SHOTS, VARIANT_NAMES, ELEMENT_ANIM_NAMES, idleVariants } from './art/dragon/anims.ts';
 import { ELEMENTS, ELEMENT_IDS } from './art/dragon/elements/index.ts';
 import { STAGES } from './art/dragon/stages.ts';
 import { DP, DFACE, ACT } from './art/dragon/pose.ts';
@@ -36,7 +40,7 @@ export const STRAW = '#e0d6b8';
 const INK = '#1a1018';
 const LABEL = '#3a2a30';
 
-export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor'] as const;
+export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots'] as const;
 export type View = typeof VIEWS[number];
 
 export interface GalleryParams {
@@ -51,6 +55,11 @@ export interface GalleryParams {
   stage: Stage;
   n: number;
   seed: number;
+  /** view=zoom / strip: 1 = facing right (default), -1 = mirrored (the facing checks of 1.1: light and face marks). */
+  facing: number;
+  /** Every pet's bond (0..1, rock's crystal count: 3.4) and boredom charge (0..1, lightning's crackle: 3.5). */
+  bond: number;
+  charge: number;
   /** A static pose overlay (face, jaw, wing fold, sleep, tuck, fx): when set, pets hold it instead of playing `anim`. */
   pose: PartialDragonPose | null;
   /** view=silhouette: 'all' stacks idle, lowest mood and asleep on one sheet (5.1 #1). */
@@ -84,6 +93,9 @@ export function parseParams(search: string): GalleryParams {
     span: q.has('span') ? Math.max(1, Math.round(num('span', 60))) : null,
     from: Math.max(0, Math.round(num('from', 0))),
     seed: Math.round(num('seed', 1)),
+    facing: num('facing', 1) < 0 ? -1 : 1,
+    bond: Math.max(0, Math.min(1, num('bond', 1))),
+    charge: Math.max(0, Math.min(1, num('charge', 0))),
     pose: poseParams(q),
     set: q.get('set'),
     flash: q.get('flash') === '1',
@@ -95,16 +107,16 @@ export function parseParams(search: string): GalleryParams {
 }
 
 /**
- * face=, jaw=, wing=, flap=, sleep=, tuck=, fx=, gulp=, flare=, bristle=, body=<rot>,<y>, head=<rot> as a static pose
- * overlay (null if none).
+ * face=, jaw=, wing=, flap=, sleep=, tuck=, fx=, gulp=, flare=, bristle=, body=<rot>,<y>, head=<rot>, pupil= as a
+ * static pose overlay (null if none).
  */
 function poseParams(q: URLSearchParams): PartialDragonPose | null {
-  const keys = ['jaw', 'wing', 'flap', 'sleep', 'tuck', 'fx', 'gulp', 'flare', 'bristle', 'body', 'head'];
+  const keys = ['jaw', 'wing', 'flap', 'sleep', 'tuck', 'fx', 'gulp', 'flare', 'bristle', 'body', 'head', 'pupil'];
   if (!q.has('face') && !keys.some((k) => q.has(k))) return null;
   const n = (k: string) => (q.has(k) ? Number(q.get(k)) : undefined);
   const body = (q.get('body') || '').split(',').map(Number);
   return DP({ face: (q.get('face') || 'neutral') as DFaceName, jaw: n('jaw'), wing: [n('wing') ?? 0, n('flap') ?? 0], sleep: n('sleep'), tuck: n('tuck'),
-    fx: n('fx'), gulp: n('gulp'), flare: n('flare'), bristle: n('bristle'), head: n('head'),
+    fx: n('fx'), gulp: n('gulp'), flare: n('flare'), bristle: n('bristle'), head: n('head'), pupil: n('pupil'),
     body: q.has('body') ? [body[0] || 0, body[1] || 0] : undefined });
 }
 
@@ -129,6 +141,9 @@ export interface Pet {
   bowl: { x: number; h: number; w: number } | null;
   /** Roaming: the pet really moves by its frames' `move` along facing, wrapping inside [x0, x1] (the habitat). */
   roam: readonly [number, number] | null;
+  /** How wary the pet is of the nearest other dragon, 0..1 eased, and its latch (stepWary; DrawDragonOpts.wary). */
+  wary: number;
+  waryOn: boolean;
 }
 
 export function makePet(el: DragonElement, stage: Stage, seed: number, anim: string, x: number, y: number,
@@ -145,7 +160,7 @@ export function makePet(el: DragonElement, stage: Stage, seed: number, anim: str
   if (STATIC_POSE) player.setStaticPose(STATIC_POSE);
   return {
     rig, player, x, y, facing: opts.facing ?? 1, scale: opts.scale ?? 1, mood: opts.mood ?? 0,
-    label: `${ELEMENTS[el].name} ${stage}`, anim, hold: 0, wx: 0, roam: null,
+    label: `${ELEMENTS[el].name} ${stage}`, anim, hold: 0, wx: 0, roam: null, wary: 0, waryOn: false,
     bowl: anim === 'eat' && !STATIC_POSE ? bowlFor(rig, anims.eat ? anims.eat.frames : []) : null,
   };
 }
@@ -167,11 +182,45 @@ function bowlFor(rig: DragonRig, frames: readonly { pose?: import('./art/dragon/
 
 /** The query's static pose overlay, applied to every pet a scene makes (set by startGallery). */
 let STATIC_POSE: PartialDragonPose | null = null;
-/** The query's flash / tint, applied at draw time. */
-let FLASH = false, TINT: string | null = null;
+/** The query's flash / tint, bond and charge, applied at draw time. */
+let FLASH = false, TINT: string | null = null, BOND = 1, CHARGE = 0;
 
 function petOpts(p: Pet, extra: Partial<DrawDragonOpts> = {}): DrawDragonOpts {
-  return { x: p.x, y: p.y, facing: p.facing, scale: p.scale, mood: p.mood, flash: FLASH, tint: TINT, tintAlpha: 0.35, ...extra };
+  return { x: p.x, y: p.y, facing: p.facing, scale: p.scale, mood: p.mood, flash: FLASH, tint: TINT, tintAlpha: 0.35, wary: p.wary, bond: BOND, charge: CHARGE, ...extra };
+}
+
+/** The wary latch (4.3, spike's wary lean): on under this many game px to the nearest other dragon, off over WARY_OFF. */
+const WARY_ON = 30, WARY_OFF = 36;
+/**
+ * Step every pet's wary state once per tick, before the pets step (a scene's owner does this; the game's pet
+ * renderer will too): the gap to the nearest OTHER pet in game px -- between the two sprites' extents along the
+ * floor (tail tip to snout, whichever way each faces) and their depth apart -- latched with hysteresis and eased
+ * over about 8 f, so a dragon walking past does not flicker the lean.
+ */
+function stepWary(pets: readonly Pet[]): void {
+  for (const p of pets) {
+    const [a0, a1] = extentX(p);
+    let g = Infinity;
+    for (const q of pets) {
+      if (q === p) continue;
+      const [b0, b1] = extentX(q), dx = Math.max(0, b0 - a1, a0 - b1), dy = Math.abs(q.y - p.y);
+      g = Math.min(g, Math.hypot(dx, dy) / (p.scale || 1));
+    }
+    if (g < WARY_ON) p.waryOn = true; else if (g > WARY_OFF) p.waryOn = false;
+    p.wary += ((p.waryOn ? 1 : 0) - p.wary) / 8;
+  }
+}
+/** A pet's screen x extent, tail tip to snout, at its facing (from the build's dims, the rest pose). */
+function extentX(p: Pet): [number, number] {
+  const d = p.rig.dims, s = p.scale * p.rig.scale;
+  const back = (d.hipR + d.gap / 2 + d.tail.n * d.tail.len) * s, front = (d.gap / 2 + d.chestR + d.headLen) * s;
+  return p.facing < 0 ? [p.x - front, p.x + back] : [p.x - back, p.x + front];
+}
+
+/** One scene tick: the scene-wide state (the wary latch, where the scene has one), then every pet. */
+function stepScene(scene: Scene): void {
+  if (scene.wary) stepWary(scene.pets);
+  for (const p of scene.pets) stepPet(p);
 }
 
 /** Frames a finished one-shot is held before the gallery replays it (a live view keeps showing the anim). */
@@ -211,6 +260,8 @@ interface Scene {
   w: number;
   h: number;
   pets: Pet[];
+  /** The pets share a floor and react to each other (the habitat): stepScene runs the wary latch. */
+  wary?: boolean;
   /** Draw the whole view (pets already stepped). */
   draw(ctx: CanvasRenderingContext2D): void;
 }
@@ -308,13 +359,13 @@ function stagesScene(P: GalleryParams): Scene {
  */
 function zoomScene(P: GalleryParams): Scene {
   const k = Math.max(1, Math.round(P.scale || 6));
-  const p = makePet(P.el, P.stage, P.seed, P.anim, 0, 0, { mood: P.mood });
+  const p = makePet(P.el, P.stage, P.seed, P.anim, 0, 0, { mood: P.mood, facing: P.facing });
   const d = p.rig.dims;
   const back = Math.ceil(d.hipR + d.gap / 2 + d.tail.n * d.tail.len + 16), front = Math.ceil(d.gap / 2 + d.chestR + d.headLen + 16);
   const w = back + front, h = Math.ceil(d.bodyY + d.head.cranR * 2 + (d.neck.hidden ? 14 : d.neck.len * 2 + 14) + 36);
   // 16 rows below the ground, and the ground row marked in both margins, so anything sinking through the floor
   // shows (1.1, 5.1 #14)
-  p.x = back; p.y = h - 16;
+  p.x = P.facing < 0 ? front : back; p.y = h - 16;
   const off = document.createElement('canvas');
   off.width = w; off.height = h;
   return {
@@ -364,22 +415,24 @@ function moodScene(P: GalleryParams): Scene {
   ELEMENT_IDS.forEach((el, r) => moods.forEach((m, c) => {
     pets.push(makePet(el, P.stage, P.seed + r * 7, P.anim, c * cw + Math.round(cw * 0.6), r * ch + ch - 7, { mood: m, blink: false }));
   }));
-  // a fourth column: asleep (pose.sleep), mood -1
+  // a fourth column: asleep (pose.sleep), mood -1, 1.35 x as wide: lying down, the head rests a neck's length
+  // further forward and the "z" rises in front of the snout (at the standing width both ran off the sheet's edge)
+  const aw = Math.round(cw * 1.35);
   const asleep: Pet[] = ELEMENT_IDS.map((el, r) => {
-    const p = makePet(el, P.stage, P.seed + r * 7, 'sleep', 3 * cw + Math.round(cw * 0.6), r * ch + ch - 7, { mood: -1, blink: false, desync: false });
+    const p = makePet(el, P.stage, P.seed + r * 7, 'sleep', 3 * cw + Math.round(cw * 0.55), r * ch + ch - 7, { mood: -1, blink: false, desync: false });
     seekPet(p, animIntro(p, 'sleep'));
     return p;
   });
   const all = pets.concat(asleep);
   const off = document.createElement('canvas');
-  off.width = cw * 4; off.height = ch * 6 + 12;
+  off.width = cw * 3 + aw; off.height = ch * 6 + 12;
   return {
     w: off.width * k, h: off.height * k, pets: all,
     draw(ctx) {
       const g = off.getContext('2d')!;
       g.fillStyle = P.bg || STRAW; g.fillRect(0, 0, off.width, off.height);
       drawPets(g, all);
-      ['MOOD -1', 'MOOD 0', 'MOOD +1', 'ASLEEP'].forEach((t, i) => label(g, t, i * cw + cw / 2, ch * 6 + 3, LABEL, 1));
+      ['MOOD -1', 'MOOD 0', 'MOOD +1', 'ASLEEP'].forEach((t, i) => label(g, t, i * cw + (i < 3 ? cw : aw) / 2, ch * 6 + 3, LABEL, 1));
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(off, 0, 0, off.width * k, off.height * k);
     },
@@ -457,7 +510,7 @@ function stripScene(P: GalleryParams): Scene {
     const f = from + Math.round(i * L / P.n);
     frames.push(f);
     const c = i % cols, r = Math.floor(i / cols);
-    const p = makePet(P.el, P.stage, P.seed, P.anim, c * cellW + Math.round(back * sc), r * cellH + cellH - 22, { scale: sc, desync: false, mood: P.mood });
+    const p = makePet(P.el, P.stage, P.seed, P.anim, c * cellW + Math.round((P.facing < 0 ? front : back) * sc), r * cellH + cellH - 22, { scale: sc, desync: false, mood: P.mood, facing: P.facing });
     seekPet(p, f);
     pets.push(p);
   }
@@ -469,9 +522,9 @@ function stripScene(P: GalleryParams): Scene {
       // a walking anim: ground ticks every 8 px of WORLD, scrolled back by the distance walked, so a planted paw
       // must hold still against them (it moves back with the ground: no skating)
       if (moves) for (const p of pets) {
-        const x0 = p.x - back * sc, x1 = x0 + cellW;
+        const x0 = p.x - (P.facing < 0 ? front : back) * sc, x1 = x0 + cellW;
         for (let k = -40; k < 80; k++) {
-          const X = p.x + (k * 8 - (p.wx % 8)) * sc;
+          const X = p.x + P.facing * (k * 8 - (p.wx % 8)) * sc;
           if (X < x0 + 4 || X > x1 - 4) continue;
           ctx.fillStyle = '#b8ab88'; ctx.fillRect(Math.round(X), p.y, sc, 2 * sc);
         }
@@ -484,21 +537,28 @@ function stripScene(P: GalleryParams): Scene {
   };
 }
 
+/**
+ * view=habitat (5.1 #13, 5.4): 8 dragons on straw, y-sorted. The cast carries the risky looks -- adult lightning (the
+ * tallest cue) standing just BEHIND an adult shriekscale (spire behind fan), and an adult water with its baby
+ * overlapping in front of it (parent over baby, one element) -- plus a young rock, a young fire and spike's adult
+ * and baby; those two pairs hold their places (`fixed`), the others roam. (The first cast had no young or adult
+ * lightning, no adult shriekscale, no young or baby water or rock, and no overlap that stayed put.)
+ */
 function habitatScene(P: GalleryParams): Scene {
-  const cast: [DragonElement, Stage, number, number, number][] = [
-    ['spike', 'adult', 470, 170, -1], ['shriekscale', 'young', 168, 182, 1],
-    ['rock', 'adult', 120, 262, 1], ['fire', 'young', 330, 236, 1], ['water', 'adult', 520, 282, -1],
-    ['lightning', 'baby', 250, 318, 1], ['spike', 'baby', 80, 336, 1], ['fire', 'baby', 372, 340, -1],
+  const cast: [DragonElement, Stage, number, number, number, boolean][] = [
+    ['spike', 'adult', 470, 170, -1, false], ['lightning', 'adult', 196, 176, 1, true], ['shriekscale', 'adult', 214, 186, 1, true],
+    ['rock', 'young', 110, 262, 1, false], ['fire', 'young', 340, 236, 1, false], ['water', 'adult', 520, 290, -1, true],
+    ['water', 'baby', 506, 306, -1, true], ['spike', 'baby', 90, 336, 1, false],
   ];
   // anim=mix: every act at once (the top pass carries the "z", the dazed stars and the embers; eat brings a bowl)
-  const MIX = ['walk', 'sleep', 'eat', 'happy', 'beg', 'walk', 'breath', 'pet'];
-  const pets = cast.map(([el, st, x, y, f], i) => {
+  const MIX = ['walk', 'happy', 'sleep', 'eat', 'breath', 'beg', 'pet', 'walk'];
+  const pets = cast.map(([el, st, x, y, f, fixed], i) => {
     const p = makePet(el, st, P.seed + i * 17, P.anim === 'mix' ? MIX[i] : P.anim, x, y, { facing: f, mood: P.mood });
-    p.roam = [-40, 680];
+    p.roam = fixed ? null : [-40, 680];
     return p;
   });
   return {
-    w: 640, h: 360, pets,
+    w: 640, h: 360, pets, wary: true,
     draw(ctx) {
       ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
       drawPets(ctx, pets);
@@ -509,10 +569,11 @@ function habitatScene(P: GalleryParams): Scene {
 // ---------- the floor audit (1.1 planted paws, 5.1 #14) ----------
 
 /**
- * The anims view=floor plays by default: the core set (4.2) and the idle variants, each through its whole length
- * (sleep: lie-down + loop); a variant a stage has not got is skipped.
+ * The anims view=floor plays by default: the core set (4.2), the idle variants and the element anims (fire's bath,
+ * rock's upset tuck, shriekscale's lonely call), each through its whole length (sleep: lie-down + loop); an anim a
+ * look has not got is skipped.
  */
-const FLOOR_ANIMS = ['idle', 'walk', 'happy', 'eat', 'sleep', 'wake', 'breath', 'pet', 'beg', ...VARIANT_NAMES];
+const FLOOR_ANIMS = ['idle', 'walk', 'happy', 'eat', 'sleep', 'wake', 'breath', 'pet', 'beg', ...VARIANT_NAMES, ...ELEMENT_ANIM_NAMES];
 
 /**
  * view=floor: nothing a dragon draws may sink through the floor (1.1: paws on the ground line; 5.1 #14). Every look
@@ -580,6 +641,76 @@ function floorScene(P: GalleryParams): Scene {
   };
 }
 
+// ---------- the leg-root audit (1.2 hard rule: roots sunk into the body) ----------
+
+/** The anims view=roots plays by default: the walk (its far pair slides with the stride: 4.2 notes) and the idle. */
+const ROOT_ANIMS = ['walk', 'idle', 'rest'];
+/**
+ * The least depth, px, a far leg's sunk root disc must keep inside the rest of the silhouette on every frame. Every
+ * look measures >= 0.5 over seeds 1, 2, 3 and 5 (the babies' far roots lie shallowest: their big heads cover the
+ * rest); the walk that hung the far front leg in front of the chest measured -0.2 to -3.6 on the looks it floated.
+ */
+export const ROOT_MIN = 0.25;
+
+const RLR = new Float32Array(3);
+const RPT = { x: 0, y: 0 };
+/**
+ * view=roots: no far leg may float free of the body (the cast review's blocker: a walk that slid the far shoulder
+ * half a stride forward hung the far front leg in front of a young or baby chest, background all round its top).
+ * Every look plays each anim frame by frame at game scale 1 and is drawn WITHOUT its far legs on a clear canvas
+ * (DrawDragonOpts.farLegs); for each far leg the audit finds the silhouette pixel nearest its sunk root (the tube's
+ * first node, 0.35 r down the upper bone: parts.ts drawLeg) and keeps r - that distance, the depth the root disc
+ * lies inside what is drawn over it (body, neck, head, tail, near legs). The worst frame per look and anim goes on
+ * window.__dragonCare.roots for tools/smoke.ts, which fails anything under ROOT_MIN.
+ */
+function rootsScene(P: GalleryParams): Scene {
+  const W = 320, H = 200, GX = 170, GY = 150, R = 14;
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const g = off.getContext('2d', { willReadFrequently: true })!;
+  const rows: { id: string; anim: string; depth: number; frame: number; leg: string; floats: boolean }[] = [];
+  const els = P.els || ELEMENT_IDS, stages = P.stages || STAGES, anims = P.anims || ROOT_ANIMS;
+  for (const el of els) for (const st of stages) for (const a of anims) {
+    const p = makePet(el, st, P.seed, a, GX, GY, { desync: false, blink: false });
+    if (p.player.name !== a) continue;
+    const rig = p.rig, d = rig.dims, len = Math.max(1, p.player.length);
+    let worst = Infinity, at = 0, leg = '';
+    for (let f = 0; f < len; f++) {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, W, H);
+      drawDragon(g, rig, p.player.pose, petOpts(p, { still: true, shadow: false, top: null, farLegs: false }));
+      for (let i = 2; i < 4; i++) {
+        const lg = rig.j.legs[i], L = i === 3 ? d.front : d.hind;
+        const dx = lg.knee.x - lg.root.x, dy = lg.knee.y - lg.root.y, l = Math.hypot(dx, dy) || 1, k = L.r1 * 0.35;
+        legRadii(L.r1, L.r2, L.bulge, RLR);
+        const s = rootToScreen(rig, lg.root.x + dx / l * k, lg.root.y + dy / l * k, RPT);
+        const x0 = Math.max(0, Math.floor(s.x) - R), y0 = Math.max(0, Math.floor(s.y) - R);
+        const img = g.getImageData(x0, y0, 2 * R + 1, 2 * R + 1).data;
+        let best = R;
+        for (let y = 0; y <= 2 * R; y++) for (let x = 0; x <= 2 * R; x++) {
+          if (img[(y * (2 * R + 1) + x) * 4 + 3] < 128) continue;
+          best = Math.min(best, Math.hypot(x0 + x + 0.5 - s.x, y0 + y + 0.5 - s.y));
+        }
+        const depth = RLR[0] - best;
+        if (depth < worst) { worst = depth; at = f; leg = i === 3 ? 'far front' : 'far hind'; }
+      }
+      stepPet(p);
+    }
+    rows.push({ id: `${el}-${st}`, anim: a, depth: Math.round(worst * 10) / 10, frame: at, leg, floats: worst < ROOT_MIN });
+  }
+  if (window.__dragonCare) window.__dragonCare.roots = rows;
+  const bad = rows.filter((r) => r.floats);
+  const lines = rows.map((r) => `${r.id} ${r.anim}: ${r.leg} ${r.depth.toFixed(1)} PX AT F${r.frame}${r.floats ? '  FLOATS' : ''}`);
+  return {
+    w: 480, h: Math.max(120, 24 + lines.length * 9), pets: [],
+    draw(ctx) {
+      ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
+      label(ctx, `LEG ROOTS: ${rows.length} LOOK x ANIM RUNS, ${bad.length} WITH A FAR ROOT UNDER ${ROOT_MIN} PX DEEP`, this.w / 2, 4, LABEL, 1);
+      lines.forEach((t, i) => label(ctx, t.toUpperCase(), this.w / 2, 16 + i * 9, t.endsWith('FLOATS') ? '#8a1c1c' : LABEL, 1));
+    },
+  };
+}
+
 // ---------- silhouette sheet (5.1 #1) ----------
 
 /**
@@ -609,7 +740,7 @@ function silhouetteScene(P: GalleryParams): Scene {
   })));
   const RW = W / 3, RH = H / 3;
   return {
-    w: 960, h: H + 18 + RH + 34, pets,
+    w: 960, h: H + 18 + RH + 44, pets,
     draw(ctx) {
       const light = P.bg || '#f4efe2';
       ctx.fillStyle = light; ctx.fillRect(0, 0, this.w, this.h);
@@ -639,7 +770,8 @@ function silhouetteScene(P: GalleryParams): Scene {
         ctx.putImageData(out, ph * RW, y0);
         label(ctx, `/3 PHASE ${ph}`, ph * RW + RW / 2, y0 + RH + 6, LABEL, 1);
       }
-      label(ctx, 'SILHOUETTE: FLAT INK, THEN /3 AREA COVERAGE (INK >= 50 %) AT 3 SUB-PIXEL PHASES', 480, this.h - 12, LABEL, 1);
+      // (a row above the live HUD line, which sits at h - 10: on it the two lines overprinted into garble)
+      label(ctx, 'SILHOUETTE: FLAT INK, THEN /3 AREA COVERAGE (INK >= 50 %) AT 3 SUB-PIXEL PHASES', 480, this.h - 22, LABEL, 1);
     },
   };
 }
@@ -679,6 +811,7 @@ function makeScene(P: GalleryParams): Scene {
     case 'mood': return moodScene(P);
     case 'faces': return facesScene(P);
     case 'floor': return floorScene(P);
+    case 'roots': return rootsScene(P);
     default: return lineupScene(P);
   }
 }
@@ -698,13 +831,14 @@ function render(ctx: CanvasRenderingContext2D, scene: Scene, P: GalleryParams, l
 export function startGallery(canvas: HTMLCanvasElement, search: string, onReady: () => void): void {
   const ctx = canvas.getContext('2d')!;
   let P = parseParams(search);
-  STATIC_POSE = P.pose; FLASH = P.flash; TINT = P.tint;
+  STATIC_POSE = P.pose; FLASH = P.flash; TINT = P.tint; BOND = P.bond; CHARGE = P.charge;
   let scene = makeScene(P);
   const size = () => { canvas.width = scene.w; canvas.height = scene.h; };
   size();
   if (P.t != null) {
-    // frozen: replay t steps from each pet's start (strip pets are already seeked)
-    if (P.view !== 'strip') for (const p of scene.pets) seekPet(p, P.t);
+    // frozen: replay t steps from each pet's start, all pets in lockstep (the wary latch reads the others' places);
+    // strip pets are already seeked
+    if (P.view !== 'strip') for (let i = 0; i < P.t; i++) stepScene(scene);
     frame = P.t;
     render(ctx, scene, P, false);
     onReady();
@@ -725,7 +859,7 @@ export function startGallery(canvas: HTMLCanvasElement, search: string, onReady:
   const loop = (now: number) => {
     if (!last) last = now;
     acc = Math.min(acc + (now - last) / (1000 / 60), 5); last = now;
-    while (acc >= 1) { if (P.view !== 'strip') for (const p of scene.pets) stepPet(p); frame++; acc -= 1; }
+    while (acc >= 1) { if (P.view !== 'strip') stepScene(scene); frame++; acc -= 1; }
     render(ctx, scene, P, true);
     if (first) { first = false; onReady(); }
     requestAnimationFrame(loop);

@@ -10,7 +10,8 @@
 // farPalette with DRAGON_FAR, so a ramp or far-shade change reaches every dragon at once.
 import { mix } from '../../lib/art/palettes.ts';
 import type { ColorMap } from '../../lib/art/palettes.ts';
-import { makeTones } from '../../lib/art/shading.ts';
+import { makeTones, toneOf, RAMP } from '../../lib/art/shading.ts';
+import type { Ramp, Tones } from '../../lib/art/shading.ts';
 
 /** The six elements, in roster order. */
 export const DRAGON_ELEMENTS = ['fire', 'spike', 'rock', 'lightning', 'water', 'shriekscale'] as const;
@@ -61,7 +62,7 @@ export const DRAGON_PALETTES: Readonly<Record<DragonElement, Readonly<DragonPale
     marking: '#173a19', dark: '#4a2618', glow: '#7dff8c', eye: '#ff9a3c',
   }),
   rock: Object.freeze({
-    scale: '#cfb788', belly: '#fff7e2', membrane: '#4c5670', horn: '#5e4e46',
+    scale: '#d4b67c', belly: '#fff5cc', membrane: '#4c5670', horn: '#5e4e46',
     marking: '#7e5f44', dark: '#3b2c24', glow: '#b48cff', eye: '#ffb84a',
   }),
   lightning: Object.freeze({
@@ -114,6 +115,23 @@ export function blushOf(e: DragonElement): string { return DRAGON_BLUSH[e] ?? DR
  */
 export function moodTones(p: Readonly<DragonPalette>): { banked: string; dimSpot: string } {
   return { banked: makeTones(p.glow).sh, dimSpot: mix(p.marking, p.scale, 0.5) };
+}
+
+/**
+ * Per-element SHADOW tones, the one exception to "derived, never stored" (2.6, palette-check gates a and d): where
+ * the engine's cool ramp greys a warm pale colour, the slot's `sh` is set by hand, hue kept, and its `deep` follows
+ * from it (x 0.78). Rock: the sandstone's ramp shadow `#8c7e69` split the baby's face into a clean half and a grey,
+ * dirty one (the other elements' head shadows keep their hue), and the cream belly's `#a8a9a7` read as a grey diaper
+ * on the baby and a metal plate under the adult's chest (the cast reviews). `#a88a66` sits 44 % under the sand and
+ * `#e6d49e` 27 % under the cream, 59 % over the new scale shadow it meets on the belly line.
+ */
+export const DRAGON_SHADOW: Readonly<Partial<Record<DragonElement, Readonly<Partial<Record<DragonSlot, string>>>>>> = Object.freeze({
+  rock: Object.freeze({ scale: '#a88a66', belly: '#e6d49e' }),
+});
+/** One slot's cel tones for an element: the engine's makeTones, with DRAGON_SHADOW's hand-set shadow if it has one. */
+export function dragonTones(e: DragonElement, slot: DragonSlot, ramp: Readonly<Ramp> = RAMP): Tones {
+  const t = makeTones(DRAGON_PALETTES[e][slot], ramp), o = DRAGON_SHADOW[e], sh = o ? o[slot] : undefined;
+  return sh ? { ...t, sh, deep: toneOf(sh, 0.78) } : t;
 }
 
 /**

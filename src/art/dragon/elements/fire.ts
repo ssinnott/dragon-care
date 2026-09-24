@@ -31,14 +31,6 @@ import { tones } from '../../../lib/art/shading.ts';
 const PAL = DRAGON_PALETTES.fire;
 const D2R = Math.PI / 180;
 
-/**
- * Fire's bath (4.2: the hiss, the flame shrunk to 0.6x, 3 steam puffs, a dog-style shake) keys this act id so the
- * renderers can draw the steam. The shared ACT table has no bath yet (the bath is not in the shared set): the
- * shared id is taken the moment pose.ts has one, and until then an id far past the shared ones, so a shared act
- * added meanwhile (play, refuse) can never set fire hissing and steaming.
- */
-const ACT_BATH: number = (ACT as Readonly<Record<string, number>>).bath ?? 32;
-
 // ---------- the flame: the torch tail (3.2), the mood meter ----------
 
 /** Flame box (w x h) and tongue count per stage (3.2 table): seed, sprout, signature (the third tongue is adult-only). */
@@ -87,8 +79,8 @@ const PTS: number[] = new Array(24).fill(0);
 
 /**
  * The flame this frame, as flameState leaves it: the size multiplier and its px box, the tongue count and the
- * flicker key, whether it has its core, whether it is banked (asleep: glow.sh) and whether the banked ember glows
- * (the sleeping inhale), and how far its tip leans back (px).
+ * flicker key, whether it has its core, whether it is banked (asleep: glow.sh) and whether the banked ember grows
+ * to the core (the sleeping inhale), and how far its tip leans back (px).
  */
 const FS = { k: 1, w: 5, h: 7, tongues: 1, key: 0, core: true, banked: false, pip: false, lean: 0 };
 
@@ -96,8 +88,9 @@ const FS = { k: 1, w: 5, h: 7, tongues: 1, key: 0, core: true, banked: false, pi
  * Work out the flame from the mood gauge and the act (3.2, 4.3), into FS. The gauge: 0.6x at mood -1 (no core,
  * swapping every 8 f) -> 1.0 -> 1.2x at +1 (every 4 f); shrunk, each axis rounds UP (60 % is a floor, D7), and the
  * width stops at FLAME_MIN. Over it, by act:
- *   asleep  banked: 0.6x in glow.sh, one slow tongue, no core; on each sleeping inhale it grows a step to 0.7x and
- *           a `glow` ember lights in its base (it breathes with the pet, alight but resting);
+ *   asleep  banked: 0.6x in glow.sh, one slow tongue, no core, a 2 x 2 `glow` ember always lit low in it; on each
+ *           sleeping inhale it grows a step to 0.7x and the ember to the core's shape (it breathes with the pet,
+ *           alight but resting);
  *   beg     the hungry tell: guttered to 0.6x, no core, whatever the resting mood;
  *   bath    the mood key has it at 0.6x; while the water hits (cue 4-24) it sputters on 3 f swaps;
  *   happy   the flourish: 1.4x for 30 f from cue 0, roaring on 3 f swaps;
@@ -114,7 +107,7 @@ function flameState(rig: DragonRig, pose: DragonPose, info: DragonInfo): void {
     k = pip ? 0.7 : 0.6; period = 12; core = false;
   } else if (act === ACT.beg) {
     k = Math.min(k, 0.6); period = 8; core = false;
-  } else if (act === ACT_BATH) {
+  } else if (act === ACT.bath) {
     if (c >= 4 && c < 24) period = 3;
   } else if (act === ACT.happy && c >= 0 && c < 30) {
     k = 1.4; period = 3;
@@ -157,8 +150,8 @@ function flameBase(r: number): number { return Math.max(1, Math.round(r * 0.5));
  * of the body's squash and stretch, so an emitter keeps its shape through a breath or a paper turn's 60 % frame
  * (squashed with the body, a turning flame's tongues fell under the mark floor). One inked flat outer shape in
  * `glow` (part of the silhouette), a `glow.hi` core at 55 % size sitting low in it with no ink; banked asleep, the
- * whole flame is `glow.sh` with no core, which marks sleep at a glance (gate h), and on each sleeping inhale a
- * `glow` ember lights in its base (the core's place, >= 2 px), so the bud reads as alight.
+ * whole flame is `glow.sh` with no core, which marks sleep at a glance (gate h), with a 2 x 2 `glow` ember always
+ * lit low in its base, grown on each sleeping inhale to the core's shape (>= 2 px), so the bud reads as alight.
  */
 const tailTip: ElementDraw = (ctx, rig, pose, info) => {
   flameState(rig, pose, info);
@@ -175,8 +168,12 @@ const tailTip: ElementDraw = (ctx, rig, pose, info) => {
   if (FS.core && !FS.banked) {
     pathPts(ctx, PTS, 0.55, 0, 0, n);
     emitterCore(ctx, rig, T.hi);
-  } else if (FS.pip) {
-    pathPts(ctx, PTS, Math.max(0.45, 2.4 / w), 0, 0, n);
+  } else if (FS.banked) {
+    // the banked ember never goes out: a 2 x 2 of `glow` low in the bud on every sleeping frame, grown to the
+    // core's shape on each inhale (lit only on the inhales, the glow.sh bud between them was a brown seed pod, a
+    // cattail or an acorn, near the body's own value: the cast review)
+    if (FS.pip) pathPts(ctx, PTS, Math.max(0.45, 2.4 / w), 0, 0, n);
+    else { ctx.beginPath(); ctx.rect(-1, -3, 2, 2); }
     emitterCore(ctx, rig, info.pal.glow);
   }
   ctx.restore();
@@ -260,7 +257,7 @@ const ambient: ElementDraw = (ctx, rig, pose, info) => {
     }
     return;
   }
-  if (act === ACT_BATH) {
+  if (act === ACT.bath) {
     const max = info.stage === 'baby' ? 3 : 4;
     for (let pass = 0; pass < 2; pass++) {
       for (let i = 0; i < 3; i++) {
@@ -394,7 +391,7 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
     }
     return;
   }
-  if (act === ACT_BATH) {
+  if (act === ACT.bath) {
     const a = info.ang * D2R, upx = -Math.sin(a), upy = -Math.cos(a);
     for (let pass = 0; pass < 2; pass++) {
       for (let k = 0; k < 2; k++) {
@@ -539,8 +536,8 @@ function eachFrame(a: DragonAnim, fn: (t: number, p: PartialDragonPose, f: Drago
  * hips while it walks (its tongues swap every 4 f then: flameState). The baby keeps its waddle; its comma tail
  * already carries the seed.
  */
-function strutAnim(stage: Stage): DragonAnim {
-  const a = walkAnim(stage, animTuning(stage, FIRE).walk);
+function strutAnim(stage: Stage, dims: DragonDims | null): DragonAnim {
+  const a = walkAnim(stage, animTuning(stage, FIRE).walk, dims);
   if (stage === 'baby') return a;
   const lift = stage === 'adult' ? -6 : -5;
   return eachFrame(a, (_t, p) => {
@@ -574,9 +571,6 @@ function sighAnim(stage: Stage): DragonAnim {
     return 0;
   };
   return eachFrame(a, (t, p) => {
-    // (the cue is re-keyed as the frame time: the shared loop's [[0, 0], [L, L]] ramp folds its last key onto
-    // frame 0 when the loop wraps, and runs L -> 0 backwards)
-    p.cue = t;
     if (!baby) { const tl = (p.tail ??= {}); tl.lift = (tl.lift ?? 0) - 12; tl.curl = (tl.curl ?? 0) - 9; }
     const v = sigh(t);
     if (!v) return;
@@ -603,7 +597,7 @@ function rekindleAnim(stage: Stage, dims: DragonDims | null): DragonAnim {
  * and HISSES (jaw 10 deg -- the rig opens it to the stage minimum -- `grumpy`, head pulled back, a hunch) while
  * its flame shrinks to 0.6x (mood -2 pins the gauge at -1) and sputters, 3 steam puffs coming off it (ambient)
  * and 2 hiss wisps from its mouth (breath); then a dog-style SHAKE (root rot +-5 on 3 f beats, the head against
- * it, eyes shut, the tail stiff) and a grumpy settle. act = ACT_BATH, cue = frames since it began.
+ * it, eyes shut, the tail stiff) and a grumpy settle. act = ACT.bath, cue = frames since it began.
  */
 function bathAnim(stage: Stage): DragonAnim {
   const L = 60, G = DFACE.grumpy, N = DFACE.neutral;
@@ -619,17 +613,17 @@ function bathAnim(stage: Stage): DragonAnim {
     'tail.stiff': [[0, 0], [4, 0.5], [50, 0.5], [L, 0]],
     face: [[0, N], [3, G], [26, DFACE.closed], [50, G], [L - 2, N]],
     mood: [[0, 0], [3, -2], [L - 4, -2], [L, 0]],
-    act: [[0, ACT_BATH]], cue: [[0, 0], [L, L]],
+    act: [[0, ACT.bath]], cue: [[0, 0], [L, L]],
   }, { stage, len: L, next: 'idle' });
 }
 
 /**
  * The head's world pitch (deg, + = snout down) that stands the rig's nostril plumb over the eye (rig.ts
  * drawHeadGroup's nostril spot, in cranium space). The face marks are pixel constructions placed by their
- * root-space offset from the eye and drawn in the pet's own facing: a mirrored (turning) sprite does not mirror
- * them, so a nostril ahead of the eye would land behind it, off the head. Plumb over the eye its offset has no
- * sideways part and it lands on the snout whichever way the turn faces the sprite, and at the turn's 60 % width.
- * Adult -100, young -92, baby -88.
+ * root-space offset from the eye: they mirror with a mirrored sprite (rig.ts faceTransform), but are never
+ * squashed, so on a turn's 80 % and 60 % frames a nostril ahead of the eye would land off the narrowed snout.
+ * Plumb over the eye its offset has no sideways part and it lands on the snout at any width. Adult -100, young -92,
+ * baby -88.
  */
 function plumbPitch(d: DragonDims | null, stage: Stage): number {
   if (!d) return stage === 'adult' ? -100 : stage === 'young' ? -92 : -88;
@@ -658,10 +652,10 @@ const TURN_NARROW = 0.6, TURN_EASE = 0.8;
  * opens out over 2 f facing the other way -- the flame always just behind it. Then it stops, dizzy (`dazed`, the
  * stars circling, a wobble), shakes it off, pleased with itself (`happy`). Adult 72 f, young 61, baby 43.
  * The turns are laid over the baked tracks (bake clamps squash to the stage's range): a turn frame keys its own
- * stretch (the volume-preserving 1 / squash would stretch a 60 % sprite to 1.7x its height, and flip a mirrored one
- * upside down). The face marks are placed by their offset from the eye and never mirrored or squashed (rig.ts
- * faceTransform), so on every turn frame and every mirrored frame the head holds plumbPitch, where they land true
- * (snout up, the flame at its side); facing its own way again, it aims back at the flame.
+ * stretch (the volume-preserving 1 / |squash| would stretch a 60 % sprite to 1.7x its height). The face marks
+ * mirror with the sprite but are never squashed (rig.ts faceTransform), so on each turn's narrow frames the head
+ * holds plumbPitch, where they land true (snout up, the flame at its side); wide again, whichever way it faces, it
+ * aims back at the flame.
  */
 function fidget(stage: Stage, dims: DragonDims | null): DragonAnim {
   const k = STAGE_TIMING[stage].dur, t = (f: number) => Math.round(f * k), L = t(72), baby = stage === 'baby';
@@ -703,11 +697,10 @@ function fidget(stage: Stage, dims: DragonDims | null): DragonAnim {
   };
   return eachFrame(a, (tt, p, fr) => {
     const w = turn(tt), s = side(tt), sq = p.squash ?? 1;
-    if (w || s < 0) (p.head ??= {}).rot = plumb;
+    if (w) (p.head ??= {}).rot = plumb;
     if (w) { p.squash = s * w; p.stretch = w < TURN_EASE ? 1.02 : 1.01; fr.interp = false; return; }
-    // mirrored: the stretch keyed as the volume-preserving 1 / squash would read (a stretch of exactly 1 means
-    // "1 / squash", which for a mirrored sprite is -1: upside down)
-    if (s < 0) { p.squash = -sq; p.stretch = 1.0001 / sq; }
+    // mirrored (the rig's volume-preserving stretch is 1 / |squash|, so a mirrored sprite stands the right way up)
+    if (s < 0) p.squash = -sq;
     // the frame before a turn holds too: nothing in-between a wide and a narrow frame
     for (const f of flips) if (tt === f - 3) fr.interp = false;
   });
@@ -727,22 +720,23 @@ export const FIRE: ElementSpec = {
       // the first flame-lick sits on the tail base at every stage (2.7): the baby's head, nub and pot belly leave
       // no flank a 4 x 4 mark can show on. t is where all of it clears the hip (the rig's fit, rig.ts fitMarkings,
       // slides a tail marking out to there anyway; these values say where it lands)
-      markings: [{ kind: 'chevron', at: 'tail', t: 0.26, size: 4 }],
+      markings: [{ kind: 'chevron', at: 'tail', t: 0.26, size: 4, solid: true }],
       wing: wingParams({ style: 'bat' }),
       dorsal: null,
     },
     young: {
       tailRest: TAIL_REST.fire.young,
       horns: hornParams({ len: 5, sweep: 6 }),
-      markings: [{ kind: 'chevron', at: 'tail', t: 0.19, size: 5 }, { kind: 'chevron', at: 'haunch', size: 5 }],
+      markings: [{ kind: 'chevron', at: 'tail', t: 0.19, size: 5, solid: true }, { kind: 'chevron', at: 'haunch', size: 5, solid: true }],
       wing: wingParams({ style: 'bat', scallop: 2 }),
       dorsal: null,
     },
     adult: {
       tailRest: TAIL_REST.fire.adult,
-      // the adult-only extra with the third tongue: the horns bend up 20 deg at the midpoint (3.2)
+      // the adult-only extra with the third tongue: the horns bend up 20 deg at the midpoint (3.2). The flame-licks
+      // are SOLID carets (5.2): with the chevron's notched foot the adult's three read as the letters "A A A"
       horns: hornParams({ len: 8, bend: 20, sweep: -4 }),
-      markings: [{ kind: 'chevron', at: 'tail', t: 0.16, size: 6 }, { kind: 'chevron', at: 'haunch', size: 6 }, { kind: 'chevron', at: 'shoulder', size: 6 }],
+      markings: [{ kind: 'chevron', at: 'tail', t: 0.16, size: 6, solid: true }, { kind: 'chevron', at: 'haunch', size: 6, solid: true }, { kind: 'chevron', at: 'shoulder', size: 6, solid: true }],
       wing: wingParams({ style: 'bat', scallop: 3 }),
       dorsal: null,
     },
@@ -754,12 +748,13 @@ export const FIRE: ElementSpec = {
     // the asleep silhouette (5.1 #1) in fire's own zone. Wrapped forward round the paws, the ember sat inside the
     // body's outline beside the head and the asleep silhouette was a plain mound. The baby keeps its comma.
     fidget,
-    overrides: (st, dims) => ({ walk: strutAnim(st), beg: sighAnim(st), wake: rekindleAnim(st, dims), bath: bathAnim(st) }),
+    overrides: (st, dims) => ({ walk: strutAnim(st, dims), beg: sighAnim(st), wake: rekindleAnim(st, dims), bath: bathAnim(st) }),
     tuning: (st) => ({
       walk: { lift: st === 'adult' ? 5 : st === 'young' ? 4 : 2.5, head: st === 'baby' ? -2 : -4 },
       sleep: st === 'baby' ? { tailCurl: 0, tailLift: 0 } : { tailLift: 72, tailCurl: st === 'adult' ? -21 : -24 },
-      // the baby holds its breath before the hiccup: puffed up round, 1.10 wide, until the puff pops out
-      ...(st === 'baby' ? { breath: { puff: 1.1 } } : {}),
+      // the baby holds its breath before the hiccup: puffed up round, 1.10 wide, until the puff pops out; and its
+      // comma keeps riding the eating bow (no tail droop, tuning.eat): the flame above the tail tip is fire's zone
+      ...(st === 'baby' ? { breath: { puff: 1.1 }, eat: { tailDroop: 0 } } : {}),
     }),
   },
 };

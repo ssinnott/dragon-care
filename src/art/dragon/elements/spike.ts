@@ -2,17 +2,18 @@
 // pale bone quills, which lean with its mood; bristling is a separate alarm (pose.bristle).
 //
 // Everything that moves the comb is drawn by backRow, from the pose and the rig's clock (no state kept):
-//   - the MOOD lean (D7: 50 / 28 / 15 deg, babies at half), the back's measured from the WORLD's upright (the
-//     body's pitch leaned out), never drooping past 60 % of the upright height; drooping quills are thorns (quill());
+//   - the MOOD lean and length (D7: 30 deg at x 0.8 / 28 / 15 deg, babies' lean at half), the back's measured from
+//     the WORLD's upright (the body's pitch leaned out), never drooping past 64 % of the upright height; quills
+//     drooping past 30 deg (the beg's growl) are thorns (quill());
 //   - the idle AMBIENT, the quill ripple (each quill 15 deg toward upright in turn, rump -> neck, each wave
 //     240 +- 60 f after the last, seeded, at mood >= 0); the happy flourish runs it twice, and each pet loop once;
 //   - the BRISTLE alarm (upright, x 1.15, a 1 px tremble every 4 f), and the breath's wind-up (upright only);
 //   - the volley: each back quill leaves the comb as its flight comes out from behind the head, and regrows over
 //     30 f; the baby's rump nub pops off, bonks it on the head and hops back into its socket (breath);
-//   - the creep's stop-and-look (the wary lean: 15 deg toward upright, no size-up), the beg's sag on each growl,
-//     the grooming fidget's pecked quills, and asleep the quill ball, world-upright, settling on each exhale.
-// (The wary lean near another dragon, 4.3, needs the owner to say how near the nearest one is: nothing on the seam
-// carries that yet, so only the stop-and-look leans wary.)
+//   - the WARY lean (15 deg toward upright, no size-up): in the creep's stop-and-look, and awake whenever another
+//     dragon is near (info.wary: the owner latches it under 30 px and eases it over 8 f), the beg's sag on each
+//     growl, the grooming fidget's pecked quills, and asleep the long low LEVEL comb (COMB sleepBack / sleepTail),
+//     20 deg back from the world's upright, settling on each exhale.
 import { DRAGON_PALETTES } from '../palettes.ts';
 import type { DragonPalette } from '../palettes.ts';
 import { TAIL_REST } from '../stages.ts';
@@ -26,6 +27,7 @@ import { ACT, DFACE } from '../pose.ts';
 import { bake, breathAnim, walkAnim } from '../anims.ts';
 import type { Key, Track, Tracks } from '../anims.ts';
 import type { DragonAnim, DragonFrame } from '../anim.ts';
+import type { DragonDims } from '../build.ts';
 import { animTuning } from '../tuning.ts';
 import { liveSpawns } from '../fx.ts';
 import { outlinePath, tones } from '../../../lib/art/shading.ts';
@@ -37,22 +39,40 @@ const PAL = DRAGON_PALETTES.spike;
  * The comb per stage (3.3 table): back quills as [x fraction rump -> neck base, height, base], then tail quills [t,
  * height, base]. Bases are wide (young 6, adult 8): the comb is ONE silhouette, and at 5-6 px a leaning quill left
  * 1-2 px of bone between two ink edges, read as a grey scribble. Baby nubs: body-space x of the rump and loin nubs
- * (rump first, like the others' rump -> neck order), then the tail nub's t (the first spot past the hip, halfway
- * along the baby's short tail), spaced so the three stand >= 1 px apart (at -4 / -8.5 / 0.3 the rump and tail nubs
- * touched and read as two).
+ * (rump first, like the others' rump -> neck order), 6 px apart centre to centre, then the tail nub's t (60 % along
+ * the baby's short tail, clear of the rump nub). Each is 6 tall (the tail's 5) on a base of 5, its point rounded
+ * 1 px: the 4 x 4 blunt nubs never covered half of a 3 x 3 cell and were gone at /3 in every block, the baby a blob
+ * with a tail stub beside baby rock and baby water (5.1 #1, the cast review). The young's are [7, 10, 8] rump ->
+ * neck: at [6, 9, 7] its /3 saw was 1 px nicks even at rest.
+ * ASLEEP the comb is LEVEL (sleepBack / sleepTail, eased in and out with the lean): the adult's tall and short by
+ * turns, the tall three 11 px apart, tallest at the rump where the back line is lowest, so their tips run flat from
+ * nape to rump and read as a crown of 3 teeth at /3; the young's graded against its back line the same way. With the
+ * awake heights (peaking mid-back) the sleeper was a crest of 1 px nicks on a mound, rock's closest pair (the cast
+ * review, round 2).
  */
-const COMB: Readonly<Record<Stage, { back: readonly (readonly number[])[]; tail: readonly (readonly number[])[]; blunt: boolean }>> = {
+interface Comb {
+  back: readonly (readonly number[])[];
+  tail: readonly (readonly number[])[];
+  /** Asleep, the heights of the back quills and of the tail quills (the same order): a LEVEL comb (backRow). */
+  sleepBack: readonly number[];
+  sleepTail: readonly number[];
+  blunt: boolean;
+}
+const COMB: Readonly<Record<Stage, Comb>> = {
   // babies: 3 soft nubs on the rump, loin and tail root (the big head hides the front 60 % of the back)
-  baby: { back: [[-7, 4, 4], [-2.5, 4, 4]], tail: [[0.5, 4, 4]], blunt: true },
-  young: { back: [[0.04, 6, 6], [0.48, 9, 6], [0.92, 7, 6]], tail: [[0.22, 5, 5]], blunt: false },
+  baby: { back: [[-7.75, 6, 5], [-2, 6, 5]], tail: [[0.6, 5, 5]], sleepBack: [6, 6], sleepTail: [5], blunt: true },
+  young: { back: [[0.04, 7, 6], [0.48, 10, 6], [0.92, 8, 6]], tail: [[0.22, 5, 5]], sleepBack: [8, 7, 6], sleepTail: [6], blunt: false },
   // the bible lists the back quills neck base -> rump, [7, 11, 12, 10, 7]; this list runs rump (0) -> neck base (1)
-  adult: { back: [[0.0, 7, 8], [0.25, 10, 8], [0.5, 12, 8], [0.75, 11, 8], [1.0, 7, 8]], tail: [[0.14, 6, 6], [0.32, 5, 5], [0.5, 4, 4]], blunt: false },
+  adult: {
+    back: [[0.0, 7, 8], [0.25, 10, 8], [0.5, 12, 8], [0.75, 11, 8], [1.0, 7, 8]], tail: [[0.14, 6, 6], [0.32, 5, 5], [0.5, 4, 4]],
+    sleepBack: [12, 5, 11, 5, 10], sleepTail: [7, 6, 5], blunt: false,
+  },
 };
 
 /**
  * Append one quill to the current path: base centred at (bx, by), `h` tall along the unit normal (nx, ny), leaning
- * `lean` deg toward (tx, ty), its tip nudged `jit` px along (tx, ty) (the bristle's tremble). A blunt nub ends in a
- * flat 2 px cap instead of a point.
+ * `lean` deg toward (tx, ty), its tip nudged `jit` px along (tx, ty) (the bristle's tremble). A blunt nub rounds its
+ * point off by 1 px (a soft nub, not a thorn).
  * A drooping quill is a THORN: its tail-side base corner runs back with the tip, by up to half the tip's lean (h sin
  * lean / 2, eased in from 30 deg to full at 50), so its back face stays steep and the bone as wide as the tip is far
  * back. Sheared at a fixed base, a quill at the 39-50 deg droop was a sliver with 1-2 px of bone between two ink
@@ -67,21 +87,37 @@ function quill(ctx: CanvasRenderingContext2D, bx: number, by: number, nx: number
   const k = 0.5 * Math.min(1, Math.max(0, (lean - 30) / 20));
   const hb = base / 2, tb = hb + k * h * s, px = bx + ux * h + tx * jit, py = by + uy * h + ty * jit;
   ctx.moveTo(bx - tx * hb, by - ty * hb);                 // base, toward the head
-  if (blunt) { ctx.lineTo(px - tx, py - ty); ctx.lineTo(px + tx, py + ty); }
+  if (blunt) ctx.arcTo(px, py, bx + tx * tb, by + ty * tb, 1);   // a soft nub's tip, rounded 1 px
   else ctx.lineTo(px, py);                                // tip
   ctx.lineTo(bx + tx * tb, by + ty * tb);                 // base, toward the tail
   ctx.closePath();
 }
 
 /**
- * The quill lean at `mood` (3.3, D7): 50 deg back at -1 (a sad droop that keeps 64 % of the upright height), 28 at
- * rest, 15 at +1 (perky); babies at half the range. At the old 35 deg rest a young quill's saw was down to 2 px
- * bumps at /3 (5.1 #1). Bristle snaps them upright, the only fully upright state.
+ * The quill lean at `mood` (3.3, D7): 28 deg back at rest, 15 at +1 (perky); babies at half the range (25 at -1).
+ * The young and adult droop to only 30 at -1 and take the rest of the droop in LENGTH (lenOf: quills x 0.8, bases
+ * too, so the comb keeps 0.8 cos 30 = 69 % of its upright height, over the gauge's 60 % floor): each tip overhangs
+ * the notch behind it by 0.4 of its height. Leaning 50 deg (the adult) or 36 (the young), a tip overhung by h sin(lean),
+ * 9.2 and 5.3 px, about the gap between quills (adult 5.5, young 7.3), and lay over the notch behind it: at /3 the
+ * young's back was flat with one step and the adult's a flat-topped box (5.1 #1, the cast reviews: identity must
+ * never depend on the dragon being happy, D7). At x 0.74 the young's teeth stood 4 px and phase 2 kept two nicks.
+ * At the old 35 deg rest a young quill's saw was down to 2 px bumps at /3. Bristle snaps them upright and full
+ * length, the only fully upright state.
  */
-function leanOf(baby: boolean, m: number, bristle: number): number {
-  const lean = baby ? 14 + (m < 0 ? -11 * m : -7 * m) : 28 + (m < 0 ? -22 * m : -13 * m);
-  return lean * (1 - bristle);
+const DROOP_LEAN = 30, DROOP_LEN = 0.8, GAUGE = Math.cos(50 * Math.PI / 180);
+function leanOf(st: Stage, m: number): number {
+  return st === 'baby' ? 14 + (m < 0 ? -11 * m : -7 * m) : 28 + (m < 0 ? -(DROOP_LEAN - 28) * m : -13 * m);
 }
+/** The quills' length factor at `mood`: 1 from 0 up, DROOP_LEN at -1 (young and adult; the baby's nubs lean only). */
+function lenOf(st: Stage, m: number): number {
+  return st === 'baby' || m >= 0 ? 1 : 1 + (1 - DROOP_LEN) * m;
+}
+/**
+ * Asleep, the comb leans this far back from the WORLD's upright (backRow): the sleeper lies long and low and its
+ * comb runs nape -> tail at a slant, each tip clear of the next. World-upright in a curled ball, the quills packed
+ * 4 px apart on a round mound and the asleep young and adult spike were rock's dome with points at /3 (5.1 #1).
+ */
+const SLEEP_LEAN = 20;
 
 /** A trapezoid envelope: 0 up to a, rising to 1 at b, held to c, back to 0 at d. */
 function env(t: number, a: number, b: number, c: number, d: number): number {
@@ -162,38 +198,39 @@ const backRow: ElementDraw = (ctx, rig, pose, info) => {
   const st = info.stage, comb = COMB[st], d = rig.dims, J = rig.j, c = pose.cue;
   const baby = st === 'baby', breathing = pose.act === ACT.breath, k = baby ? 0.5 : 1;
   const nb = comb.back.length, nt = comb.tail.length;
-  let floor = RIPPLE_FLOOR, wave = -1, wave2 = -1, peck = 0, jit = false;
+  let floor = RIPPLE_FLOOR, wave = -1, wave2 = -1, peck = 0, jit = false, zs = 0;
   // the mood lean
-  let lean = leanOf(baby, info.mood, 0);
+  let lean = leanOf(st, info.mood), len = lenOf(st, info.mood);
   // the hungry tell's sigh: on each stomach growl (f 80-88 of the beg loop) the drooping quills sag 8 deg further
   if (pose.act === ACT.beg) lean += 8 * k * env(c, 76, 82, 90, 100);
-  // the creep's stop-and-look (creepWalk keys the walk's clock on past its cycle): wary, 15 deg toward upright
-  if (pose.act === ACT.walk) {
-    const C = Math.round(rig.tune.walk.cycle);
-    if (c >= C) lean -= 15 * k * env(c - C, 0, 4, STOP[st] - 5, STOP[st]);
-  }
+  // wary, 15 deg toward upright: the creep's stop-and-look (creepWalk keys the walk's clock on past its cycle), and
+  // awake near another dragon (info.wary, 4.3), whichever is more
+  const C = Math.round(rig.tune.walk.cycle), stop = pose.act === ACT.walk && c >= C ? env(c - C, 0, 4, STOP[st] - 5, STOP[st]) : 0;
+  if (!info.asleep) lean -= 15 * k * Math.max(stop, info.wary);
   // The back's lean is measured from the WORLD's upright (the body's pitch leaned back out: the beg sits 14 deg nose
   // up, and measured from the body its 39-47 deg droop stuck out flat behind like twigs); the tail quills lean from
-  // their own segment. Either way the droop never passes the mood gauge's 60 % floor (D7): 50 deg, a baby's 25. The
-  // breath's wind-up snaps them upright on `bristle` (upright on the BODY: the alarm), without the alarm's size-up
-  // (grow, below).
-  const cap = baby ? 25 : 50, up = 1 - pose.bristle;
+  // their own segment. Either way the droop never passes the mood gauge's 60 % floor (D7): lean and length together
+  // keep GAUGE of the upright height (at full length 50 deg, at -1's x 0.74 about 30), a baby's lean 25. The breath's
+  // wind-up snaps them upright and full length on `bristle` (upright on the BODY: the alarm), without the alarm's
+  // size-up (grow, below).
+  const cap = baby ? 25 : Math.acos(Math.min(1, GAUGE / len)) * 180 / Math.PI, up = 1 - pose.bristle;
   let tail = Math.min(cap, lean) * up;
   lean = Math.min(cap, lean + info.ang) * up;
+  len = 1 - (1 - len) * up;
   if (info.asleep) {
-    // the quill ball (4.3) -- upright in the WORLD (the body's pitch leaned back out, or they droop toward the head),
-    // but no size-up or tremble, so it reads as a ball and not an alarm -- settling 5 deg back on each exhale (the
-    // sleep clock: 0 = inhale, the peak at half the breath). The lie-down eases the comb up into the ball over the
-    // 10 f after `sleep` switches on (its f 24 of 40, on the clock that counts up to the loop): it snapped
+    // asleep (4.3) the comb leans SLEEP_LEAN back from the WORLD's upright (the body's pitch leaned back out), with
+    // no size-up or tremble, so it reads as a resting comb and not an alarm, and settles 5 deg further back on each
+    // exhale (the sleep clock: 0 = inhale, the peak at half the breath). The lie-down eases the comb into it over
+    // the 10 f after `sleep` switches on (its f 24 of 40, on the clock that counts up to the loop): it snapped
     const B = rig.tune.sleep.breath, s = pose.act === ACT.sleep && c >= 0 ? 0.5 - 0.5 * Math.cos(2 * Math.PI * c / B) : 1;
     const Ld = rig.tune.sleep.lieDown, u = pose.act === ACT.sleep && c < 0 ? Math.min(1, Math.max(0, (c - Math.round(0.6 * Ld) + Ld) / 10)) : 1;
-    const z = info.ang + 5 * (1 - s);
-    lean += (z - lean) * u; tail += (z - tail) * u; floor = -90;
+    const z = info.ang + SLEEP_LEAN + 5 * (1 - s);
+    lean += (z - lean) * u; tail += (z - tail) * u; len += (1 - len) * u; zs = u; floor = -90;
   } else {
-    // waking, the ball opens back out to the mood lean over 16 f (it snapped as the eyes opened)
+    // waking, the comb eases back to the mood lean over 16 f (it snapped as the eyes opened)
     if (pose.act === ACT.wake) {
-      const w = Math.min(1, Math.max(0, c / 16));
-      lean = info.ang + (lean - info.ang) * w; tail = info.ang + (tail - info.ang) * w;
+      const w = Math.min(1, Math.max(0, c / 16)), z = info.ang + SLEEP_LEAN;
+      lean = z + (lean - z) * w; tail = z + (tail - z) * w; len = 1 + (len - 1) * w; zs = 1 - w;
     }
     if (pose.bristle > 0.01) floor = 0;
     jit = pose.bristle > 0.5 && !breathing;
@@ -213,7 +250,7 @@ const backRow: ElementDraw = (ctx, rig, pose, info) => {
   ctx.beginPath();
   for (let i = 0; i < nb; i++) {
     const q = comb.back[i], o = nt + i;
-    const g = regrowOf(baby, breathing, c, i, nb), h = (q[1] + vary) * grow * g, w = grownBase(h, q[2], g);
+    const g = regrowOf(baby, breathing, c, i, nb), h = (q[1] + (comb.sleepBack[i] - q[1]) * zs + vary) * grow * g * len, w = grownBase(h, q[2] * len, g);
     if (!w) continue;                                          // fired: nothing shows over the contour yet
     const x = baby ? q[0] * (d.hipR / 6.5) : x0 + (x1 - x0) * q[0];
     const y = backLineY(rig, x) + 1.5;
@@ -238,7 +275,7 @@ const backRow: ElementDraw = (ctx, rig, pose, info) => {
     // stand, from 37 deg above level, grown in by 53: from 14 deg the first quill of a tail hanging from the rump
     // (the young's ball, the lie-down, the wake) stuck straight back out of it, a lone stinger
     const upw = -(nx * Math.sin(info.ang * Math.PI / 180) + ny * Math.cos(info.ang * Math.PI / 180));
-    const g = Math.min(1, Math.max(0, (upw - 0.6) / 0.2)), h = q[1] * grow * g, w = grownBase(h, q[2], g);
+    const g = Math.min(1, Math.max(0, (upw - 0.6) / 0.2)), hq = q[1] + (comb.sleepTail[i] - q[1]) * zs, h = hq * grow * g * len, w = grownBase(h, q[2] * len * Math.max(1, hq / q[1]), g);
     if (!w) continue;
     const r = J.tailR[kk] + (J.tailR[kk + 1] - J.tailR[kk]) * u;
     const b = Math.max(rippleBump(wave, o), rippleBump(wave2, o));
@@ -395,16 +432,19 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
   const x0 = QV.x, y0 = QV.y;
   if (c < POP) sparkle(ctx, rig, x0, y0 - 1, hi, pal);
   if (c < HOME) {
-    // the nub as the comb draws it, a 4 x 4 blunt triangle (an inked square read as a crumb), tumbling a quarter
-    // turn every 4 f until it comes upright again (f 16), to drop into its socket; whole-pixel centre, so every
-    // turn stays on the grid
+    // the nub as the comb draws it, 5 wide and 6 tall, its point rounded 1 px (an inked square read as a crumb),
+    // tumbling a quarter turn every 4 f until it comes upright again (f 16), to drop into its socket; whole-pixel
+    // centre, so every turn stays on the grid. Its base half is in the horn's shadow tone (clipped): all pale, on
+    // the straw floor only its ink read, a hollow play glyph ">" or "v"
     nubAt(rig, x0, y0, c);
     ctx.save();
     ctx.translate(Math.round(QV.x), Math.round(QV.y)); ctx.rotate((Math.min(4, Math.floor(c / 4)) & 3) * Math.PI / 2);
-    ctx.beginPath(); ctx.moveTo(-2, 2); ctx.lineTo(-1, -2); ctx.lineTo(1, -2); ctx.lineTo(2, 2); ctx.closePath();
-    ctx.restore();
+    ctx.beginPath(); ctx.moveTo(-2.5, 3); ctx.arcTo(0, -3, 2.5, 3, 1); ctx.lineTo(2.5, 3); ctx.closePath();
     outlinePath(ctx, rig);
     ctx.fillStyle = rig.col(pal.horn); ctx.fill();
+    ctx.clip();
+    ctx.fillStyle = rig.col(tones(rig, pal.horn).sh); ctx.fillRect(-3, 1, 6, 3);
+    ctx.restore();
   }
   // the sneeze: three sap drops fanning out of the snout under a little gravity, born 3 px clear of its contour
   // (the mouth point sits a snout-tip radius and more inside it): born on it, they sat on the snout for 2 f
@@ -425,8 +465,9 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
  * turns round over the shoulder, snout down to the comb, pecking into it (every 4 f from f 10 to 30: peckAt; backRow
  * works the front quills with it), eyes shut from f 3 (the head eased round, inout, so the young's overshoot does
  * not swing it past upright first), then it eases back round over 12 f (inout, 44 f in all) and opens its eyes at
- * f 40, the head within 40 deg of level. (In profile a head turned back to the comb is a head past upside
- * down: keyed +34, snout down, it dipped forward to its own chest. It nibbled with its jaw first: the open mouth,
+ * f 40, the head within 40 deg of level. (In profile a head turned back to the comb is a head pitched past
+ * vertical, which the rig draws LOOKING BACK -- upright, the thorn on top -- where it once hung upside down with
+ * its thorns as tusks: keyed +34, snout down, it dipped forward to its own chest. It nibbled with its jaw first: the open mouth,
  * upside down, showed as a red cap on the crown. Shutting its eyes at f 8 and opening them at f 32, whipping round
  * 150 deg in 8 f, it showed an upside-down open eye on the way round and back.)
  */
@@ -453,9 +494,9 @@ function fidget(stage: Stage): ReturnType<typeof bake> {
  * and still stops after every second cycle: cycle, cycle, stop, cycle, cycle, stop, cycle, stumble, stop (the
  * stumble's end is the stride's phase 0, where the stop stands).
  */
-function creepWalk(stage: Stage): DragonAnim {
+function creepWalk(stage: Stage, dims: DragonDims | null): DragonAnim {
   const w = animTuning(stage, SPIKE).walk, C = Math.round(w.cycle), S = STOP[stage], baby = stage === 'baby';
-  const base = walkAnim(stage, w);
+  const base = walkAnim(stage, w, dims);
   const cycle: DragonFrame[] = [], stumble: DragonFrame[] = [];
   let t = 0;
   for (const f of base.frames) { if (t < C) cycle.push(f); else if (t >= 5 * C) stumble.push(f); t += f.dur || 1; }
@@ -502,6 +543,15 @@ function sneezeBreath(): DragonAnim {
   };
 }
 
+/**
+ * The brow thorn's world clamp (3.0, HornParams.worldClamp): never more than 20 deg above or 40 deg below straight
+ * back, like water's fin-ear. Laid along the neck line behind a head lowered asleep it stood upright behind the eye
+ * as a white tusk or an ear (the fixed fault of the grooming's look-back, back in the sleep: the cast review). The
+ * thorn also TAPERS to a point (r 1.5 -> 0.5): with the shared horn's round 2 px end it read at game scale as a pale
+ * capsule on the skull, a hair clip or a bandage.
+ */
+const THORN_CLAMP: readonly [number, number] = [20, 40];
+
 export const SPIKE: ElementSpec = {
   id: 'spike',
   name: 'Bramble',
@@ -522,7 +572,7 @@ export const SPIKE: ElementSpec = {
       // brow thorns lying back along the neck line (3.0: within 20 deg of it), rooted on the BACK contour of the
       // cranium as fire's are: rooted on its top (105 deg) they lay along the skull's own contour and read as a pale
       // strap or goggles on the forehead instead of sticking out of the silhouette
-      horns: hornParams({ len: 3, at: 145, sink: 1, sweep: 14 }),
+      horns: hornParams({ len: 3, at: 145, sink: 1, sweep: 14, r1: 0.5, worldClamp: THORN_CLAMP }),
       markings: [{ kind: 'ring', at: 'tail', t: 0.15, size: 3 }, { kind: 'ring', at: 'tail', t: 0.45, size: 3 }],
       wing: wingParams({ style: 'leaf', scallop: -2, foldRise: 0 }),
       dorsal: null,
@@ -531,7 +581,7 @@ export const SPIKE: ElementSpec = {
       tailRest: TAIL_REST.spike.adult,
       // the far thorn forked at the young's 8 deg, so the overlap cull takes it and one thorn shows: at the adult
       // default 28 (and still at 16-20) it lay stacked over the near one as a flat grey slab, a hair clip (1.5)
-      horns: hornParams({ len: 6, at: 145, sink: 1, sweep: 12, farTilt: 8 }),
+      horns: hornParams({ len: 6, at: 145, sink: 1, sweep: 12, farTilt: 8, r1: 0.5, worldClamp: THORN_CLAMP }),
       markings: [{ kind: 'ring', at: 'tail', t: 0.15, size: 3 }, { kind: 'ring', at: 'tail', t: 0.4, size: 3 }, { kind: 'ring', at: 'tail', t: 0.62, size: 3 }],
       // the adult-only extra: each spar pokes 3 px past the leaf as a thorn, plus a 4 px wrist thorn
       wing: wingParams({ style: 'leaf', scallop: -3, foldRise: 0, thorn: 3, wristThorn: 4 }),
@@ -542,19 +592,23 @@ export const SPIKE: ElementSpec = {
   anims: {
     // Bible 4.3 "Spike". The shy creep (tuning: 0.35 px/f, head down 8) with its stop-and-look (creepWalk); the
     // happy flourish (the quill ripple from cue 0, then the perky 15 deg of the happy mood) and the hungry tell (the
-    // beg's mood -0.5 droop to 39 deg, sagging on each growl) are backRow's; the quill-ball sleep is tuning. The
+    // beg's mood -0.5 droop, x 0.9 at 29 deg, sagging on each growl) are backRow's; the long, low sleep is tuning. The
     // grooming fidget: fidget(); the baby's sneeze: sneezeBreath().
     fidget,
-    overrides: (st) => (st === 'baby' ? { walk: creepWalk(st), breath: sneezeBreath() } : { walk: creepWalk(st) }),
+    overrides: (st, dims) => (st === 'baby' ? { walk: creepWalk(st, dims), breath: sneezeBreath() } : { walk: creepWalk(st, dims) }),
     tuning: (st) => ({
       breath: { puff: st === 'baby' ? 1.15 : 1 },
       walk: { speed: st === 'adult' ? 0.35 : st === 'young' ? 0.4 : 0.24, head: st === 'baby' ? 4 : 8 },
-      // the quill ball: pitched +10 (its chest rests on the floor: the settle allows for the pitch), the tail dropped
-      // straight down behind the rump and curled forward along the floor under the body, the quills standing
-      // world-upright (backRow): a round mound with a saw-tooth top. The baby's bun RAISES its tail a little above
-      // level behind the rump instead, so its tail nub stands over the rump nub: lying flat, its 4 x 4 nubs vanished
-      // at /3 and the asleep baby spike was baby rock's mound (5.1 #1)
-      sleep: { bodyRot: st === 'baby' ? 6 : 10, tailLift: st === 'baby' ? -12 : 88, tailCurl: st === 'baby' ? 4 : 26 },
+      // young and adult sleep LONG AND LOW: the body level, the tail dropped to the floor behind the rump and laid
+      // straight back along it top side up (a J round the rump: lift 30, curl -8 a segment levels it), so its quills
+      // stand (the 37 deg gate) and the comb runs nape -> tail, leaning SLEEP_LEAN back (backRow): a low saw on a bar
+      // twice as long as it is tall. Curled into a quill ball (pitched +10, the tail under the body, the quills
+      // world-upright 4 px apart) it was a round mound with points, rock's dome at /3 (5.1 #1, the cast review).
+      // The baby's bun RAISES its tail a little above level behind the rump instead, so its tail nub stands over the
+      // rump nub: lying flat, its nubs vanished at /3 and the asleep baby spike was baby rock's mound. Its wing nub
+      // rises to 71 deg like every other bun's (nubFold 2.15 from spike's 200 deg rest; the shared 3.3 swung it on
+      // to 2 deg, flat forward over the face, where it met the shut-eye bar in one dark band, a sleep mask)
+      sleep: st === 'baby' ? { bodyRot: 6, tailLift: -20, tailCurl: 4, nubFold: 2.15 } : { bodyRot: 0, tailLift: 30, tailCurl: -8 },
     }),
   },
 };

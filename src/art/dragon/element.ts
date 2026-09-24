@@ -63,6 +63,13 @@ export interface HornParams {
    * overlap test and reads as one horn). The far root also sits 2 px above the near one, across the horn's line.
    */
   farTilt?: number;
+  /**
+   * [up, down]: the most the horn may point above and below straight back IN THE WORLD, deg, whatever the neck line
+   * does (features.ts hornRefClamped). Omitted = no clamp. Spike's brow thorn [20, 40], like water's fin-ear (3.0):
+   * behind a head lowered asleep the neck line rises steeply, and the thorn lying along it stood upright behind the
+   * eye as a white tusk or an ear.
+   */
+  worldClamp?: readonly [number, number];
 }
 
 /** Wing construction. `style` picks the renderer in parts.ts; 'custom' means ElementRenderers.wing replaces it. */
@@ -112,6 +119,8 @@ export interface MarkingSpec {
   /** Width, px (the height too unless `h` is given). Bands are >= 3 px thick (5.2). */
   size: number;
   h?: number;
+  /** Chevron only: no notch in its bottom row, a solid caret (fire's flame-licks: 5.2). */
+  solid?: boolean;
   /** Nudge in body space (tail: along / across the tail), px. */
   dx?: number;
   dy?: number;
@@ -140,6 +149,17 @@ export interface ElementStageParams {
   tailRest: TailRest;
   /** Absolute tail radius [root, tip], replacing stage x modifier (water's baby 3.5 -> 1.5). */
   tailR?: readonly [number, number];
+  /**
+   * Multiplier on this stage's tail length after the 2.3 modifier (2.6: a baby's tail is short and stiff): rock's
+   * and lightning's babies 0.6. Omitted = 1.
+   */
+  tailLen?: number;
+  /**
+   * 0..1, a floor under pose.tail.stiff: how much of the tail chain's follow-through this look never takes (rock's
+   * heavy tail 0.7: the chain's per-segment wobble bent its outline between segments into a wavy, limp flap).
+   * Omitted = 0.
+   */
+  tailStiff?: number;
   /**
    * A box round the tail-tip feature in tail-tip space [x0, y0, x1, y1] (y down), ink and every mood's droop
    * included (water's fluke). The rig keeps all four corners on or above the floor whatever the tail's angle, lifting
@@ -216,6 +236,18 @@ export interface DragonInfo {
    * of it (rock's nose horn, a fin-ear) rather than relying on the clip.
    */
   eye: { x: number; y: number; w: number; h: number };
+  /** The pet's bond, 0..1 (DrawDragonOpts.bond; omitted = 1): rock's crystal count grows with it (3.4). */
+  bond: number;
+  /**
+   * 0..1, eased (DrawDragonOpts.wary; omitted = 0): how wary the pet is of the nearest OTHER dragon. Spike leans its
+   * quills 15 deg toward upright, no size-up (4.3). The owner measures and eases it; a renderer only reads it.
+   */
+  wary: number;
+  /**
+   * 0..1 (DrawDragonOpts.charge; omitted = 0): lightning's static charge, built up by boredom and drained by play
+   * (3.5): its crackle comes faster as it builds, down to every 40 f.
+   */
+  charge: number;
 }
 
 /** An element renderer. The rig calls it in the anchor's space with the light set for that space. */
@@ -229,7 +261,11 @@ export type ElementDraw = (ctx: CanvasRenderingContext2D, rig: DragonRig, pose: 
  *   body space   : origin at the body centre (rig.j.body), rotated by the body pitch; +x forward, y down.
  *                  Ball centres, the belly line and the tail nodes in body space are on rig.j (see DragonJoints).
  *   cranium space: origin at the cranium centre, rotated by the head angle; +x toward the snout, y down.
- *                  info.r = cranium radius. The eye centre is rig.dims.head.eye (x, y).
+ *                  info.r = cranium radius. The eye centre is rig.dims.head.eye (x, y). A head pitched past
+ *                  vertical LOOKS BACK (pose.ts DragonPose.head): cranium space is then also flipped in y
+ *                  (rig.j.headFlip -1), so the skull's top stays up. rig.ts cranToRootPt and enterFaceFromCranium
+ *                  honour it; a renderer that maps cranium points by hand (with rig.j.headAng) must multiply
+ *                  cranium y by rig.j.headFlip, and its face-space x runs mirrored.
  *   tail-tip space: origin at the centre of the last tail node, rotated so +x is FORWARD along the last segment
  *                  (toward the body) and the tail continues toward -x; -y is the tail's top (dorsal) side. When the
  *                  tail is level this is root space's orientation. info.ang = its rotation (counter-rotate to stand
@@ -242,7 +278,11 @@ export type ElementDraw = (ctx: CanvasRenderingContext2D, rig: DragonRig, pose: 
  *                  shared breath anim has the jaw open (>= its stage minimum) from cue 0, where streams start.
  */
 export interface ElementRenderers {
-  /** Step 3: far head features (far horn, far ear-fan, far fin-ear). Cranium space, far palette. */
+  /**
+   * Step 3: far head features (far horn, far ear-fan, far fin-ear). Cranium space, far palette. It may also draw a
+   * NEAR-palette feature that must sit behind the neck and skull, only its contour-breaking part showing (water's
+   * one fin-ear): colour it from info.near.
+   */
   farHead?: ElementDraw;
   /** Step 5: the tail-tip feature (flame, fluke), after the tail. Tail-tip space. */
   tailTip?: ElementDraw;
@@ -263,7 +303,7 @@ export interface ElementRenderers {
   /**
    * Step 12.6: near head features (horn-cues, ear-fans, fin-ears, rock's nose horn). Cranium space. Clipped to
    * exclude info.eye + 1 px: nothing drawn here can cover the eye. (The one sanctioned exception, baby shriekscale's
-   * fan-flop gag of ledger E8, will need a rig opt-out of this clip when its anim is authored.) For a pixel
+   * fan-flop gag of ledger E8, lifts the clip through the stepped pose.eyeClip for exactly those frames.) For a pixel
    * construction on the head (a rib, a mask) that must stay device-aligned, rig.ts enterFaceFromCranium +
    * cranToRootPt enter face space from here (from any other anchor space: enterFaceFromLocal + localToRootPt
    * with the anchor's origin and info.ang, as water's fluke rays do); features.ts pixelStroke draws 2 px
@@ -332,15 +372,19 @@ export interface ElementSpec {
   wingUnderBodyOver?: boolean;
   /**
    * The colour the shared markings are painted in, per frame: water's pearl spots swap marking -> glow (mood >= 0.5)
-   * or -> the dim spot (mood <= -0.3) (3.6, gate h). Omitted = `palette.marking`. Must return a stable string
+   * or -> the dim spot (mood <= -0.3), pulse with the sleeping breath and dim on the hungry beg (3.6, gate h).
+   * Gets the pose and the rig of the frame being drawn. Omitted = `palette.marking`. Must return a stable string
    * (a palette slot or a module constant), never a freshly built one.
    */
-  markingTone?: (info: DragonInfo) => string;
+  markingTone?: (info: DragonInfo, pose: DragonPose, rig: DragonRig) => string;
   /**
-   * The throat sac (shriekscale, 3.7): px the neck's lower contour swells just behind the jaw this frame, as a
-   * membrane bulge in the neck's own silhouette (inked with the neck, 1.2). Return 0 when not shrieking.
+   * The engine's offscreen TINT over the whole dragon this frame, as an alpha in `glow` (0 = none); 1 is the opaque
+   * flash, the silhouette flat in `glow.hi`: lightning's Spark Bolt flash on the snap (3.5; a partial yellow over its
+   * blue came out grey). An element renderer cannot composite over its own silhouette (the
+   * breath and ambient anchors draw on the scene canvas, where a source-atop would tint the floor), so the rig runs
+   * the offscreen pass for it, as it does for DrawDragonOpts.tint.
    */
-  neckSac?: (pose: DragonPose, info: DragonInfo) => number;
+  tint?: (pose: DragonPose, info: DragonInfo) => number;
   /** Lightning: the tail's secondary motion is stepped, snapping on holds of this many frames (4.1). 0 = smooth. */
   tailHold?: number;
   anims?: ElementAnimHooks;

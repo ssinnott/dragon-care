@@ -7,9 +7,9 @@
 // the stage sheet of every element, the greyscale and deuteranopia lineups, the habitat (idle, and every act at
 // once), and strips of every anim in the table (4.2) for all three stages of three elements -- fire (the reference),
 // rock (the dome tuck, the slow cycle, the roll-over happy) and shriekscale (the head cue) -- plus the baby's walk
-// stumble, the idle variants, every element's fidget, the floor audit and the face sheets. A walk strip
-// is the 8 keys of one cycle over scrolling ground ticks (a planted paw must hold still against them). Every shot is
-// frozen-time, so the set is deterministic.
+// stumble, the idle variants, every element's fidget and its own anims (bath, upset, call), the floor audit and the
+// face sheets. A walk strip is the 8 keys of one cycle over scrolling ground ticks (a planted paw must hold still
+// against them). Every shot is frozen-time, so the set is deterministic.
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,8 +57,13 @@ for (const stage of ['adult', 'baby'] as const) {
 for (const el of ELEMENT_IDS) {
   if (ELEMENTS[el].anims?.fidget) pairs.push(`shots/fidget_${el}_adult.png=view=strip&el=${el}&stage=adult&anim=fidget&n=8&t=0`);
 }
-// the floor audit (5.1 #14: every look, every anim; failing runs show their worst frame) and the face sheets
-pairs.push('shots/floor.png=view=floor&t=0');
+// the element anims past the shared table (fire's bath, rock's upset tuck, shriekscale's lonely call), young and adult
+for (const [el, anim] of [['fire', 'bath'], ['rock', 'upset'], ['shriekscale', 'call']] as const) {
+  for (const stage of ['adult', 'young']) pairs.push(`shots/element_${el}_${stage}_${anim}.png=view=strip&el=${el}&stage=${stage}&anim=${anim}&n=8&t=0`);
+}
+// the floor audit (5.1 #14: every look, every anim; failing runs show their worst frame), the leg-root audit (1.2)
+// and the face sheets
+pairs.push('shots/floor.png=view=floor&t=0', 'shots/roots.png=view=roots&t=0');
 for (const st of ['baby', 'young', 'adult']) pairs.push(`shots/faces_${st}.png=view=faces&stage=${st}&t=0`);
 // the breath stream of every element (adult sustain) and the six baby fizzles
 for (const el of ELEMENT_IDS) {

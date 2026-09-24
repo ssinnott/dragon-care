@@ -130,7 +130,7 @@ export function dragonBuild(o: DragonBuildOpts): DragonBuild {
   const sp: ElementStageParams = { ...base, markings, horns, tailRest, lenVar };
 
   // ---- tail ----
-  const tail = { ...S.tail, len: S.tail.len * m(M.tailLength) };
+  const tail = { ...S.tail, len: S.tail.len * m(M.tailLength) * (base.tailLen ?? 1) };
   let tailR0 = S.tail.r0 * m(M.tailR), tailR1 = S.tail.r1 * m(M.tailR);
   if (M.tailTipRMax != null) tailR1 = Math.min(tailR1, M.tailTipRMax);
   if (base.tailR) { tailR0 = base.tailR[0]; tailR1 = base.tailR[1]; }

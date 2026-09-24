@@ -35,20 +35,6 @@ const DIM = moodTones(PAL).dimSpot;
 const INK = DRAGON_SHARED.outline, PEARL = DRAGON_SHARED.catchlight, TONGUE = DRAGON_SHARED.tongue;
 const D2R = Math.PI / 180;
 
-// ---------- the pose behind the markings ----------
-
-/**
- * ElementSpec.markingTone gets only the info object, but the spots pulse with the SLEEPING breath and dim on the
- * hungry beg (4.3), both read from the pose. Every renderer below records its rig and pose here (the rig's one info
- * object and its one resolved pose: set once, then the same objects every frame), and farHead runs at step 3, before
- * the tail and body markings are painted, so markingTone always sees the frame being drawn.
- */
-const POSE_OF = new WeakMap<DragonInfo, DragonPose>(), RIG_OF = new WeakMap<DragonInfo, DragonRig>();
-function own(rig: DragonRig, pose: DragonPose, info: DragonInfo): void {
-  if (POSE_OF.get(info) !== pose) POSE_OF.set(info, pose);
-  if (RIG_OF.get(info) !== rig) RIG_OF.set(info, rig);
-}
-
 /** The mood gauge's state for the fluke and fin-ears: 1 flared, 0 at rest, -1 drooped (sad, dry, asleep). */
 function gauge(pose: DragonPose, info: DragonInfo): number {
   if (info.asleep) return -1;
@@ -74,7 +60,7 @@ const NOTCH = 3.5;
 /** Droop at the low end of the gauge, deg (3.6: 15; the fluke keeps its full size). */
 const DROOP = 15;
 /** How far forward of the tail's tip the fluke's edges leave its contour: the paddle wraps further along the tail. */
-const JOIN: Readonly<Record<Stage, number>> = { baby: 3.5, young: 2.5, adult: 2.5 };
+const JOIN: Readonly<Record<Stage, number>> = { baby: 6, young: 2.5, adult: 2.5 };
 
 let RC = 1, RS = 0;
 /** A fluke point (tail-tip space) turned by the droop about the tail tip, into FP. */
@@ -85,8 +71,9 @@ const FP = { x: 0, y: 0 };
  * The fluke outline, tail-tip space (the tail continues toward -x, the body is toward +x), drooped by (RC, RS) about
  * the tip. It starts and ends ON the tail's contour `jx` px forward of the tip (radius rJ there), so the tail runs
  * into the fin: the closing edge lies inside the tail and the clip in tailTip keeps its ink off it.
- *   baby : a round tadpole paddle, its top and bottom edges swelling off the tail round the tip (a disc hung on the
- *          tip read as a lollipop), a soft notch in its back edge;
+ *   baby : a tadpole paddle, one rounded leaf in one flat tone, its top and bottom edges swelling off the tail from
+ *          the joint (a disc hung on the tip read as a lollipop) to its widest two-thirds of the way out, its back
+ *          end round;
  *   young / adult: a vertical crescent -- convex leading edges out to the lobe tips, concave trailing edges into a
  *          central notch NOTCH px deep.
  */
@@ -95,13 +82,13 @@ function flukePath(ctx: CanvasRenderingContext2D, round: boolean, H: number, D: 
   ctx.moveTo(jx, -rJ);
   let p;
   if (round) {
-    // a vertical oval paddle, its back edge dipping 2 px into a soft notch: the crescent's seed (a plain round back
-    // read as a club at game scale)
-    p = fp(jx * 0.2, -H); const ax = p.x, ay = p.y; p = fp(-1.5, -H); ctx.quadraticCurveTo(ax, ay, p.x, p.y);
-    p = fp(-4, -H); const bx = p.x, by = p.y; p = fp(-D, -H * 0.75); const cx = p.x, cy = p.y; p = fp(-D, -H * 0.3); ctx.bezierCurveTo(bx, by, cx, cy, p.x, p.y);
-    p = fp(-D + 2.4, 0); const nx = p.x, ny = p.y; p = fp(-D, H * 0.3); ctx.quadraticCurveTo(nx, ny, p.x, p.y);
-    p = fp(-D, H * 0.75); const dx = p.x, dy = p.y; p = fp(-4, H); const ex = p.x, ey = p.y; p = fp(-1.5, H); ctx.bezierCurveTo(dx, dy, ex, ey, p.x, p.y);
-    p = fp(jx * 0.2, H); ctx.quadraticCurveTo(p.x, p.y, jx, rJ);
+    // ONE rounded leaf, widest two-thirds of the way out from the joint, its back end round with no notch: notched
+    // (and with the tail run on through it) it split into two round dark lobes, a dog-bone or a club end
+    const xw = jx - (jx + D) * 0.67;
+    p = fp(jx - (jx - xw) * 0.6, -H); const ax = p.x, ay = p.y; p = fp(xw, -H); ctx.quadraticCurveTo(ax, ay, p.x, p.y);
+    p = fp(-D + 0.5, -H); const bx = p.x, by = p.y; p = fp(-D, -H * 0.35); const cx = p.x, cy = p.y; p = fp(-D, 0); ctx.bezierCurveTo(bx, by, cx, cy, p.x, p.y);
+    p = fp(-D, H * 0.35); const dx = p.x, dy = p.y; p = fp(-D + 0.5, H); const ex = p.x, ey = p.y; p = fp(xw, H); ctx.bezierCurveTo(dx, dy, ex, ey, p.x, p.y);
+    p = fp(jx - (jx - xw) * 0.6, H); ctx.quadraticCurveTo(p.x, p.y, jx, rJ);
   } else {
     p = fp(-D * 0.28, -H * 0.88); const ax = p.x, ay = p.y; p = fp(-D, -H); ctx.quadraticCurveTo(ax, ay, p.x, p.y);
     p = fp(-D * 0.52, -H * 0.36); const bx = p.x, by = p.y; p = fp(-D + NOTCH, 0); ctx.quadraticCurveTo(bx, by, p.x, p.y);
@@ -137,7 +124,6 @@ function tipBox(st: Stage): readonly [number, number, number, number] {
  * Gauge: drooped 15 deg (sad, dry, asleep), the lobes spread `flare` px each (happy).
  */
 const tailTip: ElementDraw = (ctx, rig, pose, info) => {
-  own(rig, pose, info);
   const st = info.stage, F = FLUKE[st], J = rig.j, tn = J.tailN, g = gauge(pose, info);
   const H = F.h / 2 + (g > 0 ? F.flare : 0), D = F.d, droop = g < 0 ? DROOP : 0;
   // (the tail runs on toward -x, so the lobes swing DOWN, +y, under a counter-clockwise turn)
@@ -152,15 +138,8 @@ const tailTip: ElementDraw = (ctx, rig, pose, info) => {
   pathTaperedCapsule(ctx, 0, 0, px, py, Math.max(0.5, r0 - 0.5), Math.max(0.5, r1 - 0.5), true);
   ctx.clip('evenodd');
   flukePath(ctx, F.round, H, D, jx, rJ);
-  celPath(ctx, rig, info.pal.membrane, -D / 2, 0, Math.max(F.h, F.d) / 2, 0.4, 0);
-  if (!rig.override && F.round) {
-    // the tadpole's tail runs on through the paddle, tapering almost to its back edge (un-inked: the same tail),
-    // so the paddle reads as a fin round the tail, not a disc on a stick
-    ctx.save(); flukePath(ctx, F.round, H, D, jx, rJ); ctx.clip();
-    ctx.beginPath(); ctx.moveTo(jx, -r0); let q = fp(-D + 2, -0.6); ctx.lineTo(q.x, q.y); q = fp(-D + 2, 0.6); ctx.lineTo(q.x, q.y); ctx.lineTo(jx, r0); ctx.closePath();
-    ctx.fillStyle = info.pal.scale; ctx.fill();
-    ctx.restore();
-  }
+  // (the baby's paddle one flat membrane tone: a shadow band across its lower half made a second dark lobe)
+  celPath(ctx, rig, info.pal.membrane, -D / 2, 0, Math.max(F.h, F.d) / 2, F.round ? 0 : 0.4, 0);
   if (!rig.override && F.rays) {
     ctx.save(); flukePath(ctx, F.round, H, D, jx, rJ); ctx.clip();
     const ox = J.tailX[tn], oy = J.tailY[tn], adult = st === 'adult';
@@ -378,9 +357,8 @@ function lipLick(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose
 }
 
 // the one fin-ear, from behind the head (finEar); the near head features: the wind-up's cheek puff, the lip-lick
-const farHead: ElementDraw = (ctx, rig, pose, info) => { own(rig, pose, info); finEar(ctx, rig, pose, info); };
+const farHead: ElementDraw = (ctx, rig, pose, info) => { finEar(ctx, rig, pose, info); };
 const nearHead: ElementDraw = (ctx, rig, pose, info) => {
-  own(rig, pose, info);
   cheekPuff(ctx, rig, pose, info);
   lipLick(ctx, rig, pose, info);
 };
@@ -408,7 +386,6 @@ const DORSAL: Readonly<Record<Stage, { h: number; n: number; from: number; to: n
  * of the line) on a 1 px strip, so the fin reads as one continuous scalloped fin, not a row of teeth.
  */
 const backRow: ElementDraw = (ctx, rig, pose, info) => {
-  own(rig, pose, info);
   const dp = DORSAL[info.stage];
   if (!dp) return;
   const x0 = rig.hipB.x + dp.from, x1 = rig.hipB.x + dp.to, step = (x1 - x0) / dp.n;
@@ -444,13 +421,12 @@ const backRow: ElementDraw = (ctx, rig, pose, info) => {
  *     dragon never flashes happy.
  * Every value is a palette slot or a module constant (element.ts: a stable string).
  */
-function markingTone(info: DragonInfo): string {
-  const P = POSE_OF.get(info), rig = RIG_OF.get(info);
+function markingTone(info: DragonInfo, P: DragonPose, rig: DragonRig): string {
   let s = info.mood >= 0.5 ? 2 : info.mood <= -0.3 ? 0 : 1;
-  if (P && P.act === ACT.beg) s = 0;
+  if (P.act === ACT.beg) s = 0;
   else if (info.asleep) {
-    const B = rig ? rig.tune.sleep.breath : 180;
-    if (P && P.act === ACT.sleep && P.cue >= B * 0.28 && P.cue < B * 0.56) s = Math.min(2, s + 1);
+    const B = rig.tune.sleep.breath;
+    if (P.act === ACT.sleep && P.cue >= B * 0.28 && P.cue < B * 0.56) s = Math.min(2, s + 1);
   } else if (info.mood >= 0 && s === 1 && (info.tick + info.seed * 37) % 240 < 30) s = 2;
   return s === 2 ? info.pal.glow : s === 0 ? DIM : info.pal.marking;
 }
@@ -540,8 +516,12 @@ function drawDrop(ctx: CanvasRenderingContext2D, rig: DragonRig, info: DragonInf
 
 // ---------- the Bubble Jet ----------
 
-/** Stream bubble radii in spawn order (3.6: r 2 to 5), small and large alternating so neighbours never merge. */
-const BUB_R: Readonly<Record<Stage, readonly number[]>> = { baby: [2], young: [2, 3, 2, 3], adult: [3, 2, 4, 2, 5, 2, 4, 3] };
+/**
+ * Stream bubble radii in spawn order (3.6: r 2 to 5, the adult's one r 6 at the jet's middle), small and large
+ * alternating so neighbours never merge. The adult's 9 fill the sustain (the last leaves at cue 35, the jaw open to
+ * 36); its 8 of r 2-5 were a few small bubbles beside fire's flame (the cast review, round 2).
+ */
+const BUB_R: Readonly<Record<Stage, readonly number[]>> = { baby: [2], young: [2, 3, 2, 3], adult: [3, 2, 4, 2, 6, 2, 5, 3, 4] };
 /**
  * Stream: frames between bubbles per stage, the first bubble's cue, px/f out of the mouth, life before the pop and
  * the pop's frames. Spread over the whole sustain (the jaw is open cue 0-36 adult, 0-27 young): every 3 f, all 4 of
@@ -578,8 +558,8 @@ function streamPos(rig: DragonRig, info: DragonInfo, k: number, age: number, out
  * mouth and drawn as whole pixels in face space. Called every frame (element.ts):
  *   - breath, young / adult: the STREAM through the sustain, one bubble every 4 f (young 6) moving out of the mouth
  *     at 2.5 px/f in a cone (streamPos), rising 0.2 px/f with a +-1 px wobble stepped every 4 f, popping (2 f) at
- *     18 f -- a pop is skipped within 2 px of a live bubble's ring (a star beside a bubble read as beads); adult 8
- *     bubbles r 2-5, young 4 r 2-3 (half strength), each swelling from r 1 as it leaves the lip; and DROPLETS
+ *     18 f -- a pop is skipped within 2 px of a live bubble's ring (a star beside a bubble read as beads); adult 9
+ *     bubbles r 2-6, young 4 r 2-3 (half strength), each swelling from r 1 as it leaves the lip; and DROPLETS
  *     (adult 4, young 2) shed off the jaw in a fan of arcs under the stream, landing on the floor as ringed dots.
  *     (The wind-up's cheek puff and fin flare are nearHead's and finEar's.)
  *   - breath, baby: one big bubble grows on its own snout, r 2 -> 6 over 30 f, wobbles, and pops in its face at
@@ -588,7 +568,6 @@ function streamPos(rig: DragonRig, info: DragonInfo, k: number, age: number, out
  *   - asleep: a nostril bubble on each exhale (4.3), r 2 -> 4 over the exhale, popping (3 f) as it ends.
  */
 const breath: ElementDraw = (ctx, rig, pose, info) => {
-  own(rig, pose, info);
   if (rig.override) return;
   const J = rig.j, c = pose.cue;
   if (pose.act === ACT.sleep && info.asleep) {
@@ -718,7 +697,6 @@ function topBubble(ctx: CanvasRenderingContext2D, it: TopItem): void {
  *     (1.4 step 14), wobbling, and pop at the top.
  */
 const ambient: ElementDraw = (ctx, rig, pose, info) => {
-  own(rig, pose, info);
   const J = rig.j, d = rig.dims, act = pose.act;
   if (act === ACT.fidget) {
     const st = info.stage, k = SHAKE_K[st], n = SHAKE_DROPS[st], L = shakeLen(st);

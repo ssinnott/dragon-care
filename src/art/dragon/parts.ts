@@ -256,15 +256,25 @@ const SPX = new Float32Array(6), SPY = new Float32Array(6);
  * Wing space: a bat / leaf / fin wing as ONE silhouette (arm capsules + membrane polygon, unioned, stroked once),
  * the membrane matte (2 tones: hi 0) with the arm and spars painted over it in `scale` with no ink (1.2).
  * `fold` 0 = folded along the back, 1 = spread (2.2 angles lerped). `span` scales every bone; `drop` lowers the
- * folded wing (foldRise < 3).
+ * folded wing (foldRise < 3). FOLDED (1.3) it is a wing, not a strap: a round knuckle knob standing over the back
+ * line, the lead spar lying along the forearm as one leading edge to the rump, and under it a flat triangular panel
+ * of membrane down to the fanned finger tips on a lobed lower edge, attached under the shoulder. (The old fold put
+ * every tip on one line under a 3 px bar, the membrane attached far back: a bar over a 1-2 px dark sliver.)
  */
 export function drawBatWing(ctx: CanvasRenderingContext2D, rig: DragonRig, wp: Readonly<WingParams>, fold: number, pal: Readonly<DragonPalette>): void {
   const wd = rig.dims.wing;
   if (!wd) return;
   const A = WING_ANGLES[rig.stage === 'adult' ? 'adult' : 'young'];
   const spars = wp.plus ? wd.sparsPlus : wd.spars, ang = wp.plus ? A.sparsPlus : A.spars;
-  const f = Math.max(0, Math.min(1, fold)), span = wp.span;
-  const drop = (3 - wp.foldRise) * (1 - f);
+  const f = Math.max(0, Math.min(1, fold)), g = 1 - f, span = wp.span, adult = rig.stage === 'adult' ? 1 : 0;
+  const drop = (3 - wp.foldRise) * g;
+  // (a low fold -- foldRise < 3: spike's under its quills, rock's under its dome rim -- takes the drop instead)
+  const shy = FOLD_ROOT[adult][1] * g * wp.foldRise / 3;
+  ctx.save();
+  ctx.translate(FOLD_ROOT[adult][0] * g * span, shy);
+  // the folded lower edge's floor, wing-space y: >= 5 px above the belly line, so the flank colour always shows (1.3)
+  // (wing space is body space moved to the root while folded: the flap is 0 there), a convex edge's bulge included
+  const low = rig.bellyY - 5 - wd.root[1] - (wp.rootDy || 0) - shy - Math.max(0, -wp.scallop * 0.35);
   const eh = angAt(A.humerus, f), ef = angAt(A.forearm, f);
   const ex = Math.cos(eh) * wd.humerus * span, ey = -Math.sin(eh) * wd.humerus * span + drop;
   const wx = ex + Math.cos(ef) * wd.forearm * span, wy = ey - Math.sin(ef) * wd.forearm * span;
@@ -272,15 +282,26 @@ export function drawBatWing(ctx: CanvasRenderingContext2D, rig: DragonRig, wp: R
   for (let i = 0; i < n; i++) {
     const a = angAt(ang[i], f), L = spars[i] * span;
     SPX[i] = wx + Math.cos(a) * L; SPY[i] = wy - Math.sin(a) * L;
+    // (a finger tip the fan would drop below that floor -- a deep body, a low fold -- is lifted onto it)
+    SPY[i] -= Math.max(0, SPY[i] - low) * g;
   }
-  const ax = wd.attach[0] * span, ay = wd.attach[1] + drop * 0.5;
+  // the membrane's body attach: spread, the stage's point far back on the flank; FOLDED, just under the root, so the
+  // folded panel's lower edge runs from the trail tip forward to the shoulder (at the spread attach the folded
+  // membrane was a 1-2 px sliver under the arm, and the wing read as a strap)
+  const ax = (wd.attach[0] * f + FOLD_ATTACH[0] * g) * span;
+  let ay = wd.attach[1] * f + FOLD_ATTACH[1] * g + drop * 0.5;
+  ay -= Math.max(0, ay - low) * g;
   // membrane: root -> elbow -> wrist -> lead tip -> (edge) -> ... -> trail tip -> (edge) -> attach
   const thorn = wp.thorn * (rig.stage === 'adult' ? 1 : 0);
   let m = 0;
   MEM[m++] = 0; MEM[m++] = drop * 0.5;
-  MEM[m++] = ex; MEM[m++] = ey;
+  // (folded, the elbow vertex slides up the forearm to the wrist: the panel's front edge runs from the root straight
+  // up to the knuckle, and the membrane fills everything under the leading edge)
+  MEM[m++] = ex + (wx - ex) * g; MEM[m++] = ey + (wy - ey) * g;
   MEM[m++] = wx; MEM[m++] = wy;
-  const depth = wp.scallop * (wp.scallop > 0 ? f : Math.max(0.35, f));
+  // the trailing edge's scallops (x the fold, 1.2) keep a shallow cut folded, where the fanned tips land 4-6 px apart:
+  // the folded wing's lower edge reads as a wing's, lobed between the finger tips
+  const depth = wp.scallop > 0 ? wp.scallop * f + Math.min(wp.scallop, FOLD_SCALLOP[adult]) * g : wp.scallop * Math.max(0.35, f);
   ctx.beginPath();
   ctx.moveTo(MEM[0], MEM[1]); ctx.lineTo(MEM[2], MEM[3]); ctx.lineTo(MEM[4], MEM[5]);
   for (let i = 0; i < n; i++) {
@@ -291,7 +312,7 @@ export function drawBatWing(ctx: CanvasRenderingContext2D, rig: DragonRig, wp: R
     const an = i + 1 < n ? angAt(ang[i + 1], f) : 0;
     const nx = i + 1 < n ? SPX[i + 1] - Math.cos(an) * thorn : ax;
     const ny = i + 1 < n ? SPY[i + 1] + Math.sin(an) * thorn : ay;
-    edgeTo(ctx, tx, ty, nx, ny, wx, wy, depth);
+    edgeTo(ctx, tx, ty, nx, ny, wx, wy, i + 1 < n ? depth : depth * f);
   }
   ctx.lineTo(MEM[0], MEM[1]);
   ctx.closePath();
@@ -299,30 +320,61 @@ export function drawBatWing(ctx: CanvasRenderingContext2D, rig: DragonRig, wp: R
   // (each spar's round cap ENDS at its membrane tip -- a capsule centred on the tip poked its radius past the
   // membrane as a bare stick, and on the far wing behind the near one as a brown twig -- except where a thorn is
   // meant to poke out: spike's)
-  const ar = wd.armR, sr = wd.sparR;
+  // (folded, the adult's 3 px leading edge thins to 2 px, so the membrane under it reads as the wing and the bone as
+  // its edge: at 3 px over a 3-4 px panel the bone was most of it, a bar)
+  const ar = wd.armR - (wd.armR - 1) * g, sr = wd.sparR - (wd.sparR - 1) * g;
   for (let i = 0; i < n; i++) {
     const a = angAt(ang[i], f), r = sr * (i === 0 ? 1 : 0.8), k = thorn > 0 ? 0 : r;
     SPX[i] -= Math.cos(a) * k; SPY[i] += Math.sin(a) * k;
   }
-  pathCapA(ctx, 0, drop * 0.5, ex, ey, ar); pathCapA(ctx, ex, ey, wx, wy, ar);
-  for (let i = 0; i < n; i++) pathCapA(ctx, wx, wy, SPX[i], SPY[i], sr * (i === 0 ? 1 : 0.8));
+  // the wrist KNUCKLE (1.3: the "has wings" read): a round knob, grown as the wing folds so it stands above the back
+  // line as a bump, not as the corner of a bar
+  const kr = ar + (KNUCKLE[adult] - ar) * g;
+  // (only the bones painted below join it: a capsule winds against the membrane polygon, so where one lies inside
+  // the membrane it cuts a hole the bone paint then covers; an unpainted one -- the folded humerus and inner
+  // fingers -- left its ink showing through the panel as scribbles)
+  const open = f >= 0.3, bones = open ? n : 1;
+  if (open) pathCapA(ctx, 0, drop * 0.5, ex, ey, ar);
+  pathCapA(ctx, ex, ey, wx, wy, ar);
+  for (let i = 0; i < bones; i++) pathCapA(ctx, wx, wy, SPX[i], SPY[i], sr * (i === 0 ? 1 : 0.8));
+  ctx.moveTo(wx + kr, wy); ctx.arc(wx, wy, kr, 0, Math.PI * 2);
   if (wp.wristThorn && rig.stage === 'adult') pathThorn(ctx, wx, wy, eh, wp.wristThorn);
   // membrane: matte, 2 tones (hi 0)
   let minx = 0, maxx = 0, miny = 0, maxy = 0;
   for (let i = 0; i < n; i++) { minx = Math.min(minx, SPX[i]); maxx = Math.max(maxx, SPX[i]); miny = Math.min(miny, SPY[i]); maxy = Math.max(maxy, SPY[i]); }
   minx = Math.min(minx, ax, wx); maxx = Math.max(maxx, wx, ex); miny = Math.min(miny, wy, ey); maxy = Math.max(maxy, ay);
-  celPath(ctx, rig, pal.membrane, (minx + maxx) / 2, (miny + maxy) / 2, Math.hypot(maxx - minx, maxy - miny) / 2, 0.4, 0);
-  // bones over the membrane, in scale, no ink of their own. Folded, the humerus and the inner fingers lie inside
-  // the folded membrane: only the leading edge (forearm + lead spar) shows, so the membrane reads under it.
+  // (the shading gate measures the part's own radius: the membrane's half-depth under the leading edge, the widest
+  // any finger tip stands off the wrist -> lead tip line. Folded that is 3-4 px and the panel is one flat tone, as
+  // a limb that thin is: a shadow band across a 4 px panel cut it into two slivers)
+  const lx = SPX[0] - wx, ly = SPY[0] - wy, ll = Math.hypot(lx, ly) || 1;
+  let deep = 0;
+  for (let i = 1; i < n; i++) deep = Math.max(deep, Math.abs((SPX[i] - wx) * ly - (SPY[i] - wy) * lx) / ll);
+  deep = Math.max(deep, Math.abs((ax - wx) * ly - (ay - wy) * lx) / ll);
+  celPath(ctx, rig, pal.membrane, (minx + maxx) / 2, (miny + maxy) / 2, wantSh(rig, deep / 2) ? Math.hypot(maxx - minx, maxy - miny) / 2 : deep / 2, 0.4, 0);
+  // bones over the membrane, in scale, no ink of their own: the forearm and the lead spar are the leading edge, the
+  // other spars the fingers fanning from the knuckle to the lobes. Folded, the humerus lies along the body under
+  // the membrane and is not drawn.
   ctx.fillStyle = rig.col(pal.scale);
   ctx.beginPath();
-  const open = f >= 0.3;
   if (open) pathCapA(ctx, 0, drop * 0.5, ex, ey, ar);
   pathCapA(ctx, ex, ey, wx, wy, ar);
-  for (let i = 0; i < (open ? n : 1); i++) pathCapA(ctx, wx, wy, SPX[i], SPY[i], sr * (i === 0 ? 1 : 0.8));
+  for (let i = 0; i < bones; i++) pathCapA(ctx, wx, wy, SPX[i], SPY[i], sr * (i === 0 ? 1 : 0.8));
+  ctx.moveTo(wx + kr, wy); ctx.arc(wx, wy, kr, 0, Math.PI * 2);
   if (wp.wristThorn && rig.stage === 'adult') pathThorn(ctx, wx, wy, eh, wp.wristThorn);
   ctx.fill();
+  ctx.restore();
 }
+/**
+ * The folded wing's shift from the wing root, px [young, adult]: back along the back and down (the down part x
+ * foldRise / 3), so the knuckle stands clear behind the neck's root, its top about 3 px over the back line.
+ */
+const FOLD_ROOT: readonly (readonly [number, number])[] = [[-3, 2], [-4, 3]];
+/** Folded membrane attach, from the wing root (young and adult alike): under the shoulder. */
+const FOLD_ATTACH: readonly [number, number] = [-1, 3];
+/** The folded trailing edge's scallop depth cap, px [young, adult]. */
+const FOLD_SCALLOP: readonly [number, number] = [1.5, 2];
+/** The folded wrist knuckle's radius, px [young, adult]. */
+const KNUCKLE: readonly [number, number] = [1.5, 2];
 
 /** A [folded, spread] bone angle at fold f, in radians. */
 function angAt(p: readonly [number, number], f: number): number { return rad(p[0] + (p[1] - p[0]) * f); }
@@ -405,13 +457,15 @@ export function drawGroundShadow(ctx: CanvasRenderingContext2D, rig: DragonRig, 
 /**
  * Root space: the neck as one n-node tube with the throat stripe (belly, lower 40 %) on its underside, which the
  * body's chest bib and the jaw's belly half continue (chin -> throat -> belly: 2.7). A gulp bulge (pose.gulp 1..3,
- * head -> chest) is an extra circle appended to the SAME path, so it changes the silhouette (1.2).
+ * head -> chest) is an extra circle appended to the SAME path, so it changes the silhouette (1.2). (Shriekscale's
+ * throat sac is its own: drawn at its breath anchor 0.6 of the way up the neck, clipped behind the head. A sac
+ * centred on the last node, under the jaw, hid under the head drawn after the neck and never showed.)
  *
  * The neck and the body are one silhouette (1.2: the root sunk into the chest): the whole neck -- stroke, fill,
  * stripe and band -- is clipped to OUTSIDE the body capsule shrunk by 1 px. Its fill covers the body's ink ring
  * where the two overlap and its own ink stops at the body contour, so no collar arc is stroked across the chest.
  */
-export function drawNeck(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Readonly<DragonPalette>, gulp: number, sac: number): void {
+export function drawNeck(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Readonly<DragonPalette>, gulp: number): void {
   const J = rig.j, n = J.neckN + 1;
   let bulge: Bulge | null = null;
   if (gulp >= 1 && gulp <= 3 && n > 1) {
@@ -430,15 +484,6 @@ export function drawNeck(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Rea
     bulge = GB;
   }
   const rs: Float32Array = J.neckR;
-  if (sac > 0.5) {
-    // the throat sac: a membrane bulge in the neck's lower contour just behind the jaw, `sac` px proud (3.7)
-    const k = n - 1, r = rs[k];
-    SAC.r = r * 0.55 + sac * 0.5;
-    SAC.x = J.neckX[k] + J.neckVX[k] * (r + sac - SAC.r) - (J.neckX[k] - J.neckX[k - 1 < 0 ? 0 : k - 1]) * 0.25;
-    SAC.y = J.neckY[k] + J.neckVY[k] * (r + sac - SAC.r) - (J.neckY[k] - J.neckY[k - 1 < 0 ? 0 : k - 1]) * 0.25;
-    SAC.hex = pal.membrane;
-    bulge = SAC;
-  }
   ctx.save();
   ctx.beginPath(); ctx.rect(-2000, -2000, 4000, 4000);
   const d = rig.dims, h = rig.hipB, c = rig.chestB;
@@ -451,7 +496,7 @@ export function drawNeck(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Rea
   drawTube(ctx, rig, J.neckX, J.neckY, rs, n, pal.scale, pal.belly, J.neckVX, J.neckVY, n, NECK_STRIPE, bulge, NECK_SH);
   ctx.restore();
 }
-const SAC: Bulge = { x: 0, y: 0, r: 0, hex: '' }, GB: Bulge = { x: 0, y: 0, r: 0, hex: '' };
+const GB: Bulge = { x: 0, y: 0, r: 0, hex: '' };
 
 // ---------- skull and jaw (cranium space) ----------
 

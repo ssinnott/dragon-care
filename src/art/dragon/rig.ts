@@ -28,7 +28,7 @@ import type { PartRig, Point } from '../../lib/art/rigParts.ts';
 import { pathTaperedCapsule } from '../../lib/art/shapes.ts';
 import { getChain, stepChain, resetChain } from '../../lib/art/secondary.ts';
 import type { Chain, ChainRig } from '../../lib/art/secondary.ts';
-import { DRAGON_FAR, DRAGON_SHARED } from './palettes.ts';
+import { DRAGON_FAR, DRAGON_SHADOW, DRAGON_SHARED, DRAGON_SLOTS, dragonTones } from './palettes.ts';
 import type { DragonElement, DragonPalette } from './palettes.ts';
 import { TAIL_CHAIN } from './stages.ts';
 import type { LegDims, Stage } from './stages.ts';
@@ -42,7 +42,7 @@ import {
 } from './parts.ts';
 import { drawEye, drawBrow, drawBlush, faceBlushes, drawNostril, drawMouthMark, drawEggTooth, drawFangs } from './faces.ts';
 import { drawHorn, hornOverlap, hornRise, hornRefClamped, drawDorsalRow, drawTailRing, drawMarkingPixels, markingPixel } from './features.ts';
-import { AmbientBudget, SOLO_BUDGET, drawZGlyph, drawStarGlyph, crumbAt, stepAlpha } from './fx.ts';
+import { AmbientBudget, SOLO_BUDGET, drawZGlyph, drawStarGlyph, crumbAt, stepAlpha, Z_W, Z_H } from './fx.ts';
 import type { TopPass } from './fx.ts';
 import { animTuning } from './tuning.ts';
 import type { AnimTuning } from './tuning.ts';
@@ -83,6 +83,13 @@ export interface DragonJoints {
   /** Cranium centre and head angle (degrees, + = snout down). */
   cran: Point;
   headAng: number;
+  /**
+   * 1, or -1 while the head LOOKS BACK: pitched past vertical (pose.ts DragonPose.head), the head group is drawn
+   * mirrored about the snout's own axis. Cranium space is then rotated by headAng as ever (the snout points where
+   * the pitch aims it) and flipped in y, so the skull's top stays up. Every cranium -> root mapping multiplies
+   * cranium y by it (cranToRootPt, enterCranium, enterFaceFromCranium), and face space runs mirrored in x.
+   */
+  headFlip: number;
   /**
    * The neck line as the head sees it: degrees BELOW straight back in cranium space of the last neck segment,
    * unsnapped (snapped nodes would jitter it by several degrees). Horns are authored relative to it (3.0). Babies,
@@ -185,6 +192,8 @@ export interface DragonRig extends PartRig, ChainRig {
   mood: number;
   /** True while drawing a flat silhouette (bible 5.1 #1). */
   silhouette: boolean;
+  /** False while drawing without the far legs (DrawDragonOpts.farLegs: the leg-root audit). */
+  farLegs: boolean;
   /** The reusable element-renderer info object. */
   info: DragonInfo;
   /** Where rising particles go this draw (null = not drawn) and the ambient budget / slot. */
@@ -196,6 +205,8 @@ export interface DragonRig extends PartRig, ChainRig {
   ramp: Readonly<Ramp>;
   col(hex: string): string;
   override: string | null;
+  /** While `override` is set: keep the ink (`outline`) as it is and flatten only the rest (the element flash). */
+  keepInk: boolean;
   shading: boolean;
   light: LightDir;
   outline: string;
@@ -248,21 +259,22 @@ export function buildDragon(build: DragonBuild): DragonRig {
     j: {
       body: pt(), bodyAng: 0, hip: pt(), chest: pt(), legs: [legJ(), legJ(), legJ(), legJ()],
       neckN: nn, neckX: f32(nn + 1), neckY: f32(nn + 1), neckR: f32(nn + 1), neckVX: f32(nn + 1), neckVY: f32(nn + 1),
-      cran: pt(), headAng: 0, neckRef: 0, jaw: 0, eye: pt(),
+      cran: pt(), headAng: 0, headFlip: 1, neckRef: 0, jaw: 0, eye: pt(),
       tailN: tn, tailX: f32(tn + 1), tailY: f32(tn + 1), tailR: f32(tn + 1), tailBX: f32(tn + 1), tailBY: f32(tn + 1),
       tailVX: f32(tn + 1), tailVY: f32(tn + 1), tailA: f32(tn), tipAng: 0, rump: pt(),
       wingN: pt(), wingF: pt(), wingAngN: 0, wingAngF: 0, mouth: pt(), mouthAng: 0, top: 0,
     },
     tf: { x: 0, y: 0, fs: 1, ss: 1, rx: 0, ry: 0, c: 1, s: 0, rot: 0 },
-    facing: 1, tick: 0, sleepT: 0, tune: animTuning(build.stage, build.spec), mood: 0, silhouette: false,
+    facing: 1, tick: 0, sleepT: 0, tune: animTuning(build.stage, build.spec), mood: 0, silhouette: false, farLegs: true,
     info: {
       anchor: 'ambient', element: build.element, stage: build.stage, far: false, pal, near: pal, mood: 0, asleep: false,
       tick: 0, seed: build.seed, sp: build.sp, r: 0, len: 0, ang: 0,
       eye: { x: d.head.eye.x, y: d.head.eye.y, w: d.head.eye.w + 2, h: d.head.eye.h + 2 },
+      bond: 1, wary: 0, charge: 0,
     },
     top: null, budget: SOLO_BUDGET, slot: 0,
-    tones: new Map(), ramp: { ...RAMP }, override: null, shading: true,
-    col(hex: string): string { return rig.override || hex; },
+    tones: new Map(), ramp: { ...RAMP }, override: null, keepInk: false, shading: true,
+    col(hex: string): string { return rig.override && !(rig.keepInk && hex === rig.outline) ? rig.override : hex; },
     light: { x: LIGHT_X, y: LIGHT_Y }, outline: DRAGON_SHARED.outline, ow: 1, contactAlpha: 0, tonesN: 3,
     thinR: null, hiMin: null, flatR: null,
     chains: {}, tailChain: null as unknown as Chain, tailHeld: f32(tn), scratch: makeDragonPose(),
@@ -280,6 +292,10 @@ export function buildDragon(build: DragonBuild): DragonRig {
     const side = L.restUpper - Math.atan2(rx, ry) * 180 / Math.PI;
     rig.legBend[i] = Math.abs(side) > 0.5 ? (side > 0 ? 1 : -1) : front ? -1 : 1;
   }
+  // an element's hand-set shadow tones (palettes.ts DRAGON_SHADOW: rock's warm sand and cream) seed the tone cache,
+  // so every shaded part (celPath, the belly band, the head) takes them through tones() like any derived ramp
+  const shadow = DRAGON_SHADOW[build.element];
+  if (shadow) for (const s of DRAGON_SLOTS) if (shadow[s]) rig.tones.set(pal[s], dragonTones(build.element, s, rig.ramp));
   mouthCorner(rig, rig.mouthC);
   const tc = TAIL_CHAIN[build.stage];
   rig.tailChain = getChain(rig, 'tail', tn, { joint: 'rump', rest: [-1, 0], stiffness: tc.stiffness, damping: tc.damping, gain: tc.gain, follow: tc.follow, maxAng: tc.maxAng });
@@ -335,11 +351,11 @@ export function solveTwoBone(lg: DLegJoints, rx: number, ry: number, tx: number,
  * opening) is under the floor, px (<= 0: clear). Reads J.cran and J.jaw; (hc, hs) = the head angle's cos / sin.
  */
 function headSink(rig: DragonRig, hc: number, hs: number): number {
-  const J = rig.j, H = rig.dims.head, s = H.snout, jw = H.jaw, cx = J.cran.x, cy = J.cran.y;
+  const J = rig.j, H = rig.dims.head, s = H.snout, jw = H.jaw, cx = J.cran.x, cy = J.cran.y, f = J.headFlip;
   const ja = rad(J.jaw), tx = jw.tx - jw.hx, ty = jw.ty - jw.hy, hy = jw.hy + (J.jaw ? jw.drop : 0);
-  return Math.max(cy + clr(H.cranR) - floorY(cx), sinkAt(cx, cy, hc, hs, s.x0, s.y0, s.r0), sinkAt(cx, cy, hc, hs, s.x1, s.y1, s.r1),
-    sinkAt(cx, cy, hc, hs, jw.hx, hy, jw.r0),
-    sinkAt(cx, cy, hc, hs, jw.hx + tx * Math.cos(ja) - ty * Math.sin(ja), hy + tx * Math.sin(ja) + ty * Math.cos(ja), jw.r1));
+  return Math.max(cy + clr(H.cranR) - floorY(cx), sinkAt(cx, cy, hc, hs, s.x0, f * s.y0, s.r0), sinkAt(cx, cy, hc, hs, s.x1, f * s.y1, s.r1),
+    sinkAt(cx, cy, hc, hs, jw.hx, f * hy, jw.r0),
+    sinkAt(cx, cy, hc, hs, jw.hx + tx * Math.cos(ja) - ty * Math.sin(ja), f * (hy + tx * Math.sin(ja) + ty * Math.cos(ja)), jw.r1));
 }
 /** How far a circle (x, y, r) of cranium space (centre cx, cy; head angle cos / sin hc, hs) is under the floor. */
 function sinkAt(cx: number, cy: number, hc: number, hs: number, x: number, y: number, r: number): number {
@@ -520,9 +536,18 @@ export function computeDragonJoints(rig: DragonRig, pose: DragonPose): DragonJoi
   // the neck line seen from the cranium: back along the last segment (elevation e) is e below straight back in
   // root space, and the head's own pitch (+ = snout down) adds to that in cranium space
   J.neckRef = N.hidden ? 0 : lastElev + J.headAng;
+  // LOOKING BACK: a head pitched past vertical (snout up and back: fire's flame chase, spike's grooming) is a head
+  // turned round over the shoulder, a yaw a pitch cannot draw -- tipped over, its skull's top faced down, the horns
+  // lay down the throat and a round baby head read face-on. It is drawn mirrored about the snout's own axis instead:
+  // cranium space turned by the same angle and flipped in y (the snout exactly where the pitch aims it, so nothing
+  // jumps as it passes vertical), the skull's top up, the horns keeping their rest lie on the skull (along the neck
+  // line they would hang down the throat of a head turned round)
+  const hf = J.headAng < -90 && J.headAng > -270 ? -1 : 1, fy = hf;
+  J.headFlip = hf;
+  if (hf < 0) J.neckRef = N.hidden ? 0 : N.rest[nn - 1] + N.headPitch;
   const hc = Math.cos(rad(J.headAng)), hs = Math.sin(rad(J.headAng));
   const ex = J.neckX[nn], ey = J.neckY[nn];
-  J.cran.x = S(ex + H.fromNeck[0] * hc - H.fromNeck[1] * hs); J.cran.y = S(ey + H.fromNeck[0] * hs + H.fromNeck[1] * hc);
+  J.cran.x = S(ex + H.fromNeck[0] * hc - fy * H.fromNeck[1] * hs); J.cran.y = S(ey + H.fromNeck[0] * hs + fy * H.fromNeck[1] * hc);
   // An open jaw is 0 or >= the stage minimum (1.2): below that the wedge shows neither mouth nor tongue.
   const jw = pose.jaw;
   J.jaw = jw < H.jawMin * 0.5 ? 0 : clamp(jw, H.jawMin, H.jawMax);
@@ -535,7 +560,7 @@ export function computeDragonJoints(rig: DragonRig, pose: DragonPose): DragonJoi
     J.cran.y -= up;
     for (let k = 1; k <= nn; k++) J.neckY[k] = S(J.neckY[k] - up * (k / nn));
   }
-  J.eye.x = J.cran.x + H.eye.x * hc - H.eye.y * hs; J.eye.y = J.cran.y + H.eye.x * hs + H.eye.y * hc;
+  J.eye.x = J.cran.x + H.eye.x * hc - fy * H.eye.y * hs; J.eye.y = J.cran.y + H.eye.x * hs + fy * H.eye.y * hc;
   J.top = J.cran.y - H.cranR - H.brow;
   // the mouth anchor: in the snout tip closed; OPEN, the middle of the opening -- halfway between the upper jaw line
   // at the tip and the jaw's tip (its top edge) -- so a stream leaves the mouth, not the snout top 2-3 px above it
@@ -544,10 +569,11 @@ export function computeDragonJoints(rig: DragonRig, pose: DragonPose): DragonJoi
     jawTopAt(rig, J.jaw, 1, MO);
     mx = (H.snout.x1 + MO.x) / 2; my = (H.snout.y1 + H.snout.r1 * 0.9 + MO.y) / 2;
   }
-  J.mouth.x = J.cran.x + mx * hc - my * hs; J.mouth.y = J.cran.y + mx * hs + my * hc;
+  J.mouth.x = J.cran.x + mx * hc - fy * my * hs; J.mouth.y = J.cran.y + mx * hs + fy * my * hc;
   // the breath leaves along the SNOUT line, never more than 10 deg below level (5.4: it points away from its own
   // body; 5.1 #14): along the jaw's bisector a head keyed forward sent every stream 35-40 deg into the floor
-  J.mouthAng = Math.min(J.headAng, 10);
+  // (looking back, the snout points back: -180 is straight back, -190 10 deg below it)
+  J.mouthAng = hf > 0 ? Math.min(J.headAng, 10) : Math.max(J.headAng, -190);
 
   // ---- tail: rest shape + pose + chain, from the hip (root: hip centre + (-hipR + sink, -1)) ----
   const T = d.tail, tn = T.n, rest = d.tailRest, ch = rig.tailChain;
@@ -556,7 +582,7 @@ export function computeDragonJoints(rig: DragonRig, pose: DragonPose): DragonJoi
   J.tailBX[0] = bx; J.tailBY[0] = by;
   toRoot(rig, bx, by, J.rump);
   let acc = 0, tau = 0;
-  const loose = 1 - clamp(pose.tail.stiff, 0, 1);
+  const loose = 1 - clamp(Math.max(pose.tail.stiff, sp.tailStiff || 0), 0, 1);
   for (let k = 0; k < tn; k++) {
     acc += held[k] * loose;
     tau = rest.first + pose.tail.lift + pose.tail.sway + k * (rest.bend + pose.tail.curl) - acc;
@@ -644,6 +670,15 @@ export function enter(ctx: CanvasRenderingContext2D, rig: DragonRig, x: number, 
 /** Pop a local space and restore the root-space light. */
 export function leave(ctx: CanvasRenderingContext2D, rig: DragonRig): void { ctx.restore(); setLight(rig, 0); }
 /**
+ * Push CRANIUM space (the head anchors): at the cranium centre, turned by the head angle, and flipped in y while the
+ * head looks back (J.headFlip), the light flipped with it. Pair with leave().
+ */
+export function enterCranium(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
+  const J = rig.j;
+  enter(ctx, rig, J.cran.x, J.cran.y, J.headAng);
+  if (J.headFlip < 0) { ctx.scale(1, -1); rig.light.y = -rig.light.y; }
+}
+/**
  * Point rig.light at the light in a local space turned `angDeg` from root space. A sprite flipped upside down
  * (pose.stretch < 0: rock's roll onto its back) keeps its light top-left on screen: the light's y flips with it.
  */
@@ -661,14 +696,21 @@ export function enterFace(ctx: CanvasRenderingContext2D, rig: DragonRig, X: numb
   ctx.save();
   faceTransform(ctx, rig, X, Y);
 }
+/**
+ * The face's x mirror while the head group is drawn: J.headFlip (-1 while the head looks back, so its face marks
+ * mirror with it), else 1. drawHeadGroup, drawHeadFeatures and clipOffEye set it round their face-space work.
+ */
+let FACE_FLIP = 1;
 /** enterFace's transform, without the save: root space -> face space at root point (X, Y). */
 function faceTransform(ctx: CanvasRenderingContext2D, rig: DragonRig, X: number, Y: number): void {
   const t = rig.tf;
   const dx = t.fs * (t.rx + X * t.c - Y * t.s), dy = t.ss * (t.ry + X * t.s + Y * t.c);
   ctx.rotate(-rad(t.rot)); ctx.translate(-t.rx, -t.ry); ctx.scale(1 / t.fs, 1 / t.ss);
   ctx.translate(Math.round(dx), Math.round(dy));
-  // (flipped upside down, the face flips with the head it sits on)
-  ctx.scale(rig.facing * rig.pxScale, rig.tf.ss < 0 ? -rig.pxScale : rig.pxScale);
+  // (flipped upside down, the face flips with the head it sits on; mirrored -- facing -1, or a squash < 0 in a turn
+  // in place -- it mirrors with the sprite, so a nostril ahead of the eye stays on the snout; and with a head that
+  // looks back)
+  ctx.scale(Math.sign(t.fs) * FACE_FLIP * rig.pxScale, t.ss < 0 ? -rig.pxScale : rig.pxScale);
 }
 
 /**
@@ -678,7 +720,11 @@ function faceTransform(ctx: CanvasRenderingContext2D, rig: DragonRig, X: number,
  * ctx.restore(). The clip in force (the skull, the eye exclusion) is kept.
  */
 export function enterFaceFromCranium(ctx: CanvasRenderingContext2D, rig: DragonRig, X: number, Y: number): void {
-  enterFaceFromLocal(ctx, rig, rig.j.cran.x, rig.j.cran.y, rig.j.headAng, X, Y);
+  const J = rig.j;
+  ctx.save();
+  if (J.headFlip < 0) ctx.scale(1, -1);
+  ctx.rotate(-rad(J.headAng)); ctx.translate(-J.cran.x, -J.cran.y);
+  faceTransform(ctx, rig, X, Y);
 }
 
 /**
@@ -744,6 +790,21 @@ export interface DrawDragonOpts {
   slot?: number;
   /** false = no ground shadow. */
   shadow?: boolean;
+  /** The pet's bond 0..1 (DragonInfo.bond: rock's crystal count grows with it, 3.4). Omitted = 1. */
+  bond?: number;
+  /**
+   * 0..1, eased: how wary the pet is of the nearest OTHER dragon (DragonInfo.wary: spike's wary lean, 4.3). The owner
+   * measures the gap to the nearest other pet, latches it with hysteresis (on under 30 px, off over 36) and eases it
+   * over about 8 f (gallery.ts stepWary). Omitted = 0.
+   */
+  wary?: number;
+  /** 0..1: lightning's boredom charge (DragonInfo.charge, 3.5). Omitted = 0. */
+  charge?: number;
+  /**
+   * false = leave the far legs out: the leg-root audit (gallery view=roots) measures what their sunk roots must lie
+   * in -- the rest of the silhouette drawn over them (1.2 hard rule: roots sunk into the body). Omitted = true.
+   */
+  farLegs?: boolean;
 }
 
 /** Resolve a partial or full pose into the rig's scratch (full poses from a player are used as they are). */
@@ -755,7 +816,9 @@ function setTransform(rig: DragonRig, P: DragonPose, o: DrawDragonOpts): void {
   const facing = o.facing || 1, sc = (o.scale || 1) * rig.scale;
   rig.pxScale = sc;
   rig.ow = 1 / sc;
-  const squash = P.squash, stretch = P.stretch === 1 && squash !== 1 ? 1 / squash : P.stretch;
+  // (volume-preserving: a stretch left at 1 is 1 / |squash| -- a mirrored sprite, squash < 0 in a turn in place, is
+  // not flipped upside down by it)
+  const squash = P.squash, stretch = P.stretch === 1 && squash !== 1 ? 1 / Math.abs(squash) : P.stretch;
   const t = rig.tf;
   t.x = Math.round(o.x); t.y = Math.round(o.y); t.fs = facing * sc * squash; t.ss = sc * stretch;
   t.rx = Math.round(P.root.x * sc) / sc; t.ry = Math.round(P.root.y * sc) / sc;
@@ -779,7 +842,8 @@ export function stepDragon(rig: DragonRig, pose: DragonPose | PartialDragonPose,
   rootToScreen(rig, rig.j.rump.x, rig.j.rump.y, SCR);
   const inv = 1 / (Math.abs(rig.tf.fs) || 1), ang = rig.j.bodyAng + P.root.rot;
   if (ch.init) {
-    const dx = (SCR.x - ch.lastX) * rig.facing * inv, dy = (SCR.y - ch.lastY) * inv;
+    // (root space's x runs along the transform's sign: a sprite mirrored by a turn in place steps its chain as one)
+    const dx = (SCR.x - ch.lastX) * (Math.sign(rig.tf.fs) || 1) * inv, dy = (SCR.y - ch.lastY) * inv;
     if (Math.abs(dx) > ch.teleport || Math.abs(dy) > ch.teleport) resetChain(ch);
     else stepChain(ch, dx, dy, ang - ch.lastAng);
   }
@@ -811,9 +875,18 @@ export function drawDragon(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: 
   rig.top = o.silhouette ? null : o.top || null;
   rig.budget = o.budget || SOLO_BUDGET; rig.slot = o.slot || 0;
   rig.silhouette = !!o.silhouette;
+  rig.farLegs = o.farLegs !== false;
   rig.info.asleep = P.sleep >= 0.5;
+  rig.info.bond = o.bond == null ? 1 : o.bond; rig.info.wary = o.wary || 0; rig.info.charge = o.charge || 0;
   setLight(rig, 0);
   const t = rig.tf;
+  // the element's own tint this frame (lightning's bolt flash) takes the offscreen pass like an owner's tint; at 1 it
+  // is the opaque FLASH instead, drawn straight: every fill flat in `glow.hi` (the grow-up's flash, 4.2) inside its
+  // own ink, so the shape and the bolt still read on a pale floor. At any partial alpha a yellow over lightning's
+  // blue body came out grey, a dropout rather than a flash; all flat, ink too, it was a pale ghost on the straw
+  const et = rig.spec.tint && !o.silhouette ? rig.spec.tint(P, fillInfo(rig, 'ambient', false, rig.pal, 0, 0, 0)) : 0;
+  const eFlash = et >= 1 ? tones(rig, rig.pal.glow).hi : null;
+  const tint = eFlash ? o.tint : et > 0 ? rig.pal.glow : o.tint, tintA = !eFlash && et > 0 ? et : o.tintAlpha;
   ctx.save();
   if (o.alpha != null && o.alpha < 1) ctx.globalAlpha *= o.alpha;
   if (o.shadow !== false && !o.silhouette) {
@@ -821,25 +894,27 @@ export function drawDragon(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: 
     drawGroundShadow(ctx, rig, -t.ry);
     ctx.restore();
   }
-  if (o.flash || o.tint) {
+  if (o.flash || tint) {
     const g = getOffscreen();
     g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, OFF_W, OFF_H);
     g.translate(OFF_OX, OFF_OY); g.scale(t.fs, t.ss); g.translate(t.rx, t.ry); g.rotate(rad(t.rot));
-    rig.override = o.flash ? '#ffffff' : null;
+    rig.override = o.flash ? '#ffffff' : eFlash;
+    rig.keepInk = !o.flash && !!eFlash;
     drawParts(g, rig, P);
-    rig.override = null;
+    rig.override = null; rig.keepInk = false;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.globalCompositeOperation = 'source-atop';
-    g.globalAlpha = o.flash ? 1 : (o.tintAlpha != null ? o.tintAlpha : 0.5);
-    g.fillStyle = o.flash ? '#ffffff' : o.tint as string;
+    g.globalAlpha = o.flash ? 1 : (tintA != null ? tintA : 0.5);
+    g.fillStyle = o.flash ? '#ffffff' : tint as string;
     g.fillRect(0, 0, OFF_W, OFF_H);
     g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
     ctx.drawImage(offCanvas!, t.x - OFF_OX, t.y - OFF_OY);
   } else {
     ctx.translate(t.x, t.y); ctx.scale(t.fs, t.ss); ctx.translate(t.rx, t.ry); ctx.rotate(rad(t.rot));
-    rig.override = o.silhouette ? (typeof o.silhouette === 'string' ? o.silhouette : DRAGON_SHARED.outline) : null;
+    rig.override = o.silhouette ? (typeof o.silhouette === 'string' ? o.silhouette : DRAGON_SHARED.outline) : eFlash;
+    rig.keepInk = !!eFlash;
     drawParts(ctx, rig, P);
-    rig.override = null;
+    rig.override = null; rig.keepInk = false;
   }
   ctx.restore();
 }
@@ -854,8 +929,7 @@ function drawParts(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPose)
   // 3. far head features
   drawHeadFeatures(ctx, rig, P, true);
   // 4. far hind leg, far front leg
-  drawLegN(ctx, rig, 2, rig.palLegFar, false);
-  drawLegN(ctx, rig, 3, rig.palLegFar, false);
+  if (rig.farLegs) { drawLegN(ctx, rig, 2, rig.palLegFar, false); drawLegN(ctx, rig, 3, rig.palLegFar, false); }
   // 5. tail, then the tail-tip feature
   drawTailGroup(ctx, rig, P);
   // 6. back row (before the body: the body contour hides the roots)
@@ -865,10 +939,10 @@ function drawParts(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPose)
   // 7. body, belly band, body markings
   drawBody(ctx, rig, pal);
   leave(ctx, rig);
-  drawBodyMarkings(ctx, rig, pal);
+  drawBodyMarkings(ctx, rig, pal, P);
   // 8. (tuck 1: the head group -- with its neck, so the neck never lies over the head -- goes under the dome) ;
   //    rock: near wing, then bodyOver
-  if (tuck === 1) { drawNeck(ctx, rig, pal, P.gulp | 0, sacOf(rig, P)); drawHeadGroup(ctx, rig, P); }
+  if (tuck === 1) { drawNeck(ctx, rig, pal, P.gulp | 0); drawHeadGroup(ctx, rig, P); }
   const under = !!rig.spec.wingUnderBodyOver;
   if (under) drawWing(ctx, rig, P, false);
   if (R.bodyOver) {
@@ -877,7 +951,7 @@ function drawParts(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPose)
     leave(ctx, rig);
   }
   // 9. neck
-  if (tuck !== 1) drawNeck(ctx, rig, pal, P.gulp | 0, sacOf(rig, P));
+  if (tuck !== 1) drawNeck(ctx, rig, pal, P.gulp | 0);
   // 10. near hind, near front
   drawLegN(ctx, rig, 0, pal, true);
   drawLegN(ctx, rig, 1, pal, true);
@@ -887,7 +961,10 @@ function drawParts(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPose)
   // 12. the head group, last among body parts, so nothing covers the eye
   if (tuck !== 1 && tuck !== 2) drawHeadGroup(ctx, rig, P);
   // 13. the dragon's own effects, clipped off the eye's largest box + 1 px like the near head features: a tell puff,
-  //     a crumb, a popped bubble's droplets never land on the eye (hard rule)
+  //     a crumb, a popped bubble's droplets never land on the eye (hard rule). The element flash (keepInk) lights
+  //     the body only: these are separate objects, and lightning's bolt keeps its colours over its own flash
+  const ov = rig.keepInk ? rig.override : null;
+  if (ov) { rig.override = null; rig.keepInk = false; }
   if (R.breath) {
     ctx.save(); clipOffEye(ctx, rig);
     enter(ctx, rig, J.mouth.x, J.mouth.y, J.mouthAng);
@@ -897,12 +974,13 @@ function drawParts(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPose)
   }
   if (R.ambient && !rig.silhouette) R.ambient(ctx, rig, P, fillInfo(rig, 'ambient', false, pal, 0, 0, 0));
   if (!rig.silhouette) drawActEffects(ctx, rig, P);
+  if (ov) { rig.override = ov; rig.keepInk = true; }
 }
 
 /** Step 5: the tail tube, its markings, then the tail-tip feature in tail-tip space. */
 function drawTailGroup(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPose): void {
   const J = rig.j, R = rig.spec.render, pal = rig.pal;
-  drawTail(ctx, rig, pal);
+  drawTail(ctx, rig, pal, P);
   if (R.tailTip) {
     const tn = J.tailN;
     enter(ctx, rig, J.tailX[tn], J.tailY[tn], J.tipAng);
@@ -936,17 +1014,18 @@ function drawActEffects(ctx: CanvasRenderingContext2D, rig: DragonRig, P: Dragon
     ctx.restore();
   }
   if (!top) return;
-  // "z": one every tune.sleep.z frames of sleep (the first 20 f after falling asleep), 6 x 6 in ink ringed in
-  // `belly` (fx.ts), drifting up 12 px (and 3 px on along facing) over 60 f in 3 alpha steps, from above the SNOUT:
-  // from above the cranium it spawned on shriekscale's fan tips and between horns
+  // "z": one every tune.sleep.z frames of sleep (the first 20 f after falling asleep), a light 7 x 8 "z" with an ink
+  // edge (fx.ts), drifting up 12 px (and 3 px on along facing) over 60 f in 3 alpha steps, from above the SNOUT'S
+  // tip: from above the cranium it spawned on shriekscale's fan tips and between horns, and from over the snout's
+  // middle its first frames lay on the baby shriekscale's ear in the sleep bun
   const zt = rig.sleepT - 20, every = rig.tune.sleep.z;
   if (zt >= 0) {
     const age = zt % every;
     if (age < 60) {
-      const f = age / 60, zx = Math.round((J.cran.x + J.mouth.x) / 2 + 2);
-      rootToScreen(rig, zx + Math.round(f * 3), J.top - 4 - Math.round(f * 12), SCR);
-      const it = top.push(drawZGlyph, SCR.x - 3 * rig.pxScale, SCR.y - 6 * rig.pxScale, rig.pxScale, rig.facing);
-      if (it) { it.c0 = rig.pal.belly; it.c1 = ink; it.alpha = stepAlpha(f); }
+      const f = age / 60, zx = Math.round(J.mouth.x + 4);
+      rootToScreen(rig, zx + Math.round(f * 3), J.top - 8 - Math.round(f * 12), SCR);
+      const it = top.push(drawZGlyph, SCR.x - (Z_W >> 1) * rig.pxScale, SCR.y - Z_H * rig.pxScale, rig.pxScale, rig.facing);
+      if (it) { it.c0 = DRAGON_SHARED.catchlight; it.c1 = ink; it.alpha = stepAlpha(f); }
     }
   }
   // dazed: two 5 x 5 inked stars opposite each other on a small ellipse over the head, stepping 120 deg every 6 f
@@ -964,21 +1043,19 @@ const CR = { x: 0, y: 0, z: 0 };
 /** Crumb brown: a dark food colour, far below the straw floor's luminance (gate i's spirit: >= 25 % from it). */
 const FOOD = '#6e4424';
 
-/** The element's throat-sac swell this frame (0 = none). */
-function sacOf(rig: DragonRig, P: DragonPose): number {
-  const f = rig.spec.neckSac;
-  return f ? f(P, fillInfo(rig, 'breath', false, rig.pal, rig.dims.neck.r1, rig.dims.neck.len, 0)) : 0;
-}
-
 function drawLegN(ctx: CanvasRenderingContext2D, rig: DragonRig, i: number, pal: Readonly<DragonPalette>, near: boolean): void {
   const lg = rig.j.legs[i], front = i === 1 || i === 3, L = front ? rig.dims.front : rig.dims.hind;
   drawLeg(ctx, rig, lg.root, lg.knee, lg.ankle, L.r1, L.r2, L.bulge, L.pawW, L.pawH, lg.paw, pal.scale, near && !!rig.dims.claws);
 }
 
-/** Step 5: the tail tube (belly stripe on its first 60 %), then its markings clipped inside it. Root space. */
-function drawTail(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Readonly<DragonPalette>): void {
+/**
+ * Step 5: the tail tube (the belly stripe on its first half, to the next whole segment), then its markings clipped
+ * inside it. Root space. (Run on to 60 %, 4 of the adult's 6 segments, the stripe dragged a long band of `belly.sh`
+ * down a drooping tail's shaded underside: rock's read as a limp flap with a cool underside.)
+ */
+function drawTail(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Readonly<DragonPalette>, P: DragonPose): void {
   const J = rig.j, n = J.tailN + 1;
-  drawTube(ctx, rig, J.tailX, J.tailY, J.tailR, n, pal.scale, pal.belly, J.tailVX, J.tailVY, Math.ceil(n * 0.6), 0.32);
+  drawTube(ctx, rig, J.tailX, J.tailY, J.tailR, n, pal.scale, pal.belly, J.tailVX, J.tailVY, 1 + Math.ceil(J.tailN / 2), 0.32);
   const mk = rig.sp.markings;
   let any = false;
   for (let i = 0; i < mk.length; i++) if (mk[i].at === 'tail') { any = true; break; }
@@ -997,11 +1074,11 @@ function drawTail(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Readonly<D
     if (m.kind === 'ring') {
       enter(ctx, rig, x, y, -J.tailA[k]);
       ctx.translate(-(m.dx || 0), dy);
-      drawTailRing(ctx, m, markingTone(rig, pal));
+      drawTailRing(ctx, m, markingTone(rig, pal, P));
       leave(ctx, rig);
     } else {
       enterFace(ctx, rig, x - (m.dx || 0), y + dy);
-      drawMarkingPixels(ctx, m, markingTone(rig, pal));
+      drawMarkingPixels(ctx, m, markingTone(rig, pal, P));
       ctx.restore();
     }
   }
@@ -1040,7 +1117,7 @@ function markingAnchor(rig: DragonRig, m: Readonly<MarkingSpec>, out: Point): Po
  * fitMarkings still prefers >= 3 px above the belly line. Called in ROOT space: the clip is set in body space, then
  * each marking is a pixel bitmap in a device-aligned space at its anchor (features.ts).
  */
-function drawBodyMarkings(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Readonly<DragonPalette>): void {
+function drawBodyMarkings(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Readonly<DragonPalette>, P: DragonPose): void {
   const mk = rig.sp.markings;
   if (rig.override || !mk.length) return;
   const J = rig.j;
@@ -1049,7 +1126,7 @@ function drawBodyMarkings(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Re
   pathBody(ctx, rig); ctx.clip();
   ctx.beginPath(); ctx.rect(-300, -300, 600, 600); pathBelly(ctx, rig, true); ctx.clip('evenodd');
   ctx.rotate(-rad(J.bodyAng)); ctx.translate(-J.body.x, -J.body.y);
-  const tone = markingTone(rig, pal);
+  const tone = markingTone(rig, pal, P);
   for (let i = 0; i < mk.length; i++) {
     const m = mk[i];
     if (m.at === 'tail') continue;
@@ -1147,7 +1224,7 @@ function fitBodyMarkings(rig: DragonRig, g: CanvasRenderingContext2D, P: DragonP
         near = Math.min(near, Math.hypot(X - rig.markBX[k] - J.body.x, Y - rig.markBY[k] - J.body.y));
       }
       for (let yy = 0; yy < h && !clash; yy++) for (let xx = 0; xx < w; xx++) {
-        if (!markingPixel(m.kind, w, h, xx, yy)) continue;
+        if (!markingPixel(m.kind, w, h, xx, yy, m.solid)) continue;
         on++;
         const px = X + x0 + xx, py = Y + y0 + yy;
         if (maskRed(img, px, py)) raw++;
@@ -1191,13 +1268,16 @@ function fitTailMarkings(rig: DragonRig, g: CanvasRenderingContext2D, P: DragonP
   drawBackRow(g, rig, P);
   rig.override = null;
   const img = g.getImageData(0, 0, MW, MH).data;
-  let prevT = -1, prevBox = 0;
+  let prevT = -1, prevBox = 0, prevDx = 0;
   for (let i = 0; i < mk.length; i++) {
     const m = mk[i];
     if (m.at !== 'tail') continue;
     const t0 = m.t ?? 0.2, len = rig.dims.tail.len * J.tailN, box = m.kind === 'ring' ? m.size : Math.max(m.size, m.h ?? m.size);
-    // >= 3 px of tail between this box and the previous tail marking's (a pair 1 px apart read as one dash)
-    const tMin = prevT < 0 ? t0 : Math.max(t0, prevT + (prevBox / 2 + 3 + box / 2) / len);
+    // >= 3 px of tail between this box and the previous tail marking's (a pair 1 px apart read as one dash), counting
+    // each one's nudge along the tail (`dx`, + further out: the pet seed's +-2 px of 2.8), which is applied after
+    // the fit -- spaced by t alone, two spots shifted toward each other landed 1-2 px apart (water, seed 3)
+    const dx = m.dx || 0;
+    const tMin = prevT < 0 ? t0 : Math.max(t0, prevT + (prevBox / 2 + 3 + box / 2 + prevDx - dx) / len);
     // a bitmap must show whole; a ring reads as a ring with 3/4 of its section showing past the hip and legs (a
     // back-row quill standing on the tail's top may cross it: ringImg leaves the back row out)
     // a bitmap may also step 1 px across the tail to centre on a tube whose axis falls on a half pixel
@@ -1212,7 +1292,7 @@ function fitTailMarkings(rig: DragonRig, g: CanvasRenderingContext2D, P: DragonP
     }
     if (bestV >= need) bestV = 1;
     rig.markT[i] = Math.round(bestT * 100) / 100; rig.markDY[i] = bestDY; rig.markVis[i] = Math.min(1, Math.max(0, bestV));
-    prevT = rig.markT[i]; prevBox = box;
+    prevT = rig.markT[i]; prevBox = box; prevDx = dx;
   }
 }
 
@@ -1227,7 +1307,7 @@ function tailMarkVis(rig: DragonRig, m: Readonly<MarkingSpec>, t: number, dy: nu
     const w = m.size, h = m.h ?? m.size, X = Math.round(TP.x - (m.dx || 0)) - Math.floor(w / 2), Y = Math.round(TP.y + dy) - Math.floor(h / 2);
     let on = 0, seen = 0;
     for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
-      if (!markingPixel(m.kind, w, h, xx, yy)) continue;
+      if (!markingPixel(m.kind, w, h, xx, yy, m.solid)) continue;
       on++;
       if (maskRed(img, X + xx, Y + yy)) seen++;
     }
@@ -1259,7 +1339,7 @@ function drawOverMarkings(ctx: CanvasRenderingContext2D, rig: DragonRig, P: Drag
     R.bodyOver(ctx, rig, P, fillInfo(rig, 'bodyOver', false, rig.pal, rig.dims.hipR, rig.dims.bodyLen, J.bodyAng));
     leave(ctx, rig);
   }
-  drawNeck(ctx, rig, rig.pal, 0, 0);
+  drawNeck(ctx, rig, rig.pal, 0);
   drawLegN(ctx, rig, 0, rig.pal, true);
   drawLegN(ctx, rig, 1, rig.pal, true);
   if (!under) drawWing(ctx, rig, P, false);
@@ -1292,9 +1372,9 @@ function drawBackRow(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPos
 const MP: Point = { x: 0, y: 0 };
 
 /** The marking colour this frame: the element's mood-driven tone (water's spots) or the palette's marking. */
-function markingTone(rig: DragonRig, pal: Readonly<DragonPalette>): string {
+function markingTone(rig: DragonRig, pal: Readonly<DragonPalette>, P: DragonPose): string {
   const f = rig.spec.markingTone;
-  return f ? f(fillInfo(rig, 'bodyOver', false, pal, rig.dims.hipR, rig.dims.bodyLen, rig.j.bodyAng)) : pal.marking;
+  return f ? f(fillInfo(rig, 'bodyOver', false, pal, rig.dims.hipR, rig.dims.bodyLen, rig.j.bodyAng), P, rig) : pal.marking;
 }
 
 /** Steps 2 / 11: one wing (near or far) in wing space. */
@@ -1325,7 +1405,11 @@ function drawHeadFeatures(ctx: CanvasRenderingContext2D, rig: DragonRig, P: Drag
   const pal = far ? rig.palWingFar : rig.pal;
   const fn = far ? R.farHead : R.nearHead;
   if (!hp && !fn) return;
-  enter(ctx, rig, J.cran.x, J.cran.y, J.headAng);
+  enterCranium(ctx, rig);
+  FACE_FLIP = J.headFlip;
+  // (the world's up, for the horns' quiet-zone height: in a looked-back head's flipped cranium space it lies where
+  // an unflipped head's would at 180 - its angle)
+  const up = J.headFlip < 0 ? 180 - J.headAng : J.headAng;
   // far (1.5): the root 2 px ABOVE the near one across the horn's own line (a root "3 px behind" slides it along a
   // horn that lies back on the neck line) and forked further up, adults 28 deg so background shows between the
   // tips (at 8, and even at 19, the bent near tip curled up against the far horn); a far horn the near one covers
@@ -1333,17 +1417,18 @@ function drawHeadFeatures(ctx: CanvasRenderingContext2D, rig: DragonRig, P: Drag
   // not drawn: a pair that close fused into one dark two-tone wedge
   // both horns keep the quiet-zone height (3.0: <= 3 px over the skull top): the reference lowers back along the
   // head when the neck line points up-back in the world, and a far horn whose fork still rises above it is culled
-  const ref = hp ? hornRefClamped(hp, H.cranR, J.neckRef, J.headAng) : 0;
+  const ref = hp ? hornRefClamped(hp, H.cranR, J.neckRef, up) : 0;
   if (hp && !far) drawHorn(ctx, rig, hp, H.cranR, pal, ref);
   else if (hp && rig.stage !== 'baby') {
     const tilt = hp.farTilt ?? (rig.stage === 'adult' ? 28 : 8);
     const b = rad(ref - hp.sweep), fx = -Math.sin(b) * 2, fy = -Math.cos(b) * 2;
-    if (hornOverlap(hp, H.cranR, ref, tilt, fx, fy) <= 0.7 && hornRise(hp, H.cranR, ref, J.headAng, tilt, fx, fy) <= 3) {
+    if (hornOverlap(hp, H.cranR, ref, tilt, fx, fy) <= 0.7 && hornRise(hp, H.cranR, ref, up, tilt, fx, fy) <= 3) {
       drawHorn(ctx, rig, hp, H.cranR, pal, ref, tilt, fx, fy);
     }
   }
   if (fn) fn(ctx, rig, P, fillInfo(rig, far ? 'farHead' : 'nearHead', far, pal, H.cranR, rig.dims.headLen, J.headAng));
   leave(ctx, rig);
+  FACE_FLIP = 1;
 }
 
 const FP: Point = { x: 0, y: 0 }, TG: Point = { x: 0, y: 0 }, MO: Point = { x: 0, y: 0 };
@@ -1354,13 +1439,13 @@ function cranToRoot(rig: DragonRig, x: number, y: number): Point { return cranTo
  * space (enterFace) at a head feature (a rib, a mask edge), so it stays device-aligned whatever the head's pitch.
  */
 export function cranToRootPt(rig: DragonRig, x: number, y: number, out: Point): Point {
-  return localToRootPt(rig.j.cran.x, rig.j.cran.y, rig.j.headAng, x, y, out);
+  return localToRootPt(rig.j.cran.x, rig.j.cran.y, rig.j.headAng, x, y * rig.j.headFlip, out);
 }
 
 /** Step 12: mouth interior, jaw, skull, face markings, eye / brow / nostril / fangs, near head features. */
 function drawHeadGroup(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPose): void {
-  const J = rig.j, H = rig.dims.head, pal = rig.pal, R = rig.spec.render;
-  enter(ctx, rig, J.cran.x, J.cran.y, J.headAng);
+  const J = rig.j, H = rig.dims.head, pal = rig.pal, R = rig.spec.render, hf = J.headFlip;
+  enterCranium(ctx, rig);
   if (J.jaw > 0) drawMouthInterior(ctx, rig, J.jaw, DRAGON_SHARED.mouth);
   drawJaw(ctx, rig, J.jaw, pal);
   drawSkull(ctx, rig, pal);
@@ -1375,13 +1460,17 @@ function drawHeadGroup(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonP
   // brow, blush and mouth, so a neutral blink shows no brow bar
   let face = P.face | 0;
   if (P.sleep >= 0.5) face = DFACE.closed;
+  // (edge-on, a turn in place's narrow frames: a pixel-construction eye cannot be squashed, so none shows)
+  if (Math.abs(P.squash) < 0.75) face = DFACE.closed;
   // (no blink over eyes already shut: on the happy "^" it flashed an open, lidded eye for a few frames, and upside
   // down in rock's roll that lid hung from the eye's bottom)
   const blink = P.sleep >= 0.5 || face === DFACE.happy || face === DFACE.closed || face === DFACE.dazed ? 0 : P.blink | 0;
+  // (face-space x runs mirrored while the head looks back: every mark's root offset from the eye times hf)
   const ex = J.eye.x, ey = J.eye.y;
+  FACE_FLIP = hf;
   enterFace(ctx, rig, ex, ey);
   if (faceBlushes(face)) drawBlush(ctx, rig);
-  drawEye(ctx, rig, blink === 2 ? DFACE.closed : blink === 1 ? DFACE.sleepy : face);
+  drawEye(ctx, rig, blink === 2 ? DFACE.closed : blink === 1 ? DFACE.sleepy : face, P.pupil >= 0.5);
   drawBrow(ctx, rig, face, tones(rig, pal.scale).deep);
   // nostril near the snout tip, top side, and >= 2 px clear of the eye's ring ALONG THE SNOUT (cranium space),
   // whatever the head's pitch: the baby's button snout leaves ~5 px between ring and tip, and at 1 px the nostril
@@ -1392,29 +1481,29 @@ function drawHeadGroup(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonP
   let p = cranToRoot(rig, Math.max(sn.x1 + sn.r1 * 0.1 - 1, H.eye.x + ringR + 4), sn.y1 - sn.r1 * 0.55);
   // (the closed line's top row is the eye box's middle row: face row 0)
   const ny = Math.round(p.y - ey) - 1;
-  drawNostril(ctx, rig, Math.round(p.x - ex) - 1, ny === 0 ? 1 : ny);
+  drawNostril(ctx, rig, Math.round((p.x - ex) * hf) - 1, ny === 0 ? 1 : ny);
   if (H.teeth === 'egg') {
     // the egg tooth: 2 x 2 on the very tip of the snout, at the mouth line. Not with the jaw shut on the hungry
     // face: beside its two catchlights it lined up as a third white dot
     if (face !== DFACE.hungry || J.jaw > 0) {
       p = cranToRoot(rig, sn.x1 + sn.r1 * 0.72, sn.y1 + sn.r1 * 0.2);
-      drawEggTooth(ctx, rig, Math.round(p.x - ex) - 1, Math.round(p.y - ey) - 1);
+      drawEggTooth(ctx, rig, Math.round((p.x - ex) * hf) - 1, Math.round(p.y - ey) - 1);
     }
   } else if (J.jaw > 0) {
     p = cranToRoot(rig, sn.x1 - 2, sn.y1 + sn.r1 * 0.9);
-    drawFangs(ctx, rig, Math.round(p.x - ex) - 1, Math.round(p.y - ey));
+    drawFangs(ctx, rig, Math.round((p.x - ex) * hf) - 1, Math.round(p.y - ey));
   }
   if (J.jaw > 0) {
     // the 2 x 2 tongue lies on the open jaw's top edge where the mouth is widest (its bottom row on the jaw's ink,
     // the mouth colour above it), whole pixels in face space: drawn under the jaw, the jaw covered it
     jawTopAt(rig, J.jaw, 0.85, TG);
     p = cranToRoot(rig, TG.x, TG.y);
-    ctx.fillStyle = rig.col(DRAGON_SHARED.tongue); ctx.fillRect(Math.round(p.x - ex) - 1, Math.round(p.y - ey) - 1, 2, 2);
+    ctx.fillStyle = rig.col(DRAGON_SHARED.tongue); ctx.fillRect(Math.round((p.x - ex) * hf) - 1, Math.round(p.y - ey) - 1, 2, 2);
   }
   if (J.jaw === 0) {
     // the mouth corner: the back end of the mouth line, on the skull's lower contour (rig.mouthC)
     p = cranToRoot(rig, rig.mouthC.x, rig.mouthC.y);
-    drawMouthMark(ctx, rig, face, Math.round(p.x - ex), Math.round(p.y - ey));
+    drawMouthMark(ctx, rig, face, Math.round((p.x - ex) * hf), Math.round(p.y - ey));
   }
   // 12.6, near head features, clipped to exclude the eye's largest box + 1 px (the hard rule "nothing covers the
   // eye" holds for every element renderer). The clip is built in face space and the transform walked back to root
@@ -1424,6 +1513,7 @@ function drawHeadGroup(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonP
   ctx.beginPath(); ctx.rect(-400, -400, 800, 800); ctx.rect(-Math.floor(gw / 2), -Math.floor(gh / 2), gw, gh);
   if (P.eyeClip >= 0.5) ctx.clip('evenodd');
   leaveFaceKeepClip(ctx, rig, ex, ey);
+  FACE_FLIP = 1;
   drawHeadFeatures(ctx, rig, P, false);
   ctx.restore();
 }
@@ -1435,17 +1525,19 @@ function drawHeadGroup(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonP
  */
 function clipOffEye(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
   const J = rig.j, b = rig.info.eye, gw = b.w + 2, gh = b.h + 2;
+  FACE_FLIP = J.headFlip;
   faceTransform(ctx, rig, J.eye.x, J.eye.y);
   ctx.beginPath(); ctx.rect(-400, -400, 800, 800); ctx.rect(-Math.floor(gw / 2), -Math.floor(gh / 2), gw, gh);
   ctx.clip('evenodd');
   leaveFaceKeepClip(ctx, rig, J.eye.x, J.eye.y);
+  FACE_FLIP = 1;
 }
 
 /** Walk the transform from face space (enterFace at root (X, Y)) back to root space WITHOUT a restore. */
 function leaveFaceKeepClip(ctx: CanvasRenderingContext2D, rig: DragonRig, X: number, Y: number): void {
   const t = rig.tf;
   const dx = t.fs * (t.rx + X * t.c - Y * t.s), dy = t.ss * (t.ry + X * t.s + Y * t.c);
-  ctx.scale(1 / (rig.facing * rig.pxScale), 1 / (t.ss < 0 ? -rig.pxScale : rig.pxScale));
+  ctx.scale(1 / (Math.sign(t.fs) * FACE_FLIP * rig.pxScale), 1 / (t.ss < 0 ? -rig.pxScale : rig.pxScale));
   ctx.translate(-Math.round(dx), -Math.round(dy));
   ctx.scale(t.fs, t.ss); ctx.translate(t.rx, t.ry); ctx.rotate(rad(t.rot));
 }

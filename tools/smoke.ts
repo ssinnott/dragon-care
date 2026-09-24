@@ -8,7 +8,8 @@
 // cast of cel-shaded dragons hundreds. Views that draw the whole cast must also contain every element's scale
 // colour (the body hex from src/art/dragon/palettes.ts), so an element that silently fails to draw is caught too.
 // The floor audit (view=floor) plays every core anim on every look and fails any frame where something the dragon
-// draws, ground shadow aside, is >= 40 % covered more than 1 px under y = 0 (1.1, 5.1 #14).
+// draws, ground shadow aside, is >= 40 % covered more than 1 px under y = 0 (1.1, 5.1 #14). The leg-root audit
+// (view=roots) fails any walk, idle or rest frame where a far leg's sunk root lies outside the body (1.2).
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -30,7 +31,7 @@ async function launch(chromium: any): Promise<any> {
   }
 }
 
-interface Case { query: string; minColours: number; allScales: boolean; timeout?: number; floor?: boolean }
+interface Case { query: string; minColours: number; allScales: boolean; timeout?: number; floor?: boolean; roots?: boolean }
 const CASES: Case[] = [
   { query: 'view=lineup&t=0', minColours: 150, allScales: true },
   { query: 'view=lineup&t=45&mood=-1', minColours: 150, allScales: true },
@@ -61,6 +62,10 @@ const CASES: Case[] = [
   // the floor audit (1.1, 5.1 #14): every look plays every core anim frame by frame; nothing it draws (ground shadow
   // aside) may reach more than 1 row under the ground line -- the sole's own ink row
   { query: 'view=floor&t=0', minColours: 2, allScales: false, timeout: 120000, floor: true },
+  // the leg-root audit (1.2 hard rule: roots sunk into the body): every look's walk, idle and rest pose frame by
+  // frame; each far leg's sunk root must lie inside the rest of the silhouette drawn over it on every frame (a walk
+  // that slid the far shoulder half a stride forward once hung the far front leg in front of the chest)
+  { query: 'view=roots&t=0', minColours: 2, allScales: false, timeout: 60000, roots: true },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -87,6 +92,11 @@ for (const c of CASES) {
       const rows: { id: string; anim: string; depth: number; frame: number }[] = await page.evaluate(() => (window as any).__dragonCare?.floor ?? []);
       if (!rows.length) errors.push('the floor audit reported nothing');
       for (const r of rows) if (r.depth > 1) errors.push(`${r.id} ${r.anim} sinks ${r.depth - 1} px under the floor at f${r.frame}`);
+    }
+    if (c.roots) {
+      const rows: { id: string; anim: string; depth: number; frame: number; leg: string; floats: boolean }[] = await page.evaluate(() => (window as any).__dragonCare?.roots ?? []);
+      if (!rows.length) errors.push('the leg-root audit reported nothing');
+      for (const r of rows) if (r.floats) errors.push(`${r.id} ${r.anim}: the ${r.leg} root is only ${r.depth} px inside the body at f${r.frame}`);
     }
     const colours: number[] = await page.evaluate(() => {
       const cv = document.getElementById('stage') as HTMLCanvasElement;

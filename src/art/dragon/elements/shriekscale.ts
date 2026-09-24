@@ -20,7 +20,7 @@ import { cranToRootPt, enterFaceFromCranium, enterFaceFromLocal, rootToScreen } 
 import { mouthToRoot } from '../features.ts';
 import { pathTube } from '../parts.ts';
 import { pathTaperedCapsule } from '../../../lib/art/shapes.ts';
-import { celPath } from '../../../lib/art/shading.ts';
+import { celPath, outlinePath, tones } from '../../../lib/art/shading.ts';
 import { ACT, DFACE } from '../pose.ts';
 import type { DragonPose } from '../pose.ts';
 import { bake, begAnim, breathAnim } from '../anims.ts';
@@ -34,13 +34,6 @@ import type { TopItem } from '../fx.ts';
 const PAL = DRAGON_PALETTES.shriekscale;
 const DEG = Math.PI / 180;
 
-/**
- * The lonely call's act (3.7: "a different animation from the trick"). ACT has no slot for it yet (sharedRequests:
- * ACT.call = 11); the call keys this value, so the breath renderer draws its one long arc and the sac swells, never
- * the trick's three arcs.
- */
-const ACT_CALL = 11;
-
 // ---------- the ear-fans ----------
 
 /**
@@ -50,9 +43,9 @@ const ACT_CALL = 11;
  * blob. `env` is the free edge's radius per angle ([deg back from straight up, fraction of the pivot-to-top
  * height], front to back: the tall front-top to the shorter back, 3.7). On the NEAR fan the trailing edge dips in
  * round scallops, `depth` px deep, cusp to cusp between the rib ends and behind the last (a bat wing's trailing
- * edge: the young's one, the adult's two); across the top-front they cleft the fan into a heart, and at 2 px across
- * the whole gap they were a 1 px nick at game scale. The far fan has no ribs, so no scallops either: rib-less, its
- * scallops read as a lumpy cauliflower edge.
+ * edge: the young's one, the adult's two); across the top-front they cleft the fan into a heart, at 2 px between
+ * the rib ends' midpoints they were a 1 px nick at game scale, and at 2.5 cusp to cusp a faint wave. The far fan has
+ * no ribs, so no scallops either: rib-less, its scallops read as a lumpy cauliflower edge.
  * SIZE: 10 / 13 / 17 px tall (+-1 with the pet's variant, 2.8) and broad, the adult's ~17 px across upright: every
  * rib keeps 2 px of membrane to every edge (5.2), and in the table's 16 x 12 three ribs so placed were 1-2 px
  * specks, gone altogether on a pet whose variant is -1 (the young's 12 x 9 likewise). Broad, they double the head.
@@ -63,7 +56,10 @@ interface FanSpec {
   /** Half the root's width, px (where the fan's sides meet the skull). */
   root: number;
   env: readonly number[];
-  /** [angle deg back from straight up, start px from the pivot] per rib, front to back. */
+  /**
+   * [angle deg back from straight up, start px from the pivot] per rib, front to back. A rib that would crowd its
+   * neighbours starts once it is ~3.6 px (centre to centre) from them (3.7): the adult's middle one, 20 deg from each.
+   */
   ribs: readonly (readonly [number, number])[];
   /** The scallops, [from, to] deg back from straight up, each a round dip `depth` px deep; none on the far fan. */
   scal: readonly (readonly [number, number])[];
@@ -82,43 +78,60 @@ interface FanSpec {
    */
   spread: number;
   grow: number;
+  /**
+   * The near fan's ribs drawn as PLEATS instead of stamps: [from, to] deg back from straight up, the sectors laid in
+   * `membrane.sh` from the pivot out, so the fan reads as folds radiating from its root (the tone planes of rock's
+   * dome facets: 5.2's rib clearance binds stamps, not planes). The adult's three stamped ribs, cut to whatever run
+   * kept 2 px of membrane round it, stood mid-fan as three parallel pale slashes (the cast reviews). A pleated fan
+   * stamps no ribs: its `ribs` are the pleats' edges.
+   */
+  pleats?: readonly (readonly [number, number])[];
 }
 
 const FANS: Readonly<Record<Stage, FanSpec>> = {
-  // a tall fennec leaf on top of the cranium, 10 x 8 (a 10 x 10 disc read as a mouse ear, and as a shiny ball with
-  // its short rib where a gloss highlight sits), one rib up its middle from low in the ear: the ear's inner ridge
+  // a fennec leaf on top of the cranium, 10 x 8: broad where it sits on the skull (a 6 px root) and rounding to a
+  // narrower tip, one rib up its middle, the ear's inner ridge. A 10 x 10 disc on a 3 px root read as a mouse ear
+  // on a stalk, and as a shiny ball with its short rib where a gloss highlight sits; broad-based, the rib starts
+  // 2 px above the root and runs the whole 4 rows the floor leaves it (2 px of membrane below, 3 at the tip, 5.2)
   baby: {
-    h: 10, pz: 1.5, root: 1.5, depth: 0, mid: 12, at: 100, rr: 0.84, lean0: -8, spread: 1.12, grow: 1.1,
-    env: [-30, 0.6, -18, 0.84, -4, 0.94, 10, 1, 22, 0.92, 34, 0.8, 46, 0.64, 56, 0.46],
-    ribs: [[12, 2.5]], scal: [],
+    h: 10, pz: 1.5, root: 3, depth: 0, mid: 12, at: 100, rr: 0.84, lean0: -8, spread: 1.12, grow: 1.1,
+    env: [-42, 0.42, -28, 0.56, -14, 0.74, 0, 0.92, 8, 1, 16, 0.92, 30, 0.74, 44, 0.56, 58, 0.42],
+    ribs: [[8, 1.5]], scal: [],
   },
   young: {
-    h: 13, pz: 3, root: 2, depth: 2.5, mid: 22, at: 128, rr: 0.88, lean0: 0, spread: 1.35, grow: 1,
+    h: 13, pz: 3, root: 2, depth: 3, mid: 22, at: 128, rr: 0.88, lean0: 0, spread: 1.35, grow: 1,
     env: [-20, 0.6, -6, 0.94, 4, 1, 18, 0.97, 32, 0.92, 46, 0.86, 58, 0.76, 68, 0.62],
     ribs: [[4, 6.5], [28, 7.5]], scal: [[34, 62]],
+    // one pleat, front rib to the scallop's front cusp, so the young's two ribs read as the adult's folds do
+    pleats: [[4, 34]],
   },
   adult: {
-    h: 17, pz: 4, root: 2, depth: 2.5, mid: 24, at: 128, rr: 0.88, lean0: 0, spread: 1.35, grow: 1,
+    h: 17, pz: 4, root: 2, depth: 3, mid: 24, at: 128, rr: 0.88, lean0: 0, spread: 1.35, grow: 1,
     env: [-20, 0.6, -6, 0.94, 6, 1, 18, 0.97, 32, 0.93, 46, 0.86, 58, 0.78, 68, 0.66],
     ribs: [[-2, 7.5], [18, 10.4], [38, 7.5]], scal: [[18, 38], [38, 60]],
+    // the rib lines are the pleats' edges: front rib to middle rib, and back rib to the back edge, in shadow; each
+    // edge runs out to a scallop's cusp, a bat wing's spar to its point
+    pleats: [[-2, 18], [38, 90]],
   },
 };
 
 /** Edge samples between the front and the back edge (one per ~3 deg). */
 const EDGE_N = 32;
-/** A pixel lies wholly inside the fan's path when its centre is this far inside (a 45 deg edge cuts its corner at 0.71). */
-const PIX_IN = 0.65;
+/**
+ * A pixel counts as membrane when its centre is this far inside the fan's path: wholly inside against a level or
+ * upright edge, and 96 % inside against a 45 deg one (the ink is stroked outside the path). At 0.65 the ribs lost
+ * end stamps that had 2 px of membrane round them, the adult's back rib down to a 3 px stub.
+ */
+const PIX_IN = 0.5;
 /**
  * Where a rib runs at all, px from its CENTRE line to the path, tested in fan space: its length then follows the
  * fan's shape and pose alone, never the sub-pixel position of the head, so a rib never pops in and out as the idle
  * breath bobs the head (5.1 #12); ribClear only trims its end stamps on the grid (the mark floor: drawn to fixed
  * ends, the ribs ran 1 px from the edge or onto its ink and read as a pale lip).
  */
-const RIB_SIDE = 2.75;
+const RIB_SIDE = 2.5;
 /** The shortest rib worth drawing, samples 0.5 px apart: shorter, a clipped rib is a speck (5.2). */
 const RIB_MIN = 6;
-/** Rib-start spacing, px centre to centre: a rib that would crowd its neighbours starts once this far from them (3.7). */
-const RIB_GAP = 3.6;
 
 /** Radius of the fan's free edge at `th` deg (from the pivot), `depth` px scallops included, for a fan `H` px tall. */
 function edgeAt(F: FanSpec, th: number, H: number, depth: number): number {
@@ -239,9 +252,10 @@ const BEG_LEAN = -28;
 const DISH_TIP = 8;
 /**
  * Asleep (4.3), young and adult: the fans lean this far back from the WORLD's vertical, their tips curled `SLEEP_CURL`
- * down. The baby's lie back `SLEEP_LEAN_BABY` from its bowed crown.
+ * down; the far one turns `SLEEP_FAR` deg forward of its awake offset (14 back), so it stands 20 deg more upright
+ * than the near one. The baby's lie back `SLEEP_LEAN_BABY` from its bowed crown.
  */
-const SLEEP_LEAN = 42, SLEEP_CURL = 20, SLEEP_FAR = 34, SLEEP_LEAN_BABY = 55;
+const SLEEP_LEAN = 40, SLEEP_CURL = 20, SLEEP_FAR = 34, SLEEP_LEAN_BABY = 55;
 /** Frames the fans take to ease between the asleep lean and the awake one, at the eyes' switch (4.1: no pops). */
 const DROWSE = 8;
 
@@ -263,12 +277,14 @@ function twitch(rig: DragonRig, pose: DragonPose, info: DragonInfo): boolean {
  * flatten its fans"), then PULLED by the anim's `flare`: a flare of +-p moves the gauge the fraction p of the way to
  * +-1, so a flare of +-1 lands it on +-1 at ANY mood (the shriek's fold, the echo-ping's pricked fans, the call's
  * flattened ones) and 0 hands it back to the mood without a pop. Adding the flare to the mood, the shriek never
- * folded flat on a happy pet (mood +1 + fold -1 = rest) and never opened on a sad one. The twitch flicks it 0.3
- * toward upright, or back from it when there is no room left (mood > 0.7): past 1 it flashed a dish.
+ * folded flat on a happy pet (mood +1 + fold -1 = rest) and never opened on a sad one. Through the shriek's 4 f
+ * snap (breath, cue 0 .. 3) the pull starts from the fold, not the mood, so the fans open on the same frames at any
+ * mood: pulled from the mood, mid-snap a sad pet's still lay folded while a happy one's already stood up. The twitch
+ * flicks it 0.3 toward upright, or back from it when there is no room left (mood > 0.7): past 1 it flashed a dish.
  */
 function fanGauge(rig: DragonRig, pose: DragonPose, info: DragonInfo): number {
-  const fc = pose.face | 0;
-  let g = fc === DFACE.sad || fc === DFACE.scared ? -1 : info.mood;
+  const fc = pose.face | 0, snap = pose.act === ACT.breath && pose.cue >= 0 && pose.cue < 4;
+  let g = snap || fc === DFACE.sad || fc === DFACE.scared ? -1 : info.mood;
   const p = Math.max(-1, Math.min(1, pose.flare));
   g += ((p >= 0 ? 1 : -1) - g) * Math.abs(p);
   if (twitch(rig, pose, info)) g += g > 0.7 ? -0.3 : 0.3;
@@ -314,9 +330,9 @@ function walkBob(rig: DragonRig, cue: number, st: Stage): number {
  * up), 0 up and back at 40 deg, +1 upright. The DISH comes from the anim alone, `flare` past 1 (the shriek, the
  * echo-ping's flick): the ribs splay open (1.3x the area) and the rim cups forward, with the adult's ribs rattling
  * +-1 px every 2 f (its adult-only extra). Measured on the silhouette (fans on against off, pet seeds 1, 2 and 5),
- * mood -1 keeps >= 60 % of the standing fans' area (D7; laid back the full 95 deg, the adult kept 61 %). The far
- * fan: root 4 px behind and 1 px above, turned 14 deg further back, so it widens the head's silhouette instead of
- * hiding behind the near one.
+ * mood -1 keeps >= 76 / 74 / 71 % (baby / young / adult) of the resting fans' area and asleep >= 88 / 88 / 85 % (D7:
+ * >= 60 %; laid back the full 95 deg, the adult kept 61 %). The far fan: root 4 px behind and 1 px above, turned
+ * 14 deg further back, so it widens the head's silhouette instead of hiding behind the near one.
  */
 function fan(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, info: DragonInfo): void {
   const st = info.stage, F = FANS[st], r = info.r, far = info.far, act = pose.act, c = pose.cue;
@@ -325,24 +341,26 @@ function fan(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, in
   // ledger E8: after the baby's squeak its fans flop FORWARD over its eyes (the anim lifts the rig's eye clip for
   // exactly those frames: pose.eyeClip 0), landing deep and bouncing once, then pop back up with a blink. Tipped
   // only -62 / -72 from the crown's top they lay on it like a beret and the eye stayed in full view: pivoted from
-  // the crown's front and tipped -145 / -135 (-110 still only capped the eye's top half), the near fan's lobe hangs
-  // down over the eye, a sliver of it peeking out behind
+  // the crown's front and tipped -155 / -145 (-110 still only capped the eye's top half; the leaf ear, narrower at
+  // its tip than the old disc, needs the extra 10 to reach as far), the near fan's lobe hangs down over the eye, a
+  // sliver of it peeking out behind
   const flop = baby && act === ACT.breath && pose.eyeClip < 0.5;
   let lean: number, spread = 1, grow = 1, curl = 0, farOff = 14;
-  if (flop) lean = c < 16 ? -145 : -135;
+  if (flop) lean = c < 16 ? -155 : -145;
   else if (act === ACT.beg && !info.asleep) lean = BEG_LEAN + F.lean0;
   else {
     const g = fanGauge(rig, pose, info);
     let awake = (dish > 0 ? -DISH_TIP * Math.min(1, dish) : g >= 0 ? 40 - 40 * g : 40 - 48 * g) + F.lean0;
     if (dish > 0) { spread = 1 + (F.spread - 1) * dish; grow = 1 + (F.grow - 1) * dish; }
     if (act === ACT.walk) awake += walkBob(rig, c, st);
-    // Asleep (4.3) the young and adult head rests on its paws, so "back along the neck" is level and a fan laid back
-    // there only reached the back line: the asleep silhouette lost the cue (5.1 #1). They lean SLEEP_LEAN back from
-    // the WORLD's vertical (the head's own pitch taken out), their tips curled SLEEP_CURL down: drowsy, well back of
-    // the awake rest lean (at 22 they stood more upright than an alert pet's and read "ears up"), and with the head
-    // raised on its paws (tuning sleep.chin) still clear above the neck, back and wing. The far fan stands 8 deg MORE
-    // upright behind it (turned further back, it sank into the lying back). The baby's bun lays them back
-    // SLEEP_LEAN_BABY from its bowed crown (at 95 they lay flat over the bun and kept 41 %).
+    // Asleep (4.3) the young and adult head lies level over its paws, so "back along the neck" is level and a fan
+    // laid back there only reached the back line: the asleep silhouette lost the cue (5.1 #1). They lean SLEEP_LEAN
+    // back from the WORLD's vertical (the head's own pitch taken out), their tips curled SLEEP_CURL down: drowsy,
+    // well back of the awake rest lean (at 22 they stood more upright than an alert pet's, about 30 from the vertical,
+    // and read "ears up"), and with the head held up over its paws (tuning sleep.chin) still topping the lying body
+    // by 12 / 9 px (adult / young). The far fan stands 20 deg MORE upright behind it (turned further back, it sank
+    // into the lying back). The baby's bun lays them back SLEEP_LEAN_BABY from its bowed crown (at 95 they lay flat
+    // over the bun and kept 41 %).
     const w = info.asleep ? 1 : drowse(rig, pose, st);
     if (w > 0) {
       const sl = baby ? SLEEP_LEAN_BABY : SLEEP_LEAN + rig.j.headAng;
@@ -363,15 +381,17 @@ function fan(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, in
   ctx.translate(tx, ty);
   ctx.rotate(th);
   fanPath(ctx);
-  celPath(ctx, rig, info.pal.membrane, 0, -H / 2, H / 2, 0.36, 0);
-  if (!far && !rig.override) {
+  const pleats = far ? null : F.pleats;
+  // the adult's rattle through the shriek's sustain (its adult-only extra): each rib steps to and fro every 2 f,
+  // neighbours in counter-phase; pleats by 3 deg, stamps by 1 px
+  const rattle = st === 'adult' && act === ACT.breath && c >= 0 && pose.fx > 0.5;
+  if (pleats) drawPleats(ctx, rig, F, pleats, H, spread, curl, info.pal.membrane, rattle ? Math.floor(c / 2) : -1);
+  else celPath(ctx, rig, info.pal.membrane, 0, -H / 2, H / 2, 0.36, 0);
+  if (!far && !pleats && !rig.override) {
     // ribs: 2 px horn as WHOLE-PIXEL 2 x 2 stamps in face space (a rotated 2 px stroke anti-aliases into a pale
     // smear), sampled every 0.5 px up the longest run of the rib that clears the edges by RIB_SIDE (a rib shorter
-    // than RIB_MIN is not drawn), each stamp only if 2 px of membrane surround it (ribClear): no
-    // clip, so no anti-aliased rib end either. The
-    // adult's rattle through the shriek's sustain: each rib steps 1 px to and fro every 2 f, neighbours in
-    // counter-phase
-    const rattle = st === 'adult' && act === ACT.breath && c >= 0 && pose.fx > 0.5;
+    // than RIB_MIN is not drawn), each stamp only if 2 px of membrane surround it (ribClear): no clip, so no
+    // anti-aliased rib end either
     ribFrame(rig, tx, ty, th);
     // out of fan space into cranium space, then face space at the fan's root (one save each, so two restores)
     ctx.save(); ctx.rotate(-th); ctx.translate(-tx, -ty);
@@ -397,6 +417,32 @@ function fan(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, in
   ctx.restore();
 }
 const RT = { x: 0, y: 0 };
+
+/**
+ * The pleated fan (FanSpec.pleats), fan space, the outline's path current: ink, a flat `membrane` fill, then each
+ * pleat, clipped to the fan: a wedge from the pivot out past the edge, its sides sampled along the rays so the dish's
+ * spread and the sleeping curl bend it with the fan (fanPt). No cel band: the pleats are the fan's form. `beat` >= 0
+ * rattles them (3 deg to and fro, neighbours in counter-phase).
+ */
+function drawPleats(ctx: CanvasRenderingContext2D, rig: DragonRig, F: FanSpec, pleats: readonly (readonly [number, number])[],
+  H: number, spread: number, curl: number, hex: string, beat: number): void {
+  outlinePath(ctx, rig);
+  ctx.fillStyle = rig.col(hex); ctx.fill();
+  if (rig.override) return;
+  ctx.save(); ctx.clip();
+  ctx.beginPath();
+  const R = H + F.pz + 3;
+  for (let i = 0; i < pleats.length; i++) {
+    const jig = beat < 0 ? 0 : (beat + i) % 2 ? 3 : -3, a = pleats[i][0] + jig, b = pleats[i][1] + jig;
+    ctx.moveTo(0, F.pz);
+    for (let k = 1; k <= 4; k++) { fanPt(F, a, R * k / 4, H, spread, curl, FP); ctx.lineTo(FP.x, FP.y); }
+    for (let k = 1; k <= 4; k++) { fanPt(F, a + (b - a) * k / 4, R, H, spread, curl, FP); ctx.lineTo(FP.x, FP.y); }
+    for (let k = 3; k >= 1; k--) { fanPt(F, b, R * k / 4, H, spread, curl, FP); ctx.lineTo(FP.x, FP.y); }
+    ctx.closePath();
+  }
+  ctx.fillStyle = tones(rig, hex).sh; ctx.fill();
+  ctx.restore();
+}
 const farHead: ElementDraw = (ctx, rig, pose, info) => fan(ctx, rig, pose, info);
 const nearHead: ElementDraw = (ctx, rig, pose, info) => fan(ctx, rig, pose, info);
 
@@ -444,7 +490,7 @@ function sacPx(pose: DragonPose, st: Stage): number {
   const c = pose.cue;
   let k = 0;
   if (pose.act === ACT.breath) k = c < -10 ? 0 : c < 0 ? (c + 10) / 10 : c < 4 ? 1 : c < 12 ? 1 - (c - 4) / 8 : 0;
-  else if (pose.act === ACT_CALL) {
+  else if (pose.act === ACT.call) {
     const sing = CALL_SING * durOf(st), w = 12 * durOf(st);
     k = c < -w ? 0 : c < 0 ? (c + w) / w : c < sing - 8 ? 1 : c < sing ? (sing - c) / 8 : 0;
   }
@@ -535,10 +581,11 @@ function snoutFront(rig: DragonRig, out: { x: number; y: number }): { x: number;
 }
 /**
  * Where a nose sound points, world deg (+ = down): the head's facing, never more than 10 deg below level (the
- * mouth's rule, element.ts mouth space) nor 30 above, so a small arc's two ends sit level with each other: aimed
- * down the snout of a lowered head, it read as a hook ("J").
+ * mouth's rule, element.ts mouth space) nor 12 above, so a small arc's two ends sit nearly level with each other:
+ * aimed down the snout of a lowered head it read as a hook ("J"), and up the raised snout of the beg (30 deg) as a
+ * pink hair curling off the nose.
  */
-const noseDir = (rig: DragonRig): number => Math.max(-30, Math.min(10, rig.j.headAng + rig.tf.rot));
+const noseDir = (rig: DragonRig): number => Math.max(-12, Math.min(10, rig.j.headAng + rig.tf.rot));
 
 /** A chirp's life, frames. */
 const CHIRP = 12;
@@ -554,8 +601,12 @@ function chirp(ctx: CanvasRenderingContext2D, rig: DragonRig, info: DragonInfo, 
   soundArc(ctx, rig, info, ox, oy, ang, SN.x, SN.y, noseDir(rig), Math.round(5 + age * 0.45), spanAt(f, 45, 38, 30));
 }
 
-/** The echo-ping's arcs (fidget), adult frames: the chirp goes out at 12 for 14 f, the echo comes home at 30 for 12. */
-const PING_OUT = 12, PING_OUT_LIFE = 14, PING_BACK = 30, PING_BACK_LIFE = 12;
+/**
+ * The echo-ping's arcs (fidget), adult frames: the chirp goes out at 12 for 14 f, the echo comes home at 30 for 12.
+ * Each goes as a PAIR, PING_PAIR px apart: 2 px of floor between one arc's pink and the next one's dark edge (4
+ * apart, the two fused into one thick double line).
+ */
+const PING_OUT = 12, PING_OUT_LIFE = 14, PING_BACK = 30, PING_BACK_LIFE = 12, PING_PAIR = 5;
 
 /**
  * Bible 3.7 "Signature: Shriek", and every other sound the head makes that an act keys. Mouth space (clipped off
@@ -577,7 +628,7 @@ const PING_OUT = 12, PING_OUT_LIFE = 14, PING_BACK = 30, PING_BACK_LIFE = 12;
  */
 const breath: ElementDraw = (ctx, rig, pose, info) => {
   const act = pose.act, c = pose.cue, st = info.stage, J = rig.j, mx = J.mouth.x, my = J.mouth.y, ma = info.ang;
-  if (act === ACT.breath || act === ACT_CALL) drawSac(ctx, rig, pose, info);
+  if (act === ACT.breath || act === ACT.call) drawSac(ctx, rig, pose, info);
   if (rig.override) return;
   if (act === ACT.breath) {
     if (c < 0) return;
@@ -599,7 +650,7 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
     soundArc(ctx, rig, info, mx, my, ma, SN.x, SN.y, noseDir(rig) - 20, 6 + Math.floor(age / 6), spanAt(age / 24, 50, 42, 34));
     return;
   }
-  if (act === ACT_CALL) {
+  if (act === ACT.call) {
     const life = Math.round(CALL_SING * durOf(st)), R = st === 'adult' ? 40 : st === 'young' ? 30 : 20;
     if (c < 0 || c >= life) return;
     const f = c / life;
@@ -612,10 +663,10 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
     const reach = st === 'adult' ? 30 : st === 'young' ? 26 : 20, dir = noseDir(rig);
     snoutFront(rig, SN);
     if (c >= t1 && c < t1 + out) {
-      // going out: ")" then a second ")" 4 px behind it, r 8 -> 60 % of the reach
+      // going out: ")" then a second ")" PING_PAIR px behind it, r 8 -> 60 % of the reach
       const f = (c - t1) / out, R = Math.round(8 + (reach * 0.6 - 8) * f);
       soundArc(ctx, rig, info, mx, my, ma, SN.x, SN.y, dir, R, 40);
-      if (R - 4 >= 5) soundArc(ctx, rig, info, mx, my, ma, SN.x, SN.y, dir, R - 4, 40);
+      if (R - PING_PAIR >= 5) soundArc(ctx, rig, info, mx, my, ma, SN.x, SN.y, dir, R - PING_PAIR, 40);
     }
     if (c >= t2 && c < t2 + back) {
       // the echo: centred where the chirp struck (out ahead along the snout), its arcs facing back at the dragon and
@@ -623,7 +674,7 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
       const f = (c - t2) / back, R = Math.round(8 + (reach - 16) * f);
       const wx = SN.x + Math.cos(dir * DEG) * reach, wy = SN.y + Math.sin(dir * DEG) * reach;
       soundArc(ctx, rig, info, mx, my, ma, wx, wy, dir + 180, R, 35);
-      if (R - 4 >= 5) soundArc(ctx, rig, info, mx, my, ma, wx, wy, dir + 180, R - 4, 35);
+      if (R - PING_PAIR >= 5) soundArc(ctx, rig, info, mx, my, ma, wx, wy, dir + 180, R - PING_PAIR, 35);
     }
   }
 };
@@ -736,7 +787,7 @@ function fidget(stage: Stage): DragonAnim {
  * wind-up (drawSac), then one long, mournful note -- the jaw at 25, the `sad` face, the fans pinned at -1 whatever
  * its mood (flare -1, fanGauge), ONE slow arc (breath()) -- and the head sinks as it dies away. No dish, no overshoot, no
  * flinch: its 'call' event turns the neighbours' heads toward it instead (5.4). Adult 100 f; young x 0.85, baby x
- * 0.6. act = the call (ACT_CALL), cue from the note's start.
+ * 0.6. act = the call (ACT.call), cue from the note's start.
  */
 function callAnim(stage: Stage): DragonAnim {
   const k = durOf(stage), W = Math.round(CALL_WIND * k), S = Math.round(CALL_SING * k), L = W + S + Math.round(CALL_REST * k);
@@ -750,7 +801,7 @@ function callAnim(stage: Stage): DragonAnim {
     flare: [[0, 0], [t(8), -1], [L - t(8), -1], [L, 0]],
     'tail.lift': [[0, 0], [W, 5], [W + S + t(10), 8], [L, 0]],
     face: [[0, DFACE.neutral], [t(8), DFACE.sad], [L - t(6), DFACE.neutral]],
-    act: K(ACT_CALL), cue: [[0, -W], [L, L - W]],
+    act: K(ACT.call), cue: [[0, -W], [L, L - W]],
   }, { stage, len: L, next: 'idle', events: [[W, 'call']] });
 }
 
@@ -761,6 +812,7 @@ function callAnim(stage: Stage): DragonAnim {
  *   beg: the hungry tell's chirp opens the jaw (its stage minimum) for 6 f at each chirp, f 0 and f 60 (breath()
  *     draws the arc; fan() pins the fans forward);
  *   call: the lonely call, an anim of its own (callAnim).
+ * (The paws-forward sleep is tuning: sleep.frontTuck.)
  */
 function overrides(stage: Stage, dims: DragonDims | null): Partial<Record<string, DragonAnim>> {
   const tune = animTuning(stage, SHRIEKSCALE);
@@ -771,9 +823,7 @@ function overrides(stage: Stage, dims: DragonDims | null): Partial<Record<string
   const beg = begAnim(stage, tune), jaw = dims ? dims.head.jawMin : STAGE_JAW_MIN[stage];
   let t = 0;
   for (const f of beg.frames) {
-    // (the shared loop's `cue: [[0, 0], [L, L]]` folds its last key onto frame 0 and runs 120 -> 0 backwards: the
-    // clock is rewritten here as the frame time, which is what pose.cue promises for beg)
-    if (f.pose) { f.pose.cue = t; if (t % 60 < 6) f.pose.jaw = jaw; }
+    if (f.pose && t % 60 < 6) f.pose.jaw = jaw;
     t += f.dur;
   }
   return { breath: br, beg, call: callAnim(stage) };
@@ -807,10 +857,12 @@ export const SHRIEKSCALE: ElementSpec = {
       tailRest: TAIL_REST.shriekscale.young, horns: null, markings: [chevron(0.4)],
       wing: wingParams({ style: 'bat', plus: true, scallop: 3 }), dorsal: null,
     },
-    // + 2 chevrons; the adult-only nose-leaf: a 4 x 4 bump in the skull path
+    // + 2 chevrons; the adult-only nose-leaf: a 4 x 4 bump in the skull path. The spread wing's scallops are 3 px,
+    // the young's (3.7 said 5: cut 5 px deep between the tips, its four dark spars stood well past the membrane and
+    // the spread wing read as a raised hand, a rake)
     adult: {
       tailRest: TAIL_REST.shriekscale.adult, horns: null, markings: [chevron(0.3, 6, 5), chevron(0.5)],
-      wing: wingParams({ style: 'bat', plus: true, scallop: 5, wristThorn: 3 }), dorsal: null,
+      wing: wingParams({ style: 'bat', plus: true, scallop: 3, wristThorn: 3 }), dorsal: null,
       skullBumps: [{ x: 14, y: -1.5, r: 2 }],
     },
   },
@@ -818,14 +870,16 @@ export const SHRIEKSCALE: ElementSpec = {
   anims: {
     // 4.3 "Shriekscale": the walk's fan bob, the happy song, the hungry chirp with the fans pinned forward and the
     // sleeping snore are renderer flourishes keyed on act / cue (fan(), breath(), ambient()); the shriek's event,
-    // the chirping beg and the lonely call are overrides; the echo-ping is the fidget. Asleep it rests its head on
-    // its crossed paws with its neck a little up (chin 9 / 7 px: resting on the floor, or at the paws' 5.5 / 4.5, the
+    // the chirping beg, the paws-forward sleep and the lonely call are overrides; the echo-ping is the fidget. Asleep
+    // it holds its head up over its forepaws, the neck a little raised (chin 10 / 8 px: at the paws' 5.5 / 4.5 the
     // asleep silhouette was a mound with a 3 px knob at ÷3, 5.1 #1), so the curled fans stand clear above the back
     // and wing. The shriek opens the jaw to 40 deg (the young too: the element's jawMax 40 replaces the stage's 34);
     // the baby's squeak ends in the fan flop over its eyes, 24 f (ledger E8), then a blink.
     tuning: (st) => ({
       breath: { jaw: st === 'baby' ? 24 : 40, flop: st === 'baby' ? 24 : 0, fizzleFace: st === 'baby' ? 'sheepish' : 'dazed' },
-      sleep: { chin: st === 'adult' ? 10 : 8 },
+      // (the head held up over forepaws slid 10 px forward: at the shared sphinx fold's -2 the raised head floated in
+      // front of the chest over nothing)
+      sleep: st === 'baby' ? {} : { chin: st === 'adult' ? 10 : 8, frontTuck: 10 },
     }),
     overrides: (st, dims) => overrides(st, dims),
     fidget: (st) => fidget(st),

@@ -14,6 +14,12 @@ interface Window {
      * dragon draws reaches (ground shadow excluded; 1 = the sole's own anti-aliased ink row), and where.
      */
     floor?: { id: string; anim: string; depth: number; frame: number }[];
+    /**
+     * view=roots (src/gallery.ts): per look and anim, the least depth (px) either far leg's sunk root disc keeps
+     * inside the rest of the silhouette drawn over it, and where; `floats` = under the audit's minimum (1.2 hard
+     * rule: roots sunk into the body).
+     */
+    roots?: { id: string; anim: string; depth: number; frame: number; leg: string; floats: boolean }[];
   };
 }
 

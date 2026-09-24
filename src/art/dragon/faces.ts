@@ -27,10 +27,12 @@ function eyeBox(rig: DragonRig, grow: number): EyeBox {
 function rect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void { ctx.fillRect(x, y, w, h); }
 
 /**
- * How far the eye ring's corners are cut, px: 1 on babies and young; 2 on adults, so the wide 8 x 6 eye reads as
- * an almond instead of a box (a boxed iris | slit | iris read as a pause icon: bible 2.5 amendment).
+ * How far the eye ring's corners are cut, px: 1 on babies; 2 on young and adults, so the wide 8 x 6 eye reads as
+ * an almond instead of a box (a boxed iris | slit | iris read as a pause icon: bible 2.5 amendment) and the young's
+ * 7 x 7 as a round eye (cut 1, its square ring with the pupil set at its top read as a boxed "U" glyph beside the
+ * glossy baby eye and the adult almond: the cast review).
  */
-function cutOf(rig: DragonRig): number { return rig.stage === 'adult' ? 2 : 1; }
+function cutOf(rig: DragonRig): number { return rig.stage === 'baby' ? 1 : 2; }
 
 /** The 1 px ink ring with `cut` px cut corners (1 or 2), filled with `fill` inside. */
 function ring(ctx: CanvasRenderingContext2D, rig: DragonRig, b: EyeBox, fill: string): void {
@@ -63,8 +65,11 @@ function lid(ctx: CanvasRenderingContext2D, rig: DragonRig, b: EyeBox, rows: rea
   }
 }
 
-/** The stage eye interior (open), into box b. `round`: a round pupil instead of the slit / oval (hungry, surprised...). */
-function openEye(ctx: CanvasRenderingContext2D, rig: DragonRig, b: EyeBox, round: number, sparkle: boolean, look: number): void {
+/**
+ * The stage eye interior (open), into box b. `round`: a round pupil instead of the slit / oval (hungry, surprised...).
+ * `pinned`: the stage pupil CONTRACTED (pose.pupil: lightning's wind-up, 3.5).
+ */
+function openEye(ctx: CanvasRenderingContext2D, rig: DragonRig, b: EyeBox, round: number, sparkle: boolean, look: number, pinned = false): void {
   const ix = b.x + 1, iy = b.y + 1, iw = b.w - 2, ih = b.h - 2;
   const iris = rig.pal.eye, pupil = rig.col(DRAGON_SHARED.pupil), cl = rig.col(DRAGON_SHARED.catchlight);
   ring(ctx, rig, b, iris);
@@ -83,23 +88,29 @@ function openEye(ctx: CanvasRenderingContext2D, rig: DragonRig, b: EyeBox, round
   }
   ctx.fillStyle = pupil;
   if (st === 'baby') {
-    // top 4 rows pupil (a dark glossy baby eye), bottom rows iris; catchlight top-left on the pupil
-    rect(ctx, ix, iy, iw, Math.min(4, ih - 2) + (ih - 6));
-    ctx.fillStyle = cl; rect(ctx, ix, iy, 2, 2);
+    // top 4 rows pupil (a dark glossy baby eye), bottom rows iris; catchlight top-left on the pupil. Contracted, a
+    // 3 x 2 at the top of that block's place, the catchlight on its top-left
+    if (pinned) rect(ctx, ix + 1, iy, 3, 2);
+    else rect(ctx, ix, iy, iw, Math.min(4, ih - 2) + (ih - 6));
+    ctx.fillStyle = cl; rect(ctx, pinned ? ix + 1 : ix, iy, 2, 2);
     if (sparkle) rect(ctx, ix + iw - 2, iy + 2, 2, 2);
   } else if (st === 'young') {
     // iris field, a 3 x 4 oval pupil centred across it and set at its top (columns 1..3, rows 0..3 of 5 x 5), so
     // iris frames it front, back and below; catchlight on its top-left. In the bottom-front corner it touched the
     // ring on two sides and fused with it into a 3 px black "L" (the adult's E2 problem): a boxy "P" glyph.
+    // (contracted: 2 x 3 in the oval's place, the catchlight on its top-left as on the adult slit, which leaves an
+    // "L" of dark beside and under the glint)
     const px = ix + ((iw - 3) >> 1), py = iy + Math.max(0, (ih - 5) >> 1);
-    rect(ctx, px, py, 3, 4);
+    if (pinned) rect(ctx, px + 1, py, 2, 3);
+    else rect(ctx, px, py, 3, 4);
     ctx.fillStyle = cl; rect(ctx, px, py, 2, 2);
     if (sparkle) rect(ctx, ix + iw - 2, iy + ih - 2, 2, 2);
   } else {
     // 2 x 4 slit in columns 2..3 with iris on BOTH sides (a slit touching the ring fuses into it: E2); the almond's
     // top-left interior pixel is ink, so the catchlight steps in a column and sits on the slit's top-left, a glint
     // on the pupil as on the young eye
-    rect(ctx, ix + 2, iy, 2, ih);
+    // (contracted: the slit is already at the 2 px floor, so the iris closes over its top row instead)
+    rect(ctx, ix + 2, iy + (pinned ? 1 : 0), 2, ih - (pinned ? 1 : 0));
     ctx.fillStyle = cl; rect(ctx, ix + 1, iy, 2, 2);
     if (sparkle) rect(ctx, ix + 3, iy + ih - 2, 2, 2);
   }
@@ -121,7 +132,7 @@ const LIDS = {
  * Draw the eye for `face` in face space (origin at the eye centre). Only the near eye is drawn: the far eye is
  * hidden in profile. The eye is never covered: the head group is drawn last (bible 1.4).
  */
-export function drawEye(ctx: CanvasRenderingContext2D, rig: DragonRig, face: number): void {
+export function drawEye(ctx: CanvasRenderingContext2D, rig: DragonRig, face: number, pinned = false): void {
   const L = LIDS[rig.stage], ink = rig.col(rig.outline);
   const adult = rig.stage === 'adult';
   switch (face) {
@@ -161,25 +172,34 @@ export function drawEye(ctx: CanvasRenderingContext2D, rig: DragonRig, face: num
       return;
     }
     case DFACE.surprised: case DFACE.scared: {
+      if (rig.stage === 'baby') {
+        // the baby: a 3 x 4 pupil with its iris a 1 px ring all round it, in the stage ring (grown, a 2 x 2 pupil
+        // sat in a 7 x 8 field of iris: an orange square, and surprised and scared both read as it: the cast review)
+        const b = eyeBox(rig, 0), ix = b.x + 1, iy = b.y + 1;
+        ring(ctx, rig, b, rig.pal.eye);
+        ctx.fillStyle = rig.col(DRAGON_SHARED.pupil); rect(ctx, ix + 1, iy + 1, b.w - 4, b.h - 4);
+        ctx.fillStyle = rig.col(DRAGON_SHARED.catchlight); rect(ctx, ix + 1, iy + 1, 2, 2);
+        return;
+      }
       const b = eyeBox(rig, 1);
       openEye(ctx, rig, b, 2, false, 0);
       return;
     }
-    case DFACE.sleepy: { const b = eyeBox(rig, 0); openEye(ctx, rig, b, 0, false, 0); lid(ctx, rig, b, L.sleepy); return; }
+    case DFACE.sleepy: { const b = eyeBox(rig, 0); openEye(ctx, rig, b, 0, false, 0, pinned); lid(ctx, rig, b, L.sleepy); return; }
     case DFACE.sad: {
       const b = eyeBox(rig, 0);
-      openEye(ctx, rig, b, 0, false, 0);
+      openEye(ctx, rig, b, 0, false, 0, pinned);
       lid(ctx, rig, b, L.sad);
       return;
     }
-    case DFACE.grumpy: { const b = eyeBox(rig, 0); openEye(ctx, rig, b, 0, false, 0); lid(ctx, rig, b, L.grumpy); return; }
+    case DFACE.grumpy: { const b = eyeBox(rig, 0); openEye(ctx, rig, b, 0, false, 0, pinned); lid(ctx, rig, b, L.grumpy); return; }
     case DFACE.sheepish: {
       const b = eyeBox(rig, 0);
       openEye(ctx, rig, b, adult ? 2 : 3, false, 1);
       lid(ctx, rig, b, L.sheepish);
       return;
     }
-    default: { const b = eyeBox(rig, 0); openEye(ctx, rig, b, 0, false, 0); }
+    default: { const b = eyeBox(rig, 0); openEye(ctx, rig, b, 0, false, 0, pinned); }
   }
 }
 
@@ -192,9 +212,10 @@ export function facePixelInSkull(rig: DragonRig, fx: number, fy: number): boolea
   const J = rig.j, t = rig.tf, sc = t.fs || 1;
   // the face origin as faceTransform snaps it (to a whole device pixel), back in root space
   const X0 = Math.round(sc * (t.rx + J.eye.x)) / sc - t.rx, Y0 = Math.round(t.ss * (t.ry + J.eye.y)) / t.ss - t.ry;
-  const a = J.headAng * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
-  const dx = X0 + fx + 0.5 - J.cran.x, dy = Y0 + (t.ss < 0 ? -1 : 1) * (fy + 0.5) - J.cran.y;
-  return inSkull(rig, dx * c + dy * s, -dx * s + dy * c, 0.5);
+  // (a head that looks back runs its face mirrored and its cranium space flipped in y: rig.ts J.headFlip)
+  const a = J.headAng * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), hf = J.headFlip;
+  const dx = X0 + hf * (fx + 0.5) - J.cran.x, dy = Y0 + (t.ss < 0 ? -1 : 1) * (fy + 0.5) - J.cran.y;
+  return inSkull(rig, dx * c + dy * s, hf * (-dx * s + dy * c), 0.5);
 }
 
 /**

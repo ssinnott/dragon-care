@@ -19,7 +19,8 @@
 //                   from the near scale; c2 the rig's own far LEG shading (DRAGON_FAR.legs) keeps >= 25 % AND
 //                   >= OKL_MIN Oklab lightness from the near leg's base AND its shadow band; c3 the rig's far wing /
 //                   head shading keeps the far membrane and any far paired horn >= 25 % from the near scale.
-//   (d) ramps     : makeTones keeps shadow != base != highlight (and deep != shadow) after rounding, for every slot.
+//   (d) ramps     : makeTones keeps shadow != base != highlight (and deep != shadow) after rounding, for every slot;
+//                   a hand-set shadow (palettes.ts DRAGON_SHADOW, rock's) keeps >= 25 % luminance under its base.
 //   (e) ink floor : far leg scale, far membrane and far paired horns stay >= 25 % luminance AND >= OKL_MIN Oklab
 //                   lightness from the outline, so far parts do not sink into the ink.
 //   (f) colour-blind: the same 15 scale pairs still pass RULE_B under simulated deuteranopia and protanopia
@@ -33,8 +34,8 @@
 //   (g) any scale pair that passes (b) on hue alone (it would merge in greyscale); glow colours close to another
 //       element's glow (they must then differ by effect shape).
 import { hexToRgb, farPalette } from '../src/lib/art/palettes.ts';
-import { makeTones, toneOf, RAMP } from '../src/lib/art/shading.ts';
-import { DRAGON_ELEMENTS, DRAGON_PALETTES, DRAGON_SHARED, DRAGON_FAR, DRAGON_SLOTS, blushOf, moodTones } from '../src/art/dragon/palettes.ts';
+import { toneOf, RAMP } from '../src/lib/art/shading.ts';
+import { DRAGON_ELEMENTS, DRAGON_PALETTES, DRAGON_SHARED, DRAGON_FAR, DRAGON_SLOTS, DRAGON_SHADOW, blushOf, moodTones, dragonTones } from '../src/art/dragon/palettes.ts';
 import type { DragonElement, DragonPalette, DragonSlot } from '../src/art/dragon/palettes.ts';
 
 // ---------- thresholds ----------
@@ -178,7 +179,7 @@ function colour(e: DragonElement, ref: Ref): string {
   if (ref === 'blush') return blushOf(e);
   if (ref === 'banked' || ref === 'dimSpot') return moodTones(P(e))[ref];
   const [slot, tone] = ref.split('.') as [DragonSlot, Tone | undefined];
-  return tone ? makeTones(P(e)[slot], RAMP)[tone] : P(e)[slot];
+  return tone ? dragonTones(e, slot, RAMP)[tone] : P(e)[slot];
 }
 
 // ---------- adjacency: which colours touch on the sprite ----------
@@ -238,7 +239,7 @@ const MOOD_PAIRS: Readonly<Partial<Record<DragonElement, readonly Pair[]>>> = {
 const FLOOR_FX: Readonly<Record<DragonElement, readonly { what: string; ref: Ref }[]>> = {
   fire: [{ what: 'breath puff outer ring', ref: 'scale' }],
   spike: [{ what: 'sap streak / sparkle edge', ref: 'scale' }],
-  rock: [{ what: 'dust puff (opaque)', ref: 'scale' }, { what: 'pebble', ref: 'marking' }],
+  rock: [{ what: 'dust puff (opaque)', ref: 'scale' }, { what: 'adult roar puff ring', ref: 'scale.sh' }, { what: 'pebble', ref: 'marking' }],
   lightning: [{ what: 'spark ring', ref: 'scale' }],
   water: [{ what: 'bubble / drip ring', ref: 'membrane' }],
   shriekscale: [{ what: 'sound arc', ref: 'membrane' }, { what: 'sound arc edge', ref: 'scale' }],
@@ -286,7 +287,7 @@ head(`(c) FAR SIDE vs NEAR SCALE  (>= ${LUM_MIN * 100}% luminance; hue does not 
 /** One far-side comparison: far[slot] from farPalette(p, shade, desat) against a near-side tone of the scale. */
 function farGate(e: DragonElement, tag: string, shade: number, desat: number, slot: DragonSlot, near: 'base' | 'sh', ok = false): string {
   const pal = P(e), far = farPalette(pal, shade, desat)[slot];
-  const ref = near === 'base' ? pal.scale : toneOf(pal.scale, RAMP.sh);
+  const ref = near === 'base' ? pal.scale : dragonTones(e, 'scale', RAMP).sh;
   const d = relDiff(far, ref), o = okDiff(far, ref), pass = d >= LUM_MIN && (!ok || o >= OKL_MIN);
   gates++;
   if (!pass) { failures++; failed.push(`(c) ${e} ${tag} far ${slot} vs near scale.${near}`); }
@@ -299,7 +300,7 @@ for (const e of DRAGON_ELEMENTS) {
 }
 out.push(` c2  rig far LEGS farPalette(p, ${L.shade}, ${L.desat}): far leg vs near leg base, and vs near leg SHADOW band (scale.sh); >= ${LUM_MIN * 100}% and >= okL ${OKL_MIN}`);
 for (const e of DRAGON_ELEMENTS) {
-  const engineSh = relDiff(farPalette(P(e), ENGINE_FAR.shade, ENGINE_FAR.desat).scale, toneOf(P(e).scale, RAMP.sh));
+  const engineSh = relDiff(farPalette(P(e), ENGINE_FAR.shade, ENGINE_FAR.desat).scale, dragonTones(e, 'scale', RAMP).sh);
   const base = farGate(e, 'c2', L.shade, L.desat, 'scale', 'base', true);
   const sh = FLAT_LEGS.includes(e) ? '(legs flat at every stage: no shadow band to cross)'
     : `${farGate(e, 'c2', L.shade, L.desat, 'scale', 'sh', true)}   (engine default: ${pct(engineSh)}${engineSh < LUM_MIN ? ', would fail' : ''})`;
@@ -318,7 +319,7 @@ let weakest = { step: 9, where: '' };
 for (const e of DRAGON_ELEMENTS) {
   const pal = P(e), bad: string[] = [];
   for (const s of DRAGON_SLOTS) {
-    const t = makeTones(pal[s], RAMP);
+    const t = dragonTones(e, s, RAMP);
     const collapsed = t.sh === t.base || t.hi === t.base || t.sh === t.hi || t.deep === t.sh;
     gates++;
     if (collapsed) { failures++; failed.push(`(d) ${e} ${s}`); bad.push(s); }
@@ -330,6 +331,18 @@ for (const e of DRAGON_ELEMENTS) {
   out.push(`${bad.length ? '  FAIL' : '  ok  '} ${e.padEnd(12)} 8 ramps distinct${bad.length ? '; collapsed: ' + bad.join(', ') : ''}`);
 }
 out.push(`        weakest highlight step on a banded slot: ${pct(weakest.step)} (${weakest.where})`);
+for (const e of DRAGON_ELEMENTS) {
+  const o = DRAGON_SHADOW[e];
+  if (!o) continue;
+  for (const s of DRAGON_SLOTS) {
+    const sh = o[s];
+    if (!sh) continue;
+    const d = relDiff(sh, P(e)[s]), ok = d >= LUM_MIN;
+    gates++;
+    if (!ok) { failures++; failed.push(`(d) ${e} ${s} hand-set shadow`); }
+    out.push(`${ok ? '  ok  ' : '  FAIL'} ${e.padEnd(12)} hand-set ${s}.sh ${sh} (engine ${toneOf(P(e)[s], RAMP.sh)}) ${pct(d)} under ${P(e)[s]}`);
+  }
+}
 
 // (e) -----------------------------------------------------------------------------------------------------
 head(`(e) INK FLOOR  (far leg scale, far wing membrane and far paired horn vs outline ${S.outline}: >= ${LUM_MIN * 100}% and >= okL ${OKL_MIN})`);

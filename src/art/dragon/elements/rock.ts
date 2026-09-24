@@ -112,13 +112,6 @@ const PROUD_CHIN = -6;
 const FLASH: Readonly<Record<Stage, readonly number[]>> = {
   baby: [-9, -6, -4, -1], young: [-12, -8, -6, -2], adult: [-16, -12, -8, -4],
 };
-/**
- * The act the upset tuck keys (its cue = frames into it): past the shared ACT table (pose.ts), so the rig and the
- * other renderers see "not idle" -- no pebble crumb, no idle dust -- and rock's renderers key the hood and the
- * flicker on it. (Asked of the rig owner as ACT.upset = 11: sharedRequests.)
- */
-const ACT_UPSET = 11;
-
 // ---------- ground space: where floor-level effects live ----------
 
 const PT = { x: 0, y: 0 }, PG = { x: 0, y: 0 };
@@ -156,13 +149,17 @@ function bodyToRootSpace(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
 
 /**
  * A pebble in whole pixels (ground space): a `w` x `w` fill of `hex` with its top-left at (x, y) in a 1 px ink ring
- * whose corners are cut, so it reads as a round stone, not a tile (pebbles are inked: 5.4).
+ * whose corners are cut, so it reads as a round stone, not a tile (pebbles are inked: 5.4). `facet`: from 4 px (5.2,
+ * like a crystal's facet), its bottom row and right column in the fill's shadow tone, a lit 3 x 3 top-left face (the
+ * roar's thrown stones: flat 3 x 3, they were brown dots).
  */
-function pebble(ctx: CanvasRenderingContext2D, rig: DragonRig, x: number, y: number, w: number, hex: string): void {
+function pebble(ctx: CanvasRenderingContext2D, rig: DragonRig, x: number, y: number, w: number, hex: string, facet = false): void {
   x = Math.round(x); y = Math.round(y);
   ctx.fillStyle = rig.col(rig.outline);
   ctx.fillRect(x - 1, y, w + 2, w); ctx.fillRect(x, y - 1, w, w + 2);
   ctx.fillStyle = rig.col(hex); ctx.fillRect(x, y, w, w);
+  if (!facet || w < 4 || rig.override) return;
+  ctx.fillStyle = tones(rig, hex).sh; ctx.fillRect(x + 1, y + w - 1, w - 1, 1); ctx.fillRect(x + w - 1, y + 1, 1, w - 2);
 }
 
 /** Frames a kick of dust lives. */
@@ -230,10 +227,9 @@ function domeTopY(x: number, n: number): number {
   return x < ARC_X[0] ? ARC_Y[0] : ARC_Y[n];
 }
 
-/** The pet's bond, 0..1 (the crystal count grows with it: 3.4). Until the rig passes one, a full bond. */
+/** The pet's bond, 0..1 (DrawDragonOpts.bond, 1 when the owner passes none): the crystal count grows with it (3.4). */
 function bondOf(info: DragonInfo): number {
-  const b = (info as DragonInfo & { bond?: number }).bond;
-  return b == null ? 1 : Math.max(0, Math.min(1, b));
+  return Math.max(0, Math.min(1, info.bond));
 }
 /** How many of the stage's crystals the bond has grown: >= 1 from hatching (the seed), all of them at a full bond. */
 function crystalCount(stage: Stage, bond: number): number {
@@ -249,7 +245,7 @@ function crystalCount(stage: Stage, bond: number): number {
  * odd facet count gets a ridge vertex over its middle facet so no flat lid runs across the top. Facets are tone
  * steps with no line (form within one material): planes radiating from a point under the dome, toned in thirds --
  * marking.hi on the lit rear facets, the base on top, marking.sh on the front. The baby's single facet is a smooth
- * pebble in one tone. The UPSET tuck (young, adult; act ACT_UPSET, tuck 1: the head group was drawn before this)
+ * pebble in one tone. The UPSET tuck (young, adult; act ACT.upset, tuck 1: the head group was drawn before this)
  * rolls the dome's front forward over the head, down to the floor ahead of the snout, as its intro plays: a
  * boulder, one eye peeking out of the slit under its raised rim (hoodPoints). The crystals stand on the rear third
  * (drawCrystals); the hungry tell's pebble pile lies on the floor in front of the paws (begPile).
@@ -272,7 +268,7 @@ const bodyOver: ElementDraw = (ctx, rig, pose, info) => {
   n--;
   ARC_N = n;
   // the upset hood, grown over the tuck's intro (young, adult: the baby hides in its bun instead)
-  const g = pose.act === ACT_UPSET && !pebbleDome ? Math.max(0, Math.min(1, pose.cue / HOOD_GROW[st])) : 0;
+  const g = pose.act === ACT.upset && !pebbleDome ? Math.max(0, Math.min(1, pose.cue / HOOD_GROW[st])) : 0;
   const h0 = HOOD_FROM[st];
   if (g > 0) hoodPoints(rig, info, g, h0, n, cx, rx, back, rim);
   if (pose.act === ACT.beg && !rig.override) begPile(ctx, rig, info.stage);
@@ -373,7 +369,7 @@ function bezYAt(x: number, x0: number, y0: number, x1: number, y1: number, x2: n
 }
 
 /**
- * The UPSET tuck's hood (3.4; young, adult; act ACT_UPSET): the dome's front third ROLLS FORWARD over the lowered
+ * The UPSET tuck's hood (3.4; young, adult; act ACT.upset): the dome's front third ROLLS FORWARD over the lowered
  * head -- one convex arc on from the dome's crest, over the crown, the nose horn and the snout, down to a round lip
  * 2 px off the floor ahead of the snout tip: a boulder, with the head inside it, its lit top turning into its shaded
  * front at one facet step (bodyOver). Its rim runs back from
@@ -502,7 +498,7 @@ function drawCrystals(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: Drago
   const m = info.mood, J = rig.j, T = tones(rig, info.pal.glow);
   const c = pose.cue, fl = FLASH[st];
   const tell = pose.act === ACT.breath && ((c >= fl[0] && c < fl[1]) || (c >= fl[2] && c < fl[3]));
-  const upset = pose.act === ACT_UPSET;
+  const upset = pose.act === ACT.upset;
   const lit = !tell && (upset ? Math.floor(info.tick / 12) % 2 === 1 : m > -0.3 && !info.asleep);
   const col = rig.col(tell ? T.hi : lit ? info.pal.glow : BANKED);
   // which crystal glints now, and where: the happy sweep, else the ambient twinkle (-1 = none)
@@ -701,8 +697,11 @@ const PUFFS: Readonly<Record<Stage, { n: number; every: number; reach: number; r
 };
 /** Frames a roar puff lives: it grows over 18, holds, and shrinks away in 3 steps over the last 9. */
 const PUFF_LIFE = 30;
-/** Each pebble's launch: vx, vy (px/f, - = up) and delay after the snap (f). */
-const PEB: readonly (readonly number[])[] = [[1.7, -1.1, 1], [2.4, -0.6, 4], [1.2, -1.5, 7], [2.9, -0.3, 10]];
+/**
+ * Each pebble's launch: vx, vy (px/f, - = up), delay after the snap (f) and size (px: the adult's 4 and 3 by turns,
+ * the 4s faceted; all 3 x 3 flat, they were a spray of small brown dots beside fire's flame: the cast review, round 2).
+ */
+const PEB: readonly (readonly number[])[] = [[1.7, -1.1, 1, 4], [2.4, -0.6, 4, 3], [1.2, -1.5, 7, 4], [2.9, -0.3, 10, 3]];
 
 /** The breath's last cue (its length from the snap): the lying pebbles shrink away over the 6 f before it. */
 function breathEnd(st: Stage): number { const b = BREATH_BEATS[st]; return b[1] + b[2] + b[3]; }
@@ -745,21 +744,25 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
     }
   } else {
     const P = PUFFS[st];
+    // each puff ringed 1 px in the sand's shadow tone (under the disc, drawn 1 px larger): the cloud's lobes
+    // overlap into a lumpy billow, and plain sand discs were a pale smudge 27 % from the straw floor
+    const ring = tones(rig, hex).sh, adult = st === 'adult';
     for (let k = P.n - 1; k >= 0; k--) {
       const age = c - P.every * k;
       if (age < 0 || age >= PUFF_LIFE) continue;
       const q = 1 - age / PUFF_LIFE, ray = (a + PUFF_RAY[k]) * RAD, dist = 7 + P.reach * (1 - q * q);
       const grow = 3 + (P.r1 - 3) * Math.min(1, age / 18);
       const r = age < 21 ? Math.round(grow) : stepShrink((age - 21) / 9, grow);
-      const x = mx + Math.cos(ray) * dist, y = Math.min(my + Math.sin(ray) * dist + 0.1 * age, -r - 1);
+      const x = mx + Math.cos(ray) * dist, y = Math.min(my + Math.sin(ray) * dist + 0.1 * age, -r - 2);
+      if (adult && r > 0) disc(ctx, rig, Math.round(x), Math.round(y), r + 1, ring);
       disc(ctx, rig, Math.round(x), Math.round(y), r, hex);
     }
-    const nb = st === 'adult' ? 4 : 2, sv = st === 'adult' ? 1 : 0.8;
+    const nb = adult ? 4 : 2, sv = adult ? 1 : 0.8;
     for (let k = 0; k < nb && ps; k++) {
-      const p = PEB[k], t = c - p[2];
+      const p = PEB[k], t = c - p[2], w = adult ? ps + p[3] - 3 : ps;
       if (t < 0) continue;
-      ballistic(t, mx + 1, my + 1, p[0] * sv, p[1], -2.5, PG);
-      pebble(ctx, rig, PG.x - ps / 2, PG.y - ps / 2, ps, info.pal.marking);
+      ballistic(t, mx + 1, my + 1, p[0] * sv, p[1], -2.5 - (w - 3) / 2, PG);
+      pebble(ctx, rig, PG.x - w / 2, PG.y - w / 2, w, info.pal.marking, adult);
     }
   }
   ctx.restore(); ctx.restore();
@@ -1086,7 +1089,7 @@ const UPSET: Readonly<Record<Stage, { rot: number; e0: number; head: number }>> 
 
 /**
  * The UPSET tuck (3.4; bible 1.4 "the tuck branch"): hiding in its shell, the loop the game plays while it sulks or
- * is frightened -- 'upset' in the table (an intro of 16 f, adult; then a 96 f loop), act ACT_UPSET, cue = frames
+ * is frightened -- 'upset' in the table (an intro of 16 f, adult; then a 96 f loop), act ACT.upset, cue = frames
  * into it. It must read "comfort me", never "leave me be" (the sleep tuck) and never cross (D18):
  *   - YOUNG, ADULT: belly down, pitched 7 deg nose-down, the legs folded in, the neck folded down so the head sits
  *     low and back against the chest, chin on the floor and the head LEVEL (2 deg: pitched snout-down, the upright
@@ -1124,7 +1127,7 @@ function upsetTuck(stage: Stage, d: DragonDims | null): DragonAnim {
     tuck: [[0, 0], [Math.round(I / 2), baby ? 2 : 1]],
     face: [[0, DFACE.scared], [Math.round(I * 0.75), DFACE.sad]],
     mood: [[0, -2]],
-    act: [[0, ACT_UPSET]], cue: (t) => t,
+    act: [[0, ACT.upset]], cue: (t) => t,
   }, { stage, len, loop: true, loopFrom: I, ease: 'out' });
 }
 
@@ -1140,16 +1143,23 @@ export const ROCK: ElementSpec = {
   },
   stages: {
     // the dome is the marking (3.4): its facets in `marking` grow 1 -> 3 -> 5 with the stage, so no shared markings
+    // the tail (2.6, 3.4): short and stiff. The baby's is 0.6 as long, on a thinner root, tapering to r 2 with its
+    // tip on the floor (as long as its body and broad, rising up and back, it was a beaver's tail); the young's and
+    // adult's leave the hip under the rim nearly level and curve down to the floor (TAIL_REST: a heavy tail with a
+    // convex top, a concave step under the rim; run straight at 34 deg they continued the dome's back slope to the
+    // floor, a doorstop), the chain's wobble mostly held (tailStiff): bent 6 deg a segment and let swing, the
+    // outline went wavy between segments, a limp flap. The baby's wing nub roots 3 px further back (rootDx), under
+    // the rim: at the stage root its front showed as a 3 px slate speck between shell, body and head
     baby: {
-      tailRest: TAIL_REST.rock.baby, horns: null, markings: [],
-      wing: wingParams({ style: 'bat', foldRise: 0 }), dorsal: null,
+      tailRest: TAIL_REST.rock.baby, horns: null, markings: [], tailLen: 0.65, tailR: [3.4, 2], tailStiff: 0.7,
+      wing: wingParams({ style: 'bat', foldRise: 0, rootDx: -3 }), dorsal: null,
     },
     young: {
-      tailRest: TAIL_REST.rock.young, horns: null, markings: [], brow: 2,
+      tailRest: TAIL_REST.rock.young, horns: null, markings: [], brow: 2, tailStiff: 0.7,
       wing: wingParams({ style: 'bat', scallop: 1, span: 0.7, foldRise: 0 }), dorsal: null,
     },
     adult: {
-      tailRest: TAIL_REST.rock.adult, horns: null, markings: [], brow: 3,
+      tailRest: TAIL_REST.rock.adult, horns: null, markings: [], brow: 3, tailStiff: 0.7,
       wing: wingParams({ style: 'bat', scallop: 1, span: 0.7, foldRise: 0 }), dorsal: null,
     },
   },

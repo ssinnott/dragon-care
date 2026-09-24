@@ -67,10 +67,13 @@ export function hornRise(hp: Readonly<HornParams>, cranR: number, ref: number, h
  * The neck-line reference to draw a horn at (rig.ts neckRef, deg below straight back) so it keeps the quiet-zone
  * height of 3.0 (<= `maxRise` px above the skull top) whatever the pose: `ref` itself, or lowered back along the
  * head in 5 deg steps. With the neck carried below level (eating from the bowl, asleep) "along the neck line" points
- * up-back in the world, and the pair stood 5-7 px over the skull as antennae.
+ * up-back in the world, and the pair stood 5-7 px over the skull as antennae. A horn with a `worldClamp` then keeps
+ * its root direction within [up, down] deg of straight back in the world (spike's brow thorn).
  */
 export function hornRefClamped(hp: Readonly<HornParams>, cranR: number, ref: number, headAng: number, maxRise = 3): number {
   for (let i = 0; i < 18 && hornRise(hp, cranR, ref, headAng) > maxRise; i++) ref += 5;
+  const wc = hp.worldClamp;
+  if (wc) ref = Math.max(-wc[0], Math.min(wc[1], ref - hp.sweep - headAng)) + hp.sweep + headAng;
   return ref;
 }
 
@@ -117,22 +120,23 @@ export function hornOverlap(hp: Readonly<HornParams>, cranR: number, ref: number
  * Is pixel (x, y) of a w x h marking inked? The marking bitmaps, in whole pixels, so a 4-9 px mark stays crisp at
  * scale 1 (an anti-aliased polygon this small dissolves into a smudge). Bands are 3 px thick (5.2):
  *   chevron: a CHUNKY FILLED caret pointing up (fire's flame-licks, shriekscale's volume bars): a solid wedge
- *            widening 2 px per step from a 1-2 px tip, with a 1-2 px notch cut in its bottom row from 5 px wide.
- *            An outline "^" cannot be >= 3 px thick across its arms inside a 4-6 px box (two diagonal arms need
- *            ~8.5 px), and the 3 px-per-column version read as a 1.3 px pale "A"; this one is >= 3 px thick
- *            everywhere but the tip and the two feet, which stay >= 2 px wide;
+ *            widening 2 px per step from a 1-2 px tip, with a 1-2 px notch cut in its bottom row from 5 px wide
+ *            (`solid`: no notch -- fire's: notched, three on an adult read as "A A A"). An outline "^" cannot be
+ *            >= 3 px thick across its arms inside a 4-6 px box (two diagonal arms need ~8.5 px), and the 3 px-per-
+ *            column version read as a 1.3 px pale "A"; this one is >= 3 px thick everywhere but the tip and the two
+ *            feet, which stay >= 2 px wide;
  *   zstripe: a lightning Z, 3 px wide: a diagonal from the top-right that steps back 2 px at mid-height;
  *   spot   : the whole box (pearl spots, 3 x 3);
  *   ring   : the whole box (a tail ring is drawn across the tube instead: drawTailRing).
  */
-export function markingPixel(kind: MarkingSpec['kind'], w: number, h: number, x: number, y: number): boolean {
+export function markingPixel(kind: MarkingSpec['kind'], w: number, h: number, x: number, y: number, solid = false): boolean {
   switch (kind) {
     case 'chevron': {
       const w0 = 2 - (w & 1), steps = Math.max(0, (w - w0) >> 1);
       const rowW = w0 + 2 * Math.min(steps, Math.floor((y + 1) * (steps + 1) / h));
       const dx = Math.abs(x + 0.5 - w / 2);
       if (dx > rowW / 2) return false;
-      return !(y === h - 1 && w >= 5 && h >= 4 && dx < w0 / 2 + 0.01);
+      return solid || !(y === h - 1 && w >= 5 && h >= 4 && dx < w0 / 2 + 0.01);
     }
     case 'zstripe': {
       const mid = Math.floor(h / 2), run = Math.max(1, w - 3);
@@ -154,7 +158,7 @@ export function drawMarkingPixels(ctx: CanvasRenderingContext2D, mk: Readonly<Ma
   for (let y = 0; y < h; y++) {
     let run = -1;
     for (let x = 0; x <= w; x++) {
-      const on = x < w && markingPixel(mk.kind, w, h, x, y);
+      const on = x < w && markingPixel(mk.kind, w, h, x, y, mk.solid);
       if (on && run < 0) run = x;
       else if (!on && run >= 0) { ctx.fillRect(x0 + run, y0 + y, x - run, 1); run = -1; }
     }

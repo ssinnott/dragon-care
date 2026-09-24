@@ -2,8 +2,8 @@
 //
 // The engine's makePose / copyPose / lerpPose walk the humanoid's key list, so the dragon gets its own ops with the
 // same semantics: a DEFAULT pose every partial is resolved against, allocation-free copy and lerp into a caller's
-// object, and STEPPED keys (face, blink, gulp, sleep, tuck, eyeClip, act, cue) that are held, never interpolated -- a face
-// halfway between happy and sad is not a face.
+// object, and STEPPED keys (face, blink, pupil, gulp, sleep, tuck, eyeClip, act, cue) that are held, never
+// interpolated -- a face halfway between happy and sad is not a face.
 //
 // CONVENTIONS (degrees; see bible 1.1):
 // - Every rotation channel here is an OFFSET added to the stage's rest shape, so DEFAULT is all zeros and one anim
@@ -34,9 +34,12 @@ export type DFaceRef = DFaceName | number;
 /**
  * Which shared animation is playing (stepped `act`), so an element renderer can add its flourish to the shared
  * motion without owning the anim (bible 4.3): fire's strut flame in walk, the happy flourish, the hungry tell in
- * beg, water's nostril bubble asleep, the breath stream. `cue` is that act's clock (DragonPose.cue).
+ * beg, water's nostril bubble asleep, the breath stream. `cue` is that act's clock (DragonPose.cue). The acts past
+ * `variant` are element anims the shared table has no builder for (fire's bath, rock's upset tuck, shriekscale's
+ * lonely call): one id each here, so no two elements' local numbers collide and no shared act triggers another's
+ * flourish.
  */
-export const ACT = Object.freeze({ none: 0, walk: 1, happy: 2, eat: 3, sleep: 4, wake: 5, breath: 6, pet: 7, beg: 8, fidget: 9, variant: 10 });
+export const ACT = Object.freeze({ none: 0, walk: 1, happy: 2, eat: 3, sleep: 4, wake: 5, breath: 6, pet: 7, beg: 8, fidget: 9, variant: 10, bath: 11, upset: 12, call: 13 });
 export type ActName = keyof typeof ACT;
 
 /** Resolve a face name or index to an index (unknown names = neutral). */
@@ -77,7 +80,13 @@ export type DragonPose = {
   body: DBody;
   /** Per-segment neck pitch, chained: a0 turns the whole neck (and head) from the root, a1 the second segment. */
   neck: DNeck;
-  /** Head pitch on top of the neck (+ = snout down). */
+  /**
+   * Head pitch on top of the neck (+ = snout down). Pitched past vertical (the whole head angle, neck and body
+   * included, under -90: snout up and back) the head LOOKS BACK: the rig draws it mirrored, upright and facing the
+   * tail, with the snout exactly where the pitch aims it (rig.ts J.headFlip). A pitch cannot draw a look over the
+   * shoulder, which in a side view is a yaw: tipped over, the skull's top faced down, the horns lay on the throat
+   * and a round baby head read face-on.
+   */
   head: DHead;
   /** Jaw opening, degrees. 0, or at least the stage minimum (bible 1.2); the rig lifts anything between to it. */
   jaw: number;
@@ -121,6 +130,9 @@ export type DragonPose = {
    *   beg    frames into the loop (the stomach growl sits at a fixed frame of it)
    *   fidget frames into the element's idle fidget (ElementAnimHooks.fidget: its flourish keys on it)
    *   variant frames into a shared idle variant (look-around, yawn, scratch, topple, plop-sit)
+   *   bath   frames since the bath began (fire's hiss and shake; the element's own one-shot)
+   *   upset  frames into rock's upset tuck (its intro counts up from 0 as the hood swings down)
+   *   call   frames since the note starts (shriekscale's lonely call; the wind-up is negative)
    */
   cue: number;
   /** 1 = asleep (stepped): fire banks its flame, lightning drops to the sad cock, eyes are drawn closed. */
@@ -143,13 +155,19 @@ export type DragonPose = {
    * DragonAnimPlayer's blink schedule, never keyed (2.5).
    */
   blink: number;
+  /**
+   * 1 = the pupil CONTRACTED (stepped; 0 = the stage's own): lightning's Spark Bolt wind-up (3.5, tuning.breath.pupil).
+   * Only the open stage eye changes (faces.ts drawEye): baby a 3 x 2 pupil at the top of its dark block's place,
+   * young a 2 x 3 in the oval's place, adult the slit with iris over its top row (already at the 2 px floor).
+   */
+  pupil: number;
 };
 
 /** Keys whose values are held, never lerped. */
 const STEPPED: Readonly<Record<string, true | undefined>> = Object.freeze({
-  face: true, blink: true, gulp: true, sleep: true, tuck: true, eyeClip: true, act: true, cue: true,
+  face: true, blink: true, pupil: true, gulp: true, sleep: true, tuck: true, eyeClip: true, act: true, cue: true,
 });
-/** True for a channel that is held, never lerped (face, blink, gulp, sleep, tuck, eyeClip, act, cue). */
+/** True for a channel that is held, never lerped (face, blink, pupil, gulp, sleep, tuck, eyeClip, act, cue). */
 export function isSteppedKey(k: string): boolean { return STEPPED[k] === true; }
 
 type Frozen<T> = Readonly<{ [K in keyof T]: T[K] extends number ? number : Readonly<T[K]> }>;
@@ -168,7 +186,7 @@ export const DEFAULT_DRAGON_POSE: Frozen<DragonPose> = Object.freeze({
   legFF: Object.freeze({ upper: 0, lower: 0, paw: 0, plant: 1, lift: 0, slide: 0, shift: 0 }),
   tail: Object.freeze({ lift: 0, curl: 0, sway: 0, stiff: 0 }),
   wing: Object.freeze({ fold: 0, flap: 0 }),
-  mood: 0, bristle: 0, flare: 0, gulp: 0, face: 0, fx: 0, act: 0, cue: 0, sleep: 0, tuck: 0, eyeClip: 1, blink: 0,
+  mood: 0, bristle: 0, flare: 0, gulp: 0, face: 0, fx: 0, act: 0, cue: 0, sleep: 0, tuck: 0, eyeClip: 1, blink: 0, pupil: 0,
 });
 
 /** A partial pose: every group and every number optional. Anims are authored in these. */
@@ -313,6 +331,7 @@ export type DragonPoseSpec = {
   tuck?: number;
   eyeClip?: number;
   blink?: number;
+  pupil?: number;
 };
 
 const arr3 = <T>(v: number[], ...names: string[]): T => {

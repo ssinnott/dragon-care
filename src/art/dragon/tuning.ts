@@ -69,6 +69,13 @@ export interface SleepTuning {
    */
   chin: number;
   /**
+   * Where the forepaws rest asleep, px slid along the floor from their standing spot (+ forward): young and adult -2,
+   * drawn a little back under the settled chest (the sphinx fold), the baby's bun 1.5, under its chin; shriekscale's
+   * young and adult 10, forward under its raised head, so the head held up at `chin` rests over its paws instead of
+   * floating in front of the chest. The wake's play-bow starts from it.
+   */
+  frontTuck: number;
+  /**
    * Baby only: the wing channel of the sleep bun, past 1 so the nubs rise on beyond their 140 deg flutter angle and
    * lie over the back of the bowed head like a blanket (3.3 = 71 deg, 30 deg per unit; the tuck branch draws them
    * over the head, 1.4).
@@ -95,6 +102,19 @@ export interface BreathTuning {
    * (pose.eyeClip 0) and the element's fans draw the flop while it is off.
    */
   flop: number;
+  /** The pupil contracts through the wind-up (pose.pupil 1 until the snap): lightning's Spark Bolt (3.5). */
+  pupil: boolean;
+}
+
+/** Eat (4.2). */
+export interface EatTuning {
+  /**
+   * Baby: the tail's droop through the bite, deg (+ droops toward the floor), cancelling most of the body's 24 deg
+   * bow: riding the pitch, every baby tail rose about 10 px over its back line (spike's, lightning's, water's paddle
+   * a stick with a knob on top, shriekscale's), into fire's zone above the tail tip (3.0). Fire 0: its comma
+   * carries the flame, which is its own zone.
+   */
+  tailDroop: number;
 }
 
 /** Beg (4.2, 4.3 "Hungry tell"). */
@@ -110,6 +130,7 @@ export interface AnimTuning {
   walk: WalkTuning;
   sleep: SleepTuning;
   breath: BreathTuning;
+  eat: EatTuning;
   beg: BegTuning;
 }
 
@@ -119,20 +140,23 @@ export type AnimTuningPatch = { [K in keyof AnimTuning]?: Partial<AnimTuning[K]>
 const BASE: Readonly<Record<Stage, AnimTuning>> = {
   baby: {
     walk: { cycle: 24, speed: 0.3, lift: 1.5, head: 0, sway: 0, wave: 0 },
-    sleep: { lieDown: 24, breath: 120, z: 90, tuck: 2, bodyRot: 0, tailCurl: 40, tailLift: 70, nubFold: 3.3, chin: 1.5 },
-    breath: { jaw: 20, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0 },
+    sleep: { lieDown: 24, breath: 120, z: 90, tuck: 2, bodyRot: 0, tailCurl: 40, tailLift: 70, nubFold: 3.3, chin: 1.5, frontTuck: 1.5 },
+    breath: { jaw: 20, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
+    eat: { tailDroop: 22 },
     beg: { mood: -0.5, tilt: 14 },
   },
   young: {
     walk: { cycle: 40, speed: 0.5, lift: 2, head: 0, sway: 0, wave: 0 },
-    sleep: { lieDown: 34, breath: 150, z: 100, tuck: 0, bodyRot: 0, tailCurl: 18, tailLift: 8, nubFold: 0, chin: 1.5 },
-    breath: { jaw: 22, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0 },
+    sleep: { lieDown: 34, breath: 150, z: 100, tuck: 0, bodyRot: 0, tailCurl: 18, tailLift: 8, nubFold: 0, chin: 1.5, frontTuck: -2 },
+    breath: { jaw: 22, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
+    eat: { tailDroop: 0 },
     beg: { mood: -0.5, tilt: 12 },
   },
   adult: {
     walk: { cycle: 48, speed: 0.45, lift: 3, head: 0, sway: 0, wave: 0 },
-    sleep: { lieDown: 40, breath: 180, z: 120, tuck: 0, bodyRot: 0, tailCurl: 18, tailLift: 8, nubFold: 0, chin: 1.5 },
-    breath: { jaw: 30, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0 },
+    sleep: { lieDown: 40, breath: 180, z: 120, tuck: 0, bodyRot: 0, tailCurl: 18, tailLift: 8, nubFold: 0, chin: 1.5, frontTuck: -2 },
+    breath: { jaw: 30, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
+    eat: { tailDroop: 0 },
     beg: { mood: -0.5, tilt: 12 },
   },
 };
@@ -145,6 +169,7 @@ export function animTuning(stage: Stage, spec?: ElementSpec | null): AnimTuning 
     walk: { ...b.walk, ...(p && p.walk) },
     sleep: { ...b.sleep, ...(p && p.sleep) },
     breath: { ...b.breath, ...(p && p.breath) },
+    eat: { ...b.eat, ...(p && p.eat) },
     beg: { ...b.beg, ...(p && p.beg) },
   };
 }
