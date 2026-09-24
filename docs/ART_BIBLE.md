@@ -16,7 +16,7 @@
 
 **Where this came from.** Three art directors proposed designs independently, from three lenses: readability (R), charm (C) and growth (G). This bible takes the strongest idea for each decision rather than averaging, and says where each one came from. Readability constraints are **hard rules**. No decision below trades one away.
 
-**Status.** This is the design, and the rig now draws it: the quadruped rig, the shared features and a first pass of all six elements live in `src/art/dragon/` (file list in 1.1), with the idle loop per stage; the rest of the core animation set (4.2) comes next. The palette is code too: `src/art/dragon/palettes.ts` holds the values, and `tools/palette-check.ts` validates them (report in section 5.8). `npm run shots` renders the standard sheets of 5.5 and `npm run smoke` checks every gallery view. Every hex below comes from that module and passed that check. The bible has been through one review round (a readability critique and a care-game critique); what changed, and what was turned down, is in the **Review log** at the end.
+**Status.** This is the design, and the rig now draws it: the quadruped rig, the shared features and a first pass of all six elements live in `src/art/dragon/` (file list in 1.1), with the core animation set of 4.2 per stage (idle with its variants, walk, happy, eat, sleep and wake, breath, pet, beg), authored as tracks from the 4.1 stage timing rules, tuned per element by the generic knobs of 4.3 and carrying first-pass breath effects for all six elements, five element fidgets (section 3; shriekscale has none), rock's roll-over happy and baby shriekscale's fan flop (E8). **Not built yet:** the anims grow-up, hopGlide, fly, bath, play, refuse and zap; the adult pupil contracting and rock's travelling crystal glint; most of 4.3: every element's happy flourish and hungry tell, fire's flame-tongue swap on the walk, spike's stop-and-look and wary lean, rock's dust puffs and upset tuck, lightning's dream-twitch, charge sparks and glow tint, water's sleeping spot pulse and nostril bubble, shriekscale's walk fan bob, snore arc, lonely call and rib rattle; the baby's dream-kick; a real turn-in-place for fire's tail chase. Each element file lists its own "Still to do". The palette is code too: `src/art/dragon/palettes.ts` holds the values, and `tools/palette-check.ts` validates them (report in section 5.8). `npm run shots` renders the standard sheets of 5.5 and `npm run smoke` checks every gallery view. Every hex below comes from that module and passed that check. The bible has been through one design review round (a readability critique and a care-game critique) and three review rounds of the built rig (the static rig and the 18 idle looks, then the animated rig); what changed, and what was turned down, is in the **Review log** at the end, with what building the core animations found.
 
 ---
 
@@ -97,7 +97,7 @@ Section 5 lists each rule with the failure it prevents.
   - The default profile everywhere: `thinR` 6.5, `hiMin` 10, `flatR` 5, with the ramp `{ hi 1.22, sh 0.66, rim 1.55 }`.
   - Do **not** lower the gates for babies. Their flat single-tone legs and two-tone bodies and heads come out of the gates on their own, and that softness is part of what reads as a baby.
 - **Engine reuse.**
-  - `drawLimbSegs` and the `cel*` helpers only need a `PartRig` / `ShadeTarget`.
+  - The `cel*` helpers only need a `PartRig` / `ShadeTarget`. Legs use `drawLimbSegs`' construction in a local `drawLeg` that appends the paw to the same path (1.2).
   - The dragon rig satisfies `PartRig` through a palette adapter:
     - `skin`, `primary` and `secondary` map to `scale`;
     - `hair` maps to `marking`;
@@ -107,41 +107,44 @@ Section 5 lists each rule with the failure it prevents.
     - `hairStyle` is `'bald'`.
   - `enter`, `leave` and `setLight` are typed on the humanoid `Rig`. `stepChains` is private to rig.ts.
   - The dragon rig therefore gets its own small `enter` / `leave` (3 lines) and a chain stepper (about 12 lines) built on the exported `getChain` / `stepChain` / `resetChain`.
-  - **The vendored engine is never edited.**
+  - **The vendored engine is never edited.** What the dragon needed and the engine lacks is written in `src/art/dragon/` and flagged there as an **engine candidate**: a generic 2-bone IK solver (`rig.ts solveTwoBone`), `drawLimbSegs` with an extra appended subpath (`parts.ts drawLeg`) and with separate root / ankle radii (`legRadii`).
+- **Planted paws.** Legs are solved by 2-bone IK toward each paw's rest spot (the rest pose's FK, fixed at build), so the body can bob, dip, pitch and crouch while the paws stay on y = 0. The pose's leg `upper` / `lower` then only slide a planted paw along the ground (a stance stroke). Each leg has a `plant` weight (default 1); 0 hands it back to plain FK, for swing and airborne frames only. A plant spot is a **ground** spot: `root.rot` turns the whole sprite about the ground point, so planted targets are counter-rotated into root space (and the paw box levelled), and a waddle or a rock keyed as root rotation keeps its soles on the floor. `root.x` / `root.y` move the whole sprite, paws included: bob and pitch with `body`, and key `root.y` only on airborne frames (with `plant` 0). The middle joint keeps the side its rest angles put it on (hind knee forward, front elbow back), so the digitigrade Z survives any pose, and a target up to 1 px out of reach stretches the bones rather than lifting a paw. A gait moves the planted target itself: `slide` (px along the ground) and `lift` (px off it) per leg. The stance stroke is a linear slide at exactly the walk speed, so a paw on the floor never skates, and the swing is the same IK leg with its target lifted, so a leg never pops between FK and IK (a stroke keyed through `upper` / `lower` is a sine of the angle and cannot hold a constant speed).
+- **The floor.** Nothing a dragon draws goes under y = 0 but the outer half of its ink (5.1 #14). `computeDragonJoints` guards it in root space against the real floor line, which `root.y` lifts and `root.rot` tilts (a circle's clearance on a tilted floor is r / cos): a settled body rests **on** it (the hip and chest balls, the baby's belly sag at its pitched extent), a thigh ball through it lifts the body and the legs are solved again, a sole's lowest corner (a tilted toe, a heel under a root rotation) stays on it, a knee or elbow pushed through it lies on it on its own side with the lower bone folded flat (the sphinx forearm), the head lifts out of it (cranium, snout, jaw at its opening), and a tail node that would sink lies on it further along the way the tail was going (a tail-tip feature that hangs below the tip lifts the tail's end: `ElementStageParams.tipBox`). Snapping never rounds a floor-resting joint down. Tumbling past 60° or flipped (`stretch` < 0: rock's roll) the guards stand aside and the anim places the sprite. `view=floor` plays every look through every core anim and variant and reports the deepest row reached; the smoke run fails on anything past row 1.
 - **Files** (all under `src/art/dragon/`):
   - `palettes.ts`: the 6 x 8 palette, shared colours, `blushOf`, `moodTones`, `DRAGON_FAR`.
-  - `pose.ts`: `DragonPose` (the 4.1 channels, plus the stepped `sleep` and `tuck` of the tuck branch), `DFACE`, make / copy / lerp / add and the `DP()` shorthand.
-  - `anim.ts`: `DragonAnimPlayer`, the engine `AnimPlayer`'s semantics over `DragonPose`, with runtime blinks and desync.
-  - `anims.ts`: the animation table per stage (the idle loops today).
+  - `pose.ts`: `DragonPose` (the 4.1 channels, the leg `plant` / `lift` / `slide`, `tail.stiff`, the stepped `sleep` and `tuck` of the tuck branch, the stepped `act` / `cue` the element renderers key their flourishes on (`ACT.fidget` and `ACT.variant` included), the stepped `eyeClip` (1; 0 lets an anim's near head features over the eye: E8 only), and the runtime `blink`), `DFACE`, `ACT`, make / copy / lerp / add / blend and the `DP()` shorthand.
+  - `anim.ts`: `DragonAnimPlayer`, the engine `AnimPlayer`'s semantics over `DragonPose`, with runtime blinks and desync, a loop with an intro (`loopFrom`: the sleep's lie-down), per-frame root motion (`move`: the walk), a cross-fade on `play` (`blend`) and the idle-variant schedule (`setVariants`: a seeded cut to a variant every 6 to 10 s, and back).
+  - `anims.ts`: the track authoring (`bake`, `lag`, `neckFit`) and the core set of 4.2 per stage, with the idle variants (`VARIANT_NAMES`, `idleVariants(stage)`); its builders are exported, so an element override is authored the same way.
+  - `tuning.ts`: the generic knobs of the shared set that 4.3 changes per element (walk cycle, speed, lift, head, sway and S-wave; the sleep's breath, "z" interval, tuck, body pitch and tail; the breath's jaw and fizzle face; the beg's mood and tilt).
   - `stages.ts`: the 2.1 / 2.2 tables, the 2.3 modifiers, the tail rest shapes, the 4.1 chain parameters and timing rules.
   - `build.ts`: `dragonBuild({ element, stage, seed })` resolves a complete build (modifiers, the seeded variant of 2.8, the solved body height); `buildDragonFor(element, stage)`.
-  - `rig.ts`: `buildDragon`, `computeDragonJoints`, `stepDragon` and `drawDragon` in the draw order of 1.4.
+  - `rig.ts`: `buildDragon`, `computeDragonJoints` (with the leg IK), `stepDragon` and `drawDragon` in the draw order of 1.4; the one-time marking fit of body and tail markings (2.7); the face-space helpers element renderers use (`enterFace`, `enterFaceFromCranium` / `cranToRootPt` from the head, `enterFaceFromLocal` / `localToRootPt` from any anchor space).
   - `parts.ts`: body, neck, skull, jaw, legs and paws, the n-node tube, bat / leaf / fin wings, nubs, the ground shadow.
   - `faces.ts`: the stage eye, lids in rows, brow, blush, nostril, mouth marks and teeth (2.5).
-  - `features.ts`: the shared, parameterised features: paired horns, markings, the dorsal row, emitter helpers.
-  - `fx.ts`: deterministic particle schedules, the top pass (1.4 step 14) and the ambient caps (5.4).
-  - `element.ts`: **the seam**, `ElementSpec`. `elements/<id>.ts`: one file per element; `elements/index.ts`: the registry.
+  - `features.ts`: the shared, parameterised features: paired horns (with the far-horn fork and overlap cull), markings, the dorsal row, emitter helpers, and `pixelStroke` for 2 px whole-pixel ribs and rays (fan ribs, fin-ear and fluke rays).
+  - `fx.ts`: deterministic particle schedules, the top pass (1.4 step 14) and the ambient caps (5.4), the "z" and dazed-star glyphs and the eat crumbs (the rig schedules those shared act effects).
+  - `element.ts`: **the seam**, `ElementSpec`: the renderers at their anchors, the per-stage params (with `tipBox` for a tail-tip feature the floor guard must lift), and `anims` (`tuning`, `overrides(stage, dims)`, `fidget(stage, dims)`). Everything an element artist needs is reachable from it. `elements/<id>.ts`: one file per element; `elements/index.ts`: the registry.
   - Shared features are **part kinds with parameters** (horns, markings, wing style, tail rest shape, dorsal row), drawn by one renderer for all 18 looks. What only one element has (a flame, a quill comb, a dome, bolt wings, a fluke, ear-fans) is a renderer at a **fixed anchor** of the draw order, declared in that element's `ElementSpec`; each element artist owns exactly one `elements/<id>.ts`.
-  - The gallery is `src/gallery.ts` (views: lineup, silhouette, stages, grey, cvd, strip, habitat, plus zoom, cast, mood and faces for close review).
+  - The gallery is `src/gallery.ts` (views: lineup, silhouette (`set=all` stacks idle, lowest mood, asleep and a walk key; `set=idle|low|asleep|walk` one block), stages, grey, cvd, strip (`from` / `span` pick the frames; a walk strip is one cycle over scrolling ground ticks; any variant or `fidget` plays by name), habitat (`anim=mix` plays every act at once; walkers roam), floor (the floor audit: `els`, `stages`, `anims` narrow it; a failing run shows its worst frame), plus zoom (16 rows under the ground, the ground row marked), cast, mood and faces for close review). An eating pet gets a bowl, drawn after it, its rim ≥ 2 px under the eye.
 
 ### 1.2 Parts and the primitive each one uses
 Every part is **one outlined path**, stroked once and filled once (the `drawLimbSegs` lesson). Any colour change inside a part is a clipped fill.
 
 | Part | Primitive | Construction |
 |---|---|---|
-| **Body** | `pathTaperedCapsule` + `celPath` | A hip ball joined to a chest ball in one path. The chest ball sits 1 px higher than the hip ball (a proud chest). Babies add a belly-sag ellipse to the same path. `ext` = half the body length. **Belly band:** the lower 38 % of the depth (babies 45 %), clipped inside, in `belly`. It carries one shadow band that switches to `belly.sh` inside the belly, and the belly line is **not inked** (D13). |
-| **Neck** | subpaths of `pathTaperedCapsule`, appended | 1 to 2 segments, one stroke and one fill. The root is sunk into the chest top-front. A throat stripe in `belly`, clipped to the lower 40 %, runs on continuously from the belly. **Bulges live in this contour:** the eat gulp and shriekscale's throat sac are extra nodes appended to the same path, so they change the silhouette instead of hiding inside the stripe. |
-| **Skull** | one `celPath` union | Made of a cranium circle, a snout taper, a brow-ridge bump (young and adult) and optional bumps (rock's nose horn root, shriekscale's nose-leaf). This is the `drawSkull` approach: bumps in the contour, not new outlined objects. `ext` = half the head length. |
-| **Jaw** | `celTaper`, drawn **under** the skull | Hinged. The upper half is `scale` and the lower half `belly`, so the chin continues the throat stripe. **An open jaw is either 0° or at least the stage minimum**, `atan(2.5 / jaw length)`: baby 20°, young 14°, adult 10°. Below that the wedge is 1 to 1.5 px and shows neither mouth nor tongue. Open, the wedge behind it is filled with mouth `#5a2030`, plus a 2 × 2 tongue `#f07890` and fangs `#f8f4ec`. |
+| **Body** | `pathTaperedCapsule` + `celPath` | A hip ball joined to a chest ball in one path. The chest ball sits 1 px higher than the hip ball (a proud chest). Babies add a belly-sag ellipse to the same path. `ext` = half the body length. **Belly band:** the lower 38 % of the depth (babies 45 %), clipped inside, in `belly`, its line on a whole pixel (a crisp step, not a row of anti-aliased in-between tone). At the chest front it rises into a **bib** whose top runs along the throat stripe's inner edge at the neck root, so the stripe runs on into it: a bib that stopped at a fixed height left a 2 to 4 px wedge of the chest's scale shadow between them. It carries one shadow band that switches to `belly.sh` inside the belly, and the belly line is **not inked** (D13). |
+| **Neck** | subpaths of `pathTaperedCapsule`, appended | 1 to 2 segments, one stroke and one fill. The root is sunk into the chest top-front, and **neck and body are one silhouette**: the whole neck is clipped to outside the body (the hip–chest capsule shrunk 1 px), so its fill covers the body's ink where the two overlap and its own ink stops at the body contour. No collar arc is stroked across the chest. A throat stripe in `belly`, clipped to the lower 45 %, runs on continuously from the belly's bib. The neck's shadow band covers 0.2 of its diameter, not a limb's 0.6. Its shadow side *is* its underside, so the band lies over the stripe: at 0.4 / 0.26 about 1 px of `belly` showed between them, at 0.45 / 0.2 it is 2 px or more, with the band turning `belly.sh` along its edge. **Bulges live in this contour:** the eat gulp and shriekscale's throat sac are extra nodes appended to the same path, so they change the silhouette instead of hiding inside the stripe. |
+| **Skull** | one `celPath` union | Made of a cranium circle, a snout taper, a brow-ridge bump (young and adult) and optional bumps (rock's nose horn root, shriekscale's nose-leaf). This is the `drawSkull` approach: bumps in the contour, not new outlined objects. `ext` = half the head length. The shadow band covers **0.22** of the head on young and adult (babies 0.34): the band runs perpendicular to the light across a *long* head, and at 0.34 it crossed the snout at its root, so the whole muzzle sat in shadow. At 0.22 the snout's top stays base and the shadow takes its front-bottom and the chin. |
+| **Jaw** | `celTaper`, drawn **under** the skull | Hinged. Open, the upper half is `scale` and the lower half `belly`, so the chin continues the throat stripe. **Closed**, the belly half is tucked and the ~1 px sliver that shows below the snout is the scale's shadow tone, the head's underside: in `belly` it read as a lip line, and on shriekscale's near-white belly as bared teeth at neutral. **An open jaw is either 0° or at least the stage minimum**: baby 20°, young 20°, adult 16°, and an open jaw first **drops** its hinge (baby 4 px, young and adult 3) before it turns. The baby's jaw is short (hinge to tip 6.5 px): at 8 px with a 5 px drop its open tip lay on the bib as a diagonal belly-coloured sash, a white stick on rock and shriekscale; its tip now stays within about 2 px under the snout. Closed, the jaw's top edge lies about 2 px inside the skull, so a jaw that only turned about its hinge showed no mouth at all at its old minima (`atan(2.5 / length)`: 20 / 14 / 10°): measured, 0 px of mouth on the baby. Open, the wedge between the snout's underside and the jaw's top is filled with mouth `#5a2030`, with a 2 × 2 tongue `#f07890` on the jaw (in face space: under the jaw it was hidden) and fangs `#f8f4ec` hanging into the opening, never over the chin. |
 | **Eye** | flat rects in a 1 px ink ellipse | Only the near eye is drawn, since the far eye is hidden in profile. It has a coloured iris and **no whites**. See 2.5. |
-| **Brow** | `brow()` bar, 2 px, in `scale.deep` | Sits 1 px clear of the eye's ink ring. The engine rule: a 3 px brow reads as a lid. |
-| **Nostril** | 2 × 2 rect in `dark` | |
-| **Legs × 4** | `drawLimbSegs(ctx, rig, a, b, c, r1, r2, scale, scale, true, bulge)` | One silhouette per leg with the root sunk 0.35 r. The hind leg has its knee forward and hock back, the digitigrade "Z" (G). The front leg is nearly straight. |
-| **Paws** | `celRect` r 2 | `ext` < 5, so they are one flat tone. Claws on **near** paws only: 2 claws in `horn`, drawn **un-inked** (`flat(…, false)`) inside the toe with their tips on the paw's ink line, with a 2 px gap between them (D16). |
+| **Brow** | 2 px bar, in `scale.deep`, face space | Sits 1 px clear of the eye's **visible** top (the happy arc, a lid's edge, else the ring), so it follows a lidded eye down instead of floating over it. The **whole bar** must lie inside the skull: a bar that ran off the cranium read as a hat brim, and one clipped to its inside columns left a 2 px nick on the contour. Where an expression's lift does not fit, the bar is lowered a pixel at a time, each end stopping at 1 px clear (so a lift gives way to a tilt, then to a flat bar), never dropped. The grow faces (hungry, surprised, scared: the ring 1 px bigger each way) have no room above their ring on any head, so their bar is measured from the **un-grown** ring: its low end may sit on the grown ring's top. Only if no drop fits is the longest inside run drawn, and never one under 3 columns. Upside down (rock's roll) no brow is drawn: under the screen-upright "^" it read as a mouth. The engine rule: a 3 px brow reads as a lid. |
+| **Nostril** | 2 × 2 rect in `dark` | Near the snout tip, top side, at least 4 px ahead of the eye's ring along the snout (so ≥ 2 px of skin between them whatever the head's pitch): at 1 px the nostril read as a smudge on the eye, and in line with a `closed` eye's bar the two read as one dash. |
+| **Legs × 4** | `drawLeg`: `drawLimbSegs`' construction with the paw appended | **One silhouette per leg, paw included:** the tube (root sunk 0.35 r → knee → ankle) and the paw box are one path, stroked once and filled once, so no ink crosses the ankle. The limb's one shadow band is clipped inside; the paw stays flat. Radii run root → knee → ankle from `r1` to `r2` (`legRadii`: r1 = r2 is the engine's `limbRadii`), so the hind shin tapers. The hind leg has its knee forward and hock back, the digitigrade "Z" (G); the front elbow sits back with the forearm reaching forward. Solved by IK (1.1). |
+| **Paws** | a rounded rect (r 2) in the leg's path | One flat tone. The paw starts at the leg's back edge (ankle − ankle radius), so the leg's round end never pokes out behind the heel, and reaches forward to the toe. Claws on **near** paws only: 2 claws in `horn`, drawn **un-inked** inside the toe with their tips on the paw's ink line, with a 2 px gap between them (D16). |
 | **Tail** | an n-node tube, as `drawLimbSegs` generalised to n nodes (`drawTube`) | One stroke, one fill and one clipped shadow band, gated by the root radius. A belly stripe runs along the underside for the first 60 %. The tip feature is drawn in the last segment's space. |
-| **Wing** | arm capsules + membrane `celPoly`, unioned, stroked once | The membrane fills with `hi 0`: membranes are matte, and a highlight would add a boundary. Arm and spars are 3 px (adult) or 2 px (young) fills in `scale` with **no ink of their own**. Between spar tips the trailing edge is cut with concave arcs, with the scallop depth set per element **and multiplied by the `wing` channel** (0 when folded): folded spar tips land only 3 to 4 px apart, less than a 3 to 5 px scallop. |
-| **Back row** (spike quills, water dorsal fin) | `celPoly` | Drawn **before** the body, so the body contour hides the roots (the `sunk` idea). |
-| **Rock dome** | `celPoly` | Drawn **after** the body, with its rim inked. Facets are tone steps with no line: form within one material. |
+| **Wing** | arm capsules + membrane `celPoly`, unioned, stroked once | The membrane fills with `hi 0`: membranes are matte, and a highlight would add a boundary. Arm and spars are 3 px (adult) or 2 px (young) fills in `scale` with **no ink of their own**. Each spar's round cap **ends at its membrane tip** (a capsule centred on the tip poked its radius past the membrane as a bare stick, and on the far wing as a brown twig); only spike's thorns poke past on purpose. Between spar tips the trailing edge is cut with concave arcs, with the scallop depth set per element **and multiplied by the `wing` channel** (0 when folded): folded spar tips land only 3 to 4 px apart, less than a 3 to 5 px scallop. |
+| **Back row** (spike quills, water dorsal fin) | one path each | Drawn **before** the body, so the body contour hides the roots (the `sunk` idea). Spike's whole comb, back and tail quills, is **one path** stroked once and filled once in flat `horn`, so overlapping neighbours share one outer ink line; a `celPoly` per quill crossed each quill's ink over its neighbour's and left grey scribbles. |
+| **Rock dome** | one path | Drawn **after** the body, with its rim inked. A shell resting on the back: its top edge is the body's back line lifted by a thickness that is the dome's rise at the centre and tapers to 1.5 px at the ends, and its rim sags over the flank mid-body. Facet corners on that arc, plus a ridge vertex over the middle facet. Facets are tone steps with no line, planes radiating from a point under the dome, toned in thirds (3.4); a run of facets in one tone is one plane, since two planes meeting edge to edge left a faint anti-aliased seam. |
 | **Emitters** (flame, crystals, sparks, glow dots) | `flat()` | Outlined when they are part of the silhouette. **Never banded** (D20). An emitter that can land on the floor carries a 1 px ring in a dark slot of its own palette (5.4, gate i). |
 | **Ground shadow** | flat ellipse | `#1a1018` at α 0.28: (body length + 6) × 2 px for babies, (+ 8) × 3 for young, (+ 10) × 4 for adults. Shrinks during hops. |
 
@@ -177,14 +180,14 @@ Every part is **one outlined path**, stroked once and filled once (the `drawLimb
     3. skull;
     4. face markings (clipped);
     5. eye, brow, nostril, fangs;
-    6. near horn, near fan and near fin-ear.
+    6. near horn, near fan and near fin-ear, **clipped to exclude the eye's largest box + 1 px** (`DragonInfo.eye`), so no element renderer can cover the eye.
 13. The dragon's own effects: breath, sound arcs, sparks.
 14. **Top pass, after every dragon:** rising particles (embers, "z", bubbles, notes, dazed stars), so a neighbour never hides them.
 
 The head is drawn last so that no pose can cover the eye.
 
-**The tuck branch.** Three poses need something drawn *over* the head, so they move the whole head group (step 12) earlier:
-- **Rock's sleep tuck and upset tuck:** the head group is drawn before step 8, so the dome and its rim lie over it.
+**The tuck branch.** Two poses need something drawn *over* the head, so they move the whole head group (step 12) earlier:
+- **Rock's upset tuck** (`tuck` 1): the head group is drawn before step 8, so the dome and its rim lie over it. Rock's **sleep** tuck rests its head on the floor *outside* the rim (3.4) and draws in the normal order: drawn under the dome, the near legs landed over its face.
 - **The baby sleep bun:** the head group is drawn before step 11, so the wing nubs lie over the head.
 
 In the sleep poses the eyes are closed. In rock's upset tuck one eye peeks out *below* the raised rim, where nothing is drawn over it. This is ledger entry E9.
@@ -194,7 +197,7 @@ In the sleep poses the eyes are closed. In rock's upset tuck one eye peeks out *
 |---|---|
 | Legs | `farPalette(p, 0.55, 0.30)` (D8). Far paws sit **2 px higher**. At rest the far front paw is 4 px ahead of the near one and the far hind paw 4 px behind, so both legs of each pair show. |
 | Wing | `farPalette(p, 0.62, 0.25)`. Spread: rotated 8° further back (+8° in the 1.1 convention), root 2 px higher, with **≥ 5 px of far membrane edge visible**. Folded: not drawn. |
-| Horns, ear-fans, fin-ears | `farPalette(p, 0.62, 0.25)`. The root is 3 px behind and 1 px above the near one, angled −8°, so the tips separate by ≥ 3 px. If a far feature would overlap its near partner by more than 70 %, it is not drawn. A far horn keeps ≥ 6 Oklab L from the ink (gate e). |
+| Horns, ear-fans, fin-ears | `farPalette(p, 0.62, 0.25)`. **Horns:** the far root sits 2 px above the near one, measured across the horn's own line, and the far horn **forks** further up: 28° on adults (`HornParams.farTilt`), so background shows between the tips of an 8 px pair (at 8°, and even at 19°, the bent near tip curled up against the far horn and the pair hung off the head as one two-tone wedge, a floppy ear or a beret). Young pairs keep 8°, which the overlap test culls, so a young dragon shows one horn. Horns lie back along the neck line (3.0), so a root "3 px behind" would slide the far horn along its partner and stack the pair into one dark slab. **Fans and fin-ears:** the root is 3 px (fans 4 px) behind and 1 px above the near one, angled −8° (fans 14°). If a far feature would overlap its near partner by more than 70 %, it is not drawn (horns: `hornOverlap`, sampled every frame, with the near horn dilated by 2 px, so a far horn lying parallel within 2 px counts as covered; every young pair measures ≥ 0.86 and every adult pair ≤ 0.62 over the seeds, so the cull never flickers with the idle's neck motion). A far horn keeps ≥ 6 Oklab L from the ink (gate e). |
 | Claws, markings, glow dots, eye, fan ribs, fin rays | **Not drawn on the far side.** A 2 px detail at far shading falls under the mark floor. |
 | Body, neck, head, tail, back row, dome | Near palette. These are midline parts. |
 
@@ -217,34 +220,34 @@ All values are px at scale 1. Positions are given as (x, y) in body space unless
 | | **body length**, hip back to chest front | **19** | **29.5** | **39** |
 | | depth at the chest | 15 | 17 | 22 |
 | | belly-sag ellipse (same path) | rx 10, ry 4, centre (0, +3.5) | none | none |
-| | `bodyY`, body centre above ground (solved from the hind leg) | 13.5 | 19.5 | 24.5 |
-| | belly clearance under the chest | 5 | 10 | 12.5 |
+| | `bodyY`, body centre above ground (solved from the hind leg) | 13.5 | 17.7 | 22.6 |
+| | belly clearance under the chest | 5 | 8 | 10.5 |
 | **Neck** | segments × length | 1 × 3 (hidden; the head sits on the chest) | 2 × 6 | 2 × 9 |
 | | radius, root → head | 5.5 → 5 | 5 → 4 | 6.5 → 4.5 |
 | | root / sink | (+5, −5) / 2 | (+10, −5) / 2 | (+13, −7) / 3 |
-| | rest elevation per segment | 70° | 70°, 45° | 65°, 35° (an S), head pitched 10° down |
+| | rest elevation per segment | 70° | 70°, 45°, head pitched 4° down | 65°, 35° (an S), head pitched 10° down |
 | **Head** | **cranium radius** | **8.5** | **9** | **9.5** |
 | | cranium centre from the neck end | (+1, −3) | (+1.5, −2) | (+2, −2) |
 | | snout taper, cranium space: from → to, r0 → r1 | (1.5, 1.5) → (6.5, 2), 5 → 4 | (2.5, 1) → (11.5, 1.5), 5.5 → 4 | (3, 1) → (15, 2), 6 → 3.5 |
 | | **snout length** beyond the cranium | **2** (a button) | **6.5** | **9** (a wedge) |
 | | head length / `celPath` ext / tones | 19 / 9.5 / 2 | 24.5 / 12.25 / 3 | 28 / 14 / 3 |
 | | brow ridge bump in the skull path | none | 1 px | 2 px |
-| | jaw: hinge → tip (cranium space), r | (−1, 4) → (6, 4.5), 3 → 2 | (−1, 4.5) → (10, 5), 3 → 2 | (−1, 5) → (13, 5.5), 3.5 → 2 |
+| | jaw: hinge → tip (cranium space), r; the open jaw's hinge drop | (0.5, 4.5) → (8.5, 5.2), 2.5 → 1.5; drop 5 | (−1, 4.5) → (10, 5), 3 → 2; drop 3 | (−1, 5) → (13, 5.5), 3.5 → 2; drop 3 |
 | | jaw maximum opening | 40° | 34° | 30° (shriekscale 40°) |
-| | **jaw minimum opening** (any open frame; 1.2) | **20°** | **14°** | **10°** |
+| | **jaw minimum opening** (any open frame; 1.2) | **20°** | **20°** | **16°** |
 | **Eye** | **outer size including the ink ring / interior** | **7 × 8 / 5 × 6** | **7 × 7 / 5 × 5** | **8 × 6 / 6 × 4** |
 | | centre, cranium space | (+2, 0) | (+2.5, −1) | (+3, −2) |
-| | brow bar (2 px, 1 px above the ring) | expressions only | 5 px long | 6 px long |
+| | brow bar (2 px, 1 px above the ring) | expressions only | 5 px long, expressions only | 6 px long, expressions only |
 | **Teeth** | | egg tooth 2 × 2 on the snout tip | 1 fang 2 × 2, jaw open only | 2 fangs 2 × 3, jaw open only |
-| **Hind leg** | hip joint: x = −(gap/2 + X) | (−5.75, +3), X 3.25 | (−8.5, +2), X 1.5 | (−10.5, +3), X 1 |
+| **Hind leg** | hip joint: x = −(gap/2 + X) | (−8.5, +3), X 6 | (−11.25, +2), X 4.25 | (−12.75, +3), X 3.25 |
 | | **thigh / shin length** | **4 / 4** | **8 / 7.5** | **10 / 9** |
-| | rest angles, thigh / shin (engine convention: shin relative to thigh; 1.1) | +20 / −30 | +25 / −45 | +25 / −45 |
-| | `drawLimbSegs(r1, r2, bulge)` → root / knee / ankle radius | (2.6, 2.6, 0.6) → 2.9 / 2.4 / 2.3, flat | (4.2, 4.2, 0.8) → 4.7 / 3.9 / 3.5, flat | (5.8, 5.8, 0.8) → 6.5 / 5.3 / 4.9, 2 tones |
+| | rest angles, thigh / shin (engine convention: shin relative to thigh; 1.1) | +20 / −30 | +35 / −70 (the hock shows) | +35 / −70 |
+| | `legRadii(r1, r2, bulge)` → root / knee / ankle radius (the shin tapers: r2 ≈ 0.7 r1) | (2.6, 2.6, 0.6) → 2.9 / 2.4 / 2.3, flat | (4.2, 3.0, 0.8) → 4.7 / 3.3 / 2.5, flat | (5.8, 4.1, 0.8) → 6.5 / 4.6 / 3.4, 2 tones |
 | | **paw (foot)**, w × h | **5 × 3** mitten | **7 × 3** | **9 × 4** |
-| **Front leg** | shoulder joint: x = +(gap/2 + X) | (+5.75, +3) | (+8.5, +2) | (+10.5, +3) |
+| **Front leg** | shoulder joint: x = +(gap/2 + X) | (+8.5, +3) | (+11.25, +2) | (+12.75, +3) |
 | | **upper / lower length** | **4 / 4** | **7 / 7.5** | **9 / 8.5** |
-| | rest angles, upper / lower (lower relative to upper) | −5 / +10 | −5 / +10 | −5 / +10 |
-| | `drawLimbSegs(r1, r2, bulge)` → root / elbow / wrist radius | (2.4, 2.4, 0.5) → 2.6 / 2.3 / 2.2, flat | (3.7, 3.7, 0.5) → 4.0 / 3.5 / 3.3, flat | (4.7, 4.7, 0.5) → 5.1 / 4.5 / 4.2, 2 tones |
+| | rest angles, upper / lower (lower relative to upper), before the plant nudge | −5 / +10 (planted: ≈ −5 / +27) | −10 / +20 (planted: ≈ −10 / +49: the elbow back, the forearm reaching forward) | −10 / +20 (planted: ≈ −10 / +48) |
+| | `legRadii(r1, r2, bulge)` → root / elbow / wrist radius | (2.4, 2.4, 0.5) → 2.6 / 2.3 / 2.2, flat | (3.7, 3.2, 0.5) → 4.0 / 3.3 / 2.9, flat | (4.7, 4.0, 0.5) → 5.1 / 4.1 / 3.6, 2 tones |
 | | **paw (foot)**, w × h | **5 × 3** mitten | **6 × 3** | **8 × 4** |
 | **Claws** | near paws only, `horn`, 2 px gap | none | 2 × (2 × 2) | 2 × (2 × 3) |
 | **Tail** | **segments × length** | **3 × 5.5 = 16.5** | **5 × 6.5 = 32.5** | **6 × 7 = 42** |
@@ -257,10 +260,11 @@ All values are px at scale 1. Positions are given as (x, y) in body space unless
 | | what the wings can do | flutter only | hop-glide | fly (rock: the boulder hop) |
 | **Shadow** | ground ellipse | (body L + 6) × 2 | (body L + 8) × 3 | (body L + 10) × 4 |
 
-- **Solving the body height.** `bodyY` is solved at build time from the hind leg (drop + paw height + hip-joint offset), so the hind paws sit exactly on y = 0. The front lengths above land the front paws within ±1 px. The rig then nudges the front `lower` rest angle to plant them exactly. When a modifier changes leg length, both pairs scale together and `bodyY` is solved again.
-- **Why the leg joints sit out at gap/2 + X.** With the joints at ±gap/2, the near hind and near front legs overlapped by 3.6 to 4.3 px on all six babies, and young fire, spike, lightning and shriekscale kept 0.6 px or less of background between them, so the walk could not show four legs (5.1 #5). With X = 3.25 / 1.5 / 1 (and the thinner baby legs above), at least 3.0 px of background shows between the near legs at rest on all 18 looks. X does not scale with the body-length modifier.
+- **Solving the body height.** `bodyY` is solved at build time from the hind leg (drop + paw height + hip-joint offset), so the hind paws sit exactly on y = 0. The rig then nudges the front `lower` rest angle so the front paws land on y = 0 too (the "planted" angles above). When a modifier changes leg length, both pairs scale together and `bodyY` is solved again. From then on the **IK plant** (1.1) keeps every paw on its rest spot whatever the body does.
+- **Why the legs bend at rest (review of the built rig).** A planted leg can only let the body rise by its slack, the reach it has left. A straight front leg has none: the adult's was 0.02 px short at rest, so the idle's 1 px inhale lifted its paws off the floor. With the hind at +35 / −70 and the front elbow at −10, young and adult legs keep 1.4 to 4.1 px of slack (front 1.4 to 2.3), enough for the 1 px idle rise, pitch ±6° and walk dips. The same bend makes the hock and the elbow visible, where the old +25 / −45 legs with untapered radii read as pillars. Baby legs (4 + 4 px) stay nearly straight (0.3 px of slack), so a baby bob dips *down* (4.2).
+- **Why the leg joints sit out at gap/2 + X.** With the joints at ±gap/2, the near hind and near front legs overlapped by 3.6 to 4.3 px on all six babies, and young fire, spike, lightning and shriekscale kept 0.6 px or less of background between them, so the walk could not show four legs (5.1 #5). X = 4 / 2.25 / 1.75 left at least 3.5 px of background between the near legs at rest on all 18 looks, but not in the walk: at the keys where the near hind reaches forward and the near front trails, the legs touched (review round 3). X = 6 / 4.25 / 3.25, with the stance strokes centred a little behind each joint (front −0.05, hind −0.15 of a stride), keeps ≥ 3 px between the near legs at every walk key on all 18 looks (measured on the drawn walk strips). That is measured on the rig as drawn: joints rounded to whole pixels, the knee forward, the elbow back, legs and paws as one shape, minus both ink lines. The first figures (3.25 / 1.5 / 1) gave exactly 3.0 before rounding and 2.3 after it. X does not scale with the body-length modifier.
 - **Checking the tone gates.** The engine's gates decide tones from these radii. Nothing sets tones by hand.
-  - An adult leg root (≥ 5) gets one shadow band; `drawLimbSegs` never draws a highlight.
+  - An adult leg root (≥ 5) gets one shadow band; a leg never draws a highlight.
   - Baby and young legs (< 5) are flat, and so are shriekscale's at every stage (leg r × 0.75: adult hind root 4.9).
   - Adult and young body and head get 3 tones.
   - The baby body and head (ext 9.5 < 10) get 2 tones, so **a baby has no highlights at all**. That is part of its softness.
@@ -271,11 +275,11 @@ Measured from +x, with positive going up, and lerped by `wing`.
 | Keyframe | humerus | forearm | spars, adult 3-spar (lead / mid / trail) | adult 4-spar (water, shriekscale) | spars, young 2-spar | young 3-spar (water, shriekscale) |
 |---|---|---|---|---|---|---|
 | folded (`wing` 0) | 165° | 18° | 204° / 208° / 212° | 204° / 207° / 210° / 213° | 204° / 210° | 204° / 207° / 211° |
-| spread (`wing` 1) | 110° | 80° | 95° / 130° / 165° | 95° / 120° / 145° / 170° | 100° / 150° | 100° / 133° / 165° |
+| spread (`wing` 1) | 110° | 80° | 85° / 133° / 182° | 85° / 118° / 150° / 184° | 88° / 178° | 88° / 133° / 180° |
 
 - **Membrane polygon:** root → along the arm → lead tip → scallop → mid tip → scallop → trail tip → scallop → body attach point at (−16, +1) from the root (young: −10, +1). Scallop depth × `wing` (1.2).
 - **Lightning** does not use this table: its bolt keeps the spars closed and rotates as one polygon (3.5).
-- **Adult spread:** the lead tip lands about (−3, 40) above the root.
+- **Adult spread:** the lead tip lands about (+1, 40) above the root, and the trail spar reaches level back, so the fan opens over ~100°. Over 70° (lead 95° → trail 165°) the spread wing was a narrow upright sail, 16 × 40 px, and with its bare spar ends and the far wing's stubs behind it, it read as a rake.
 - **Adult folded:** the wrist sits 3 px above the back line and the lead tip lies on the rump contour.
 
 ### 2.3 Element proportion modifiers
@@ -285,7 +289,7 @@ Multipliers on 2.1. Every modifier stays within **0.7 to 1.3** (G), and on **bab
 |---|---|---|---|---|---|---|---|---|---|
 | Fire | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 0°, −9° (it curls up; the flame rises above the tail tip). Young 0°, −10°. |
 | Spike | 0.95 | 1.1 | 0.9 | 1.05 | 0.8 | 0.9 | 1.0 | 1.0 | +5°, 0° (level) |
-| Rock | 1.1 | 1.2 | 0.75 | 1.2 | 0.7, neck angles −25° (head low) | 0.7 | 1.2 at the root; the tip radius is capped at 2 (≤ 4 px wide), blunt by its round cap | 0.9, boxy (r1 = 0.9 r0) | +30°, +6° (the tip rests on the ground; y clamped to 0) |
+| Rock | 1.1 | 1.2 | 0.75 | 1.2 | 0.7, neck angles −40° and the neck root 4 px lower on the chest (`neckDrop`; halved on babies): the head is carried below the dome top (3.4). At −25° alone the short neck left the young head 5 px above the dome | 0.7 | 1.2 at the root; the tip radius is capped at 2 (≤ 4 px wide), blunt by its round cap | 0.9, boxy (r1 = 0.9 r0) | +30°, +6° (the tip rests on the ground; y clamped to 0) |
 | Lightning | 1.0 | 0.85 | 1.2 | 0.9 | 1.0 | 1.0 | 0.85 | 1.2 | 0°, 0° (straight and stiff, at every stage) |
 | Water | 1.1 | 0.9 | 0.8 | 1.0 | 1.3 | 1.15 | 1.0 (baby: 3.5 → 1.5 absolute, see below) | 1.0 | 0°, 0° (level) |
 | Shriekscale | 1.0 | 1.0 | 1.0 | **0.75** (thin, bat-like legs: flat at every stage, D8) | 1.1 | 1.1 | 0.7 (a whip) | 1.0, jaw depth 1.3 | +15°, −4° |
@@ -298,17 +302,19 @@ Multipliers on 2.1. Every modifier stays within **0.7 to 1.3** (G), and on **bab
 - water stays level (0°, 0°) on a thinner tail (radius 3.5 → 1.5 instead of 4 → 2), so its 10 × 6 tadpole paddle is clearly wider than the tail that carries it.
 
 ### 2.4 Resulting sizes
-Length is nose → tail tip and height is ground → top, both including the cue at rest mood and excluding effects. The figures are from a rest-pose solve and hold to ±4 px.
+Length is nose → tail tip and height is ground → top, both including the cue at rest mood and excluding effects. The figures are **measured on the drawn rig** (the silhouette sheet at the rest pose, ink included) after the review of the built rig, and hold to ±2 px.
 
 | | Fire | Spike | Rock | Lightning | Water | Shriekscale |
 |---|---|---|---|---|---|---|
-| **Adult** | 105 × 56 | 97 × 52 | 86 × 46 | 105 × 65 | 123 × 57 | 109 × 66 |
-| **Young** | 79 × 45 | 74 × 42 | 67 × 37 | 79 × 48 | 92 × 45 | 82 × 53 |
-| **Baby** | 41 × 33 | 40 × 32 | 39 × 31 | 42 × 34 | 46 × 33 | 41 × 39 |
+| **Adult** | 107 × 55 | 100 × 51 | 91 × 46 | 106 × 64 | 123 × 55 | 110 × 68 |
+| **Young** | 80 × 45 | 77 × 41 | 72 × 37 | 81 × 47 | 92 × 45 | 84 × 53 |
+| **Baby** | 41 × 36 | 43 × 33 | 43 × 30 | 46 × 36 | 49 × 33 | 45 × 42 |
+
+(Against the first rest-pose solve: spike is lower (adult 51, young 41) now that its brow thorns lie back along the neck from the back of the head, where they no longer top its head; rock is 6 px longer at young and adult, the cost of carrying its head low and forward. Re-measured in the second rig review, seed 1, silhouette at the rest pose.)
 
 - **Height.** An adult stands about 45 to 65 px, a pony-sized pet beside a 72 to 76 px hero.
 - **Screen budget.** Two adults, two young and three babies fit across the 640 px habitat, with room between them.
-- **Stage steps.** Within an element, every stage step is at least 1.28× in length and 1.19× in height (rock is the tightest in both), so a stage is never mistaken for its neighbour. The head ratio, eye and neck carry the rest.
+- **Stage steps.** Within an element, every stage step is at least 1.26× in length (rock, young → adult) and 1.22× in height (fire and water, young → adult; baby → young at least 1.23×, rock), so a stage is never mistaken for its neighbour. These are the floors 5.1 #3 checks against. The head ratio, eye and neck carry the rest.
 
 ### 2.5 The eye, and the face set
 The eye's **aspect ratio is itself a stage signal**: taller than wide for babies, square for young, wider than tall for adults (C). Its absolute size barely changes, so relative to the head it is largest on the baby (47 % of head height, against 32 % on the adult).
@@ -319,22 +325,22 @@ The eye's **aspect ratio is itself a stage signal**: taller than wide for babies
   - the bottom 2 rows are iris, a coloured crescent;
   - a 2 × 2 catchlight `#f8f4ec` sits at the top-left of the interior, toward the light, on the pupil.
 - **Young, 7 × 7** (interior 5 × 5):
-  - an iris field with a 3 × 4 oval pupil in columns 2 to 4;
+  - an iris field with a 3 × 4 oval pupil in columns 1 to 3, rows 0 to 3: centred across the eye and set at its top, so iris frames it front, back and below (in columns 2 to 4 and the bottom rows it touched the ring on two sides, fused into a 3 px black "L" and read as a boxy "P" glyph: the adult's E2 problem);
   - a 2 × 2 catchlight on the pupil's top-left.
-- **Adult, 8 × 6** (interior 6 × 4):
-  - a 2 × 2 catchlight on the iris in columns 0 and 1, rows 0 and 1;
-  - iris in columns 0 and 1 (rows 2 and 3) and in columns 4 and 5 (all rows);
+- **Adult, 8 × 6** (interior 6 × 4), an **almond**: the ring's corners are cut by 2 px, not 1, so the interior loses its four corner pixels. A boxed iris | slit | iris in 2-2-2 columns read as a pause icon;
+  - a 2 × 2 catchlight in columns 1 and 2, rows 0 and 1: on the slit's top-left, a glint on the pupil as on the young eye (the almond made column 0, row 0 ink). It covers the slit's column 2 over those two rows, so the slit shows 1 px wide there beside the glint, which is part of the pupil read. There is no other 2 × 2 spot: in iris | slit | iris at 2-2-2 columns, off the slit the catchlight lands on a cut corner or splits the back iris into single pixels;
+  - iris in columns 0 to 1 (below the catchlight) and in columns 4 and 5 (all rows);
   - a **2 × 4 slit** in columns 2 and 3, with iris on **both** sides. The pupil is only 1 Oklab L from the ink ring, so a slit that touches the ring's front edge fuses into a 3 px black wall and the slit never shows;
   - the slit is the pupil of neutral, alert and breath, and it shows below the lid in sleepy, sad and grumpy. The hungry, surprised, scared and sheepish faces use a **round** pupil (below), so an adult's pupil is a mood read too, and the adult face never settles into a fixed "villain" slit;
   - the brow ridge sits above as a contour bump, never as a lid.
 - **Every iris is ≥ 31 % luminance from the catchlight** (gate a, eye/catchlight), so the catchlight never vanishes into a pale iris.
 
-**DFACE (stepped, never interpolated, like `FACE`).** The blink runs at runtime: 2 frames half-lid (the sleepy lid), 4 closed, 2 half-lid (babies 3 / 4 / 3). It is not keyed.
+**DFACE (stepped, never interpolated, like `FACE`).** The blink runs at runtime: 2 frames half-lid (the sleepy lid), 4 closed, 2 half-lid (babies 3 / 4 / 3). It is not keyed. The player writes it to the stepped `blink` channel, not to `face`, and it swaps the **eye only**: the face keeps its brow, blush and mouth, so a neutral blink never flashes the sleepy brow bar.
 
 | Face | Eye | Brow (2 px) | Mouth and extras |
 |---|---|---|---|
-| neutral | stage eye | flat; babies show none | jaw closed |
-| happy | "^" arc, 2 px ink, eye width × 3 | up 1 px | 2 px up-notch at the mouth corner; blush (babies 4 × 2, others 3 × 2, opaque `blushOf(element)`, under and behind the eye); babies open the jaw 20° (their minimum) to show the tongue |
+| neutral | stage eye | **none, at every stage**: the brow-ridge bump in the skull contour carries the young and adult stage, and a flat dark bar over a resting eye read as a visor | jaw closed |
+| happy | "^" arc, 2 px ink, eye width × 3 | up 1 px | 2 px up-notch at the mouth corner (the back end of the closed mouth line, where the jaw first shows below the skull, on the skull's lower contour so the mark touches its ink: on the cheek above it the notch read as a tear), and **≥ 2 px of skin clear of the eye's box**, like every mouth mark: on a baby's head the corner lies just under the eye, and the notch against the arc's front leg turned the eye into a hook or a "?", so there the blush and the open jaw carry the smile; blush (babies 4 × 2, others 3 × 2, opaque `blushOf(element)`, under and behind the eye); babies open the jaw 20° (their minimum) to show the tongue (the pet loop too). **Upside down** (rock's roll, `stretch` < 0) the arc's rows and the blush are mirrored so they read upright on screen (flipped with the head the arc read "v"), and no brow is drawn |
 | closed | flat 2 px ink line | relaxed | used for blinks and asleep |
 | hungry | stage eye + 1 px each way, a **round** pupil (adult 4 × 4, in place of the slit), **two** 2 × 2 catchlights (sparkly) | front end up 2 px (pleading) | mouth corner down |
 | sleepy | lid (rows below) | low | slow blink |
@@ -343,14 +349,14 @@ The eye's **aspect ratio is itself a stage signal**: taller than wide for babies
 | grumpy (needs care) | flat lid (rows below) | front end down 1 px, pressed onto the ring | cheek +1 px (a pout). **Never angry.** |
 | sheepish | flat lid (rows below); pupil looking down and back, in the bottom-back corner (adult: a round 2 × 2) | front end up 1 px | blush; head turned 10° away. After lightning's zap and a failed baby breath. |
 | scared | the surprised ring (+ 1 px each side), round pupil 2 × 2 | front end up 2 px | jaw closed; a 1 px tremble every 4 f. With shriekscale's fans at −1. |
-| dazed | a 2 px ink ">" chevron in place of the eye (squeezed shut) | none | wobble mouth; two 3 × 3 inked `#f8f4ec` stars circle above the head in 3 stepped positions, one step every 6 f (top pass). It replaces the engine's X-eyes, whose 1 px strokes fall under the mark floor and read as "knocked out". |
+| dazed | a 2 px ink ">" chevron in place of the eye (squeezed shut) | none | wobble mouth; two 5 × 5 inked `#f8f4ec` four-point stars (a solid diamond: the 3 × 3 "+" read as a first-aid sign) circle above the head in 3 stepped positions, one step every 6 f (top pass). It replaces the engine's X-eyes, whose 1 px strokes fall under the mark floor and read as "knocked out". |
 
-**Lids, in rows of the interior.** A lid is a `scale` fill whose lowest row is its own 1 px ink edge: no separate ink band, and never less than 2 rows (a 1-row lid is just a thicker ring). Percentages are not used, because 30 % of a 4-row interior is 1.2 px.
+**Lids, in rows of the interior.** A lid is a `scale` fill whose lowest row is its own 1 px ink edge: no separate ink band, and never less than 2 rows (a 1-row lid is just a thicker ring). Percentages are not used, because 30 % of a 4-row interior is 1.2 px. The skin and the ink edge span the **whole ring**, its side columns and cut corners included, from the ring's top down: a lid over the interior only left the ring's sides standing above its edge as two ink posts, and every lidded eye (and every blink) read as a "U" cup instead of a lidded almond.
 
 | Lid | Baby (interior 5 × 6) | Young (5 × 5) | Adult (6 × 4) |
 |---|---|---|---|
-| sleepy (and the blink's half-lid) | 4 rows | 3 rows | 3 rows (one row of iris and slit still shows, unlike `closed`) |
-| sad: a wedge, back columns / front columns | back 2 cols × 3 rows, front 3 cols × 2 rows | back 2 × 3, front 3 × 2 | back 3 × 3, front 3 × 2; the slit shows only below it |
+| sleepy (and the blink's half-lid) | 4 rows | 3 rows | 2 rows (2 rows of iris \| slit \| iris still show; at 3 the almond's cut corners split the last row's iris into two lone 1 × 1 pixels) |
+| sad: a wedge, back columns / front columns | back 2 cols × 3 rows, front 3 cols × 2 rows | back 2 × 3, front 3 × 2 | per column back → front 3, 4, 3, 2, 2, 2: column 1 goes a row deeper, or its last iris pixel is left alone beside the cut corner; iris and slit show only in front, below the lid |
 | grumpy: flat | 2 rows | 2 rows | 2 rows |
 | sheepish: flat | 3 rows | 2 rows | 2 rows |
 
@@ -407,7 +413,7 @@ The cue is a **seed**: small, soft and already in its adult zone. Where the baby
 - the belly stripe from chin to throat to belly to tail underside;
 - the head construction (cranium + snout + hinged jaw, with the eye in the same slot);
 - **the element cue present from hatching, in the same zone and pointing the same way**;
-- the first marking, at the same anchor;
+- the first marking, at the same anchor, and showing at every stage. Anchors are preferences: on the first draw the rig fits each body marking to the nearest spot where all of it shows past the folded wing, the leg roots, the neck and a baby's head, a third of the body length from the others where the flank allows (two marks side by side at one height read as text: "AA", "▪▪"), and slides each **tail** marking out along the tail to where all of it clears the hip, the near legs and anything else drawn over the tail (a ring needs three quarters of its section: a back-row quill may cross it) and sits ≥ 3 px from the tail marking before it (`fitMarkings`). The element files' `t` values are where their tail markings land. It prefers spots ≥ 3 px above the belly line and never crosses onto the belly (5.1 #4: belly / marking passes gate a on every palette). A baby's flank is mostly head, wing nub and pot belly, so a first marking that must show at every stage sits on the tail base (fire, lightning, spike) or low on the rear flank (water);
 - the tail-tip kind.
 
 A baby next to its adult shares all of these. Only proportion and detail count differ.
@@ -415,8 +421,8 @@ A baby next to its adult shares all of these. Only proportion and detail count d
 ### 2.8 Individual variation (a seeded per-pet variant)
 Two pets of the same element and stage would otherwise be pixel-identical, and 5.4 expects several on screen. Each pet gets a seed at hatching, and the seed picks, **inside the invariants of 2.7**:
 - every marking after the first shifts ±2 px along its anchor line (the first marking stays put: it is an invariant);
-- one optional extra marking of the element's own kind, placed only where the marking rules already allow one (for example ≥ 3 px above the belly line);
-- horn, quill and fan lengths ±1 px (never past a quiet-zone budget in 3.0);
+- one optional extra marking of the element's own kind, on half of the pets, placed only where the marking rules already allow one: further out along the tail, or on the flank where the rig's fit shows all of it (otherwise it is not drawn). Only a stage that already carries a second marking gets one (a baby carries its first alone: D15);
+- horn, quill and fan lengths ±1 px (never past a quiet-zone budget in 3.0): `sp.lenVar`, which spike's quills and shriekscale's fans add to their own lengths;
 - the tail rest bend ±2° per segment (never past the 3 px limit above the back line).
 
 The palette, the iris colour and the cue never vary. The seed survives stage-ups, so a pet keeps its own pattern as it grows. Players will still tell pets apart mostly by name and place; the variant only makes sure two of them never look like copies.
@@ -429,7 +435,7 @@ The palette, the iris colour and the cue never vary. The seed survives stage-ups
 | Element | Zone it owns | Cue | Flat-black shape of the adult at ÷ 3 | Mood gauge (≥ 60 % at `mood` −1) |
 |---|---|---|---|---|
 | **Fire** | above the tail tip (the high back end, behind the hips) | torch tail: a flame on an up-curling tail | a "U": head high in front, a flame blob high at the back | flame scale 0.6 → 1.0 → 1.2 |
-| **Spike** | the back line, nape → tail | comb of pale bone quills | a saw-tooth top edge | quill lean 50° back (droop; 64 % of the upright height) → 35° → 20° (perky). The alarm bristle is a separate one-shot (3.3) |
+| **Spike** | the back line, nape → tail | comb of pale bone quills | a saw-tooth top edge | quill lean 50° back (droop; 64 % of the upright height) → 28° → 15° (perky). The alarm bristle is a separate one-shot (3.3) |
 | **Rock** | the body mass | boulder dome carapace + a low, heavy stance | a dome/turtle, head below the dome top | the dome is always 100 %; its crystals (≥ 1 from hatching) glow `glow.sh` (dim) → `glow` → `glow` + glint |
 | **Lightning** | the space above the back, behind the head | bolt wings, held cocked upright and leaning back | one tall zigzag spire over the back | cock 140° (79 % of the rest height) → 115° → 95° (1.1 convention) |
 | **Water** | the tail end, low and level | a crescent fluke on the longest, flattest body | a long flat bar (about 3 : 1) ending in a crescent | spot glow, fin-ears and fluke droop or flare |
@@ -438,7 +444,7 @@ The palette, the iris colour and the cue never vary. The seed survives stage-ups
 **Quiet-zone rule (C), with numbers (G).** A feature on one element that sits in another element's zone stays at or under **half** that zone's cue at the same stage, and keeps the shape language quiet:
 - **Head (shriekscale's):**
   - Every other head feature is ≤ half the fan height (adult ≤ 8 px, young ≤ 6, baby ≤ 5).
-  - Paired horns (fire, spike, lightning) are ≤ 3 px thick, swept back within 20° of the neck line, and ≤ 3 px above the skull top.
+  - Paired horns (fire, spike, lightning) are ≤ 3 px thick, swept back within 20° of the neck line, and ≤ 3 px above the skull top. The rig measures the neck line every frame (the last neck segment, seen from the cranium), and `HornParams.sweep` is authored **relative to it** (0 = lying along it), so the rule holds at every stage and pose. Measured at rest, root to tip: fire and lightning within 10° of the neck line, spike's thorns within 14° (near horns; the far horn forks 28° further up behind the head, 1.5, and still stays under the skull top). Babies, whose neck hides under the head, point their buds relative to straight back.
   - Rock's single blunt nose horn sits on the snout, well forward of where the fans would be.
   - Water's fin-ears point back, never up: even flared they rise ≤ 10° above the neck line.
 - **Back line (spike's):**
@@ -457,7 +463,7 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
 | **scale** | `#f04422` | `#2f8232` | `#cfb788` | `#2d58cc` | `#20a3ce` | `#5a2f6e` |
 | **belly** | `#e08a2c` | `#a3ad55` | `#fff7e2` | `#9fb4f2` | `#85c6ae` | `#fff5f8` |
 | **membrane** | `#7f1e3a` | `#2e6b58` | `#4c5670` | `#ffcf33` | `#1e5f8c` | `#ff6fae` |
-| **horn** | `#463039` | `#f2e8c6` | `#5e4e46` | `#2a306c` | `#eaf6f0` | `#f0dce6` |
+| **horn** | `#734a4c` | `#f2e8c6` | `#5e4e46` | `#404a9c` | `#eaf6f0` | `#f0dce6` |
 | **marking** | `#ffe29a` | `#173a19` | `#7e5f44` | `#ffcf33` | `#dcfff6` | `#9a6aa8` |
 | **dark** | `#2b1418` | `#4a2618` | `#3b2c24` | `#141a3c` | `#0e2a36` | `#2e1638` |
 | **glow** | `#ffa21f` | `#7dff8c` | `#b48cff` | `#fff6a0` | `#40d8f0` | `#ff9ed2` |
@@ -510,7 +516,7 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
 **Identity and care.**
 - A warm, affectionate show-off with the fastest metabolism, so it needs food most often.
 - It hates baths: a bath shrinks its flame for a while (`bath`, 4.2).
-- It sleeps curled around its own tail flame and follows you around like a pet heater.
+- It sleeps curled up with its tail flame banked on the raised tip behind its rump (4.3) and follows you around like a pet heater.
 - The flame is its mood meter.
 
 **The cue: the torch tail.** A flame on the tip of an up-curling tail, in the zone above the tail tip.
@@ -522,11 +528,11 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
 | Feature | Baby (seed) | Young (sprout) | Adult (signature) |
 |---|---|---|---|
 | Flame, w × h, tongues | 5 × 7, 1 | 7 × 10, 2 | 10 × 14, 3; flame base about 4 px above the back line |
-| Horns: 2, swept back along the neck line, `celTaper` in `horn` | 3 px buds, r 1.5 | 5 px, r 1.5 → 1 | 8 px, r 1.5 → 1, bent +20° at the midpoint |
+| Horns: 2, swept back along the neck line, `celTaper` in `horn` | 3 px buds, r 1.5: near-round nubs on the top-back of the cranium pointing up and back (a flat 6 × 3 capsule read as a bruise) | 5 px, r 1.5 → 1 | 8 px, r 1.5 → 1, bent +20° at the midpoint |
 | Back row | none: a smooth back leaves the flame and head as the only high points | none | none |
 | Wings | nub | bat, 2 spars, 2 px scallops | bat, 3 spars, 3 px scallops |
 | Head | round, no ridge | 1 px brow bump | 2 px brow bump |
-| Markings: flame-lick chevrons in `marking`, pointing up | 1 on the shoulder, 4 × 4 | + haunch, 5 × 5 | + tail base, 6 × 6 |
+| Markings: flame-lick chevrons in `marking`, pointing up: chunky filled carets (5.2) | 1 on the **tail base**, 4 × 4 (the baby's shoulder is under its head) | 5 × 5: tail base + haunch | 6 × 6: tail base + haunch + shoulder |
 
 - **Mood.**
   - `mood` −1: flame 0.6×, no core, tongues swap every 8 f. The minimum is 3 × 4.
@@ -544,7 +550,7 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
   - **Baby:** a **hiccup**. One puff (r 3), 2 embers, then `dazed`.
 - **Ambient:**
   - An ember (2 × 2 `glow.hi`) rises 10 px from the flame over 40 f in alpha steps 1 / 0.7 / 0.4, every 90 ± 30 f.
-  - Idle fidget: it chases its own tail flame (60 f).
+  - Idle fidget: it chases its own tail flame (60 f): the tail curls up and forward and the head turns up and back past vertical, snout toward the flame (a look up and forward read as ignoring it).
 
 ### 3.3 SPIKE: "Bramble", the bramble dragon
 **Identity and care.**
@@ -553,28 +559,28 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
 - It is slow to bond, and *where* you pet it matters: stroking its back makes it bristle, the head and chin build trust. (Lightning's zap comes from boredom instead, so the two never punish the same mistake: 3.5.)
 - Adults shed quills, which are a collectible.
 
-**The cue: the comb back.** A row of pale bone quills from the nape to the tail: `celPoly` triangles in `horn`, drawn before the body so their roots are hidden.
+**The cue: the comb back.** A row of pale bone quills from the nape to the tail: triangles in plain `horn`, drawn before the body so their roots are hidden, the whole comb **one path** stroked once and filled once (1.2), so neighbours share one outer ink line.
 - **Along the tail.** The quills carry on along the *top* of the tail, shrinking toward the tip. The tail tip itself is a plain taper (D5).
-- **Lean, driven by `mood` like every other cue (D7).** `mood` −1: 50° back, a sad droop that still shows 64 % of the upright height, so the saw survives at its lowest. `mood` 0: 35°. `mood` +1: 20°, perky, with the ripple. Hungry and sad read as a droop, happy as a lift, the same direction as the other five cues.
+- **Lean, driven by `mood` like every other cue (D7).** `mood` −1: 50° back, a sad droop that still shows 64 % of the upright height, so the saw survives at its lowest. `mood` 0: 28°. `mood` +1: 15°, perky, with the ripple. (The rest lean was 35°; at /3 the young saw came down to 2 px bumps.) Hungry and sad read as a droop, happy as a lift, the same direction as the other five cues.
 - **Bristle (a separate alarm one-shot, the `bristle` channel).** Triggered by a stroke on the back, a loud noise or a shriek nearby: the quills snap upright (0°) and grow × 1.15, with a 1 px tremble every 4 f, for 30 f, then ease back to the mood lean. It is the only state where the quills stand fully upright, so alarm never looks like happiness.
 
 | Feature | Baby | Young | Adult |
 |---|---|---|---|
-| Quills (count × height, base) | 3 soft nubs, 4 × 4, base 4, blunt tips, on the **loin, rump and tail root** (x ≈ −4, −8, −12): the baby's head covers the front 60 % of its back, so nubs at the neck base and shoulders would be hidden. Lean at half the adult range (30° → 20° → 10°) | 4 on the back [5, 7, 7, 5], base 5, + 1 on the tail (4) | 5 on the back [7, 11, 12, 10, 7], base 6 (neck base, shoulders, mid-back, loin, rump), + 3 on the tail [6, 5, 4]. All in plain `horn`: no dark tips (a 3 px tip on a tapering quill is under 2 px wide and merges with the ink) |
-| Brow thorns: 2, pointing back | none | 3 px, r 1.5 → 1 | 6 px, r 1.5 → 1 |
+| Quills (count × height, base) | 3 soft nubs, 4 × 4, base 4, blunt tips, on the **loin, rump and tail** (x ≈ −2.5 and −7, and halfway along the short tail, the first spot past the hip), ≥ 1 px apart (at −4 / −8.5 / 30 % the rump and tail nubs touched and read as two): the baby's head covers the front 60 % of its back, so nubs at the neck base and shoulders would be hidden. Lean at half the adult range (25° → 14° → 7°) | 3 on the back [6, 9, 7], base 6, + 1 on the tail (5). Four teeth over the young's short back sat 4.5 px apart, 1.5 px at /3, and merged into a flat edge (5.1 #1); three at about 7 px keep a saw at /3 even at `mood` −1 | 5 on the back [7, 11, 12, 10, 7], base 8 (neck base, shoulders, mid-back, loin, rump), + 3 on the tail [6, 5, 4], bases 6 / 5 / 4. Wide bases: at 5 to 6 px a leaning quill left 1 to 2 px of bone between two ink edges and read as a grey scribble. All in plain `horn`: no dark tips (a 3 px tip on a tapering quill is under 2 px wide and merges with the ink) |
+| Brow thorns: 2, pointing back, lying back along the neck line, rooted on the cranium's **back** contour (145°) as fire's horns are (rooted on its top, at 105°, they stood up like ears; then, lying back, they lay along the skull's own top and read as a pale strap or goggles) | none | 3 px, r 1.5 → 1 (the far one culled: one thorn) | 6 px, r 1.5 → 1 |
 | Wings: leaf-shaped, smooth convex trailing edge, the spar is the leaf's vein | nub | 2 spars | 3 spars. Each spar pokes 3 px past the membrane as a thorn, plus a 4 px wrist thorn. |
 | `foldRise` | 0: the nub rests at 200°, along the flank below the quills, so it never hides one | 0: a folded wing never hides a quill | 0 |
-| Markings: dark tail rings, 3 px wide | 1 (tail base) | 2 | 3 |
+| Markings: dark tail rings, 3 px wide; the first at the tail base at every stage, just behind the hip where the tail shows (15 % of a young or adult tail, 32 % of the baby's short one), later rings further out | 1 (tail base) | 2 (+ 45 %) | 3 (+ 40 %, 62 %) |
 
 - **Adult-only extra:** the wing thorns.
 - **Signature: Quill Volley.**
   - **Wind-up:** the quills snap upright over 4 f, and the body puffs (stretch 1.06).
-  - **Volley:** 5 real quills (young: 3) fly out in a forward-up fan. Each is `horn`, 3 × 6, ink-outlined, trailing a 6 px sap streak (`glow`, flat, with a 1 px `scale` edge so it reads on the pale floor; at α 0.5 it was 5 % from the floor).
-  - **After 20 f:** each quill pops into 2 sap sparkles (2 × 2 `glow.hi` with a 1 px `scale` ring). The fired quills regrow from 0 to full over 30 f.
+  - **Volley:** 5 real quills (young: 3) fly out in a forward-up fan: all launched from the neck base within 4 f, the most forward quill first, from 20° above level to 60°, toward the facing side at 3 px/f, so the fan opens in front of and above the head (launched straight up first, 85° → 40° 2 f apart, the five stood in one column behind the head and read as a crest or a feather duster). They are drawn with the back row, before the body, so the neck and head lie over them until they clear the silhouette. Each is `horn`, 3 × 6, ink-outlined, trailing a 6 px sap streak (`glow`, flat, with a 1 px `scale` edge so it reads on the pale floor; at α 0.5 it was 5 % from the floor), the streak in whole pixels.
+  - **After 20 f:** each quill pops into **one** sap sparkle for 6 f (2 × 2 `glow.hi` with a 1 px `scale` ring on its four sides, corners cut: a full 4 × 4 box round a pale centre read as a hollow square, and two per quill read as pairs of rings, "oo oo oo"). The fired quills regrow from 0 to full over 30 f.
   - **Baby:** bristles into a puffball (squash 1.15 wide). One nub pops off, bounces, and it sneezes.
 - **Ambient:**
   - Quill ripple: each quill leans 15° toward upright in turn, from rump to neck, 4 f apart, every 240 ± 60 f (only at `mood` ≥ 0).
-  - Idle fidget: it grooms its quills with its head turned back (40 f).
+  - Idle fidget: it grooms its quills with its head turned back (40 f): the neck arches back and the head turns round over the shoulder, snout down to the comb (keyed snout-down, it dipped forward to its chest).
 
 ### 3.4 ROCK: "Cobble", the boulder dragon
 **Identity and care.**
@@ -583,16 +589,16 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
 - **Crystals grow on the dome as its bond grows** (count), and their glow shows its mood (brightness). Every rock hatches with one seed crystal, so even a new baby has a mood read.
 
 **The cue: the boulder dome.** A faceted carapace over the back, plus a heavy, low stance (the lowest clearance in the cast).
-- **Construction.** One `celPoly` drawn after the body.
-- **Rim.** It overhangs the flank by 2 px and is inked, so it reads as a shell.
-- **Facets** are tone steps with no lines: `marking.hi` `#a87a4e` on the lit left facet, the base colour on top, `marking.sh` `#53423d` on the right.
-- **Head.** Carried below the dome top.
+- **Construction.** One path drawn after the body: a shell resting **on** the back. Its top edge is the body's own back line, lifted by a thickness that is the rise at the centre and tapers to 1.5 px at the ends. An elliptical arc stands its ends vertical and read as a lampshade. One convex arc (3.0), with the facet corners on it and a ridge vertex over the middle facet, so no flat lid runs across the top.
+- **Rim.** It is inked, 1 px under the back line at the two ends, sagging over the flank mid-body, so it reads as a shell.
+- **Facets** are tone steps with no lines: planes radiating from a point under the dome, toned **in thirds**. `marking.hi` `#a87a4e` on the lit rear facets (adult 0–1, young 0), the base colour on top (adult 2, young 1), `marking.sh` `#53423d` on the front (adult 3–4, young 2). Only the outermost facets were toned before, 3 px slivers, and the dome read as one flat brown. The baby's pebble is one tone.
+- **Head.** Carried below the dome top, at least 2 px (young 3, adult 4.5 at rest): the neck runs out nearly level from low on the chest (2.3).
 
 | Feature | Baby | Young | Adult |
 |---|---|---|---|
-| Dome, width × rise above the back, facets | 12 × 5, 1 facet: a pebble backpack | 22 × 7, 3 facets | 34 × 11, 5 facets |
+| Dome, width × rise above the back, facets | 12 × 5, 1 facet: a pebble backpack | 22 × 9, 3 facets (rise 7 → 9: with the head low it still tops the young's silhouette) | 34 × 11, 5 facets |
 | Crystals: `flat()` `glow` polygons with ink, on the rear third; the count grows with bond | 1 seed crystal, 2 × 3, from hatching | 1 to 2 (the seed grown to 3 × 5, + one 3 × 5) | 1 to 3 (3 × 5, 4 × 7, 3 × 5); one `glow.hi` facet on the 4 × 7 crystal only (on a 3 px crystal a facet would be under 2 px) |
-| Nose horn: one, blunt, on the snout, pointing up and forward, near palette | 2 × 3 nub | 4 px, r 2 → 1.5 | 5 px, r 3 → 1.5 |
+| Nose horn: one, blunt, on the snout, pointing up and forward, near palette; the whole horn ≥ 2 px clear of the eye's largest box (`info.eye`). Young and adult root it on the snout's rounded top-front (its end circle, 60° up from the front) and lean it 60° up in head space: rooted at the tip and leaning forward it continued the snout's line and read as a cigar | 2 × 3 nub **on the snout tip**, leaning forward (35°): behind the tip it sat on the eye's ring | 4 px, r 2 → 1.5 | 5 px, r 3 → 1.5 |
 | Brow ridge | none | 2 px | 3 px, a contour bump in the skull path only. No lid over the eye at neutral: a permanent hood made the neutral face read as `sleepy` |
 | Tail | short and thick (root r × 1.2); the tip rests on the ground; tip radius capped at 2 (≤ 4 px, water's zone rule), blunt by its round cap, no club | same | same |
 | Wings: slate | a nub under the dome rim | stubby, 0.7× span, 2 spars, 1 px scallops | stubby, 0.7×, 3 spars; flaps hard and hops 3 px. It cannot fly: its adult reward is the **boulder hop** (4.2) |
@@ -637,25 +643,25 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
   - one 3 px leading spar in `scale`.
   - It is a simple polygon, 15 × 28. Each zigzag shelf ends 5.7 and 9.2 px behind the leading edge, so the 3 px spar plus at least 2 px of yellow survive at both steps.
 - **Cock.** The polygon rotates about its root by (cock − 115°): sad 140° keeps 79 % of the rest height, excited 95° reaches 104 %.
-- **Young polygon.** The adult's, scaled to 16 × 7 (× 7/15 across, × 16/28 up).
+- **Young polygon.** The adult's, scaled to 16 × 9 (× 9/15 across, × 16/28 up). At 16 × 7 the young's 2 px spar left only 2 to 3 px of yellow, and the signal colour was weak.
 - **Far wing.** Offset (−4, −2) and turned **+8°** (further back), so a double bolt shows.
 - **Clearance** (rest solve, horns rooted at the top-back of the cranium): the tip stays ≥ 10 px from the horn tips at rest and when sad (adult 21 px, young 11). Excited, it comes to 14 px (adult) and 6 px (young), which is when sparks jump between them. The polygon never comes within 6 px of the cranium in any mood.
 - **Folding.** The wings **never fold flat**. Asleep they drop to the sad cock (140°) with the spars closed, and the horns keep their colour, so the sleeping silhouette still names the element (5.1 #1).
 
 | Feature | Baby | Young | Adult |
 |---|---|---|---|
-| Bolt wings, h × w, notches, rest cock | 2 bolt nubs, 12 × 5, one zigzag step 2 px deep at 55 % of the height, a pointed tip, at 105° from (−3, −6): the only upright shape behind a baby's head (about 37 px² of it clears head and body) | 16 × 7, 2 notches, 115° | 28 × 15, 2 notches, 115° |
-| Horns: 2, swept back, with one kink at 60 % of their length | 3 px buds | 5 px, r 1.5 → 1 | 8 px, r 1.5 → 1 |
+| Bolt wings, h × w, notches, rest cock | 2 bolt nubs, 12 × 5, one zigzag step 2 px deep at 55 % of the height, a pointed tip, at 105° from (−3, −6): the only upright shape behind a baby's head (about 37 px² of it clears head and body) | 16 × 9, 2 notches, 115° | 28 × 15, 2 notches, 115° |
+| Horns: 2, swept back along the neck line, with one kink at 60 % of their length | 3 px buds, pointing up and back | 5 px, r 1.5 → 1 | 8 px, r 1.5 → 1 |
 | Back row | none | none | none |
 | Tail | thin, straight and stiff; a plain sharp taper; motion is stepped (4 f holds) | same | same |
-| Markings: yellow Z-stripes, 3 px thick, below the wing root, ≥ 3 px above the belly line | 1 (shoulder), 6 px tall | + haunch, 7 px | + tail base, 9 px |
+| Markings: yellow Z-stripes, 3 px thick, below the wing root, ≥ 3 px above the belly line (preferred; 2.7) | 1 on the **tail base**, 5 × 5 (the baby's shoulder is under its head; a 6 px Z never fits whole in its thin tail) | tail base 6 px + haunch 7 px | tail base 7 px + haunch and shoulder, 6 × 8 (the lean flank between the leg roots and the back holds no 9 px Z whole) |
 | Build | lean (depth 0.85), long legs (1.2), head high | same | same |
 
 - **Mood:** cock 140° (sad; the spire keeps 79 % of its rest height) → 115° → 95° (excited). The baby nubs run 125° → 105° → 95°.
 - **Adult-only extra:** **charge**. When `mood` > 0.5, sparks crawl between the horn tips and the wing tips.
 - **Signature: Spark Bolt.**
-  - **Wind-up:** the wings flare to 95°. 2 × 2 spark crawlers in `glow` hop between the horn tips and wing tips every 3 f for 18 f, and the pupil contracts.
-  - **Bolt:** a 4-segment polyline from the mouth, with segment lengths 8 / 6 / 8 / 6 and kinks of ±30°, seeded and re-rolled every 4 f. It is drawn as a 3 px filled zig polygon in `glow` with a 1 px ink outline, plus a 1-segment fork and a 5 × 5 impact diamond at the tip. Lifetime 20 f.
+  - **Wind-up:** the wings flare to 95°. 2 × 2 spark crawlers in flat `glow` (no ring: they never reach the floor, and ringed in `scale` they read as hollow square boxes) hop between the horn tips and wing tips every 3 f for 18 f, and the pupil contracts.
+  - **Bolt:** a 4-segment polyline from the mouth, with segment lengths 8 / 6 / 8 / 6, each kinked 40 to 49° the other way from the last (seeded and re-rolled every 4 f): at ±30° it read as a bent straw, at 50 to 60° it folded into a 16 px "N". It is drawn as a filled zig polygon in `glow` with a 1 px ink outline, 3.5 px at the mouth tapering to 40 % at the tip (tapered to a point, its end was an ink hair), plus a 6 px, 3 px wide fork off the middle node and a 5 × 5 impact diamond at the tip. Lifetime 20 f.
   - **Tint:** the dragon gets the engine's offscreen tint, `glow` at α 0.35, for 2 f.
   - **Young:** 2 segments.
   - **Baby:** a 4 f "static pop". One 2-segment spark from the nose, every feature raised +1 px (hair on end), then `dazed`.
@@ -672,17 +678,17 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
 - It sings in bubbles, follows toys and floats belly-up in the pond.
 
 **The cue: the fluke tail.** A vertical crescent fluke at the end of the longest, flattest, level body in the cast (the body and tail form a bar about 3.5 : 1).
-- **Construction.** The fluke is `membrane` with 2 tones (no highlight) and 2 px rays in `horn`.
+- **Construction.** The fluke is `membrane` with 2 tones (no highlight) and 2 px rays in `horn`, one down each lobe from 2.5 px out of the tail tip. Rays, fin-ear rays and the lobe dots are whole-pixel runs in face space (`pixelStroke`): a 2 px stroke in the rotated tail-tip space anti-aliased into mush.
 - **Notch.** A central notch ≥ 3 px deep keeps both lobes readable.
 
 | Feature | Baby | Young | Adult |
 |---|---|---|---|
-| Fluke, h × depth | round paddle 10 × 6, no rays, on a thinner tail (r 3.5 → 1.5, 2.3): a tadpole paddle clearly wider than the tail that carries it | crescent 11 × 6, 2 rays | crescent 16 × 8, 3 rays, notch ≥ 3 px, and a 2 × 2 `glow` dot set 2 px in from each lobe tip (the tips themselves are under 3 px wide) |
+| Fluke, h × depth | round paddle 10 × 6, no rays, on a thinner tail (r 3.5 → 1.5, 2.3): a tadpole paddle clearly wider than the tail that carries it. Its top and bottom edges leave the tail's own contour 3.5 px before the tip and swell round it, drawn only outside the tail and its ink, so the tail runs into the fin. A disc hung on the tip read as a lollipop | crescent 11 × 6, 2 rays | crescent 16 × 8, 2 rays, notch ≥ 3 px, and a 2 × 2 `glow` dot set 2 px in from each lobe tip (the tips themselves are under 3 px wide). A third ray down the middle fills the notch, and a lobe 4 to 5 px thick holds one 2 px ray: the adult's extra is the dots |
 | Fin-ears: behind the cheek, pointing back along the neck, never up | 3 × 3 lobe | 5 × 4, no rays (a smooth lobe: two 2 px rays would fill it) | 7 × 6, 1 ray, with 2 px of membrane either side (≤ half the shriekscale fan) |
 | Horns | none: a smooth, domed forehead | none | none |
 | Dorsal fin: low, continuous, round scallops, `membrane` | none | 2 px, 2 scallops | 3 px, 3 scallops (inside spike's zone budget) |
 | Wings: fin-wings with a rounded, smooth trailing edge and no scallops | nub | 3 rays | 4 rays |
-| Markings: pearl spots, 3 × 3, on the lateral line, ≥ 3 px apart | 2 | 3 | 5 |
+| Markings: pearl spots, 3 × 3, on the lateral line, ≥ 3 px apart. The first sits low on the rear flank at every stage (2.7); the rest run forward along the flank and back along the tail's side, and the pet seed steps each one after the first 1 px across the line, **alternating** up and down, so the row never reads as a dashed stripe or as pairs at one height. The flank anchor is the lateral line itself, halfway down from the back to the belly line | 2 (flank + tail) | 3 (2 flank + tail) | 5 (3 flank + 2 tail) |
 | Build | long (1.1), low legs (0.8), long neck (1.3), long level tail (1.15) | same | same |
 
 - **Mood.** Three spot states, each ≥ 40 % from the next (gate h):
@@ -729,7 +735,7 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
 
 **The cue: ear-fans.**
 - **Construction.** Membrane on 2 px `horn` ribs. The fans are rooted at the back of the skull (−0.6 r), behind the eye, so they never cover it. The baby's are rooted **on top of the cranium** instead, so they read as ears on the head and stay well clear of baby lightning's bolt nubs over the hips.
-- **Ribs** start 4 px out from the root (where the fan is too narrow for them) and keep ≥ 2 px of membrane between them, 3 px at the free edge: adult 3 ribs × 2 px + 2 gaps × 3 px = 12 px. The far fan has no ribs (1.5).
+- **Ribs** radiate from the root like fingers and spread over the **whole free edge**, from the tall front-top to the short back, ending ~2 px inside the outline with ≥ 5 px between their ends (≥ 3 px of membrane at the free edge). Adult 3 ribs × 2 px + 2 gaps × 3 px = 12 px. They start 4 px out from the root, where the fan is too narrow for them. A rib that would crowd its neighbours there (the adult's middle one, the young's front one) starts once it is ~3.6 px (centre to centre) from them. Each is drawn as **whole-pixel runs** (a 2 px brush in a device-aligned space, `pixelStroke`): a rotated 2 px anti-aliased stroke blended into a pale smear. The far fan has no ribs (1.5).
 - **`flare`, driven by mood:**
   - −1 (scared, sad, asleep): laid back along the neck, still ≥ 60 % of the silhouette above the neck line;
   - 0 (rest): up and back at 40°;
@@ -740,7 +746,7 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
 |---|---|---|---|
 | Ear-fans, h × w, ribs, edge | 10 × 8, 1 rib, round (fennec ears), on top of the cranium | 12 × 9, 2 ribs, 1 back-edge scallop | 16 × 12, 3 ribs, 2 scallops 2 px deep |
 | Horns | none: the fans replace them | none | none |
-| Eye mask in `marking` (lilac `#9a6aa8`), from the snout base to behind the eye (the mint iris sits inside it): a pale "spectacles" patch on the dark head. The ink face marks read on it (97 %) as they do on every other dragon, and it clears the head's shadow (86 %) and highlight (53 %) tones | 6 px tall, present from hatching | 6 px | 7 px |
+| Eye mask in `marking` (lilac `#9a6aa8`), from the snout base to behind the eye (the mint iris sits inside it): a pale "spectacles" patch on the dark head, drawn like the eye as a **pixel bitmap in face space** (3 px behind the eye to 3 px in front, corners cut 1 px), clipped to the skull. A rect in the pitched cranium space stair-stepped into a band that read as a highlight. The ink face marks read on it (97 %) as they do on every other dragon, and it clears the head's shadow (86 %) and highlight (53 %) tones | 6 px tall, present from hatching | 6 px | 7 px |
 | Throat sac: a `membrane` bulge in the neck's lower contour, just behind the jaw (1.2), inked with the neck; shown only while shrieking | swells 3 px | 5 px | 7 px |
 | Legs | thin, bat-like (leg r × 0.75): flat at every stage, so the far leg never has to clear a shadow band (D8) | same | same |
 | Jaw | depth 1.3, opens to 40° | same | same |
@@ -757,7 +763,7 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
     - An arc fades by **narrowing**, never by alpha: its span steps ±35° → ±25° → ±15° around the facing direction.
   - **Neighbours:** `event: 'shriek'` lets up to 2 nearby dragons flinch (spike bristles).
   - **Young:** 2 arcs, out to 24 px.
-  - **Baby:** a squeak. One arc (r 4 → 14), then its fans flop over its eyes for 24 f, a gag (ledger E8), and pop back up.
+  - **Baby:** a squeak. One arc (r 4 → 14), then its fans flop over its eyes for 24 f, a gag (ledger E8), and pop back up with a blink. Flopped, they pivot from the **front** of the crown and tip about 140° forward (−145° landing, −135° after the bounce), so the near fan's lobe hangs down over the eye with only a sliver peeking out behind: tipped −62° from the crown's top they lay on it like a beret and the eye stayed in view.
   - **The lonely call is a different animation** from this trick: fans at −1, jaw 25°, one long arc, the `sad` face, no overshoot and no flinch; neighbours turn their heads toward it instead. The trick keeps the dish, the 3 arcs and the flinch.
 - **Ambient:**
   - Echolocation chirp: a small arc in the same style (r 3 → 9, span ±15°) from the snout, every 150 ± 50 f.
@@ -774,10 +780,12 @@ All values from `src/art/dragon/palettes.ts`; every one passed `tools/palette-ch
 Channels:
 - `root {x, y, rot}`, `squash`, `body {rot, y}`
 - `neck {a0, a1}` (degrees added per segment), `head {rot}`, `jaw` (degrees)
-- `legNH`, `legNF`, `legFH`, `legFF` `{upper, lower, paw}` (near and far, hind and front)
-- `tail {lift, curl, sway}` (added on top of the rest shape and the chain)
+- `legNH`, `legNF`, `legFH`, `legFF` `{upper, lower, paw, plant, lift, slide, shift}` (near and far, hind and front). `plant` (default 1) pins the paw to its spot by IK (1.1): `upper` / `lower` then slide it along the ground. `slide` and `lift` move the planted target in px: the walk is authored in them, and a hop tucks the paws with `lift`. `shift` slides the whole leg along the body, root and planted spot together (the hip or shoulder swinging with the stride): the walk moves the far pair outward with it (4.2 notes). Key `plant` 0 only where a leg must hang in plain FK.
+- `tail {lift, curl, sway, stiff}` (added on top of the rest shape and the chain; `stiff` 0..1 fades the chain out: the breath's stiff tail, a tail lying on the floor asleep, half the whip of a hop)
 - `wing {fold, flap}`, `mood` (−1 to +1, drives the cue), `bristle` (spike's alarm one-shot, 0 to 1, separate from mood: 3.3), `flare` (shriekscale)
-- `face` (DFACE, stepped)
+- `face` (DFACE, stepped); `blink` (stepped, 0 open / 1 half-lid / 2 closed), written by the player's runtime blink, never keyed (2.5)
+- `act` (stepped, `ACT`: which shared anim is playing) and `cue` (stepped, that act's clock in frames from its key moment, negative before it: the walk's gait phase, the happy flourish, the chomp, the sleeping breath, the breath's snap). An element renderer draws its flourish from these two without owning the anim (4.3), and ages its particles from `cue`, so a frozen frame is reproducible. `fx` is the breath stream's envelope (0 wind-up, 1 sustain).
+- **`root.rot` and planted paws.** Pitch the dragon with `body.rot`. `root.rot` turns the whole sprite about the ground point: planted paws are counter-rotated so their soles stay on the floor (a waddle, a rocking stumble), and a topple that should lift them keys `plant` 0. `root.x` / `root.y` carry the paws with the sprite.
 
 **Tail chain.** `getChain(rig, 'tail', n, { joint: 'rump', rest, stiffness, damping, gain, follow, maxAng: 30 })`, where `rest` is the direction of the tail's rest shape. `maxAng` 30 keeps a tail from folding through the body.
 
@@ -795,21 +803,23 @@ Lightning's tail is **stepped**: it snaps between poses on 4 f holds instead of 
 - **Head lag:** the baby's head follows the body 6 f late at 2× amplitude (a heavy head on a small body). The adult's follows 8 f late at 1×.
 - **Easing:** babies use `out` (bouncy, quick to settle). Adults use `inout` (weight). Young adults overshoot.
 
-**Desync.** Every loop starts at a random phase, with duration ±10 % per dragon, so the habitat never breathes in lockstep.
+**Desync.** Every loop starts at a random phase, with duration ±10 % per dragon, so the habitat never breathes in lockstep. The phase and the ±10 % come from the pet seed (never `Math.random`); a loop with an intro (sleep) starts inside its loop, so a pet that is already asleep is asleep.
+
+**Authoring in tracks (`anims.ts`).** Every anim is written as one key list (or a function of time) per channel and baked into the player's frames every 2 f and at every key, so channels on different beats coexist: the head keys are the body's shifted by the stage's head lag and scaled by its amplitude (`lag`), `'stage'` easing resolves to the rule above, squash is clamped to the stage's range, and one-shots end on a held frame. Where a pose must put the head somewhere (the chin on the floor asleep, the snout in the bowl), `neckFit` solves the neck from the build's dims with a small forward model of the rig's neck, so it fits rock's short dropped neck and water's long one alike.
 
 ### 4.2 The core set
 Adult key beats are in frames at 60 Hz. The young and baby columns give only what differs.
 
 | Anim | Adult | Young | Baby |
 |---|---|---|---|
-| **idle** (loop) | 120 f. **Inhale** 0 to 56 (`inout`): body y −1, squash 1.03, wing knuckle +1 px, neck a0 −2°. **Exhale** 56 to 120. The head follows 8 f late. The tail sways ±5° over 150 f, out of sync with the breath. Blinks run at runtime every 180 to 300 f. **Variants** every 6 to 10 s: look-around (head ±12°, 40 f), yawn (jaw 30°, 40 f), hind-leg scratch (36 f), and the element fidget (section 3). | 100 f; tail ±8° over 100 f; a curious head tilt of ±5° | 72 f; bob 2 px with squash 0.97 ↔ 1.03; head wobble ±4°, 15 f behind; the tail **wags** ±12° over 48 f; 30 % of blinks are double blinks. Its scratch variant topples (root rot 20°, 48 f, then recovers). One loop in four is a **plop-sit**: hind legs fold over 10 f, it sits for 60 f, then pops up over 6 f with stretch 1.1. |
+| **idle** (loop) | 120 f. **Inhale** 0 to 56 (`inout`): body y −1, squash 1.03, wing knuckle +1 px, neck a0 −2°. **Exhale** 56 to 120. The head follows 8 f late. The tail sways ±5° over 150 f, out of sync with the breath. Blinks run at runtime every 180 to 300 f. **Variants** every 6 to 10 s: look-around (head ±12°, 40 f), yawn (jaw 30°, 40 f), hind-leg scratch (36 f), and the element fidget (section 3). | 100 f; tail ±8° over 100 f; a curious head tilt of ±5° | 72 f; bob 2 px with squash 0.97 ↔ 1.03, **dipping down** from the rest height: the body drops 1 px on its planted, nearly straight legs and the squash (about the ground point) carries the head the other ~1 px. A bob upward would lift the paws: 4 px legs have no reach left, and a 2 px dip folds them into a frog crouch; head wobble ±4°, 15 f behind; the tail **wags** ±12° over 48 f; 30 % of blinks are double blinks. Its scratch variant topples (root rot 20°, 48 f, then recovers). One loop in four is a **plop-sit**: hind legs fold over 10 f, it sits for 60 f, then pops up over 6 f with stretch 1.1. |
 | **walk** (loop) | 48 f = 8 keys × 6. **Lateral-sequence gait:** NH → NF → FH → FF, legs 25 % apart in phase, stance 60 % / swing 40 %. Contact: upper +20°. Passing: upper −15°, lower +35°, paw lifted 3 px. The body dips 1 px at each hind contact. The head counter-bobs 1 px, 4 f late. Neck ±3°. The tail sways ±5° against the hips. Folded wings jiggle 1 px. Speed 0.45 px/f. | 40 f (8 × 5), paw lift 2 px, 0.5 px/f (teens are quick) | **24 f (8 × 3)**, so the stubby legs churn. Waddle: root rot ±4°, bounce 2 px at every contact, 0.3 px/f. One cycle in 6 stumbles (a face-plant squash of 0.85 for 12 f, then a head shake for 12 f). |
 | **happy** (one-shot: pet, feed, play) | 72 f, **no hop: it preens.** Chest puff 0 to 14 (body rot −6°, neck a0 −10°). Wings to 0.8, held 14 to 30. The tail sweeps ±20° twice at 12 f each, 30 to 54. Settle 54 to 72. Face `happy` from 10 to 60, jaw 10° (the adult minimum). Element flourish at f 14 (rock's runs longer: 4.3). `mood` jumps to +1. | 64 f: one hop (−5 px) with half-spread wings (0.6), 3 wags at 10 f each | 60 f: **two hops.** Crouch 0 to 6 (squash 0.88). Hop −6 px, 6 to 16 (stretch 1.12, wings flutter 2 × 5 f). Land 16 to 22 (0.90). Hop −4, 22 to 28. Land 28 to 34. Wag ±25° at 8 f per swing, 34 to 60. Jaw 20° (the baby minimum) with the tongue out. |
-| **eat** (one bite; the bowl is drawn after the dragon) | 84 f. Neck down to the bowl 0 to 20 (`out`, a0 +35°, head +25°). Jaw 20°, 20 to 26. **Chomp** 26 to 29 (jaw to 0, stepped) with 3 crumbs (2 × 2). Lift 4 px, 29 to 35. Chew: jaw 0 ↔ 10° on 6 f beats × 3 with a 1 px head bob, 35 to 71. **Gulp** 71 to 78: a bulge in the neck contour (one neck node grows 2 px) travels from the head to the chest in 3 stepped positions, and the eyes close. A ball inside the throat stripe would change nothing on screen. Tail swish 78 to 84. | 72 f | 56 f: **the snout plunges** 3 px behind the bowl rim, 2 chomps, 5 crumbs spray, a 2 px chew bob, `happy` on the swallow, a 6 f tongue lick |
-| **sleep** (lie-down → loop → wake) | **Lie-down**, 40 f: hind legs tuck (upper +70°, lower −140°), front paws fold under the chest, the belly settles to the ground, the head rests on the paws, the tail wraps forward (curl +18° per segment), wings fold (lightning's drop to the 140° sad cock instead: 3.5), `closed` from f 20. **Loop**, 180 f: breath 90 / 90 (squash 1.00 ↔ 1.03, y 1 px). Every 120 f a "z" glyph drifts up 12 px over 60 f in the top pass: 6 × 6 in `belly` with a 1 px ink outline, rows 0–1 full, row 2 at columns 3–4, row 3 at columns 1–2, rows 4–5 full (at 5 × 5 the diagonal had one row and read as "≡"). **Wake**, 30 f: stretch (front legs forward, rump up, body rot +10°), **full wing spread for 12 f**, yawn (jaw 30°, 16 f), shake (root ±3°, 3 × 4 f). | lie-down 34 f, loop 150 f | lie-down 24 f; loop **120 f** (60 / 60) with a dream-kick paw twitch (6 f) at f 90 and a "z" every 90 f; it curls into a tighter bun with the wing nubs over its head (the tuck branch, 1.4); the wake has a flutter instead of a spread |
+| **eat** (one bite; the bowl is drawn after the dragon) | 84 f. Neck down to the bowl 0 to 20 (`out`, a0 +35°, head +25°). Jaw 20°, 20 to 26. **Chomp** 26 to 29 (jaw to 0, stepped) with 3 crumbs (2 × 2). Lift 4 px, 29 to 35. Chew: jaw 0 ↔ 10° on 6 f beats × 3 with a 1 px head bob, 35 to 71. **Gulp** 71 to 80: a bulge in the neck contour (a ball 2.5 px proud of the neck's underside) travels from the head to the chest in 3 stepped positions, 3 f each, and the eyes close. A ball inside the throat stripe would change nothing on screen. Tail swish 78 to 84. | 72 f | 56 f: **the snout plunges** 3 px behind the bowl rim, 2 chomps, 5 crumbs spray, a 2 px chew bob, `happy` on the swallow, a 6 f tongue lick |
+| **sleep** (lie-down → loop → wake) | **Lie-down**, 40 f: hind legs tuck (upper +70°, lower −140°), front paws fold under the chest, the belly settles to the ground, the head rests on the paws, the tail wraps forward (curl +18° per segment), wings fold (lightning's drop to the 140° sad cock instead: 3.5), `closed` from f 20. **Loop**, 180 f: breath 90 / 90 (squash 1.00 ↔ 1.03, y 1 px). Every 120 f a "z" glyph drifts up 12 px over 60 f in the top pass: 6 × 6, rows 0–1 full, row 2 at columns 3–4, row 3 at columns 1–2, rows 4–5 full (at 5 × 5 the diagonal had one row and read as "≡"), its strokes in ink with a 1 px `belly` ring on its box's four sides, corners open (a closed ring made an 8 × 8 tile at game scale), rising from above the **snout**, not the cranium (there it spawned on shriekscale's fan tips and between horns) (5.2). **Wake**, 30 f: stretch (front legs forward, rump up, body rot +10°), **full wing spread for 12 f**, yawn (jaw 30°, 16 f), shake (root ±3°, 3 × 4 f). | lie-down 34 f, loop 150 f | lie-down 24 f; loop **120 f** (60 / 60) with a dream-kick paw twitch (6 f) at f 90 and a "z" every 90 f; it curls into a tighter bun with the wing nubs over its head (the tuck branch, 1.4); the wake has a flutter instead of a spread |
 | **breath** (signature, one-shot) | 70 f. **Wind-up** 0 to 18: head back −8°, neck a1 −10°, chest squash 1.05, the element's tell. **Snap** 18 to 24: head forward +12° (`out`), jaw 30°, root recoils x −1. **Sustain** 24 to 54: the effect stream; the head jitters ±1 px every 4 f; the tail is stiff. **Recover** 54 to 70: the jaw closes, `happy` for 10 f (proud). | 56 f (14 / 5 / 22 / 15), jaw 22°, half-strength effect, a 3 px recoil (still learning) | 36 f (10 / 4 / 8 / 14), jaw 20°: **it always fails, adorably** (the per-element fizzle in section 3), then `dazed` for 12 f and a 2 px sneeze-back ("did I do that?") |
-| **pet** (loop while held) | 48 f: the head leans 15° toward the hand, `happy`, blush, the tail wags, a 1 px purr vibration every 4 f, `mood` +0.2 per loop | 44 f | 36 f; the whole body leans in and the root rotates 6° |
-| **beg** (hungry idle, loop) | 120 f: sits with the head tilted up, `hungry` face, cue at `mood` −0.5. A stomach growl every 120 f (3 shakes of 1 px, 2 f each). | same | same, with a bigger head tilt |
+| **pet** (loop while held) | 48 f: the head leans 15° toward the hand, `happy`, blush, the tail wags, a 1 px purr vibration every 4 f, `mood` +0.2 per loop | 44 f | 36 f; the whole body leans in and the root rotates 6°; the jaw open 20° with the tongue out (2.5: its mouth-corner notch would sit on the eye) |
+| **beg** (hungry idle, loop) | 120 f: sits with the head tilted up, `hungry` face, cue at `mood` −0.5. A stomach growl every 120 f (3 shakes of 1 px, 2 f each). | same | same, with a bigger head tilt (14°, against 12°: at 20° the enlarged hungry eye pressed against the skull's top); the egg tooth is hidden while the jaw is shut in `hungry` (beside the two catchlights it read as a third) |
 | **grow-up** (stage transition, the biggest reward in the game) | n/a | 240 f, the same for baby → young and young → adult. Curls into the sleep bun. 3 tint pulses in `glow` (the engine tint, α 0.3 → 0.8), speeding up: 40, 30, then 20 f apart. Squash 0.8, then the **new proportion set is swapped in** with stretch 1.2, and the **new silhouette flashes flat `glow.hi` at α 1.0 for 12 f** before its colours return, so the new shape is seen before any detail. 6 to 10 old-skin flakes (2 × 2 and 3 × 2 in `scale`) fall. Then a "look at me" pose, **held until the player taps**: the new cue flashes once, the wings spread if newly allowed, `happy`. | the same 240 f |
 | **hopGlide** (young; the baby → young reward) | n/a | 56 f: crouch 0 to 8 (squash 0.9); leap −10 px with 2 wing flaps of 6 f; glide 24 px forward on spread wings (`wing` 1); land 46 to 56 (squash 0.92, wings fold). Rock: a 3 px hop with the stubby flaps. | n/a |
 | **fly** (adult; the young → adult reward) | take-off 30 f (crouch, spring, 2 hard flaps); flap loop 24 f at `flap` ±40°, the legs trailing, the tail as a rudder; land 24 f. **Lightning** flaps its cocked bolts ±20° about 115° with the spars closed, so the spire never turns into a bat wing. **Rock** cannot fly: its reward is the **boulder hop**, 50 f: crouch 10 f (squash 0.88), a heavy hop of −6 px with 3 hard flaps of 4 f, a landing of 8 f with a ring of 3 dust puffs and a 1 px root jitter. | n/a | n/a |
@@ -818,15 +828,25 @@ Adult key beats are in frames at 60 Hz. The young and baby columns give only wha
 | **refuse** (one-shot: disliked food, a bath for fire) | 48 f: the head turns away −20°, `grumpy`, a tail flick, then back to idle. | same | same, plus a 2 px stamp of the near front paw |
 | **zap** (lightning only) | 40 f: a spark crackles at the touched point, the bolt wings snap to 95°, a recoil of −3 px, then `sheepish` with the wings back at 115°. | same | same |
 
+**Notes from building the set (the numbers above are the authored ones unless listed here).**
+- **Walk.** The far pair (5.1 #5): each far leg runs half a cycle from its near partner, so over a stride longer than the rest splay it crossed exactly behind it twice a cycle and only two legs read at those keys. Through the walk the far hip and shoulder slide outward by half a stride (the leg channel `shift`: root and planted spot together, so the leg keeps its shape and its reach) and the far hind's stroke sits another 0.15 stride back (the hind has reach to spare behind, the front none ahead); measured, ≥ 4 px of every far leg's fill shows at all 8 keys on all 18 looks, and planted far soles still hold their world x within 1 px. The stride is solved from the speed: stride = speed × stance frames (adult 0.45 × 28.8 f = 13 px), so a planted paw slides back at exactly the speed the owner moves the pet by (`move`) and never skates; `node`-measured on all 18 looks, planted soles stay on y = 0 and hold their world x to ≤ 1 px (snapping). The contact angle above (+20°) would give only about 9 px. A front paw reached ahead of its rest spot runs out of forearm first, so the front strokes sit a fifth of a stride further back than the hind ones. The swing is a cubic whose end tangents match the stance speed (the paw leaves and meets the floor with no world velocity) under a sine lift. Head counter-bob, tail sway and the wing jiggle ride the gait phase; the baby's loop is 6 cycles, the last one the stumble (standing still: `move` 0).
+- **Idle variants** (built): look-around, yawn and, for young and adults, a hind-leg scratch; the baby gets the topple (its scratch that tips over) and the plop-sit (listed twice in its pool: about one cut in three) in place of a scratch; every stage gets the element fidget where its element has one. The player cuts to one every 360 to 600 f (seeded per pet) with an 8 f blend and back to idle with 10 f; `ACT.variant` / `ACT.fidget` mark them for renderers.
+- **Happy.** The young and baby hops keep the paws planted relative to the sprite and tuck them with `lift`; half the tail chain is faded out through a hop (`tail.stiff` 0.5), or the young's tail folded under its body.
+- **Eat.** The adult and young bite pitch the head 30° with the jaw at its stage minimum (at 50° and 20° the open jaw hung ~70° below level under the chin and read as a third front leg; its world angle now stays under ~46°), and fit the neck so the snout tip reaches the bowl (adult 6 px, young 5 px above the floor); the gallery's bowl stands where the snout is at the chomp, its rim 1 px over the mouth, food heaped 2 px over that. The baby's snout can only get to about 7 px (the head rides a 3 px neck), so it bows its whole body (pitch 24°, a 3 px crouch) and eats from a deeper bowl between its paws. Its head's whole pitch stays ≤ 45° (body 24 + neck 12 + head 9): at 85° the top of its head faced forward (fire's horn bud read as a nose, shriekscale's fans as a trunk) and the eye sat on the bowl's rim; the bowl's rim now stands ≥ 2 px under the eye.
+- **Sleep.** The body settles until the belly is 1 px off the floor, the planted legs folding under it by IK (hind paws tucked forward 4 px, front 2 px back; an elbow the crouch pushes into the floor lies on it, the forearm flat: the sphinx), the head lies nearly level with its chin on the floor (`neckFit`), the tail lies stiff. A baby cannot lower its head: it curls into a **bun**, its pot belly resting on the floor, its head bowed onto its chest and the wing nubs folded over it. The cue stays in the asleep silhouette (5.1 #1): **fire's** young and adult tail drops to the floor behind the rump and curls its end up, so the banked ember stands on the raised tip behind the hips (wrapped forward along the body, the flame sank into the body's silhouette and the asleep read became a plain mound); **spike** pitches +10° (not 30°: the whole ball pitched 30° drove the chest into the floor) with its tail curled under and its quills upright, a round burr; **shriekscale** rests its head on its paws with its fans 25° back (the baby's 95°), clear above its back. The **baby bun's tail** wraps forward under the body (lift 70°, curl 40° per segment) where the cue is not on the tail (rock, lightning, shriekscale): sticking straight back it made a loaf. Fire's baby keeps its tail up (the ember), water's keeps the paddle back, and **spike's baby raises its tail** a little above level behind the rump (lift −12°), so the tail nub stands over the rump nub: lying flat, its 4 × 4 nubs vanished at /3 and the asleep baby spike and baby rock were the same mound (5.1 #1).
+- **Wake** runs 30 f / 26 f / 24 f and overlaps its beats: the stretch 0–10, the spread 5–17, the yawn 4–20, the shake 18–30. The stretch is a **play-bow** (body pitched 12° chest-down, the front paws sliding forward along the floor, 7 px on the adult, the head raised): a rump-up keyed as a body rot of +10° alone read as sitting. The eyes open in steps (`sleepy`, shut for the yawn, `sleepy`, `neutral`), and the sleep state (fire's banked ember) ends with the first open eye, not before.
+- **Breath.** The jaw is open (≥ its stage minimum) by the snap's first frame, `cue` 0, where the streams start (opening over the snap's first 2 f, a bolt and a bubble left a still-closed mouth), and the mouth anchor of an open jaw sits in the middle of the opening, halfway between the upper jaw line at the tip and the jaw's tip (from the snout tip the streams left 2 to 3 px above the mouth). The snap thrusts the neck forward and the stream leaves along the snout, never more than 10° below horizontal: along the jaw's bisector a head keyed forward sent every stream 35 to 40° into the floor. The baby fizzle's puff squashes the whole body (a puffball) before the pop. The adult's chest puff of 1.05 is clamped to the adult squash range (1.04). The recoil eases over 4 f and the tail is stiff from the wind-up through the sustain (a 1 px recoil in 2 f whipped every tail down). Element tells are theirs: spike's quills ride the shared `bristle`, shriekscale's fans the shared `flare` (−1 wind-up, 1.3 dish), lightning's bolts flare while `act` = breath.
+
 ### 4.3 Element overrides on the shared set
+How an element gets its column (`ElementSpec.anims`, element.ts), cheapest first: the generic numbers go in **tuning** (tuning.ts: fire's strut lift and head, spike's creep speed and head, the quill ball's pitch, rock's 60 f cycle at 0.3 px/f, its dome tuck and 240 f sleep breath, lightning's faster cycle, water's slink and S-wave, the breath jaws and baby fizzle faces); the flourishes are **renderers** keyed on `act` / `cue` (the happy flourish at `cue` 0, the hungry tell while `act` = beg, a nostril bubble on each sleeping exhale); a different motion is an **override** built with the same track tools (rock's roll-over happy, spike's stop-and-look). Rock's walk speed is not in the table below: at 0.45 px/f its 60 f cycle needs a 16 px stride on 7 px legs, so it walks at 0.3.
 | | Walk | Happy flourish (f 14) | Hungry tell (beg) | Sleep pose (must read as asleep across the room) |
 |---|---|---|---|---|
-| **Fire** | a show-off **strut**: paw lift 5 px, head up 4°, the flame's tongues swap every 4 f while it walks | 3 embers; flame 1.4× for 30 f | flame 0.6×, sighs smoke puffs | curled round the tail; flame banked to an ember in `glow.sh` |
-| **Spike** | a shy **creep**: 0.35 px/f, head down 8°, a 24 f stop-and-look every second cycle; when another dragon is within 30 px the quills lean 15° toward upright (wary, no bristle size-up) | quill ripple, then the quills settle at the perky 20° | the quills droop (`mood` −0.5: 43°) | curls into a quill ball (body rot +30°, quills upright but with no size-up or tremble, so it reads as a ball, not an alarm) |
-| **Rock** | 60 f cycle; a 2 × 2 dust puff on every other hind contact | a slow roll onto its back, belly up (90 f), no preen; its `happy` runs 110 f so the roll fits | stares at pebbles and licks a rock | the **sleep tuck** (3.4): head resting on the ground outside the rim, eyes `closed`, tail wrapped forward, crystals `glow.sh`, "z" glyphs; breath slows to 240 f. Never the upset tuck. |
+| **Fire** | a show-off **strut**: paw lift 5 px, head up 4°, the flame's tongues swap every 4 f while it walks | 3 embers; flame 1.4× for 30 f | flame 0.6×, sighs smoke puffs | curled up, the tail on the floor behind the rump with its end curled up (a J), the flame banked to an ember in `glow.sh` on the raised tip (4.2 notes) |
+| **Spike** | a shy **creep**: 0.35 px/f, head down 8°, a 24 f stop-and-look every second cycle; when another dragon is within 30 px the quills lean 15° toward upright (wary, no bristle size-up) | quill ripple, then the quills settle at the perky 15° | the quills droop (`mood` −0.5: 39°) | curls into a quill ball (body rot +10°, tail curled under, quills upright but with no size-up or tremble, so it reads as a ball, not an alarm; +30° drove the chest through the floor) |
+| **Rock** | 60 f cycle; a 2 × 2 dust puff on every other hind contact | a slow roll onto its back, belly up (90 f), no preen; its `happy` runs 110 f so the roll fits. Built as an override: in profile the roll IS a vertical flip, so it tips back onto its rump and flips in one held frame (`stretch` −1, the shell's peak on the floor, the crystals pressed under it), rocks with its paws paddling (±40° on 4 f beats, knees and elbows bent, far legs a beat behind) and its tail wagging, `happy` the whole way (the "^" and blush kept upright on screen, 2.5), the jaw at its stage minimum with the tongue out and its chin tucked 22° toward its belly (baby 24°), and flips back: legs straight up, eyes shut and the head hanging snout-down was the "dead bug" pictogram | stares at pebbles and licks a rock | the **sleep tuck** (3.4): head resting on the ground outside the rim, eyes `closed`, tail wrapped forward, crystals `glow.sh`, "z" glyphs; breath slows to 240 f. Never the upset tuck. |
 | **Lightning** | 20 % faster; the tail is stepped | 3 crackles and a spark shower | sparks come out irregular and jittery | the bolt wings drop to the 140° sad cock with the spars closed (they never fold flat); the horns keep their colour; eyes `closed`; a dream-twitch every 6 loops (leg kick + 1 spark) |
 | **Water** | slinky: body rot ±2°, the neck and tail carry an S-wave 8 f behind the legs | 3 bubbles; the fin-ears flare | spots dim, it licks its lips | spots pulse with each breath; a nostril bubble (r 2 → 4) on each exhale; floats belly-up if in water |
-| **Shriekscale** | the fans bob 1 f behind the head | sings a 3-note rising scale (note glyphs) | one short chirp arc every 60 f, fans pinned forward | the fans lie back flat along the neck (flare −1) with their tips curled 20° down, so the `closed` eye stays in view; a small snore arc (r 3, span ±15°) on each exhale |
+| **Shriekscale** | the fans bob 1 f behind the head | sings a 3-note rising scale (note glyphs) | one short chirp arc every 60 f, fans pinned forward | the head rests on its paws and the fans lie back 25° (the baby's 95°) with their tips curled 20° down, clear above the back, so both the cue and the `closed` eye stay in view (flat along a level neck the fans vanished from the silhouette); a small snore arc (r 3, span ±15°) on each exhale |
 
 ---
 
@@ -835,39 +855,39 @@ Adult key beats are in frames at 60 Hz. The young and baby columns give only wha
 ### 5.1 Failure modes, what prevents them, and how each is checked
 | # | Risk | Prevention (hard rules) | Check |
 |---|---|---|---|
-| 1 | **Two elements read as the same dragon** by shape | One zone per element. Quiet-zone budgets (3.0). Tail-end, head and back budgets. The cue is ≥ 60 % at `mood` −1. | **Silhouette sheet:** all 18 as flat `#1a1018` at idle, walk keys, lowest mood and the sleep pose, reduced ÷ 3 (the humanoids' own 72 → 24 px ratio) by **area coverage** (box filter, a pixel is ink when ≥ 50 % covered), at **3 sub-pixel phase offsets**. A viewer must name every element at all three phases. Expected shapes: U / saw / dome / spire / bar-and-crescent / big head. (Nearest-neighbour to 24 px wide was ÷ 4.4 to ÷ 5.1 on adults, and whether a 3 to 10 px feature survived depended on sub-pixel phase.) |
+| 1 | **Two elements read as the same dragon** by shape | One zone per element. Quiet-zone budgets (3.0). Tail-end, head and back budgets. The cue is ≥ 60 % at `mood` −1. | **Silhouette sheet** (`view=silhouette&set=all` stacks idle, lowest mood, asleep (the sleep loop's pose) and walk key 3 of 8, where the near legs come closest): all 18 as flat `#1a1018` at idle, walk keys, lowest mood and the sleep pose, reduced ÷ 3 (the humanoids' own 72 → 24 px ratio) by **area coverage** (box filter, a pixel is ink when ≥ 50 % covered), at **3 sub-pixel phase offsets**. A viewer must name every element at all three phases. Expected shapes: U / saw / dome / spire / bar-and-crescent / big head. (Nearest-neighbour to 24 px wide was ÷ 4.4 to ÷ 5.1 on adults, and whether a 3 to 10 px feature survived depended on sub-pixel phase.) |
 | 2 | **Two elements read as the same dragon** by colour | Value-stacked bodies (D9). | Gate (b), plus the colour-blind gate (f), which applies the same RULE_B: **all 15 pairs pass in normal vision, deuteranopia and protanopia; none passes on hue alone in normal vision.** |
-| 3 | **Stages confused** | Head : height ratio 52 / 40 / 34 %. Eye aspect 7 × 8 / 7 × 7 / 8 × 6. Visible neck. Snout 2 / 6.5 / 9. Seed → sprout → signature. Each step ≥ 1.28× length. | Stage contact sheet: every element's three stages side by side. |
+| 3 | **Stages confused** | Head : height ratio 52 / 40 / 34 %. Eye aspect 7 × 8 / 7 × 7 / 8 × 6. Visible neck. Snout 2 / 6.5 / 9. Seed → sprout → signature. Each step ≥ 1.26× length and ≥ 1.22× height (2.4, measured on the drawn rig). | Stage contact sheet: every element's three stages side by side. |
 | 4 | **Adjacent parts fuse** (the "gold blob") | The ladder between every touching pair. The folded wing stays ≥ 5 px above the belly line. Markings stop ≥ 3 px above the belly line unless belly / marking passes. | Gate (a), 11 core pairs (including the shadow and highlight tones a pigment edge crosses) + element extras + face pairs. Thinnest by value: lightning glow / membrane 26 %, rock membrane / marking 28 %, water scale.sh / membrane 29 %; rock membrane / horn passes on hue alone (157°). |
-| 5 | **Far side fuses** (a two-legged or one-winged read) | Far legs at 0.55 / 0.30 (D8); shriekscale's legs thin and flat. Leg joints at gap/2 + X, so the near legs leave ≥ 3 px of background at rest (2.1). Far paws 2 px up and splayed ±4 px. Far horn and fan offsets. The ≥ 3 px sliver rule. No far eye, claws, markings, ribs or rays. | Gates (c1 to c3) and (e), with a 6-point Oklab L floor on the dark pairs (the luminance ratio alone is lenient in the darks). Walk contact sheet: all four legs countable at all 8 keys. |
+| 5 | **Far side fuses** (a two-legged or one-winged read) | Far legs at 0.55 / 0.30 (D8); shriekscale's legs thin and flat. Leg joints at gap/2 + X, so the near legs leave ≥ 3 px of background at rest and at every walk key (2.1). Far paws 2 px up and splayed ±4 px. Far horn and fan offsets. The ≥ 3 px sliver rule. No far eye, claws, markings, ribs or rays. | Gates (c1 to c3) and (e), with a 6-point Oklab L floor on the dark pairs (the luminance ratio alone is lenient in the darks). Walk contact sheet: all four legs countable at all 8 keys. |
 | 6 | **Membrane vanishes into the body shadow** | Dark membranes below the scale's own shadow tone (D11), or signal membranes. No highlight on a membrane. | Gate (a) scale / membrane and scale.sh / membrane; gate (c) far membrane. |
 | 7 | **Markings read as shading** | A marking is ≥ 25 % (or ≥ 40° of hue) from the base, the shadow and the highlight tones it crosses, and from the belly. | Gate (a) scale / marking, scale.sh / marking, scale.hi / marking, belly / marking. |
 | 8 | **Emitters look like objects** | Flame, crystals, bolts, sparks, bubbles, dots and arcs are `flat()`, never banded. The only light marks on them are the listed cores and facets. | Recorder check (to build): no `celPath` call on an emitter part. |
 | 9 | **Marks eaten by the mark floor** | The table in 5.2. | Recorder check (to build): no rect or stroke under 2 px except the ink and `rimTop`. |
 | 10 | **Tone noise on small parts** | The engine gates decide. Never override `thinR` / `hiMin` / `flatR` per rig. | Recorder: band count per part. |
-| 11 | **The eye gets covered or loses its catchlight** | The head is drawn last (tuck poses: E9). Every iris is ≥ 31 % from the catchlight. The adult slit has iris on both sides, so it never merges into the ink ring. | Gate (a) eye / catchlight. Frame-by-frame review of eat and sleep. |
+| 11 | **The eye gets covered or loses its catchlight** | The head is drawn last (tuck poses: E9), and near head features are clipped off the eye's largest box + 1 px (1.4 step 12.6). Every iris is ≥ 31 % from the catchlight. The adult slit has iris on both sides, so it never merges into the ink ring. | Gate (a) eye / catchlight. Frame-by-frame review of eat and sleep. |
 | 12 | **Shimmer under nearest-neighbour upscaling** | Flames, sparks and bolts switch keys every 3 to 6 f, never tweened. Alpha changes in 3 steps. Effect positions are rounded to whole pixels. Joints snap to the device grid. | Visual review of the `tools/shot.ts` sequences. |
 | 13 | **A crowded habitat turns to mush** | See 5.4. | A habitat shot with 8 dragons. |
-| 14 | **The dragon's underside or its effects vanish into the floor** | Every scale, every belly and the outer colour of every floor-level effect sits ≥ 25 % from the floor (5.4). Effects fade by shrinking or narrowing, never by alpha. | Gate (i). |
+| 14 | **The dragon's underside or its effects vanish into the floor**, or sink through it | Every scale, every belly and the outer colour of every floor-level effect sits ≥ 25 % from the floor (5.4). Effects fade by shrinking or narrowing, never by alpha. The rig's floor guards (1.1) keep every part on or above y = 0; crumbs and droplets land on it. | Gate (i). **Floor audit** (`view=floor`, in the smoke run): every look through every core anim and variant on a transparent canvas; anything with ≥ 40 % coverage more than 1 row under the ground line fails, and the sheet shows the failing frame. |
 | 15 | **A mood change cannot be seen** | Every colour a mood swaps between passes the ladder (fire's banked flame, rock's dim crystals, water's three spot states). | Gate (h). |
 
 ### 5.2 The mark floor (no mark under about 2 px)
 | Mark | Minimum size | Stages |
 |---|---|---|
-| Pupil | 3 × 4 (baby and young); 2 × 4 slit with iris on both sides (adult) | all |
+| Pupil | 3 × 4 (baby and young; the young's with iris on both sides and below); 2 × 4 slit with iris on both sides (adult; its top-left 1 × 2 under the catchlight) | all |
 | Catchlight | 2 × 2, never 1 px | all |
 | Brow, brow ridge | 2 px bar | young and adult; babies only in expressions |
 | Nostril, egg tooth, fangs | 2 × 2 (adult fangs 2 × 3) | all / baby / young and adult |
 | Claws | 2 × 2 (young), 2 × 3 (adult), 2 px gaps, **un-inked**; **none on far paws or babies** | young, adult |
 | Wing arm and spars | 3 px (adult), 2 px (young); none on baby nubs | young, adult |
 | Fan ribs, fin rays | 2 px, with ≥ 2 px of membrane between them and the edge (fans: 3 px at the free edge); ribs start 4 px out from the root; none on far fans | all that have them |
-| Quills | base ≥ 4, plain `horn`, no dark tips | all |
+| Quills | base ≥ 4 (young 6, adult 8), plain `horn`, no dark tips, the comb one path | all |
 | Eye lids | ≥ 2 rows including their own 1 px ink edge, counted in rows per stage (2.5), never as a percentage | all |
-| Open jaw | ≥ the stage minimum (baby 20°, young 14°, adult 10°), so the mouth wedge is ≥ 2.5 px | all |
-| Stripes, rings, bolts, flame-licks, chevrons | ≥ 3 px thick | per marking count |
-| Spots, glow dots, sparks, embers, crumbs | ≥ 2 × 2 (spots 3 × 3). A glow dot sits ≥ 2 px in from the tip it decorates. A crystal facet only on a crystal ≥ 4 px wide. No "+" sparkles with 1 px arms. | all |
+| Open jaw | ≥ the stage minimum (baby 20°, young 20°, adult 16°) after the hinge drop, so the mouth shows ≥ 3 px and a 2 × 2 tongue | all |
+| Stripes, rings, bolts, flame-licks, chevrons | ≥ 3 px thick. A chevron is a **chunky filled caret** with a 1–2 px notch in its bottom row, ≥ 3 px thick everywhere but its tip and two ≥ 2 px feet. An outline "^" cannot be 3 px thick across both arms inside a 4 to 6 px box, and the first bitmap (3 px down each column) was 1.3 px across its diagonals | per marking count |
+| Spots, glow dots, sparks, embers, crumbs | ≥ 2 × 2 (spots 3 × 3). Crumbs stay 2 × 2 for their whole life and then are gone (shrunk in steps they spent two-thirds of it as 1 px specks), landing within 8 px of the mouth. A glow dot sits ≥ 2 px in from the tip it decorates. A crystal facet only on a crystal ≥ 4 px wide. No "+" sparkles with 1 px arms. | all |
 | Sound arcs, sap streaks | 2 px, plus a 1 px dark edge | all |
-| "z" glyph, dazed stars | 6 × 6 "z"; 3 × 3 stars; both inked | all |
+| "z" glyph, dazed stars | 6 × 6 "z", its strokes in ink with a 1 px `belly` ring round its box (its 1-row counters stay open); 5 × 5 solid four-point stars with an ink ring | all |
 | Water dorsal fin | ≥ 2 px tall; omitted on babies | young, adult |
 
 **Banned outright:**
@@ -881,7 +901,7 @@ The adult base comes to about 30 cel shapes: body, neck, 4 legs, 4 paws, tail, 2
 
 | Element | Fire | Spike | Rock | Lightning | Water | Shriekscale |
 |---|---|---|---|---|---|---|
-| Adult (≤ 45) | 32 | 41 (8 quills, thorns) | 35 (dome + 3 crystals) | 33 | 36 (fluke, fins, dorsal, spots; 1 fin-ear ray) | 35 (2 fans + 3 ribs on the near fan) |
+| Adult (≤ 45) | 32 | 33 (the comb is one shape, 8 quills in one path; thorns) | 35 (dome + 3 crystals) | 33 | 36 (fluke, fins, dorsal, spots; 1 fin-ear ray, 2 fluke rays) | 35 (2 fans + 3 ribs on the near fan) |
 
 Babies come in at about 18 to 22 and young adults at about 26 to 32.
 
@@ -926,9 +946,10 @@ Babies come in at about 18 to 22 and young adults at about 26 to 32.
   1. `tools/dragon-sheet`, through `tools/shot.ts`, rendering:
      - the ÷ 3 area-coverage silhouette sheet at 3 phase offsets (5.1 #1);
      - the stage sheet;
-     - the walk-leg sheet;
+     - the walk-leg sheet (built: the walk strips, 8 keys of one cycle over scrolling ground ticks, and the walk block of the silhouette sheet);
      - a greyscale sheet and a deuteranopia sheet of all 18 dragons;
-     - a habitat shot with 8 dragons.
+     - a habitat shot with 8 dragons;
+     - (built) the floor audit (`view=floor`, 5.1 #14), the idle-variant and fidget strips and the face sheets, all in `npm run shots`.
   2. A recorder pass (the Aether & Brass `art-invariants` pattern) for:
      - the mark floor;
      - emitters never banded;
@@ -940,13 +961,13 @@ Babies come in at about 18 to 22 and young adults at about 26 to 32.
 | # | Exemption | Why it is allowed | Measured |
 |---|---|---|---|
 | E1 | The iris is saturated and outside the signal family on spike (orange), rock (honey), water (gold) and shriekscale (mint). | It is at most 6 × 4 px inside an ink ring, and in a care game the face is where attention belongs. | Every iris is ≥ 31 % from the catchlight and ≥ 98 % from the pupil. |
-| E2 | The adult pupil is a 2 × 4 slit, against the engine's "3 px pupils". | The engine's pupil is 3 × 2, so its smallest dimension is also 2. The slit keeps the 2 px floor and more area (8 px against 6), and it has iris on both sides (2.5). | Pupil vs ink ring: 1.0 Oklab L, which is why the slit may never touch the ring's side. |
+| E2 | The adult pupil is a 2 × 4 slit, against the engine's "3 px pupils". | The engine's pupil is 3 × 2, so its smallest dimension is also 2. The slit keeps the 2 px floor and more area (8 px against 6), and it has iris on both sides (2.5). The catchlight covers its top-left 1 × 2, a glint on the pupil (the young eye's convention): the dark still shows 6 px, 2 px wide below the glint. | Pupil vs ink ring: 1.0 Oklab L, which is why the slit may never touch the ring's side. |
 | E3 | No eye whites, where `drawFace` draws whites. | A profile animal eye. The ink ring does the separating. | n/a |
 | E4 | Far legs use `farPalette(0.55, 0.30)`, not the engine's 0.62 / 0.25. | The engine exposes `farShade` / `farDesat` as per-build readability knobs. The quadruped far leg sits next to the near leg's shadow. | Gate c2 against the near leg's shadow band: 38 to 48 % and 7.1 to 10.2 Oklab L at 0.55 / 0.30, against 19 to 33 % at the default (2 of the 5 banded elements fail). Shriekscale's legs are flat (× 0.75 radius), because its shadow tone is too near the ink for any far shade to clear both by 6 Oklab L; against the near base its far leg measures 67 % and 12.2. |
 | E5 | Pigment boundaries are not inked (belly, markings, eye mask, spots). | The same hide, following `drawLimbSegs`' sleeve → skin precedent. `band()` is for changes of material. | Gate (a): every pigment pair is ≥ 25 %, including against the shadow and highlight tones it crosses (lowest: lightning belly / marking, 30 %). |
 | E6 | The signal colour covers a large area on lightning (the wings) and shriekscale (fans and wings), not only small emitters. | That area *is* the silhouette cue. It is one hue family, and the neutral ceiling is unaffected. | n/a |
 | E7 | Water's pearl spots have a weak highlight step (7 %). | Spots are 3 × 3, below `FLAT_R`, and drawn flat, so the ramp is never used. | Gate (d) reports it. No other banded slot is below it. |
-| E8 | Baby shriekscale's fans flop over its eyes for 24 f after its squeak. | A gag, and the only frame range where a head feature covers the eye. It ends on a pop back up and a blink. Asleep, the fans lie back and the eye stays in view (4.3). | n/a |
+| E8 | Baby shriekscale's fans flop over its eyes for 24 f after its squeak. | A gag, and the only frame range where a head feature covers the eye. It ends on a pop back up and a blink. Asleep, the fans lie back and the eye stays in view (4.3). The rig clips every near head feature off the eye (1.4 step 12.6); this gag opts out through the stepped `eyeClip` pose channel (0 for exactly those frames), the only anim that does. | Frame review of the baby breath strip. |
 | E9 | The tuck poses draw the head group before the dome (rock) or before the wing nubs (baby sleep bun), against "the head drawn last". | The eyes are `closed` in the sleep tucks; in rock's upset tuck the one peeking eye sits below the raised rim with nothing drawn over it (1.4). | Frame review of the sleep and upset loops. |
 
 ### 5.7 Rejected ideas
@@ -968,12 +989,12 @@ ladder: >= 25% rel. luminance OR >= 40deg hue (hue counts only when S >= 0.2 and
   ok   scale.sh/belly.sh   #9e2f23 #945f2a  lum  36%  hue 24deg  lum
   ok   scale/membrane      #f04422 #7f1e3a  lum  75%  hue 27deg  lum
   ok   scale.sh/membrane   #9e2f23 #7f1e3a  lum  39%  hue 23deg  lum
-  ok   scale/horn          #f04422 #463039  lum  84%  hue 34deg  lum
+  ok   scale/horn          #f04422 #734a4c  lum  60%  hue 13deg  lum
   ok   scale/marking       #f04422 #ffe29a  lum  71%  hue 33deg  lum
   ok   scale.sh/marking    #9e2f23 #ffe29a  lum  88%  hue 37deg  lum
   ok   scale.hi/marking    #ff5927 #ffe29a  lum  63%  hue 29deg  lum
   ok   belly/marking       #e08a2c #ffe29a  lum  56%  hue 11deg  lum
-  ok   membrane/horn       #7f1e3a #463039  lum  35%  hue  7deg  lum
+  ok   membrane/horn       #7f1e3a #734a4c  lum  37%  hue 14deg  lum
   ok   scale/dark          #f04422 #2b1418  lum  95%  hue   n/a  lum
   ok   glow/scale          #ffa21f #f04422  lum  52%  hue 25deg  lum
   ok   eye/catchlight      #ffc02e #f8f4ec  lum  35%  hue   n/a  lum
@@ -1018,14 +1039,14 @@ ladder: >= 25% rel. luminance OR >= 40deg hue (hue counts only when S >= 0.2 and
   ok   scale.sh/belly.sh   #1e3da7 #697cc5  lum  70%  hue  1deg  lum
   ok   scale/membrane      #2d58cc #ffcf33  lum  82%  hue 178deg  lum+hue
   ok   scale.sh/membrane   #1e3da7 #ffcf33  lum  90%  hue 179deg  lum+hue
-  ok   scale/horn          #2d58cc #2a306c  lum  69%  hue 11deg  lum
+  ok   scale/horn          #2d58cc #404a9c  lum  29%  hue 10deg  lum
   ok   scale/marking       #2d58cc #ffcf33  lum  82%  hue 178deg  lum+hue
   ok   scale.sh/marking    #1e3da7 #ffcf33  lum  90%  hue 179deg  lum+hue
   ok   scale.hi/marking    #4571e9 #ffcf33  lum  71%  hue 178deg  lum+hue
   ok   belly/marking       #9fb4f2 #ffcf33  lum  30%  hue 179deg  lum+hue
-  ok   membrane/horn       #ffcf33 #2a306c  lum  94%  hue 171deg  lum+hue
+  ok   membrane/horn       #ffcf33 #404a9c  lum  87%  hue 172deg  lum+hue
   ok   scale/dark          #2d58cc #141a3c  lum  90%  hue   n/a  lum
-  ok   glow/horn           #fff6a0 #2a306c  lum  96%  hue 180deg  lum+hue
+  ok   glow/horn           #fff6a0 #404a9c  lum  91%  hue 179deg  lum+hue
   ok   glow/membrane       #fff6a0 #ffcf33  lum  26%  hue  8deg  lum
   ok   eye/catchlight      #ffc41f #f8f4ec  lum  33%  hue   n/a  lum
   ok   eye/pupil           #ffc41f #1a1418  lum  99%  hue   n/a  lum
@@ -1104,10 +1125,10 @@ ladder: >= 25% rel. luminance OR >= 40deg hue (hue counts only when S >= 0.2 and
         water        scale #22546b  75% okL 24.6   scale #22546b vs #1570a9  47% okL 10.2   (engine default:  31%)
         shriekscale  scale #2e1d3b  67% okL 12.2   (legs flat at every stage: no shadow band to cross)
  c3  rig far WING + HEAD features farPalette(p, 0.62, 0.25): far membrane (wing, ear-fan, fin-ear) and far paired horn vs near scale
-        fire         membrane #45182b  91%   horn #291f29  93%
+        fire         membrane #45182b  91%   horn #433037  84%
         spike        membrane #233f3c  75%   horn #949086  40%
         rock         membrane #313547  93%   (no paired horns)
-        lightning    membrane #96803d  47%   horn #1c1f40  87%
+        lightning    membrane #96803d  47%   horn #2a2f5b  72%
         water        membrane #1a3954  88%   (no paired horns)
         shriekscale  membrane #904d70  57%   (no paired horns)
 
@@ -1121,10 +1142,10 @@ ladder: >= 25% rel. luminance OR >= 40deg hue (hue counts only when S >= 0.2 and
         weakest highlight step on a banded slot:   7% (water.marking #dcfff6 -> hi #ffffff)
 
 (e) INK FLOOR  (far leg scale, far wing membrane and far paired horn vs outline #1a1018: >= 25% and >= okL 6)
-  ok   fire         far leg scale #702d26  88% okL 20.1   far membrane #45182b  69%  okL 9.5   far horn #291f29  59%  okL 6.5
+  ok   fire         far leg scale #702d26  88% okL 20.1   far membrane #45182b  69%  okL 9.5   far horn #433037  82% okL 14.4
   ok   spike        far leg scale #224229  85% okL 15.7   far membrane #233f3c  85% okL 15.4   far horn #949086  98% okL 46.4
   ok   rock         far leg scale #6e6559  95% okL 32.2   far membrane #313547  82% okL 14.3
-  ok   lightning    far leg scale #203063  80% okL 13.6   far membrane #96803d  97% okL 41.6   far horn #1c1f40  59%  okL 6.6
+  ok   lightning    far leg scale #203063  80% okL 13.6   far membrane #96803d  97% okL 41.6   far horn #2a2f5b  80% okL 13.5
   ok   water        far leg scale #22546b  92% okL 23.2   far membrane #1a3954  83% okL 14.5
   ok   shriekscale  far leg scale #2e1d3b  63%  okL 7.7   far membrane #904d70  95% okL 32.2
 
@@ -1261,3 +1282,143 @@ Two critiques reviewed the first draft: **R**, readability (2 blockers, 9 major,
 - Gate (a) gained scale.sh / belly.sh (the shadow band crosses the belly line) and scale.hi / marking, beyond the pairs the critiques named. Both pass.
 - The horn / dark pair moved from the core pairs to rock only: the dark claw and quill tips it measured no longer exist, and rock's nose horn is the one horn beside a nostril.
 - Lightning's bolt root sits 3 px behind the generic wing root: with R2's angles alone, the young's excited tip came within 2.7 px of its horns.
+
+### Review of the built rig (the static rig and the 18 idle looks)
+A review of the drawn rig (1 blocker, 12 major, 12 minor), checked against renders at game scale before and after each fix. **Applied** means the change is in the code and in this bible.
+
+| # | Item | Verdict | Why, in one line |
+|---|---|---|---|
+| 1 | **Blocker:** dragons float off the ground while they idle; nothing keeps the paws planted | Applied | 2-bone IK plant with a per-leg `plant` weight (1.1, 4.1). Front legs had no reach left at rest (adult 0.02 px short), so legs now bend at rest (2.1). The baby bob dips down. Soles measured on y = 0 at every frame of all 18 idles, and under pitch ±6°, a 1 px rise and a 3 px dip. |
+| 2 | Chevrons 1.3 px thick on their diagonals | Applied | Chunky filled carets (5.2). |
+| 3 | First markings hidden under the folded wing, leg roots and the baby head | Applied | A one-time coverage fit moves every body marking to where all of it shows (2.7). Fire's and lightning's first marking moves to the tail base, water's first spot to the rear flank. Markings may reach the belly line, since belly / marking passes gate (a). |
+| 4 | Spike's first ring moves along the tail by stage | Applied | At the tail base at every stage (3.3): 15 % of the tail, or 32 % of the baby's short one, where the hip hid a 15 % ring. Quill heights: no change; the list runs rump → neck, so it already matches [7, 11, 12, 10, 7] read from the neck. |
+| 5 | Horns ignore the neck line; the pair reads as a flat black cap | Applied | `sweep` is relative to the measured neck line (3.0): adult fire 7°, lightning 8°, spike 11° from it (were 38°, 42°, 70°). The far horn is offset across its line, and the > 70 % overlap cull is implemented (1.5). Fire's and lightning's horns are one step lighter, `#734a4c` and `#404a9c`. All 277 gates still pass (5.8). |
+| 6 | Rock's dome reads as a flat-topped trapezoid | Applied | A shell resting on the back, with a ridge vertex and facets toned in thirds (1.2, 3.4). |
+| 7 | Rock's head rides above its dome | Applied | Neck −40° and `neckDrop` 4 (2.3), young rise 9. The head sits 3 px (young) and 4.5 px (adult) below the dome top. Rock is 6 px longer as a result (2.4). |
+| 8 | Baby rock's nub covers the eye; nothing stops an element covering the eye | Applied | The nub moves onto the snout tip. The seam clips `nearHead` off `info.eye` + 1 px (1.4 step 12.6). |
+| 9 | An ink line across every ankle; paws read as boots | Applied | Leg and paw are one path; the paw starts at the leg's back edge (1.2). |
+| 10 | An ink collar where the neck enters the chest | Applied | The neck is clipped outside the body, so neck and chest are one silhouette (1.2). |
+| 11 | The adult neutral face reads as a stern robot | Applied | No brow bar at neutral. The adult ring is an almond, with the catchlight on the slit (2.5). |
+| 12 | Young and adult legs read as pillars | Applied | Hind +35 / −70, the shin tapered (r2 ≈ 0.7 r1), front elbow −10. X rewidened (4 / 2.25 / 1.75), so ≥ 3.5 px of background shows between the near legs as drawn (2.1). |
+| 13 | Shriekscale's fan ribs fuse into a smear | Applied | Whole-pixel ribs over the whole free edge, ends ≥ 5 px apart, crowded starts staggered (3.7). |
+| 14 | Baby water's paddle is a lollipop | Applied | The tail runs into a tadpole fin (3.6). |
+| 15 | Baby horn buds read as a bruise | Applied | Near-round 3 px buds pointing up and back (3.2). |
+| 16 | Shriekscale's mask is a stair-stepped band | Applied | A face-space bitmap round the eye (3.7). |
+| 17 | Water's spots read as a dashed stripe; one is clipped at the hip | Applied | Seeded ±1 px across the line; the first sits inside the rear flank; the row continues onto the tail (3.6). |
+| 18 | The throat stripe always shows `belly.sh` | Applied | The neck's shadow band is 0.26 of its diameter (1.2). |
+| 19 | The young reads as a 0.75× adult (R21) | Rejected, for now | A shorter young torso gains 1 px of length, and only if the legs move out by as much, or the near legs fuse again. Longer young legs put fire's young → adult height step at 1.17, under the height-step floor of 2.4 (then 1.19; 1.22 as measured now). The young already differs by neck carriage, head ratio and eye (2.6). |
+| 20 | The young bolt's yellow is thin | Applied | Young polygon 16 × 9 (3.5). |
+| 21 | The 2.8 variant is incomplete | Applied | The optional extra marking and the ±1 px `lenVar` on quills and fans (2.8). |
+| 22 | The silhouette view shows one state at a time | Applied | `view=silhouette&set=all` stacks idle, lowest mood, asleep and a walk key (added with the walk). |
+| 23 | The faces view crops the head; labels overflow | Applied | Wider cells centred on the head. |
+| 24 | Anti-aliased grey fringe outside the ink | Noted, not changed | House engine behaviour (the engine's `outlinePath` strokes an anti-aliased path); the vendored engine is never edited. |
+
+### Review of the built rig, round 2
+A second review of the drawn rig (0 blockers, 6 major, 13 minor), after round 1's fixes. Each item was reproduced on game-scale renders before it was changed and looked at again after; `tsc`, the palette check (277 / 277) and the smoke run pass.
+
+| # | Item | Verdict | Why, in one line |
+|---|---|---|---|
+| 1 | Horn pairs fuse into one wedge; spike's thorns read as goggles | Applied | `hornOverlap` dilates the near horn by 2 px (young pairs cull to one horn; stable over seeds and the idle); adult far horns fork 28°, not 8° (19° still let the bent near tip curl into the far one); spike's thorns root on the back contour at 145° (1.5, 3.3). |
+| 2 | Fire's tail-base chevron is half-hidden by the hip | Applied | `fitMarkings` now fits tail markings too: tail red, everything drawn over it blue, slide out to where all of it shows (2.7). Fire's `t` 0.26 / 0.19 / 0.16, lightning's 0.26 / 0.16 / 0.14. |
+| 3 | Lidded eyes read as a "U" cup | Applied | The lid's skin and ink edge span the whole ring; adult sleepy is 2 rows, the adult sad wedge steps over the cut corner (2.5). |
+| 4 | The young eye reads as a "P" | Applied | Pupil in columns 1 to 3, rows 0 to 3, framed by iris (2.5, 5.2). |
+| 5 | Spike's quills read as grey scribbles | Applied | The comb is one path in flat `horn`; bases 6 / 8; rest lean 28°; the young's three back quills keep a saw at /3, also at `mood` −1 (1.2, 3.3). |
+| 6 | Mouth marks float on the cheek | Applied | The corner is the back end of the closed mouth line, on the skull's lower contour (2.5). |
+| 7 | The throat stripe shows almost no belly | Applied | Stripe 0.45, band 0.2; the chest bib's top follows the stripe's inner edge (1.2). |
+| 8 | The jaw's belly sliver reads as a lip or teeth | Applied | Closed, the belly half is tucked and the sliver is the scale's shadow tone (1.2). |
+| 9 | Every blink flashes the brow bar | Applied | The blink is its own stepped `blink` channel and swaps the eye only (2.5, 4.1). |
+| 10 | Water's rays are anti-aliased mush; the adult shows 2 of 3 | Applied, in part | Rays, the fin-ear ray and the lobe dots are whole-pixel runs in face space. The adult keeps 2 rays: a third fills the notch (3.6 amended). |
+| 11 | Water's spots sit high and pair at one height | Applied | The flank anchor is the lateral line; the seeded step alternates up / down from spot to spot. |
+| 12 | Fitted body markings cluster ("AA", "ϟϟ") | Applied, in part | The fit keeps a third of the body length between marks where the flank allows, with a second pass against all marks. Fire's and lightning's adult flank pair land 10 px apart (the visible band under the wing holds no more); visibility still comes first. Lightning's adult Zs are 6 × 8 (3.5). |
+| 13 | Anti-aliased pigment edges | Applied, in part | The belly line is on a whole pixel; same-tone dome facets are one plane. The neck stripe's edge is a rotated tube's and stays anti-aliased. |
+| 14 | Baby nostrils smudge the eye | Applied | ≥ 2 px from the ring in face space (1.2). |
+| 15 | The adult slit is 1 px wide beside the catchlight | Rejected | No other 2 × 2 spot exists in 2-2-2 columns under the almond's corners; the glint on the pupil is the convention (2.5, E2 amended). |
+| 16 | Baby spike's rump and tail nubs merge | Applied | Nubs at x −2.5, −7 and halfway along the tail, ≥ 1 px apart (3.3). |
+| 17 | `root.rot` drives planted paws through the floor | Applied | Plant spots are ground spots, counter-rotated for `root.rot`, joints unsnapped under rotation: soles measured on the floor at ±4° and 8° (1.1, 4.1). |
+| 18 | The snout sits in the shadow band | Applied | Skull shadow 0.22 on young and adult (1.2). |
+| 19 | Bible drift in the stage-step numbers and the young head pitch | Applied | 2.4 re-measured; 5.1 #3 cites 2.4's floors (1.26× length, 1.22× height); the young's 4° head pitch is in 2.1. |
+
+### Found while building the core animations
+Each was seen on frozen-time strips (`tools/shot.ts`) or measured with the rig's own solver before it was changed.
+
+| # | Found | Change | Why, in one line |
+|---|---|---|---|
+| 1 | A stance stroke keyed through `upper` / `lower` cannot match a walk speed: the paw's travel is a sine of the angle, and the bible's contact angle gives a 9 px stride where 0.45 px/f needs 13 | Legs gained `slide` and `lift` (px on the planted target); the stride is solved from the speed | Planted soles stay on y = 0 and hold their world x within 1 px on all 18 walks (measured). |
+| 2 | A front paw pushed ahead of its rest spot runs out of forearm (the adult front leg has about 1 px of slack) | The front strokes sit a fifth of a stride back | The IK target stays within reach at every key (measured: every ankle within 0.7 px of its target, the whole-pixel snap). |
+| 3 | Rock at 0.45 px/f on a 60 f cycle needs a 16 px stride on 7 px legs | Rock walks at 0.3 (young 0.32, baby 0.2) | 4.3 names its cycle, not its speed; heavy and slow is its character. |
+| 4 | The snap's 1 px recoil in 2 f and a 5 px hop whipped the tails through the floor and over the back (the chain's gain) | `tail.stiff` fades the chain: 1 through the breath's wind-up and sustain ("the tail is stiff"), 0.5 through a hop, 1 while asleep; the recoil eases over 4 f | The tail keeps its keyed shape where the bible asks for stiffness, and still follows the body elsewhere. |
+| 5 | Asleep with the chin on the floor, fire's flame lay on the floor with its tail and shriekscale's fans lay flat along a horizontal neck: neither cue showed in the asleep silhouette | Fire keeps its tail's up-curl asleep (tuning); shriekscale's asleep fans lean 55° back, not flat | "The cue present asleep" is a hard rule (5.1 #1); the asleep block of the silhouette sheet now uses the real sleep pose, not the standing one with `sleep` on. |
+| 6 | Summing neck and head pitch put the sleeping and eating heads snout-down (100° and 80°) | `neckFit` solves the neck for a target chin or snout height at a chosen head angle, per look | One rule fits rock's dropped neck and water's long one; a table of angles per look would not. |
+| 7 | A baby's head rides a hidden 3 px neck and cannot reach a floor bowl | The baby bows its body into the bite and eats from a deeper bowl between its paws | 4.2's "the snout plunges 3 px behind the bowl rim" holds. |
+
+### Review of the built rig, round 3 (the animated rig)
+A review of the core animations (1 blocker, 14 major, 11 minor). Each item was reproduced on frozen-time renders (`tools/shot.ts`, the zoom and strip views, and the new floor audit) before it was changed and looked at again after; `tsc`, the palette check (277 / 277) and the smoke run (now with the floor audit) pass.
+
+| # | Item | Verdict | Why, in one line |
+|---|---|---|---|
+| 1 | **Blocker:** parts sink through the floor (sleeping knees and elbows, spike's ball, water's fluke, tails, heads) | Applied | The rig's floor guards (1.1) on body, thigh balls, soles, knees and elbows, head and tail, tilt-aware and never snapped down; spike's ball pitches +10°; water's fluke lifts the tail's end (`tipBox`); `view=floor` audits every look through every anim and the smoke run fails on anything past the ink row. |
+| 2 | The baby's open jaw never shows a mouth | Applied | Measured: the closed jaw's top lies 2 px inside the skull, so a turn about the hinge showed 0 px of mouth at every stage's minimum. An open jaw drops its hinge first; minima 20 / 20 / 16°; the tongue sits on the jaw (1.2). |
+| 3 | The breath aims 35–40° into the floor | Applied | The snap thrusts the neck; the stream leaves along the snout, ≤ 10° below horizontal (4.2 notes). |
+| 4 | The baby sleep is not a bun | Applied | Pot belly on the floor, head bowed onto the chest, nubs folded over it, a rounder squash. |
+| 5 | Shriekscale's asleep fans leave no silhouette cue | Applied | Head on the paws, fans 25° back (baby 95°), clear above the back (4.3). |
+| 6 | Effects cover the eye | Applied | Every act effect (breath, crumbs) is clipped off the eye's box; fire's tell puffs leave the nostril drifting up and forward. |
+| 7 | The baby's eat over-rotates the head | Applied | Whole pitch ≤ 45°, the bowl's rim ≥ 2 px under the eye, the nostril placed along the snout's axis. |
+| 8 | Horns stand upright when the neck is lowered | Applied | The horn's lean follows the head down until its tip is ≤ 3 px above the skull's top; the far horn is culled while it would rise more. |
+| 9 | Rock's sleep tuck draws the legs over its head | Applied | The sleep tuck rests the head outside the rim and draws in the normal order; tuck 1 is the upset tuck only; the tucked legs fold flatter (1.4). |
+| 10 | The brow bar is not clipped to the skull | Applied | Placed from the eye's visible top, drawn only over its longest run of columns inside the skull (1.2). |
+| 11 | The sleep "z" reads as a solid tile | Applied | Counters open, strokes in ink with a `belly` ring round the box (5.2). |
+| 12 | The near legs fuse in the walk | Applied | X 6 / 4.25 / 3.25 and stroke centres behind the joints: ≥ 3 px between the near legs at every walk key on all 18 (2.1). |
+| 13 | Young and adult sleeps are not cozy | Applied, in part | Spike: +10°, tail curled under, quills upright. Fire: the tail lies on the floor behind the rump with its end curled up, not wrapped forward along the body: wrapped forward, the flame sank into the body's silhouette and the asleep block lost fire's cue (5.1 #1 outranks cozy). |
+| 14 | Core-set content is missing (idle variants, fidgets, rock's roll, E8, lightning's wind-up) | Applied, in part | Built: the idle variants and their schedule, five fidgets through a wired `ElementAnimHooks.fidget` (it was never called), rock's 110 f roll-over, the E8 fan flop with its `eyeClip` opt-out, lightning's wind-up flare to 95° with crawling sparks. What is still unbuilt is listed in the Status line at the top. |
+| 15 | Spike's volley is a bundle; lightning's bolt a straw; water's bubbles grapes | Applied | Quills fan out from the shoulders (85° → 40°); the bolt tapers with alternating kinks; bubbles rise 2 px/f in varied sizes. |
+| 16 | The dazed stars read as "+" signs | Applied | 5 × 5 solid four-point stars (2.5, 5.2). |
+| 17 | Mouth marks are 1 px | Applied | 2 × 2 stamps kept inside the skull (5.2). |
+| 18 | Adult fangs read as buck teeth at 10° | Applied | The hinge drop and the 16° minimum hang the fangs inside an open mouth. |
+| 19 | Sound arcs are anti-aliased | Applied | Whole-pixel 2 × 2 stamps in face space. |
+| 20 | The gulp bulge is about 1 px | Applied | A ball 2.5 px proud of the neck, 3 f per step (4.2). |
+| 21 | The wake: the flame un-banks with the eyes shut; the stretch reads as a sit | Applied | The eyes open in steps and the sleep state ends with the first open eye; the stretch is a play-bow (4.2 notes). |
+| 22 | Spike's baby fizzle is a square nub with no puffball squash | Applied | A triangular nub; the body squashes to a puffball before the pop. |
+| 23 | Rock's nose horn reads as a cigar | Applied | Rooted on the snout's rounded top-front, leaning 60° up (3.4). |
+| 24 | The `closed` eye's bar and the nostril read as one dash | Applied | The nostril sits ≥ 4 px ahead of the ring (1.2). |
+| 25 | The faces view crops off-centre; adult water's strip cells overlap | Applied | Head-sized windows centred on the head; strip cells sized from the look's own tail and head (plus a breath's reach). |
+
+**Found while fixing (each measured or seen before it was changed):**
+- A `Math.round` snap of a floor-resting joint rounds −1.5 to −1, half a pixel down through the floor: floor-resting joints snap up (`snapAbove`).
+- Under a root rotation the guards compared vertical distances to a tilted floor, 0.8 px short on an adult hip at 23°: clearances are r / cos.
+- A toe-up paw under a root rotation hangs its heel below the ankle (the box hangs from a heel point); a pitched belly sag reaches 1.5 px lower than its ry; a thigh ball tipped onto the rump hung below the hip ball. All three are guarded now.
+- Crumbs measured the floor from the unrounded mouth but were drawn from the rounded face origin: a mouth at a half pixel put them 1 px under the floor.
+- `bake` clamped a keyed `stretch` of −1 to 0.96, so no flip could be authored; negative stretch now passes through (the roll-over's flips are one held frame each).
+- `ElementAnimHooks.overrides` did not receive the dims an override needs to place a body; it does now (`overrides(stage, dims)`), and `fidget(stage, dims)` likewise.
+- The strip title and the live HUD line were drawn on the same row.
+- Engine candidates: none new. The floor guards and `solveTwoBone` stay in `rig.ts` (the humanoid rig has no floor contact of this kind yet).
+
+### Review of the built rig, round 4
+A review of the animated rig after round 3 (8 major, 10 minor). Each item was reproduced on frozen-time renders (`tools/shot.ts`: strips, zooms, casts, face sheets, the /3 silhouette sheet) before it was changed and looked at again after; `tsc`, the palette check (277 / 277) and the smoke run (37 / 37, the floor audit included) pass, and a wider floor audit (every look and anim, seeds 1 to 3, facing ±1, `mood` −1 / 0 / +1: 4266 runs) finds nothing deeper than the ink row at the 40 % threshold of 5.1 #14.
+
+| # | Item | Verdict | Why, in one line |
+|---|---|---|---|
+| 1 | Rock's roll-over reads as a dead pet | Applied | `happy` through the flip with the arc and blush kept upright on screen, the jaw at the stage minimum with the tongue out, the chin tucked 22°, a ±40° paddle on 4 f beats with bent knees and elbows, the tail wagging (4.3). |
+| 2 | No brow on hungry, surprised, scared | Applied | The whole bar must fit inside the skull and is lowered, never dropped; the grow faces measure from the un-grown ring; no run under 3 columns (1.2). |
+| 3 | Far legs vanish behind the near legs at walk keys | Applied | The far hip and shoulder slide half a stride outward through the walk (`shift`), the far hind stroke another 0.15 back: measured ≥ 4 px of every far leg at all 8 keys on all 18, soles still hold within 1 px (4.2 notes). |
+| 4 | Spike's volley is a bundle | Applied | From the neck base within 4 f, forward quill first, 20° → 60° at 3 px/f, drawn behind the body and head; whole-pixel streaks; one sparkle per quill (3.3). |
+| 5 | The baby happy notch hooks the "^" eye | Applied | Every mouth mark keeps ≥ 2 px of skin from the eye box; the baby pet opens its jaw 20° (2.5). |
+| 6 | Baby shriekscale's E8 flop is a beret | Applied | The fans pivot from the crown's front and tip ~140°; the near lobe covers the eye (−110° still capped only its top half) (3.7). |
+| 7 | Crumbs shrink to 1 px and scatter | Applied | 2 × 2 for life, then gone; they land within 8 px of the mouth (5.2). |
+| 8 | Baby spike and baby rock asleep are one mound at /3 | Applied | Spike's baby raises its sleeping tail above level (nub over nub); the other tail-less-cue babies wrap theirs under (with #17), so rock is a round loaf and spike a raised wedge at all three phases. |
+| 9 | The baby's open jaw is a sash across the chest | Applied | Hinge to tip 6.5 px and a 4 px drop (not 3: at 3 the mouth wedge was about 1 px), the tip within ~2 px under the snout (1.2). |
+| 10 | The adult bite's jaw hangs like a third leg | Applied | The bite pitches the head 30° with the jaw at its stage minimum: its world angle stays under ~46° (4.2 notes). |
+| 11 | Breath leaves above the mouth, before it opens | Applied | An open jaw's mouth anchor sits mid-opening; the jaw reaches its minimum by `cue` 0 (4.2 notes). |
+| 12 | Lightning's crawlers are hollow boxes; the bolt has no fork | Applied | Flat `glow` crawlers; a 6 px, 3 px fork; the bolt tapers to 40 %, not a point, kinked 40–49° (3.5). |
+| 13 | The fidgets do not read (fire looks away, spike looks down) | Applied | Both turn the head back past vertical toward the tail or the comb; strip cells are sized from the anim's own extent (3.2, 3.3). |
+| 14 | The "z" spawns on the fan tips and reads as a tile | Applied | It rises from above the snout; its ring is 4-neighbour, corners open. A ring only where it meets a dark neighbour would need the canvas read back: not done. |
+| 15 | Spread wings are a sail, a rake | Applied, in part | The spar caps end at the membrane tips and the fan opens over ~100° (2.2). The spars' lengths (2.1) still make the spread wing taller than wide; the far wing's lead lobe still peeks over the near one. |
+| 16 | The baby beg eye presses the skull top; the egg tooth reads as a third catchlight | Applied | Baby tilt 14° (not 20°); the egg tooth is hidden while the jaw is shut in `hungry` (4.2). |
+| 17 | The baby sleep bun's tail sticks straight back | Applied | Wrapped under where the cue is not on the tail (rock, lightning, shriekscale); fire's ember, water's paddle and spike's raised tail stay (4.2 notes). |
+| 18 | Bible drift (fire's sleep, spike's fan) | Applied | 3.2 and 3.3 now say what the code does. |
+
+**Found while fixing:**
+- The walk's far legs could not simply be offset along the floor: a paw target ahead of the front leg's rest spot (or more than ~4 px behind the hind's) is out of reach, and the IK lifted it short, so far soles floated up to 3 px and skated up to 5 px. The `shift` channel moves the joint with the paw.
+- `bowlFor` solves the chomp frame with the jaw shut, since an open jaw now moves the mouth anchor.
+- The runtime blink swapped a `happy` "^" for an open, lidded eye for a few frames (and, upside down in the roll, a lid hanging from the eye's bottom): the blink now skips faces whose eyes are already shut (happy, closed, dazed).
+- At a 16 % coverage threshold (stricter than 5.1 #14's 40 %) the audit flags anti-aliased toe fringes 1.2 to 1.5 px under the floor (19 to 25 % alpha) on a front paw's toe corner at rest and a lifting hind paw's tilted toe; they are in poses this round did not touch.
+- Engine candidates: none new.

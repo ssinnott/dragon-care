@@ -7,6 +7,8 @@
 // reads the stage canvas back and counts DISTINCT colours: a straw floor alone is 1, a labelled floor a handful, a
 // cast of cel-shaded dragons hundreds. Views that draw the whole cast must also contain every element's scale
 // colour (the body hex from src/art/dragon/palettes.ts), so an element that silently fails to draw is caught too.
+// The floor audit (view=floor) plays every core anim on every look and fails any frame where something the dragon
+// draws, ground shadow aside, is >= 40 % covered more than 1 px under y = 0 (1.1, 5.1 #14).
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -28,12 +30,13 @@ async function launch(chromium: any): Promise<any> {
   }
 }
 
-interface Case { query: string; minColours: number; allScales: boolean }
+interface Case { query: string; minColours: number; allScales: boolean; timeout?: number; floor?: boolean }
 const CASES: Case[] = [
   { query: 'view=lineup&t=0', minColours: 150, allScales: true },
   { query: 'view=lineup&t=45&mood=-1', minColours: 150, allScales: true },
   { query: 'view=lineup&t=20&mood=1', minColours: 150, allScales: true },
   { query: 'view=silhouette&t=0', minColours: 4, allScales: false },
+  { query: 'view=silhouette&set=all&t=0', minColours: 4, allScales: false },
   { query: 'view=grey&t=0', minColours: 40, allScales: false },
   { query: 'view=cvd&t=0', minColours: 80, allScales: false },
   { query: 'view=habitat&t=45', minColours: 80, allScales: false },
@@ -42,10 +45,22 @@ const CASES: Case[] = [
   { query: 'view=zoom&el=rock&stage=baby&t=0', minColours: 20, allScales: false },
   { query: 'view=mood&stage=young&t=0', minColours: 100, allScales: true },
   { query: 'view=faces&el=shriekscale&stage=adult&t=0', minColours: 20, allScales: false },
+  { query: 'view=faces&el=rock&stage=baby&t=0', minColours: 20, allScales: false },
   { query: 'view=lineup&t=0&wing=1&face=happy&jaw=20', minColours: 150, allScales: true },
   { query: 'view=zoom&el=rock&stage=adult&t=0&sleep=1&tuck=1', minColours: 20, allScales: false },
   { query: 'view=stages&el=lightning&t=0&flash=1', minColours: 4, allScales: false },
   ...DRAGON_ELEMENTS.map((el) => ({ query: `view=stages&el=${el}&t=0`, minColours: 40, allScales: false })),
+  // the core anims (4.2): every one on the whole cast mid-play, and the strips that exercise the bowl, the tuck, the
+  // stumble and the fizzles
+  ...['walk', 'happy', 'eat', 'sleep', 'wake', 'breath', 'pet', 'beg'].map((a) => ({ query: `view=lineup&anim=${a}&t=24`, minColours: 150, allScales: true })),
+  { query: 'view=habitat&anim=mix&t=60', minColours: 80, allScales: false },
+  { query: 'view=strip&el=rock&stage=adult&anim=sleep&n=6&t=0', minColours: 40, allScales: false },
+  { query: 'view=strip&el=fire&stage=baby&anim=walk&n=8&from=120&span=24&t=0', minColours: 40, allScales: false },
+  { query: 'view=strip&el=water&stage=baby&anim=eat&n=6&t=0', minColours: 40, allScales: false },
+  { query: 'view=strip&el=lightning&stage=young&anim=breath&n=6&t=0', minColours: 40, allScales: false },
+  // the floor audit (1.1, 5.1 #14): every look plays every core anim frame by frame; nothing it draws (ground shadow
+  // aside) may reach more than 1 row under the ground line -- the sole's own ink row
+  { query: 'view=floor&t=0', minColours: 2, allScales: false, timeout: 120000, floor: true },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -66,8 +81,13 @@ for (const c of CASES) {
   let msg = '';
   try {
     await page.goto(`http://localhost:${port}/index.html?${c.query}`, { waitUntil: 'load' });
-    await page.waitForFunction(() => (window as any).__dragonCare?.ready === true, null, { timeout: 15000 });
+    await page.waitForFunction(() => (window as any).__dragonCare?.ready === true, null, { timeout: c.timeout ?? 15000 });
     errors.push(...await page.evaluate(() => (window as any).__dragonCare?.errors ?? []));
+    if (c.floor) {
+      const rows: { id: string; anim: string; depth: number; frame: number }[] = await page.evaluate(() => (window as any).__dragonCare?.floor ?? []);
+      if (!rows.length) errors.push('the floor audit reported nothing');
+      for (const r of rows) if (r.depth > 1) errors.push(`${r.id} ${r.anim} sinks ${r.depth - 1} px under the floor at f${r.frame}`);
+    }
     const colours: number[] = await page.evaluate(() => {
       const cv = document.getElementById('stage') as HTMLCanvasElement;
       const d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;

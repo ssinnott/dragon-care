@@ -76,7 +76,8 @@ export function dragonBuild(o: DragonBuildOpts): DragonBuild {
   const legLen = m(M.legLength), legR = m(M.legR);
   const hind = legOf(S.hind, legLen, legR), front = legOf(S.front, legLen, legR);
   const neckAng = stage === 'baby' ? M.neckAngle / 2 : M.neckAngle;
-  const neck = { ...S.neck, len: S.neck.len * m(M.neckLength), rest: S.neck.rest.map((a) => a + neckAng) };
+  const neckDrop = (M.neckDrop || 0) * (stage === 'baby' ? 0.5 : 1);
+  const neck = { ...S.neck, len: S.neck.len * m(M.neckLength), rest: S.neck.rest.map((a) => a + neckAng), root: [S.neck.root[0], S.neck.root[1] + neckDrop] as const };
 
   // Snout: the modifier scales the length BEYOND the cranium (2 / 6.5 / 9), the jaw tip follows the snout tip.
   const H = S.head, sn = H.snout, base0 = spec.stages[stage];
@@ -94,16 +95,39 @@ export function dragonBuild(o: DragonBuildOpts): DragonBuild {
 
   // ---- 2.8 seeded variant (inside the 2.7 invariants) ----
   const base = spec.stages[stage];
+  // spots also step 1 px across their line, ALTERNATING up and down from one spot to the next (the seed picks
+  // which way the second goes), so a row of them never reads as a dashed stripe (3.6); an independent +-1 per spot
+  // left neighbours at one height a third of the time, and they read as pairs ("▪▪ ▪▪")
+  let spotSign = 0;
   const markings: MarkingSpec[] = base.markings.map((mk, i) => {
     if (i === 0) return mk;                          // the first marking is an invariant
     const shift = Math.round(rng.range(-2, 2));
-    return mk.at === 'tail' ? { ...mk, dx: (mk.dx || 0) + shift } : { ...mk, dx: (mk.dx || 0) + shift };
+    let lift = 0;
+    if (mk.kind === 'spot') {
+      const r = rng.range(-1.49, 1.49);             // one draw per spot, as before, so other variants keep their values
+      if (!spotSign) spotSign = r < 0 ? -1 : 1;
+      lift = i % 2 ? spotSign : -spotSign;
+    }
+    return { ...mk, dx: (mk.dx || 0) + shift, dy: (mk.dy || 0) + lift };
   });
   const hornVar = Math.round(rng.range(-1, 1));
   const horns = base.horns ? { ...base.horns, len: Math.max(2, base.horns.len + (stage === 'baby' ? 0 : hornVar)) } : null;
   const bendVar = Math.round(rng.range(-2, 2));
   const tailRest = { first: base.tailRest.first, bend: base.tailRest.bend + (base.tailRest.bend !== 0 ? bendVar : 0) };
-  const sp: ElementStageParams = { ...base, markings, horns, tailRest };
+  const phase = rng.next(), speed = 1 / (1 + rng.range(-0.1, 0.1));
+  // (drawn after the older draws, so adding them left every earlier pet's variant as it was)
+  const lenVar = stage === 'baby' ? 0 : Math.round(rng.range(-1.49, 1.49));
+  // 2.8: one optional extra marking of the element's own kind, where the marking rules already allow one. Only a
+  // stage that already carries a second marking gets one (a baby carries the first alone: D15); on the tail it
+  // goes further out along the tail, on the body onto the flank, where the rig's fit decides whether it shows.
+  if (markings.length >= 2 && rng.next() < 0.5) {
+    const last = markings[markings.length - 1];
+    const extra: MarkingSpec = last.at === 'tail'
+      ? { ...last, t: Math.min(0.78, (last.t ?? 0.3) + 0.14), dx: 0, dy: last.kind === 'spot' ? -(last.dy || spotSign || 1) : last.dy, optional: true }
+      : { ...last, at: 'flank', t: 0.3 + rng.next() * 0.4, dx: 0, optional: true };
+    markings.push(extra);
+  }
+  const sp: ElementStageParams = { ...base, markings, horns, tailRest, lenVar };
 
   // ---- tail ----
   const tail = { ...S.tail, len: S.tail.len * m(M.tailLength) };
@@ -131,7 +155,7 @@ export function dragonBuild(o: DragonBuildOpts): DragonBuild {
   };
   return {
     element: o.element, stage, seed, spec, sp, palette: spec.palette, dims, scale: o.scale ?? 1,
-    phase: rng.next(), speed: 1 / (1 + rng.range(-0.1, 0.1)),
+    phase, speed,
   };
 }
 

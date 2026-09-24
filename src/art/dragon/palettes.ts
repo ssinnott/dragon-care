@@ -53,7 +53,7 @@ export const DRAGON_SLOTS: readonly DragonSlot[] = ['scale', 'belly', 'membrane'
 /** The palette table. Every value is validated by tools/palette-check.ts; see its report in docs/ART_BIBLE.md. */
 export const DRAGON_PALETTES: Readonly<Record<DragonElement, Readonly<DragonPalette>>> = Object.freeze({
   fire: Object.freeze({
-    scale: '#f04422', belly: '#e08a2c', membrane: '#7f1e3a', horn: '#463039',
+    scale: '#f04422', belly: '#e08a2c', membrane: '#7f1e3a', horn: '#734a4c',
     marking: '#ffe29a', dark: '#2b1418', glow: '#ffa21f', eye: '#ffc02e',
   }),
   spike: Object.freeze({
@@ -65,7 +65,7 @@ export const DRAGON_PALETTES: Readonly<Record<DragonElement, Readonly<DragonPale
     marking: '#7e5f44', dark: '#3b2c24', glow: '#b48cff', eye: '#ffb84a',
   }),
   lightning: Object.freeze({
-    scale: '#2d58cc', belly: '#9fb4f2', membrane: '#ffcf33', horn: '#2a306c',
+    scale: '#2d58cc', belly: '#9fb4f2', membrane: '#ffcf33', horn: '#404a9c',
     marking: '#ffcf33', dark: '#141a3c', glow: '#fff6a0', eye: '#ffc41f',
   }),
   water: Object.freeze({

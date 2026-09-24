@@ -4,9 +4,8 @@
 // allocates nothing: scratch arrays live at module scope. Each part is ONE outlined silhouette, stroked once and
 // filled once (the drawLimbSegs lesson); any colour change inside a part is a clipped fill with no line (D13).
 import { rad } from '../../lib/engine/math.ts';
-import { celPath, flat, outlinePath, tones, wantSh, pathCap, pathRR } from '../../lib/art/shading.ts';
+import { celPath, outlinePath, tones, wantSh, pathCap } from '../../lib/art/shading.ts';
 import type { ShadeTarget } from '../../lib/art/shading.ts';
-import { drawLimbSegs } from '../../lib/art/rigParts.ts';
 import type { Point } from '../../lib/art/rigParts.ts';
 import { pathTaperedCapsule } from '../../lib/art/shapes.ts';
 import type { DragonPalette } from './palettes.ts';
@@ -61,12 +60,12 @@ function pathOffsetTube(ctx: CanvasRenderingContext2D, xs: ArrayLike<number>, ys
 /**
  * An n-node tube (tail, neck) as ONE silhouette: stroke once, fill once, then clipped inside it an optional
  * underside stripe (belly colour on the first `stripeUpto` nodes, toward the per-node underside normals) and ONE
- * shadow band gated by the root radius, exactly as drawLimbSegs gates a limb. Root space (or any unrotated space:
+ * shadow band (`shK` of the diameter) gated by the root radius, exactly as drawLimbSegs gates a limb. Root space (or any unrotated space:
  * the shadow offset reads rig.light).
  */
 export function drawTube(ctx: CanvasRenderingContext2D, rig: DragonRig, xs: ArrayLike<number>, ys: ArrayLike<number>, rs: ArrayLike<number>, n: number,
   hex: string, stripeHex: string | null, vx: ArrayLike<number> | null, vy: ArrayLike<number> | null, stripeUpto: number, stripeK = 0.4,
-  bulge: Readonly<Bulge> | null = null): void {
+  bulge: Readonly<Bulge> | null = null, shK = 0.6): void {
   ctx.beginPath(); pathTube(ctx, xs, ys, rs, n); pathBulge(ctx, bulge);
   outlinePath(ctx, rig);
   ctx.fillStyle = rig.col(tones(rig, hex).base); ctx.fill();
@@ -84,13 +83,13 @@ export function drawTube(ctx: CanvasRenderingContext2D, rig: DragonRig, xs: Arra
     ctx.fillStyle = tones(rig, stripeHex).base; ctx.fill();
   }
   if (shadow) {
-    ctx.beginPath(); pathOffsetTube(ctx, xs, ys, rs, n, -rig.light.x, -rig.light.y, 0.6);
+    ctx.beginPath(); pathOffsetTube(ctx, xs, ys, rs, n, -rig.light.x, -rig.light.y, shK);
     ctx.fillStyle = tones(rig, hex).sh; ctx.fill();
     if (stripeHex && vx && vy && stripeUpto > 1) {
       // the band switches to belly.sh where it crosses the stripe (bible 1.2 body note), never restarts
       ctx.save();
       ctx.beginPath(); pathOffsetTube(ctx, xs, ys, rs, n, vx, vy, stripeK, stripeUpto); ctx.clip();
-      ctx.beginPath(); pathOffsetTube(ctx, xs, ys, rs, n, -rig.light.x, -rig.light.y, 0.6);
+      ctx.beginPath(); pathOffsetTube(ctx, xs, ys, rs, n, -rig.light.x, -rig.light.y, shK);
       ctx.fillStyle = tones(rig, stripeHex).sh; ctx.fill();
       ctx.restore();
     }
@@ -118,17 +117,27 @@ export function pathBody(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
 }
 
 /**
- * Body space: the belly region, a half-plane below the belly line that rises at the chest front into a bib up to
- * the neck root, so the throat stripe runs on into it (the stripe is continuous chin -> throat -> belly: 2.7).
+ * Body space: the belly region, a half-plane below the belly line that rises at the chest front into a bib whose top
+ * runs along the throat stripe's inner edge at the neck root (the neck's rest direction), so the stripe runs on into
+ * it (continuous chin -> throat -> belly: 2.7). A bib that stopped at a fixed height left a 2-4 px wedge of the
+ * chest's scale shadow between the stripe and the belly.
  */
-export function pathBelly(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
-  const c = rig.chestB, d = rig.dims, by = rig.bellyY, big = 200;
-  const ny = d.neck.root[1] + d.neck.r0 * 0.9;
-  ctx.beginPath();
+export function pathBelly(ctx: CanvasRenderingContext2D, rig: DragonRig, append = false): void {
+  const c = rig.chestB, d = rig.dims, N = d.neck, by = rig.bellyY, big = 200;
+  const e = rad(N.rest[0]), ux = Math.cos(e), uy = -Math.sin(e), k = (1 - 2 * NECK_STRIPE) * N.r0;
+  // the stripe's inner edge at the neck root: the root moved toward the underside normal (sin e, cos e)
+  const px = N.root[0] + Math.sin(e) * k, py = N.root[1] + Math.cos(e) * k;
+  if (!append) ctx.beginPath();
   ctx.moveTo(-big, by); ctx.lineTo(c.x + d.chestR * 0.15, by);
-  ctx.lineTo(c.x + d.chestR * 0.72, ny); ctx.lineTo(big, ny - 2);
-  ctx.lineTo(big, big); ctx.lineTo(-big, big); ctx.closePath();
+  ctx.lineTo(px, py); ctx.lineTo(px + ux * 40, py + uy * 40);
+  ctx.lineTo(big, py + uy * 40); ctx.lineTo(big, big); ctx.lineTo(-big, big); ctx.closePath();
 }
+/**
+ * The neck's throat stripe (fraction of its diameter, on the underside) and shadow band (fraction, away from the
+ * light). The neck's shadow side IS its underside, so the band lies over the stripe: at 0.4 / 0.26 about 1 px of
+ * belly colour showed between them; at 0.45 / 0.2 it is 2+ px, with the band turning belly.sh along its edge.
+ */
+export const NECK_STRIPE = 0.45, NECK_SH = 0.2;
 
 /** Body space: the body with its belly band (one shadow band that turns belly.sh inside the belly). */
 export function drawBody(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Readonly<DragonPalette>): void {
@@ -149,45 +158,90 @@ export const BODY_SH = 0.36, BODY_HI = 0.3;
 
 // ---------- legs and paws ----------
 
-/** Scratch for the raised ankle node. */
-const ANK: Point = { x: 0, y: 0 };
+/**
+ * The leg's radius profile [root, knee, ankle]. The engine's limbRadii averages r1 and r2, so a leg could never
+ * taper; here r1 sets the root and r2 the ankle, with the engine's bulge on top. With r1 = r2 it IS limbRadii, and
+ * a tapered hind shin (r2 < r1) is what lets the digitigrade Z read instead of a pillar (1.2, 2.1).
+ */
+export function legRadii(r1: number, r2: number, bulge: number, out: Float32Array): Float32Array {
+  out[0] = r1 * (1 + 0.16 * bulge); out[1] = (r1 + r2) / 2 * (1 - 0.10 * bulge); out[2] = r2 * (1 - 0.20 * bulge);
+  return out;
+}
+const LR = new Float32Array(3);
+/** Scratch: the sunk root and the raised ankle node. */
+const SUNK: Point = { x: 0, y: 0 }, ANK: Point = { x: 0, y: 0 };
+
+/** Append a rounded rect to the current path (pathRR without its beginPath). */
+function appendRR(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.moveTo(x + rr, y);
+  ctx.lineTo(x + w - rr, y); ctx.arcTo(x + w, y, x + w, y + rr, rr);
+  ctx.lineTo(x + w, y + h - rr); ctx.arcTo(x + w, y + h, x + w - rr, y + h, rr);
+  ctx.lineTo(x + rr, y + h); ctx.arcTo(x, y + h, x, y + h - rr, rr);
+  ctx.lineTo(x, y + rr); ctx.arcTo(x, y, x + rr, y, rr);
+  ctx.closePath();
+}
+
+/** The leg tube (sunk root -> knee -> raised ankle) plus the paw box, appended as one path. */
+function pathLegPaw(ctx: CanvasRenderingContext2D, knee: Point, px: number, py: number, pawW: number, pawH: number, pawAng: number): void {
+  ctx.beginPath();
+  pathTaperedCapsule(ctx, SUNK.x, SUNK.y, knee.x, knee.y, LR[0], LR[1], true);
+  pathTaperedCapsule(ctx, knee.x, knee.y, ANK.x, ANK.y, LR[1], LR[2], true);
+  pathPawBox(ctx, px, py, pawW, pawH, pawAng);
+}
+/** The paw box: top-left (px, py) at the heel, tilted `pawAng` about the ankle top. The path survives restore. */
+function pathPawBox(ctx: CanvasRenderingContext2D, px: number, py: number, w: number, h: number, ang: number): void {
+  if (!ang) { appendRR(ctx, px, py, w, h, 2); return; }
+  ctx.save(); ctx.translate(px, py); ctx.rotate(rad(ang)); appendRR(ctx, 0, 0, w, h, 2); ctx.restore();
+}
 
 /**
- * Root space: one leg through the engine's drawLimbSegs (one silhouette, root sunk 0.35 r into the body), then the
- * paw. The tube's end node is raised so its round cap never dips below the paw's sole (the ankle sits pawH above
- * the ground, and an adult ankle radius is ~0.9 px bigger than its paw is tall).
+ * Root space: one leg AND its paw as ONE silhouette (1.2; the drawLimbSegs lesson): the tube root sunk 0.35 r into
+ * the body, the paw box appended to the same path, stroked once and filled once, so no ink crosses the ankle. Then,
+ * clipped inside, the limb's one shadow band (gated by the root radius, as drawLimbSegs gates it) with the paw kept
+ * flat (ext < 5), and on near paws of young and adults 2 claws in `horn`, UN-INKED (D13, D16), their tips on the
+ * sole's ink line with a 2 px gap. The paw reaches back to the leg's back edge (ankle - ankle radius), so the leg's
+ * round end never pokes out behind the heel. Engine candidate: drawLimbSegs with an extra appended subpath.
  */
 export function drawLeg(ctx: CanvasRenderingContext2D, rig: DragonRig, root: Point, knee: Point, ankle: Point, r1: number, r2: number, bulge: number,
   pawW: number, pawH: number, pawAng: number, hex: string, claws: boolean): void {
-  const rC = (r1 + r2) / 2 * (1 - 0.2 * bulge);
-  const lift = Math.max(0, rC - pawH);
-  ANK.x = ankle.x; ANK.y = ankle.y - lift;
-  const s = SUNK, dx = knee.x - root.x, dy = knee.y - root.y, L = Math.hypot(dx, dy) || 1, k = r1 * 0.35;
-  s.x = root.x + dx / L * k; s.y = root.y + dy / L * k;
-  drawLimbSegs(ctx, rig, s, knee, ANK, r1, r2, hex, hex, false, bulge);
-  drawPaw(ctx, rig, ankle.x, ankle.y, rC, pawW, pawH, pawAng, hex, claws);
-}
-const SUNK: Point = { x: 0, y: 0 };
-
-/**
- * A paw: celRect r 2 (ext < 5 at every stage, so one flat tone), its top at the ankle and its sole pawH below,
- * reaching back to the leg's back edge and forward to the toe. Near paws of young and adults carry 2 claws in
- * `horn`, drawn UN-INKED (D13, D16) inside the toe with their tips on the sole's ink line and a 2 px gap.
- */
-export function drawPaw(ctx: CanvasRenderingContext2D, rig: DragonRig, ax: number, ay: number, rC: number, w: number, h: number, ang: number, hex: string, claws: boolean): void {
-  const sc = rig.pxScale;
-  // the heel is the leg's own round end; the paw starts under the middle of it and reaches forward to the toe
-  const x0 = Math.round((ax - rC * 0.5) * sc) / sc, y0 = Math.round(ay * sc) / sc;
+  legRadii(r1, r2, bulge, LR);
+  const rC = LR[2];
+  // the tube's end node rises so its round cap never dips below the sole (the ankle sits pawH above the ground)
+  ANK.x = ankle.x; ANK.y = ankle.y - Math.max(0, rC - pawH);
+  const dx = knee.x - root.x, dy = knee.y - root.y, L = Math.hypot(dx, dy) || 1, k = r1 * 0.35;
+  SUNK.x = root.x + dx / L * k; SUNK.y = root.y + dy / L * k;
+  // the paw box on the device grid -- except under a root rotation (a waddle), where root space is turned off the
+  // grid and a rounded box lands up to half a pixel through the floor
+  // (under a rotation the heel sits back from the ankle along the paw's OWN direction, so the box's sole stays level
+  // with the floor: offset along root x, it tilted with the sprite and dipped half a pixel under)
+  const sc = rig.pxScale, rot = rig.tf.rot !== 0, pa = rad(pawAng);
+  const px = rot ? ankle.x - rC * Math.cos(pa) : Math.round((ankle.x - rC) * sc) / sc, py = rot ? ankle.y - rC * Math.sin(pa) : Math.round(ankle.y * sc) / sc;
+  pathLegPaw(ctx, knee, px, py, pawW, pawH, pawAng);
+  outlinePath(ctx, rig);
+  const t = tones(rig, hex);
+  ctx.fillStyle = rig.col(t.base); ctx.fill();
+  if (rig.override || !rig.shading) return;
   ctx.save();
-  ctx.translate(x0, y0);
-  if (ang) ctx.rotate(rad(ang));
-  pathRR(ctx, 0, 0, w, h, 2);
-  flat(ctx, rig, hex);
+  ctx.clip();
+  if (wantSh(rig, LR[0])) {
+    // ONE shadow down the limb (the tube offset away from the light and shrunk: inside the silhouette)
+    const lx = rig.light.x, ly = rig.light.y, kk = 0.6;
+    ctx.beginPath();
+    pathTaperedCapsule(ctx, SUNK.x - lx * LR[0] * (1 - kk), SUNK.y - ly * LR[0] * (1 - kk), knee.x - lx * LR[1] * (1 - kk), knee.y - ly * LR[1] * (1 - kk), LR[0] * kk, LR[1] * kk, true);
+    pathTaperedCapsule(ctx, knee.x - lx * LR[1] * (1 - kk), knee.y - ly * LR[1] * (1 - kk), ANK.x - lx * rC * (1 - kk), ANK.y - ly * rC * (1 - kk), LR[1] * kk, rC * kk, true);
+    ctx.fillStyle = t.sh; ctx.fill();
+    // the paw stays one flat tone
+    ctx.beginPath(); pathPawBox(ctx, px, py, pawW, pawH, pawAng);
+    ctx.fillStyle = t.base; ctx.fill();
+  }
   const cw = rig.dims.claws;
-  if (claws && cw && !rig.override) {
+  if (claws && cw) {
+    ctx.translate(px, py);
+    if (pawAng) ctx.rotate(rad(pawAng));
     ctx.fillStyle = rig.pal.horn;
-    ctx.fillRect(w - cw.w - 1, h - cw.h, cw.w, cw.h);
-    ctx.fillRect(w - cw.w * 2 - 3, h - cw.h, cw.w, cw.h);
+    ctx.fillRect(pawW - cw.w - 1, pawH - cw.h, cw.w, cw.h);
+    ctx.fillRect(pawW - cw.w * 2 - 3, pawH - cw.h, cw.w, cw.h);
   }
   ctx.restore();
 }
@@ -242,7 +296,14 @@ export function drawBatWing(ctx: CanvasRenderingContext2D, rig: DragonRig, wp: R
   ctx.lineTo(MEM[0], MEM[1]);
   ctx.closePath();
   // the arm and spars join the silhouette: appended capsules, one stroke over the union
+  // (each spar's round cap ENDS at its membrane tip -- a capsule centred on the tip poked its radius past the
+  // membrane as a bare stick, and on the far wing behind the near one as a brown twig -- except where a thorn is
+  // meant to poke out: spike's)
   const ar = wd.armR, sr = wd.sparR;
+  for (let i = 0; i < n; i++) {
+    const a = angAt(ang[i], f), r = sr * (i === 0 ? 1 : 0.8), k = thorn > 0 ? 0 : r;
+    SPX[i] -= Math.cos(a) * k; SPY[i] += Math.sin(a) * k;
+  }
   pathCapA(ctx, 0, drop * 0.5, ex, ey, ar); pathCapA(ctx, ex, ey, wx, wy, ar);
   for (let i = 0; i < n; i++) pathCapA(ctx, wx, wy, SPX[i], SPY[i], sr * (i === 0 ? 1 : 0.8));
   if (wp.wristThorn && rig.stage === 'adult') pathThorn(ctx, wx, wy, eh, wp.wristThorn);
@@ -344,19 +405,31 @@ export function drawGroundShadow(ctx: CanvasRenderingContext2D, rig: DragonRig, 
 /**
  * Root space: the neck as one n-node tube with the throat stripe (belly, lower 40 %) on its underside, which the
  * body's chest bib and the jaw's belly half continue (chin -> throat -> belly: 2.7). A gulp bulge (pose.gulp 1..3,
- * head -> chest) is an extra node grown 2 px appended to the SAME path, so it changes the silhouette (1.2).
+ * head -> chest) is an extra circle appended to the SAME path, so it changes the silhouette (1.2).
+ *
+ * The neck and the body are one silhouette (1.2: the root sunk into the chest): the whole neck -- stroke, fill,
+ * stripe and band -- is clipped to OUTSIDE the body capsule shrunk by 1 px. Its fill covers the body's ink ring
+ * where the two overlap and its own ink stops at the body contour, so no collar arc is stroked across the chest.
  */
 export function drawNeck(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Readonly<DragonPalette>, gulp: number, sac: number): void {
   const J = rig.j, n = J.neckN + 1;
-  let rs: Float32Array = J.neckR;
-  if (gulp >= 1 && gulp <= 3 && n > 1) {
-    // one node grows 2 px; the bulge travels head (1) -> chest (3) on stepped keys
-    for (let i = 0; i < n; i++) GR[i] = rs[i];
-    const i = Math.max(0, Math.min(n - 1, Math.round((n - 1) * (1 - (gulp - 1) / 2))));
-    GR[i] += 2;
-    rs = GR;
-  }
   let bulge: Bulge | null = null;
+  if (gulp >= 1 && gulp <= 3 && n > 1) {
+    // the swallowed lump (C15, 4.2): a circle in the neck's own contour, 2.5 px proud of the throat, stepping head
+    // (gulp 1) -> chest (3) at 70 / 50 / 30 % of the neck from its root. Growing a node by 2 px changed the contour
+    // by about 1 px, and two of the three nodes hide under the head and in the chest
+    const f = (gulp === 1 ? 0.7 : gulp === 2 ? 0.5 : 0.3) * (n - 1), k = Math.min(n - 2, Math.floor(f)), u = f - k;
+    const r = J.neckR[k] + (J.neckR[k + 1] - J.neckR[k]) * u;
+    const vx = J.neckVX[k] + (J.neckVX[k + 1] - J.neckVX[k]) * u, vy = J.neckVY[k] + (J.neckVY[k + 1] - J.neckVY[k]) * u;
+    const vl = Math.hypot(vx, vy) || 1;
+    GB.r = r * 0.55 + 1.5;
+    const out = r + 2.5 - GB.r;
+    GB.x = J.neckX[k] + (J.neckX[k + 1] - J.neckX[k]) * u + vx / vl * out;
+    GB.y = J.neckY[k] + (J.neckY[k + 1] - J.neckY[k]) * u + vy / vl * out;
+    GB.hex = pal.belly;
+    bulge = GB;
+  }
+  const rs: Float32Array = J.neckR;
   if (sac > 0.5) {
     // the throat sac: a membrane bulge in the neck's lower contour just behind the jaw, `sac` px proud (3.7)
     const k = n - 1, r = rs[k];
@@ -366,10 +439,19 @@ export function drawNeck(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Rea
     SAC.hex = pal.membrane;
     bulge = SAC;
   }
-  drawTube(ctx, rig, J.neckX, J.neckY, rs, n, pal.scale, pal.belly, J.neckVX, J.neckVY, n, 0.4, bulge);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(-2000, -2000, 4000, 4000);
+  const d = rig.dims, h = rig.hipB, c = rig.chestB;
+  ctx.save(); ctx.translate(J.body.x, J.body.y); ctx.rotate(rad(J.bodyAng));
+  pathTaperedCapsule(ctx, h.x, h.y, c.x, c.y, d.hipR - 1, d.chestR - 1, true);
+  ctx.restore();
+  ctx.clip('evenodd');
+  // a narrower band than a limb's (NECK_SH, not 0.6): the neck's shadow side IS its underside (the throat), and
+  // a wide band swallowed the stripe, so it showed belly.sh, never the belly colour
+  drawTube(ctx, rig, J.neckX, J.neckY, rs, n, pal.scale, pal.belly, J.neckVX, J.neckVY, n, NECK_STRIPE, bulge, NECK_SH);
+  ctx.restore();
 }
-const SAC: Bulge = { x: 0, y: 0, r: 0, hex: '' };
-const GR = new Float32Array(8);
+const SAC: Bulge = { x: 0, y: 0, r: 0, hex: '' }, GB: Bulge = { x: 0, y: 0, r: 0, hex: '' };
 
 // ---------- skull and jaw (cranium space) ----------
 
@@ -393,6 +475,60 @@ export function pathSkull(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
   if (bumps) for (let i = 0; i < bumps.length; i++) { const b = bumps[i]; ctx.moveTo(b.x + b.r, b.y); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); }
 }
 
+/** Is cranium-space point (x, y) at least `pad` px inside the skull path (pathSkull's circles and snout taper)? */
+export function inSkull(rig: DragonRig, x: number, y: number, pad = 0): boolean {
+  const h = rig.dims.head, s = h.snout, r = h.cranR - pad;
+  if (x * x + y * y <= r * r) return true;
+  // the snout taper: the nearest point on its axis, the radius lerped there
+  const ax = s.x1 - s.x0, ay = s.y1 - s.y0, L2 = ax * ax + ay * ay || 1;
+  const t = Math.max(0, Math.min(1, ((x - s.x0) * ax + (y - s.y0) * ay) / L2));
+  const qx = x - s.x0 - ax * t, qy = y - s.y0 - ay * t, rr = s.r0 + (s.r1 - s.r0) * t - pad;
+  if (rr > 0 && qx * qx + qy * qy <= rr * rr) return true;
+  if (h.brow > 0) {
+    const a = rad(58), br = 3 - pad, d = r + pad + h.brow - 3, bx = Math.cos(a) * d - x, by = -Math.sin(a) * d - y;
+    if (br > 0 && bx * bx + by * by <= br * br) return true;
+  }
+  const bumps = rig.sp.skullBumps;
+  if (bumps) for (let i = 0; i < bumps.length; i++) {
+    const b = bumps[i], dx = b.x - x, dy = b.y - y, br = b.r - pad;
+    if (br > 0 && dx * dx + dy * dy <= br * br) return true;
+  }
+  return false;
+}
+
+/** y of a tapered capsule's lower contour at x (end circles, straight between): NaN where it has none. */
+function capsuleUnderY(x: number, x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): number {
+  let y = NaN;
+  if (Math.abs(x - x0) < r0) y = y0 + Math.sqrt(r0 * r0 - (x - x0) * (x - x0));
+  if (Math.abs(x - x1) < r1) { const v = y1 + Math.sqrt(r1 * r1 - (x - x1) * (x - x1)); y = y === y ? Math.max(y, v) : v; }
+  if (x > x0 && x < x1) { const v = y0 + r0 + (y1 + r1 - y0 - r0) * (x - x0) / (x1 - x0); y = y === y ? Math.max(y, v) : v; }
+  return y;
+}
+
+/** Cranium space: y of the skull's lower contour at x (the cranium circle or the snout taper, whichever is lower). */
+export function skullUnderY(rig: DragonRig, x: number): number {
+  const h = rig.dims.head, s = h.snout, r = h.cranR;
+  const c = Math.abs(x) < r ? Math.sqrt(r * r - x * x) : NaN, v = capsuleUnderY(x, s.x0, s.y0, s.r0, s.x1, s.y1, s.r1);
+  return c === c ? (v === v ? Math.max(c, v) : c) : v;
+}
+
+/**
+ * Cranium space, into `out`: the mouth corner, the back end of the closed mouth line -- the first x where the
+ * closed jaw shows below the skull -- on the skull's lower contour (0.5 px in, so a mark there touches its ink).
+ * Placed on the cheek at the jaw hinge, a mouth mark floated 2-2.5 px above the contour, and the happy notch read
+ * as a tear under the eye.
+ */
+export function mouthCorner(rig: DragonRig, out: Point): Point {
+  const j = rig.dims.head.jaw;
+  let x = j.hx + 4;
+  for (let t = j.hx; t <= j.tx; t += 0.25) {
+    const jy = capsuleUnderY(t, j.hx, j.hy, j.r0, j.tx, j.ty, j.r1), sy = skullUnderY(rig, t);
+    if (jy === jy && sy === sy && jy - sy >= 0.75) { x = t; break; }
+  }
+  out.x = x; out.y = skullUnderY(rig, x) - 0.5;
+  return out;
+}
+
 /** Cranium-space centre and extent of the whole head (cranium + snout), for the skull's cel bands. */
 export function skullBands(rig: DragonRig): { cx: number; ext: number } {
   const h = rig.dims.head, tip = h.snout.x1 + h.snout.r1;
@@ -401,27 +537,50 @@ export function skullBands(rig: DragonRig): { cx: number; ext: number } {
 }
 const SB = { cx: 0, ext: 0 };
 
-/** Cranium space: the skull, cel-shaded as one part (ext = half the head length: babies 2 tones, others 3). */
+/**
+ * Cranium space: the skull, cel-shaded as one part (ext = half the head length: babies 2 tones, others 3). The
+ * shadow band covers 0.22 of the head on young and adult, not 0.34: the band runs perpendicular to the light across
+ * a LONG head, and at 0.34 it crossed the snout at its root, so the whole muzzle sat in shadow (a dark muzzle, the
+ * nostril lost in it); at 0.22 the snout's top stays base and the shadow takes its front-bottom and the chin. The
+ * baby's round head and button snout keep 0.34 (its volume is that shadow).
+ */
 export function drawSkull(ctx: CanvasRenderingContext2D, rig: DragonRig, pal: Readonly<DragonPalette>): void {
   const b = skullBands(rig);
   pathSkull(ctx, rig);
-  celPath(ctx, rig, pal.scale, b.cx, 0, b.ext, 0.34, 0.3);
+  celPath(ctx, rig, pal.scale, b.cx, 0, b.ext, rig.stage === 'baby' ? 0.34 : 0.22, 0.3);
+}
+
+/**
+ * Cranium space, into `out`: the point on the jaw's TOP edge at fraction u (0 = hinge, 1 = tip) with the jaw open
+ * `jawDeg` (dropped and turned, as drawJaw draws it). The tongue lies there; an effect can too.
+ */
+export function jawTopAt(rig: DragonRig, jawDeg: number, u: number, out: Point): Point {
+  const j = rig.dims.head.jaw, a = rad(jawDeg), c = Math.cos(a), s = Math.sin(a);
+  const tx = j.tx - j.hx, ty = j.ty - j.hy, L = Math.hypot(tx, ty) || 1, r = j.r0 + (j.r1 - j.r0) * u;
+  // along the axis, then out along its upper normal (the axis turned -90 deg), all turned by the opening
+  const lx = tx * u + (ty / L) * r, ly = ty * u - (tx / L) * r;
+  out.x = j.hx + lx * c - ly * s; out.y = j.hy + (jawDeg ? j.drop : 0) + lx * s + ly * c;
+  return out;
 }
 
 /**
  * Cranium space: the hinged jaw, drawn UNDER the skull (1.2): a celTaper hinge -> tip rotated `jawDeg` open, upper
- * half `scale`, lower half `belly` so the chin continues the throat stripe.
+ * half `scale`, lower half `belly` so the chin continues the throat stripe. OPEN, it first drops `jaw.drop` px
+ * (stages.ts: a jaw that only turned showed no mouth at its minimum). CLOSED, the belly half is tucked: all that
+ * shows below the snout is a ~1 px sliver, and in belly it read as a lip line, or on shriekscale's near-white belly
+ * as bared teeth at neutral; it is painted in the scale's shadow tone instead, the underside of the head.
  */
 export function drawJaw(ctx: CanvasRenderingContext2D, rig: DragonRig, jawDeg: number, pal: Readonly<DragonPalette>): void {
   const j = rig.dims.head.jaw;
   ctx.save();
-  ctx.translate(j.hx, j.hy);
+  ctx.translate(j.hx, j.hy + (jawDeg ? j.drop : 0));
   if (jawDeg) ctx.rotate(rad(jawDeg));
   const tx = j.tx - j.hx, ty = j.ty - j.hy;
   pathTaperedCapsule(ctx, 0, 0, tx, ty, j.r0, j.r1);
   outlinePath(ctx, rig);
-  ctx.fillStyle = rig.col(pal.scale); ctx.fill();
-  if (!rig.override) {
+  const t = tones(rig, pal.scale);
+  ctx.fillStyle = rig.col(jawDeg ? t.base : rig.shading ? t.sh : t.base); ctx.fill();
+  if (!rig.override && jawDeg) {
     ctx.save(); ctx.clip();
     const a = Math.atan2(ty, tx);
     ctx.rotate(a);
@@ -432,24 +591,25 @@ export function drawJaw(ctx: CanvasRenderingContext2D, rig: DragonRig, jawDeg: n
 }
 
 /**
- * Cranium space: the open mouth (drawn FIRST in the head group, 1.4 step 12.1): the wedge between the skull's
- * underside and the open jaw in mouth `#5a2030`, with a 2 x 2 tongue. Only called with the jaw at >= the stage
- * minimum, so the wedge is >= 2.5 px and shows (1.2).
+ * Cranium space: the open mouth (drawn FIRST in the head group, 1.4 step 12.1): the whole gap between the skull's
+ * underside and the open, dropped jaw in mouth `#5a2030` -- from behind the hinge, along under the snout to its
+ * tip, down the front of the opening to the jaw's tip and back along the jaw. The skull and jaw drawn over it trim
+ * it to the wedge that shows. (The 2 x 2 tongue is the rig's, on the jaw's top edge in face space: drawn here, under
+ * the jaw, the jaw covered it.)
  */
-export function drawMouthInterior(ctx: CanvasRenderingContext2D, rig: DragonRig, jawDeg: number, mouth: string, tongue: string): void {
-  const h = rig.dims.head, j = h.jaw, s = h.snout;
-  const a = rad(jawDeg), tx = j.tx - j.hx, ty = j.ty - j.hy;
-  const jx = j.hx + tx * Math.cos(a) - ty * Math.sin(a), jy = j.hy + tx * Math.sin(a) + ty * Math.cos(a);
-  const ux = s.x1 - 1, uy = s.y1 + s.r1 * 0.6;
+export function drawMouthInterior(ctx: CanvasRenderingContext2D, rig: DragonRig, jawDeg: number, mouth: string): void {
+  const h = rig.dims.head, j = h.jaw, s = h.snout, a = rad(jawDeg), c = Math.cos(a), sn = Math.sin(a);
+  const dx = j.tx - j.hx, dy = j.ty - j.hy, hy = j.hy + j.drop;
+  // the jaw tip's centre, and its front-top on the round end; the snout's front-bottom on its end circle: the
+  // opening's front edge runs between the two, so the widest part of the gap (at the jaw's front) is mouth too
+  const tx = j.hx + dx * c - dy * sn, ty = hy + dx * sn + dy * c, k = j.r1 * 0.7;
   ctx.beginPath();
   ctx.moveTo(j.hx - 1, j.hy - j.r0 * 0.5);
-  ctx.lineTo(ux, uy);
-  ctx.lineTo(jx, jy);
+  ctx.lineTo(s.x1, s.y1);
+  ctx.lineTo(s.x1 + s.r1 * 0.7, s.y1 + s.r1 * 0.7);
+  ctx.lineTo(tx + k * c + k * sn, ty + k * sn - k * c);
+  ctx.lineTo(tx, ty);
+  ctx.lineTo(j.hx, hy);
   ctx.closePath();
   ctx.fillStyle = rig.col(mouth); ctx.fill();
-  if (rig.override) return;
-  // tongue: 2 x 2 on the jaw, a third of the way in
-  const tl = 0.45;
-  const qx = j.hx + (tx * Math.cos(a) - ty * Math.sin(a)) * tl, qy = j.hy + (tx * Math.sin(a) + ty * Math.cos(a)) * tl - j.r0 * 0.9;
-  ctx.fillStyle = tongue; ctx.fillRect(Math.round(qx), Math.round(qy), 2, 2);
 }

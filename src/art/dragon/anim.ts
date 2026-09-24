@@ -10,12 +10,24 @@
 //   deterministic.
 // - DESYNC. A looping anim may start at a seeded phase and run at a seeded +-10 % speed, so a habitat never
 //   breathes in lockstep. The owner passes `phase` / `speed` to play(); dragonBuild derives them from the pet seed.
+//
+// - VARIANTS. While a "home" loop plays (idle), every 6-10 s (seeded, so a frozen frame is reproducible) the player
+//   cuts to one of the home's variants -- a look-around, a yawn, a scratch, the element's fidget -- with a blend, and
+//   blends back to the home loop when it ends (setVariants; 4.2 "Variants every 6 to 10 s").
+//
+// And three small additions to the frame format's semantics, all opt-in:
+// - `loopFrom`: a loop with an INTRO (sleep: the lie-down plays once, then the breathing loops). A desynced start
+//   (phase > 0) lands inside the loop, so a pet that is already asleep is asleep, not lying down.
+// - `move` per frame: root motion along facing, px/f, as the engine Frame's `move` (the walk's world speed; a
+//   stance paw slides back at exactly it). The owner moves the pet by `player.move` each tick.
+// - `blend` on play(): a cross-fade of N frames from the pose being shown, so idle -> walk or sleep -> wake never
+//   pops. Stepped channels (face, act, cue...) switch at once.
 import { ease } from '../../lib/art/poses.ts';
 import type { EaseName } from '../../lib/art/poses.ts';
 import type { FrameFx } from '../../lib/art/animation.ts';
 import { makeRng } from '../../lib/engine/rng.ts';
 import type { RngInstance } from '../../lib/engine/rng.ts';
-import { DFACE, dfaceIndex, makeDragonPose, lerpDragonPose, copyDragonPose } from './pose.ts';
+import { DFACE, dfaceIndex, makeDragonPose, lerpDragonPose, copyDragonPose, blendDragonPose } from './pose.ts';
 import type { DFaceRef, DragonPose, PartialDragonPose } from './pose.ts';
 
 /** One frame. No index signature, like the engine's Frame: a misspelled key is a compile error. */
@@ -34,6 +46,8 @@ export interface DragonFrame {
   /** Effect spawns raised into `events` on frame entry (the engine's FrameFx shape). */
   fx?: FrameFx[];
   sfx?: string;
+  /** Root motion along facing, px per frame, while this frame plays (the walk's world speed). */
+  move?: number;
 }
 
 /** One named animation. */
@@ -46,6 +60,10 @@ export interface DragonAnim {
    * without authoring a 600 f loop. Deterministic: the clock is the tick count.
    */
   tailSway?: { period: number; amp: number };
+  /** A loop with an intro: the frame index the loop returns to (frames before it play once). */
+  loopFrom?: number;
+  /** For a one-shot: what the owner plays when it ends (default 'idle'; the gallery follows it). */
+  next?: string;
 }
 export type DragonAnimSet = Record<string, DragonAnim>;
 
@@ -64,8 +82,10 @@ export interface DragonPlayOpts {
   fallback?: string;
   /** Steps advanced per tick (desync: 1 / (1 +- 0.1)). */
   speed?: number;
-  /** 0..1 start phase for a LOOP (desync). One-shots always start at frame 0. */
+  /** 0..1 start phase for a LOOP (desync), within its loop part. One-shots always start at frame 0. */
   phase?: number;
+  /** Cross-fade frames from the pose on screen into the new anim (0 = cut, the engine's behaviour). */
+  blend?: number;
 }
 
 /** Blink timing per stage (bible 2.5 / 4.2). */
@@ -114,6 +134,17 @@ export class DragonAnimPlayer {
   private blinkAt = -1e9;
   private blinkTwice = false;
   private staticPose: PartialDragonPose | null = null;
+  /** The idle-variant schedule (setVariants): the home loop, its variants, the interval range, the next cut. */
+  private home: string | null = null;
+  private variants: readonly string[] = [];
+  private varMin = 360;
+  private varMax = 600;
+  private nextVariant = Infinity;
+  private varRng: RngInstance;
+  /** The pose a blend starts from, and the blend's length / frames left. */
+  private blendFrom: DragonPose = makeDragonPose();
+  private blendLen = 0;
+  private blendLeft = 0;
 
   /**
    * @param anims the table (anims.ts `dragonAnims(stage)`)
@@ -124,6 +155,7 @@ export class DragonAnimPlayer {
     this.anims = anims;
     this.blinkT = blink;
     this.blinkRng = makeRng(seed * 7919 + 17);
+    this.varRng = makeRng(seed * 104729 + 31);
     this.nextBlink = 30 + Math.floor(this.blinkRng.next() * (blink.min - 30));
   }
 
@@ -134,31 +166,63 @@ export class DragonAnimPlayer {
   /** Progress through the current animation in [0,1]. */
   get progress(): number { const L = this.length; return L ? Math.min(1, this.time / L) : 1; }
 
+  /** Root motion of the current frame, px along facing (0 when the frame has none). */
+  get move(): number { return this.done ? 0 : this.frame.move || 0; }
+
   /** Play an animation; restarting the one already playing needs restart: true. */
-  play(name: string, { restart = false, fallback = 'idle', speed = 1, phase = 0 }: DragonPlayOpts = {}): boolean {
+  play(name: string, { restart = false, fallback = 'idle', speed = 1, phase = 0, blend = 0 }: DragonPlayOpts = {}): boolean {
     let n: string | null = name;
     if (!this.has(n)) n = this.has(fallback) ? fallback : null;
     if (n === null) { this.name = null; this.def = null; this.done = true; return false; }
     if (n === this.name && !restart) return true;
+    if (blend > 0) { copyDragonPose(this.pose as unknown as PartialDragonPose, this.blendFrom, true); this.blendLen = this.blendLeft = blend; }
+    else this.blendLeft = 0;
     this.name = n;
     this.def = this.anims[n];
     this.staticPose = null;
     this.frameIndex = 0; this.frameTime = 0; this.time = 0; this.done = false;
     this.speed = speed; this.instance++; this.newFrame = true;
     if (this.def.loop && phase > 0) {
-      // Seek without raising the skipped frames' events: a desynced loop starts mid-breath, not with a burst.
-      let skip = (phase % 1) * this.length;
-      while (skip >= (this.frame.dur || 1)) { skip -= this.frame.dur || 1; this.frameIndex = (this.frameIndex + 1) % this.def.frames.length; }
+      // Seek without raising the skipped frames' events: a desynced loop starts mid-breath, not with a burst. A loop
+      // with an intro starts inside its loop part (a pet already asleep is asleep, not lying down).
+      const from = this.def.loopFrom || 0, frames = this.def.frames;
+      let loopLen = 0;
+      for (let i = from; i < frames.length; i++) loopLen += frames[i].dur || 1;
+      let skip = (phase % 1) * loopLen;
+      this.frameIndex = from;
+      while (skip >= (this.frame.dur || 1)) { skip -= this.frame.dur || 1; this.frameIndex = this.frameIndex + 1 < frames.length ? this.frameIndex + 1 : from; }
       this.frameTime = skip;
     } else this.emitFrameEvents();
     this.updatePose();
     return true;
   }
 
+  /**
+   * Schedule idle variants: while `home` (a loop) plays, every `min`-`max` frames (seeded) cut to one of `names`
+   * (one-shots in the table; a name may repeat to weight it) with an 8 f blend, and blend back to `home` when it ends.
+   * Names missing from the table are skipped. An empty list switches the schedule off.
+   */
+  setVariants(home: string, names: readonly string[], min = 360, max = 600): void {
+    this.home = home; this.variants = names.filter((n) => this.has(n)); this.varMin = min; this.varMax = Math.max(min, max);
+    this.nextVariant = this.variants.length ? this.clock + this.varMin + Math.floor(this.varRng.next() * (this.varMax - this.varMin + 1)) : Infinity;
+  }
+
+  /** Is the current anim one of the home loop's variants (it returns to the home loop when it ends)? */
+  get inVariant(): boolean { return !!this.name && this.name !== this.home && this.variants.includes(this.name); }
+
   /** Advance one fixed step (60 Hz). */
   tick(): void {
     this.newFrame = false;
     this.clock++;
+    if (this.home && this.def) {
+      if (this.name === this.home && this.clock >= this.nextVariant) {
+        this.play(this.variants[Math.floor(this.varRng.next() * this.variants.length)], { restart: true, blend: 8 });
+      } else if (this.done && this.inVariant) {
+        this.play(this.home, { restart: true, blend: 10 });
+        this.nextVariant = this.clock + this.varMin + Math.floor(this.varRng.next() * (this.varMax - this.varMin + 1));
+      }
+    }
+    if (this.blendLeft > 0) this.blendLeft--;
     this.stepBlink();
     if (!this.def) { if (this.staticPose) { copyDragonPose(this.staticPose, this.pose, true); this.applyBlink(); } return; }
     const frames = this.def.frames;
@@ -169,7 +233,7 @@ export class DragonAnimPlayer {
     while (this.frameTime >= (frames[this.frameIndex].dur || 1) && guard++ < 64) {
       this.frameTime -= frames[this.frameIndex].dur || 1;
       if (this.frameIndex + 1 < frames.length) { this.frameIndex++; this.newFrame = true; this.emitFrameEvents(); }
-      else if (this.def.loop) { this.frameIndex = 0; this.newFrame = true; this.emitFrameEvents(); }
+      else if (this.def.loop) { this.frameIndex = this.def.loopFrom || 0; this.newFrame = true; this.emitFrameEvents(); }
       else { this.done = true; this.frameTime = (frames[this.frameIndex].dur || 1) - 0.0001; break; }
     }
     this.updatePose();
@@ -194,13 +258,18 @@ export class DragonAnimPlayer {
     const frames = this.def!.frames, f = frames[this.frameIndex];
     const interp = f.interp !== false && !this.done;
     let next = f;
-    if (interp) next = this.frameIndex + 1 < frames.length ? frames[this.frameIndex + 1] : (this.def!.loop ? frames[0] : f);
+    if (interp) next = this.frameIndex + 1 < frames.length ? frames[this.frameIndex + 1] : (this.def!.loop ? frames[this.def!.loopFrom || 0] : f);
     let t = interp ? Math.min(1, this.frameTime / (f.dur || 1)) : 0;
     if (f.ease) t = ease(f.ease, t);
     lerpDragonPose(f.pose, next.pose, t, this.pose);
     if (f.face != null) this.pose.face = dfaceIndex(f.face);
     const sw = this.def!.tailSway;
     if (sw) this.pose.tail.sway += sw.amp * Math.sin(this.clock * 2 * Math.PI / sw.period);
+    if (this.blendLeft > 0) {
+      // smoothstep, so the fade neither starts nor lands with a jolt
+      const u = 1 - this.blendLeft / this.blendLen;
+      blendDragonPose(this.blendFrom, this.pose, u * u * (3 - 2 * u));
+    }
     this.applyBlink();
   }
 
@@ -222,11 +291,12 @@ export class DragonAnimPlayer {
     return k < b.half || k >= b.half + b.closed ? 1 : 2;
   }
 
+  /**
+   * The blink goes on pose.blink, not pose.face: overriding the face with `sleepy` for the half-lid frames drew the
+   * sleepy brow bar too, so every blink flashed a brow over a neutral eye (the rig reads blink for the eye only).
+   */
   private applyBlink(): void {
     const p = this.pose;
-    if (p.sleep >= 0.5 || !BLINKS[p.face]) return;
-    const lid = this.lid;
-    if (lid === 2) p.face = DFACE.closed;
-    else if (lid === 1) p.face = DFACE.sleepy;
+    p.blink = p.sleep >= 0.5 || !BLINKS[p.face] ? 0 : this.lid;
   }
 }

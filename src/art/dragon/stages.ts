@@ -12,7 +12,12 @@ export type Stage = typeof STAGES[number];
 
 /** One leg pair's dimensions (bible 2.1). Angles in the engine convention: 0 = down, + forward, lower RELATIVE. */
 export interface LegDims {
-  /** Joint x offset beyond +-gap/2 (does not scale with the body-length modifier: 2.1 note). */
+  /**
+   * Joint x offset beyond +-gap/2 (does not scale with the body-length modifier: 2.1 note). 6 / 4.25 / 3.25: at the
+   * rest-pose values (4 / 2.25 / 1.75) the near hind paw landing forward met the near front paw still lingering at
+   * the back of its stroke, and every walk fused the near pair into one Lambda for a key or two (5.1 #5); these
+   * keep >= 3 px of background between them near the floor at every frame of all 18 walks.
+   */
   X: number;
   /** Joint y in body space (+ = below the body centre). */
   y: number;
@@ -22,7 +27,7 @@ export interface LegDims {
   /** Rest angles, degrees. */
   restUpper: number;
   restLower: number;
-  /** drawLimbSegs(r1, r2, bulge). */
+  /** Root and ankle radius and the bulge profile (parts.ts legRadii: r1 = r2 is the engine's limbRadii). */
   r1: number;
   r2: number;
   bulge: number;
@@ -40,8 +45,14 @@ export interface HeadDims {
   snout: { x0: number; y0: number; x1: number; y1: number; r0: number; r1: number };
   /** Brow-ridge bump in the skull contour, px (0 = none). */
   brow: number;
-  /** Jaw taper from the hinge (hx, hy) r0 to the tip (tx, ty) r1, drawn under the skull. */
-  jaw: { hx: number; hy: number; tx: number; ty: number; r0: number; r1: number };
+  /**
+   * Jaw taper from the hinge (hx, hy) r0 to the tip (tx, ty) r1, drawn under the skull. An OPEN jaw also drops
+   * `drop` px before it turns about its hinge: closed, the jaw's top edge lies ~2 px inside the skull (a 1 px sliver
+   * shows) and the mouth loses 2 px to the skull's and the jaw's own ink, so a jaw that only turned showed no mouth
+   * colour at all at its minimum (baby 20 deg: none; young 14, adult 10: none either). The dropped hinge hides under
+   * the cranium's round bottom (a 1-2 px jowl at most).
+   */
+  jaw: { hx: number; hy: number; tx: number; ty: number; r0: number; r1: number; drop: number };
   /** Jaw opening range, degrees: max, and the minimum any open frame lifts to (1.2). */
   jawMax: number;
   jawMin: number;
@@ -132,11 +143,11 @@ const B: StageDims = {
   head: {
     cranR: 8.5, fromNeck: [1, -3],
     snout: { x0: 1.5, y0: 1.5, x1: 6.5, y1: 2, r0: 5, r1: 4 }, brow: 0,
-    jaw: { hx: -1, hy: 4, tx: 6, ty: 4.5, r0: 3, r1: 2 }, jawMax: 40, jawMin: 20,
+    jaw: { hx: 0.5, hy: 4.5, tx: 7, ty: 5.2, r0: 2.5, r1: 1.5, drop: 4 }, jawMax: 40, jawMin: 20,
     eye: { w: 7, h: 8, x: 2, y: 0 }, browLen: 0, teeth: 'egg',
   },
-  hind: { X: 3.25, y: 3, upper: 4, lower: 4, restUpper: 20, restLower: -30, r1: 2.6, r2: 2.6, bulge: 0.6, pawW: 5, pawH: 3 },
-  front: { X: 3.25, y: 3, upper: 4, lower: 4, restUpper: -5, restLower: 10, r1: 2.4, r2: 2.4, bulge: 0.5, pawW: 5, pawH: 3 },
+  hind: { X: 6, y: 3, upper: 4, lower: 4, restUpper: 20, restLower: -30, r1: 2.6, r2: 2.6, bulge: 0.6, pawW: 5, pawH: 3 },
+  front: { X: 6, y: 3, upper: 4, lower: 4, restUpper: -5, restLower: 10, r1: 2.4, r2: 2.4, bulge: 0.5, pawW: 5, pawH: 3 },
   claws: null,
   tail: { n: 3, len: 5.5, r0: 4, r1: 2, sink: 1.5 },
   wing: null,
@@ -151,11 +162,11 @@ const Y: StageDims = {
   head: {
     cranR: 9, fromNeck: [1.5, -2],
     snout: { x0: 2.5, y0: 1, x1: 11.5, y1: 1.5, r0: 5.5, r1: 4 }, brow: 1,
-    jaw: { hx: -1, hy: 4.5, tx: 10, ty: 5, r0: 3, r1: 2 }, jawMax: 34, jawMin: 14,
+    jaw: { hx: -1, hy: 4.5, tx: 10, ty: 5, r0: 3, r1: 2, drop: 3 }, jawMax: 34, jawMin: 20,
     eye: { w: 7, h: 7, x: 2.5, y: -1 }, browLen: 5, teeth: 'fang1',
   },
-  hind: { X: 1.5, y: 2, upper: 8, lower: 7.5, restUpper: 25, restLower: -45, r1: 4.2, r2: 4.2, bulge: 0.8, pawW: 7, pawH: 3 },
-  front: { X: 1.5, y: 2, upper: 7, lower: 7.5, restUpper: -5, restLower: 10, r1: 3.7, r2: 3.7, bulge: 0.5, pawW: 6, pawH: 3 },
+  hind: { X: 4.25, y: 2, upper: 8, lower: 7.5, restUpper: 35, restLower: -70, r1: 4.2, r2: 3, bulge: 0.8, pawW: 7, pawH: 3 },
+  front: { X: 4.25, y: 2, upper: 7, lower: 7.5, restUpper: -10, restLower: 20, r1: 3.7, r2: 3.2, bulge: 0.5, pawW: 6, pawH: 3 },
   claws: { w: 2, h: 2 },
   tail: { n: 5, len: 6.5, r0: 4.5, r1: 1.5, sink: 2 },
   wing: { root: [4, -8], humerus: 6, forearm: 8, armR: 1, sparR: 1, spars: [14, 11], sparsPlus: [14, 11, 9], attach: [-10, 1] },
@@ -170,11 +181,11 @@ const A: StageDims = {
   head: {
     cranR: 9.5, fromNeck: [2, -2],
     snout: { x0: 3, y0: 1, x1: 15, y1: 2, r0: 6, r1: 3.5 }, brow: 2,
-    jaw: { hx: -1, hy: 5, tx: 13, ty: 5.5, r0: 3.5, r1: 2 }, jawMax: 30, jawMin: 10,
+    jaw: { hx: -1, hy: 5, tx: 13, ty: 5.5, r0: 3.5, r1: 2, drop: 3 }, jawMax: 30, jawMin: 16,
     eye: { w: 8, h: 6, x: 3, y: -2 }, browLen: 6, teeth: 'fang2',
   },
-  hind: { X: 1, y: 3, upper: 10, lower: 9, restUpper: 25, restLower: -45, r1: 5.8, r2: 5.8, bulge: 0.8, pawW: 9, pawH: 4 },
-  front: { X: 1, y: 3, upper: 9, lower: 8.5, restUpper: -5, restLower: 10, r1: 4.7, r2: 4.7, bulge: 0.5, pawW: 8, pawH: 4 },
+  hind: { X: 3.25, y: 3, upper: 10, lower: 9, restUpper: 35, restLower: -70, r1: 5.8, r2: 4.1, bulge: 0.8, pawW: 9, pawH: 4 },
+  front: { X: 3.25, y: 3, upper: 9, lower: 8.5, restUpper: -10, restLower: 20, r1: 4.7, r2: 4, bulge: 0.5, pawW: 8, pawH: 4 },
   claws: { w: 2, h: 3 },
   tail: { n: 6, len: 7, r0: 5.5, r1: 1.5, sink: 2 },
   wing: { root: [5, -9], humerus: 9, forearm: 12, armR: 1.5, sparR: 1.5, spars: [20, 17, 13], sparsPlus: [20, 17, 14, 11], attach: [-16, 1] },
@@ -187,15 +198,17 @@ export const STAGE_DIMS: Readonly<Record<Stage, Readonly<StageDims>>> = Object.f
 
 /** 2.2 bone angles, [folded, spread]. */
 export const WING_ANGLES: Readonly<Record<'young' | 'adult', Readonly<WingAngles>>> = Object.freeze({
+  // spread, the fan opens over ~100 deg, the trail spar reaching level back: over 70 deg (lead 95 -> trail 165) the
+  // spread wing was a narrow upright sail, 16 x 40 px, and with its spars poking out, a rake
   young: {
     humerus: [165, 110], forearm: [18, 80],
-    spars: [[204, 100], [210, 150]],
-    sparsPlus: [[204, 100], [207, 133], [211, 165]],
+    spars: [[204, 88], [210, 178]],
+    sparsPlus: [[204, 88], [207, 133], [211, 180]],
   },
   adult: {
     humerus: [165, 110], forearm: [18, 80],
-    spars: [[204, 95], [208, 130], [212, 165]],
-    sparsPlus: [[204, 95], [207, 120], [210, 145], [213, 170]],
+    spars: [[204, 85], [208, 133], [212, 182]],
+    sparsPlus: [[204, 85], [207, 118], [210, 150], [213, 184]],
   },
 });
 
@@ -222,6 +235,11 @@ export interface ElementModifiers {
   jawMax?: number;
   /** Cap on the tail tip radius (rock 2: water's zone rule, <= 4 px wide). */
   tailTipRMax?: number;
+  /**
+   * px the neck root sits LOWER on the chest front (rock's head-low turtle carriage: 3.4 "head carried below the
+   * dome top"); halved on babies like neckAngle. A short neck (rock's x 0.7) barely lowers the head by angle alone.
+   */
+  neckDrop?: number;
 }
 
 export const NO_MODIFIERS: Readonly<ElementModifiers> = Object.freeze({

@@ -26,12 +26,17 @@ import type { ElementModifiers, Stage, TailRest } from './stages.ts';
 import type { DragonPose } from './pose.ts';
 import type { DragonRig } from './rig.ts';
 import type { DragonAnim } from './anim.ts';
+import type { AnimTuningPatch } from './tuning.ts';
+import type { DragonDims } from './build.ts';
 
 // ---------- shared-feature parameters (drawn by features.ts / parts.ts) ----------
 
 /**
  * Paired horns (fire, lightning) and brow thorns (spike), drawn by features.drawHorn. Cranium space. Quiet-zone
- * budget (3.0): <= 3 px thick, swept back within 20 deg of the neck line, <= 3 px above the skull top.
+ * budget (3.0): <= 3 px thick, swept back within 20 deg of the neck line, <= 3 px above the skull top. The rig
+ * measures the neck line every frame (the last neck segment, seen from the cranium), so `sweep` is authored
+ * relative to it and holds at every stage, head pitch and pose; a baby's neck hides under its head, so its
+ * reference is straight back instead.
  */
 export interface HornParams {
   /** Length, px. */
@@ -43,12 +48,21 @@ export interface HornParams {
   at: number;
   /** Root sunk this far inside the cranium circle, px. */
   sink: number;
-  /** Direction, degrees BELOW straight back in cranium space (the neck line runs back and down). */
+  /**
+   * Direction, degrees ABOVE the neck line (0 = lying along it, + lifts the tip away from the neck). Keep the whole
+   * horn (sweep, plus half the bend) within +-20 (3.0). Babies: degrees above straight back.
+   */
   sweep: number;
   /** Bend at the midpoint, degrees (+ = the tip curls up). */
   bend: number;
   /** 0..1 position of a sharp kink instead of a bend (lightning: 0.6); 0 = the bend is at the midpoint. */
   kinkAt: number;
+  /**
+   * Degrees the FAR horn forks further up than the near one (1.5). Omitted = the stage default: adult 28 (so
+   * background shows between the tips of an 8 px pair), young 8 (a 3-5 px pair that close is culled by the
+   * overlap test and reads as one horn). The far root also sits 2 px above the near one, across the horn's line.
+   */
+  farTilt?: number;
 }
 
 /** Wing construction. `style` picks the renderer in parts.ts; 'custom' means ElementRenderers.wing replaces it. */
@@ -77,8 +91,16 @@ export interface WingParams {
 
 export type MarkingKind = 'chevron' | 'ring' | 'zstripe' | 'spot';
 /**
- * Where a marking sits. Body anchors are body space and are clipped to the body above the belly line; 'tail' is
- * clipped to the tail tube and drawn across it at fraction `t` of its length.
+ * Where a marking sits. Every anchor is only a PREFERENCE, fitted once on the first draw (rig.ts fitMarkings),
+ * since a hidden first marking breaks 2.7:
+ *   - body anchors are body space, clipped to the body outside the belly region; the rig moves each to the nearest
+ *     spot where all of it shows past the folded wing, the leg roots, the neck and a baby's head, a third of the
+ *     body length from the others where the flank allows ('flank' sits on the lateral line, halfway down);
+ *   - 'tail' is clipped to the tail tube; the rig slides it out along the tail from `t` to where all of it clears
+ *     the hip and legs (a ring: 3/4 of its section) and sits >= 3 px from the tail marking before it, and may step
+ *     a bitmap 1 px across the tail to centre it. Author `t` where you want it; the fit only ever moves it out.
+ * A baby's flank is mostly head, nub and pot belly: put a first marking that must show at every stage on 'tail'
+ * (the tail base) or low on the rear flank.
  */
 export type MarkingAnchor = 'shoulder' | 'haunch' | 'flank' | 'tail';
 
@@ -93,6 +115,11 @@ export interface MarkingSpec {
   /** Nudge in body space (tail: along / across the tail), px. */
   dx?: number;
   dy?: number;
+  /**
+   * The seeded extra marking of 2.8 (build.ts adds it; element files never set it): drawn only where the rig's fit
+   * shows all of it, since an optional mark may never become a hidden speck (5.2).
+   */
+  optional?: boolean;
 }
 
 /** Water's dorsal fin row (3.6): low, continuous, round scallops in membrane. Drawn by features.drawDorsalRow. */
@@ -113,6 +140,13 @@ export interface ElementStageParams {
   tailRest: TailRest;
   /** Absolute tail radius [root, tip], replacing stage x modifier (water's baby 3.5 -> 1.5). */
   tailR?: readonly [number, number];
+  /**
+   * A box round the tail-tip feature in tail-tip space [x0, y0, x1, y1] (y down), ink and every mood's droop
+   * included (water's fluke). The rig keeps all four corners on or above the floor whatever the tail's angle, lifting
+   * the tail's end (1.1, 5.1 #14): a level tail's lowest point is a lobe tip, a drooping one's is the fluke's far
+   * edge. Omit it for a feature that stands above the tip (fire's flame).
+   */
+  tipBox?: readonly [number, number, number, number];
   /** Paired horns, or null. */
   horns: HornParams | null;
   /** Markings, first marking first: the first is an invariant (2.7), the rest vary with the pet seed (2.8). */
@@ -126,6 +160,12 @@ export interface ElementStageParams {
   skullBumps?: readonly { x: number; y: number; r: number }[];
   /** Brow-ridge bump in px, replacing the stage table's 0 / 1 / 2 (rock's heavier 0 / 2 / 3). */
   brow?: number;
+  /**
+   * The pet's seeded length variant, -1 / 0 / +1 px (2.8), set by build.ts on every stage (the seed survives
+   * stage-ups). Shared horns already carry it; element renderers add it to their OWN length features -- spike's
+   * quills, shriekscale's fans -- never past a quiet-zone budget of 3.0.
+   */
+  lenVar?: number;
 }
 
 // ---------- the renderer anchors ----------
@@ -169,6 +209,13 @@ export interface DragonInfo {
    * something upright: `ctx.rotate(-info.ang * Math.PI / 180)` (fire's flame). Includes body pitch.
    */
   ang: number;
+  /**
+   * The eye's box in CRANIUM space at its largest (the hungry / surprised / scared ring, 1 px bigger each way):
+   * centre (x, y) and outer size (w, h) including the ink ring. The head is drawn last so nothing covers the eye
+   * (hard rule), and the rig CLIPS nearHead to exclude this box + 1 px on every side -- place head features clear
+   * of it (rock's nose horn, a fin-ear) rather than relying on the clip.
+   */
+  eye: { x: number; y: number; w: number; h: number };
 }
 
 /** An element renderer. The rig calls it in the anchor's space with the light set for that space. */
@@ -189,7 +236,10 @@ export type ElementDraw = (ctx: CanvasRenderingContext2D, rig: DragonRig, pose: 
  *                  upright), info.r = tip radius.
  *   wing space   : origin at the wing root, rotated by body pitch and the flap; +x forward, y down. Bone angles are
  *                  elevations from +x (+ up), as in 2.2.
- *   mouth space  : origin at the jaw hinge, rotated to the upper jaw line; +x points OUT of the mouth.
+ *   mouth space  : origin in the mouth (rig.j.mouth: inside the snout tip while the jaw is shut; open, the middle of
+ *                  the opening, halfway between the upper jaw line at the tip and the jaw's tip), rotated along the
+ *                  snout but never more than 10 deg below level (rig.j.mouthAng); +x points OUT of the mouth. The
+ *                  shared breath anim has the jaw open (>= its stage minimum) from cue 0, where streams start.
  */
 export interface ElementRenderers {
   /** Step 3: far head features (far horn, far ear-fan, far fin-ear). Cranium space, far palette. */
@@ -210,20 +260,57 @@ export interface ElementRenderers {
   wing?: ElementDraw;
   /** Step 12.4: face markings, clipped to the skull (shriekscale's mask). Cranium space. */
   headMarkings?: ElementDraw;
-  /** Step 12.6: near head features (horn-cues, ear-fans, fin-ears, rock's nose horn). Cranium space. */
+  /**
+   * Step 12.6: near head features (horn-cues, ear-fans, fin-ears, rock's nose horn). Cranium space. Clipped to
+   * exclude info.eye + 1 px: nothing drawn here can cover the eye. (The one sanctioned exception, baby shriekscale's
+   * fan-flop gag of ledger E8, will need a rig opt-out of this clip when its anim is authored.) For a pixel
+   * construction on the head (a rib, a mask) that must stay device-aligned, rig.ts enterFaceFromCranium +
+   * cranToRootPt enter face space from here (from any other anchor space: enterFaceFromLocal + localToRootPt
+   * with the anchor's origin and info.ang, as water's fluke rays do); features.ts pixelStroke draws 2 px
+   * whole-pixel strokes there.
+   */
   nearHead?: ElementDraw;
-  /** Step 13: the signature breath / trick effect, driven by pose.fx and info.tick (plus the baby fizzle). Mouth space. */
+  /**
+   * Step 13: the signature breath / trick effect. Mouth space. Called EVERY frame: draw only while
+   * pose.act === ACT.breath. The shared breath anim (anims.ts) keys pose.cue = frames since the snap (the wind-up,
+   * where the element's tell plays, is cue < 0) and pose.fx = the stream's envelope (0 wind-up, 1 sustain, back to
+   * 0 in the recover). Age every particle from cue so a frozen frame is reproducible. A baby's breath always
+   * fizzles (info.stage === 'baby'): draw the element's fizzle instead of the stream; the anim then plays the
+   * fizzle face of tuning.breath. Emitted particles may leave mouth space: rig.j holds the root-space joints.
+   */
   breath?: ElementDraw;
   /** Step 13: the idle ambient effect (embers, crackles, drips), through fx.ts caps; rising particles go to the top pass. Root space. */
   ambient?: ElementDraw;
 }
 
-/** Animation hooks, merged by anims.ts over the shared table. */
+/**
+ * Animation hooks (bible 4.3), three levels deep, cheapest first:
+ *   1. `tuning`: the generic numbers of the shared set (tuning.ts): rock's 60 f walk cycle, spike's creep speed and
+ *      head-down, fire's 5 px strut, water's slink and S-wave, rock's dome tuck and 240 f sleep breath, the jaw of
+ *      the breath snap, the face after a baby's fizzle. The shared anims are rebuilt from them.
+ *   2. RENDERERS that read pose.act / pose.cue (pose.ts ACT): the shared anim says what is playing and hands over a
+ *      clock, so a flourish needs no anim of its own -- the happy flourish at cue 0 (fire's 3 embers, water's
+ *      bubbles, shriekscale's notes), the walk's cue for rock's dust at each hind contact, the hungry tell while
+ *      act = beg, water's nostril bubble on each sleeping exhale, the breath tell while act = breath and cue < 0.
+ *   3. `overrides`: a whole anim replaced (rock's 110 f roll-over happy, spike's stop-and-look walk). anims.ts
+ *      exports its track authoring (bake, the stage timing, the shared builders) so an override is authored the
+ *      same way, and can start from the shared builder with its own tuning.
+ */
 export interface ElementAnimHooks {
-  /** Per-stage anim overrides by name (a fire strut for 'walk', rock's 110 f 'happy'...). */
-  overrides?: (stage: Stage) => Partial<Record<string, DragonAnim>>;
-  /** The idle fidget variant (section 3: fire chases its flame, rock sunbathes...). */
-  fidget?: (stage: Stage) => DragonAnim | null;
+  /** Per-stage tuning of the shared set's generic knobs (tuning.ts). */
+  tuning?: (stage: Stage) => AnimTuningPatch;
+  /**
+   * Per-stage anim overrides by name (rock's 110 f roll-over 'happy'...), merged over the shared table. `dims` (the
+   * build's solved dimensions; null in dims-less tools) sizes them: settles, reaches, heights.
+   */
+  overrides?: (stage: Stage, dims: DragonDims | null) => Partial<Record<string, DragonAnim>>;
+  /**
+   * The idle fidget (section 3: fire chases its flame, rock sunbathes...): a one-shot joined to the table as
+   * 'fidget', which the player's idle-variant schedule plays among the shared variants every 6-10 s and then blends
+   * back to idle (anim.ts setVariants, anims.ts idleVariants). Key act = ACT.fidget and cue = its clock, so the
+   * element's renderers can add the flourish (water's droplets). `dims` sizes it (anims.ts neckFit, the leg lengths).
+   */
+  fidget?: (stage: Stage, dims: DragonDims | null) => DragonAnim | null;
 }
 
 /** Everything one element is. elements/<id>.ts exports exactly one of these. */
@@ -264,7 +351,7 @@ export function wingParams(p: Partial<WingParams> & { style: WingStyle }): WingP
   return { plus: false, scallop: 0, span: 1, foldRise: 3, thorn: 0, wristThorn: 0, ...p };
 }
 
-/** A shorthand for horn params with the house defaults (root at the top-back of the cranium, swept along the neck). */
+/** A shorthand for horn params with the house defaults (root at the top-back of the cranium, along the neck line). */
 export function hornParams(p: Partial<HornParams> & { len: number }): HornParams {
-  return { r0: 1.5, r1: 1, at: 145, sink: 1, sweep: 18, bend: 0, kinkAt: 0, ...p };
+  return { r0: 1.5, r1: 1, at: 145, sink: 1, sweep: 0, bend: 0, kinkAt: 0, ...p };
 }

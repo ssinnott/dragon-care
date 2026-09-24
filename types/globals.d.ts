@@ -9,6 +9,11 @@ interface Window {
   __dragonCare?: {
     ready: boolean;
     errors: string[];
+    /**
+     * view=floor (src/gallery.ts): per look and anim, the deepest row below the ground line that anything the
+     * dragon draws reaches (ground shadow excluded; 1 = the sole's own anti-aliased ink row), and where.
+     */
+    floor?: { id: string; anim: string; depth: number; frame: number }[];
   };
 }
 
