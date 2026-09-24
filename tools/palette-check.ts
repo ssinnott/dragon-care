@@ -79,10 +79,10 @@ const FLOOR_REF = '#e0d6b8';
 const PAIRED_HORNS: readonly DragonElement[] = ['fire', 'spike', 'lightning'];
 /**
  * Elements whose legs are narrower than the engine's FLAT_R (5) at every stage, so no near leg ever gets a shadow band
- * and c2 compares the far leg against the near leg's base only. Shriekscale's leg radius is x0.75 (bible 2.3): its
+ * and c2 compares the far leg against the near leg's base only. Slinkwing's leg radius is x0.75 (bible 2.3): its
  * shadow tone sits only ~12 Oklab L above the ink, too narrow a window for a far leg to clear both by OKL_MIN.
  */
-const FLAT_LEGS: readonly DragonElement[] = ['shriekscale'];
+const FLAT_LEGS: readonly DragonElement[] = ['slinkwing'];
 
 // ---------- colour maths ----------
 function lin(c: number): number { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }
@@ -215,7 +215,7 @@ const EXTRA_PAIRS: Readonly<Record<DragonElement, readonly Pair[]>> = {
     { a: 'glow', b: 'scale', why: 'spots swap to glow on the flank' },
     { a: 'glow', b: 'membrane', why: 'glow dots on the fluke lobes' },
   ],
-  shriekscale: [
+  slinkwing: [
     { a: 'membrane', b: 'belly', why: 'throat sac swells out of the throat stripe' },
     { a: 'marking', b: 'belly', why: 'eye mask meets the chin stripe' },
     { a: 'scale.deep', b: 'marking', why: 'the brow bar sits on the eye mask' },
@@ -242,7 +242,7 @@ const FLOOR_FX: Readonly<Record<DragonElement, readonly { what: string; ref: Ref
   rock: [{ what: 'dust puff (opaque)', ref: 'scale' }, { what: 'adult roar puff ring', ref: 'scale.sh' }, { what: 'pebble', ref: 'marking' }],
   lightning: [{ what: 'spark ring', ref: 'scale' }],
   water: [{ what: 'bubble / drip ring', ref: 'membrane' }],
-  shriekscale: [{ what: 'sound arc', ref: 'membrane' }, { what: 'sound arc edge', ref: 'scale' }],
+  slinkwing: [{ what: 'sound arc', ref: 'membrane' }, { what: 'sound arc edge', ref: 'scale' }],
 };
 
 out.push('DRAGON PALETTE CHECK  (tools/palette-check.ts)');

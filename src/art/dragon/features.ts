@@ -119,7 +119,7 @@ export function hornOverlap(hp: Readonly<HornParams>, cranR: number, ref: number
 /**
  * Is pixel (x, y) of a w x h marking inked? The marking bitmaps, in whole pixels, so a 4-9 px mark stays crisp at
  * scale 1 (an anti-aliased polygon this small dissolves into a smudge). Bands are 3 px thick (5.2):
- *   chevron: a CHUNKY FILLED caret pointing up (fire's flame-licks, shriekscale's volume bars): a solid wedge
+ *   chevron: a CHUNKY FILLED caret pointing up (fire's flame-licks, slinkwing's volume bars): a solid wedge
  *            widening 2 px per step from a 1-2 px tip, with a 1-2 px notch cut in its bottom row from 5 px wide
  *            (`solid`: no notch -- fire's: notched, three on an adult read as "A A A"). An outline "^" cannot be
  *            >= 3 px thick across its arms inside a 4-6 px box (two diagonal arms need ~8.5 px), and the 3 px-per-

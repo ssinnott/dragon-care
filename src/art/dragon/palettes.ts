@@ -14,7 +14,7 @@ import { makeTones, toneOf, RAMP } from '../../lib/art/shading.ts';
 import type { Ramp, Tones } from '../../lib/art/shading.ts';
 
 /** The six elements, in roster order. */
-export const DRAGON_ELEMENTS = ['fire', 'spike', 'rock', 'lightning', 'water', 'shriekscale'] as const;
+export const DRAGON_ELEMENTS = ['fire', 'spike', 'rock', 'lightning', 'water', 'slinkwing'] as const;
 export type DragonElement = typeof DRAGON_ELEMENTS[number];
 
 /**
@@ -31,13 +31,13 @@ export interface DragonPalette extends ColorMap {
    */
   belly: string;
   /**
-   * Wing membrane, plus the element's skin features: water's fluke and fins, shriekscale's ear-fans, throat sac and
+   * Wing membrane, plus the element's skin features: water's fluke and fins, slinkwing's ear-fans, throat sac and
    * sound arcs. Also the 1 px ring on water's bubbles and drips.
    */
   membrane: string;
-  /** Horns, claws (drawn un-inked), spike quills, shriekscale fan ribs, water fin rays. */
+  /** Horns, claws (drawn un-inked), spike quills, slinkwing fan ribs, water fin rays. */
   horn: string;
-  /** Element markings: flame-licks, tail rings, rock's dome carapace, bolt stripes, pearl spots, shriekscale's eye mask. */
+  /** Element markings: flame-licks, tail rings, rock's dome carapace, bolt stripes, pearl spots, slinkwing's eye mask. */
   marking: string;
   /** Nostrils (2 x 2). The quill and claw tips it once coloured were dropped: at 2 px they were under the mark floor. */
   dark: string;
@@ -73,7 +73,7 @@ export const DRAGON_PALETTES: Readonly<Record<DragonElement, Readonly<DragonPale
     scale: '#20a3ce', belly: '#85c6ae', membrane: '#1e5f8c', horn: '#eaf6f0',
     marking: '#dcfff6', dark: '#0e2a36', glow: '#40d8f0', eye: '#ffc64a',
   }),
-  shriekscale: Object.freeze({
+  slinkwing: Object.freeze({
     scale: '#5a2f6e', belly: '#fff5f8', membrane: '#ff6fae', horn: '#f0dce6',
     marking: '#9a6aa8', dark: '#2e1638', glow: '#ff9ed2', eye: '#3fe0a0',
   }),
@@ -139,7 +139,7 @@ export function dragonTones(e: DragonElement, slot: DragonSlot, ramp: Readonly<R
  * `legs`: the far front and far hind leg. Darker than the engine default because on a quadruped the far leg is
  *   seen right next to the near leg's shadow band (it crosses behind it on every walk step), and at 0.62 / 0.25
  *   the far scale lands within 25 % of that shadow tone on three of the six elements (tools/palette-check.ts, c2).
- *   Shriekscale's shadow tone is too close to the ink for any far shade to clear both, so its legs are thin enough
+ *   Slinkwing's shadow tone is too close to the ink for any far shade to clear both, so its legs are thin enough
  *   (radius x0.75, bible 2.3) to stay under the engine's FLAT_R and never get a shadow band at all.
  * `wingAndHead`: the far wing and the far horn / ear-fan / fin-ear. These are seen against the lit top of the near
  *   body and head and against the background, never against a shadow band, so they keep the engine default:

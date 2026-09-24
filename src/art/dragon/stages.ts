@@ -72,7 +72,7 @@ export interface WingDims {
   /** Arm and spar radius (the arm is drawn 2r wide, un-inked, in scale). */
   armR: number;
   sparR: number;
-  /** Spar lengths leading -> trailing, for the stage's standard and "+1 spar" (water, shriekscale) wing. */
+  /** Spar lengths leading -> trailing, for the stage's standard and "+1 spar" (water, slinkwing) wing. */
   spars: readonly number[];
   sparsPlus: readonly number[];
   /** Membrane attach point on the body, from the root. */
@@ -229,9 +229,9 @@ export interface ElementModifiers {
   snout: number;
   /** Snout tip radius as a fraction of its root radius (rock's boxy 0.9); omitted = the stage table's taper. */
   snoutTaper?: number;
-  /** Jaw radius multiplier (shriekscale 1.3). */
+  /** Jaw radius multiplier (slinkwing 1.3). */
   jawDepth?: number;
-  /** Adult jaw maximum override (shriekscale 40). */
+  /** Adult jaw maximum override (slinkwing 40). */
   jawMax?: number;
   /** Cap on the tail tip radius (rock 2: water's zone rule, <= 4 px wide). */
   tailTipRMax?: number;
@@ -267,7 +267,7 @@ export const TAIL_REST: Readonly<Record<DragonElement, Readonly<Record<Stage, Re
   rock: { baby: { first: 30, bend: 12 }, young: { first: 14, bend: 9 }, adult: { first: 10, bend: 7 } },
   lightning: { baby: { first: -12, bend: 0 }, young: { first: -5, bend: 0 }, adult: { first: -5, bend: 0 } },
   water: { baby: { first: 0, bend: 0 }, young: { first: 0, bend: 0 }, adult: { first: 0, bend: 0 } },
-  shriekscale: { baby: { first: -5, bend: -15 }, young: { first: 15, bend: -4 }, adult: { first: 15, bend: -4 } },
+  slinkwing: { baby: { first: -5, bend: -15 }, young: { first: 15, bend: -4 }, adult: { first: 15, bend: -4 } },
 });
 
 /** 4.1 tail chain (secondary.ts getChain options) per stage. `maxAng` 30 keeps a tail from folding through the body. */

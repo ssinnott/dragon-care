@@ -6,7 +6,7 @@
 // (idle, and idle / lowest mood / asleep stacked),
 // the stage sheet of every element, the greyscale and deuteranopia lineups, the habitat (idle, and every act at
 // once), and strips of every anim in the table (4.2) for all three stages of three elements -- fire (the reference),
-// rock (the dome tuck, the slow cycle, the roll-over happy) and shriekscale (the head cue) -- plus the baby's walk
+// rock (the dome tuck, the slow cycle, the roll-over happy) and slinkwing (the head cue) -- plus the baby's walk
 // stumble, the idle variants, every element's fidget and its own anims (bath, upset, call), the floor audit and the
 // face sheets. A walk strip is the 8 keys of one cycle over scrolling ground ticks (a planted paw must hold still
 // against them). Every shot is frozen-time, so the set is deterministic.
@@ -37,7 +37,7 @@ const pairs: string[] = [
   ...['baby', 'young', 'adult'].map((st) => `shots/mood_${st}.png=view=mood&stage=${st}&t=0&scale=1`),
   ...['baby', 'young', 'adult'].map((st) => `shots/cast_${st}.png=view=cast&stage=${st}&t=0&scale=1`),
 ];
-for (const el of ['fire', 'rock', 'shriekscale']) {
+for (const el of ['fire', 'rock', 'slinkwing']) {
   for (const stage of ['adult', 'young', 'baby']) {
     for (const anim of ANIM_NAMES) {
       if (anim === 'rest') continue;
@@ -57,8 +57,8 @@ for (const stage of ['adult', 'baby'] as const) {
 for (const el of ELEMENT_IDS) {
   if (ELEMENTS[el].anims?.fidget) pairs.push(`shots/fidget_${el}_adult.png=view=strip&el=${el}&stage=adult&anim=fidget&n=8&t=0`);
 }
-// the element anims past the shared table (fire's bath, rock's upset tuck, shriekscale's lonely call), young and adult
-for (const [el, anim] of [['fire', 'bath'], ['rock', 'upset'], ['shriekscale', 'call']] as const) {
+// the element anims past the shared table (fire's bath, rock's upset tuck, slinkwing's lonely call), young and adult
+for (const [el, anim] of [['fire', 'bath'], ['rock', 'upset'], ['slinkwing', 'call']] as const) {
   for (const stage of ['adult', 'young']) pairs.push(`shots/element_${el}_${stage}_${anim}.png=view=strip&el=${el}&stage=${stage}&anim=${anim}&n=8&t=0`);
 }
 // the floor audit (5.1 #14: every look, every anim; failing runs show their worst frame), the leg-root audit (1.2)

@@ -7,12 +7,12 @@ import { SPIKE } from './spike.ts';
 import { ROCK } from './rock.ts';
 import { LIGHTNING } from './lightning.ts';
 import { WATER } from './water.ts';
-import { SHRIEKSCALE } from './shriekscale.ts';
+import { SLINKWING } from './slinkwing.ts';
 
-/** Element ids in bible order: fire, spike, rock, lightning, water, shriekscale. */
-export const ELEMENT_IDS: readonly DragonElement[] = ['fire', 'spike', 'rock', 'lightning', 'water', 'shriekscale'];
+/** Element ids in bible order: fire, spike, rock, lightning, water, slinkwing. */
+export const ELEMENT_IDS: readonly DragonElement[] = ['fire', 'spike', 'rock', 'lightning', 'water', 'slinkwing'];
 
 /** Every element's spec by id. */
 export const ELEMENTS: Readonly<Record<DragonElement, ElementSpec>> = Object.freeze({
-  fire: FIRE, spike: SPIKE, rock: ROCK, lightning: LIGHTNING, water: WATER, shriekscale: SHRIEKSCALE,
+  fire: FIRE, spike: SPIKE, rock: ROCK, lightning: LIGHTNING, water: WATER, slinkwing: SLINKWING,
 });

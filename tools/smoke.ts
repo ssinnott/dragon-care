@@ -45,7 +45,7 @@ const CASES: Case[] = [
   { query: 'view=cast&stage=adult&t=0', minColours: 100, allScales: true },
   { query: 'view=zoom&el=rock&stage=baby&t=0', minColours: 20, allScales: false },
   { query: 'view=mood&stage=young&t=0', minColours: 100, allScales: true },
-  { query: 'view=faces&el=shriekscale&stage=adult&t=0', minColours: 20, allScales: false },
+  { query: 'view=faces&el=slinkwing&stage=adult&t=0', minColours: 20, allScales: false },
   { query: 'view=faces&el=rock&stage=baby&t=0', minColours: 20, allScales: false },
   { query: 'view=lineup&t=0&wing=1&face=happy&jaw=20', minColours: 150, allScales: true },
   { query: 'view=zoom&el=rock&stage=adult&t=0&sleep=1&tuck=1', minColours: 20, allScales: false },

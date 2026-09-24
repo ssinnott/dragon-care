@@ -539,14 +539,14 @@ function stripScene(P: GalleryParams): Scene {
 
 /**
  * view=habitat (5.1 #13, 5.4): 8 dragons on straw, y-sorted. The cast carries the risky looks -- adult lightning (the
- * tallest cue) standing just BEHIND an adult shriekscale (spire behind fan), and an adult water with its baby
+ * tallest cue) standing just BEHIND an adult slinkwing (spire behind fan), and an adult water with its baby
  * overlapping in front of it (parent over baby, one element) -- plus a young rock, a young fire and spike's adult
  * and baby; those two pairs hold their places (`fixed`), the others roam. (The first cast had no young or adult
- * lightning, no adult shriekscale, no young or baby water or rock, and no overlap that stayed put.)
+ * lightning, no adult slinkwing, no young or baby water or rock, and no overlap that stayed put.)
  */
 function habitatScene(P: GalleryParams): Scene {
   const cast: [DragonElement, Stage, number, number, number, boolean][] = [
-    ['spike', 'adult', 470, 170, -1, false], ['lightning', 'adult', 196, 176, 1, true], ['shriekscale', 'adult', 214, 186, 1, true],
+    ['spike', 'adult', 470, 170, -1, false], ['lightning', 'adult', 196, 176, 1, true], ['slinkwing', 'adult', 214, 186, 1, true],
     ['rock', 'young', 110, 262, 1, false], ['fire', 'young', 340, 236, 1, false], ['water', 'adult', 520, 290, -1, true],
     ['water', 'baby', 506, 306, -1, true], ['spike', 'baby', 90, 336, 1, false],
   ];
@@ -570,7 +570,7 @@ function habitatScene(P: GalleryParams): Scene {
 
 /**
  * The anims view=floor plays by default: the core set (4.2), the idle variants and the element anims (fire's bath,
- * rock's upset tuck, shriekscale's lonely call), each through its whole length (sleep: lie-down + loop); an anim a
+ * rock's upset tuck, slinkwing's lonely call), each through its whole length (sleep: lie-down + loop); an anim a
  * look has not got is skipped.
  */
 const FLOOR_ANIMS = ['idle', 'walk', 'happy', 'eat', 'sleep', 'wake', 'breath', 'pet', 'beg', ...VARIANT_NAMES, ...ELEMENT_ANIM_NAMES];

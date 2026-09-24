@@ -261,7 +261,7 @@ function farFrontSunk(d: DragonDims, s: number): number {
  * separate limb with background all round its top (the cast review's blocker; the adults' joined at the throat).
  * The 3 px margin covers the stroke's own swing of the root. A baby's far root only just reaches its chest at rest
  * (its big head covers the rest), so a baby's never slides forward; one under half a pixel deep at rest (the thin-
- * legged shriekscale's) tucks back up to 1 px instead, or the waddle's roll lifts it clear.
+ * legged slinkwing's) tucks back up to 1 px instead, or the waddle's roll lifts it clear.
  */
 function farFrontShift(d: DragonDims | null, want: number): number {
   if (!d) return want;
@@ -347,7 +347,7 @@ export function walkAnim(stage: Stage, w: Readonly<WalkTuning>, dims: DragonDims
 /**
  * How far a resting spread (the adult preen, the wake's stretch) leans back, deg of `wing.flap` (+ = back), and how
  * far it opens (`wing.fold`): spread at 0.8 the lead spar stood at 108 deg, a vertical membrane spire behind the head
- * in lightning's zone (3.0; fire's, spike's, water's, shriekscale's wings alike), and the wake's full spread was a
+ * in lightning's zone (3.0; fire's, spike's, water's, slinkwing's wings alike), and the wake's full spread was a
  * tall dark plank edge-on, a sail on the back. Leaned back 25 deg the membrane showed its face, but the tip still
  * stood 5 px over spike's head top and level with fire's, so at /3 every adult preen was lightning's "spire behind
  * the head" (the cast review, round 2). At 0.7 leaning back 40 the tip stays 7 px or more under the head top on
@@ -490,7 +490,7 @@ export function eatAnim(stage: Stage, dims: DragonDims | null = null, tune: Anim
     }, { stage, len: L, next: 'idle' });
   }
   // the head's whole pitch stays <= 45 deg (body 24 + neck 12 + head 9): at 85 deg its top turned to face forward --
-  // fire's horn bud read as a nose, shriekscale's fans as a trunk -- and the eye sat on the bowl's rim. The body bows
+  // fire's horn bud read as a nose, slinkwing's fans as a trunk -- and the eye sat on the bowl's rim. The body bows
   // and crouches deeper instead, and the bowl stands >= 2 px under the eye (gallery bowlFor)
   const L = 56;
   return bake({
@@ -642,7 +642,7 @@ export function wakeAnim(stage: Stage, dims: DragonDims | null, tune: AnimTuning
 /**
  * BREATH (4.2, the signature one-shot). pose.fx is the stream's envelope and pose.cue the frames since the snap,
  * for the element's breath renderer (element.ts). Adult 70 f: WIND-UP 0-18 (head back -8, neck a1 -10, the chest
- * puffs; spike's quills snap upright on `bristle`, shriekscale's fans fold flat on `flare`: the element's tell),
+ * puffs; spike's quills snap upright on `bristle`, slinkwing's fans fold flat on `flare`: the element's tell),
  * SNAP 18-24 (a neck thrust, neck a0 -6 with the head level to a little up, `out`; jaw to tuning.jaw, a 1 px
  * recoil; the fans snap to the dish), SUSTAIN 24-54 (fx 1; the head jitters 1 px every 4 f; the tail stiff),
  * RECOVER 54-70 (jaw closed, `happy` for 10 f: proud). The rig aims the stream along the snout, never more than
@@ -885,7 +885,7 @@ export const VARIANT_NAMES: readonly string[] = ['lookAround', 'yawn', 'scratch'
 
 /**
  * The element anims past the shared table (ElementAnimHooks.overrides): fire's 'bath', rock's 'upset' tuck (a loop),
- * shriekscale's lonely 'call'. A look without one plays idle in its place.
+ * slinkwing's lonely 'call'. A look without one plays idle in its place.
  */
 export const ELEMENT_ANIM_NAMES: readonly string[] = ['bath', 'upset', 'call'];
 

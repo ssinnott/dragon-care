@@ -1,4 +1,4 @@
-// SHRIEKSCALE: "Echo", the night-singer (docs/ART_BIBLE.md 3.7), a sound dragon. Zone: the head. Cue: ribbed
+// SLINKWING: "Echo", the night-singer (docs/ART_BIBLE.md 3.7), a sound dragon. Zone: the head. Cue: ribbed
 // ear-fans that double the head, laid back when scared, upright when curious, a dish when it shrieks.
 //
 // What is its own, and where it lives:
@@ -31,7 +31,7 @@ import { animTuning } from '../tuning.ts';
 import { liveSpawns, stepAlpha } from '../fx.ts';
 import type { TopItem } from '../fx.ts';
 
-const PAL = DRAGON_PALETTES.shriekscale;
+const PAL = DRAGON_PALETTES.slinkwing;
 const DEG = Math.PI / 180;
 
 // ---------- the ear-fans ----------
@@ -815,7 +815,7 @@ function callAnim(stage: Stage): DragonAnim {
  * (The paws-forward sleep is tuning: sleep.frontTuck.)
  */
 function overrides(stage: Stage, dims: DragonDims | null): Partial<Record<string, DragonAnim>> {
-  const tune = animTuning(stage, SHRIEKSCALE);
+  const tune = animTuning(stage, SLINKWING);
   const br = breathAnim(stage, tune);
   if (stage !== 'baby') {
     for (const f of br.frames) if (f.pose && f.pose.act === ACT.breath && (f.pose.cue ?? -1) >= 0) { f.event = 'shriek'; break; }
@@ -837,8 +837,8 @@ const STAGE_JAW_MIN: Readonly<Record<Stage, number>> = { baby: 20, young: 20, ad
  */
 const chevron = (t: number, size = 5, h = 4) => ({ kind: 'chevron' as const, at: 'tail' as const, t, size, h });
 
-export const SHRIEKSCALE: ElementSpec = {
-  id: 'shriekscale',
+export const SLINKWING: ElementSpec = {
+  id: 'slinkwing',
   name: 'Echo',
   blurb: 'Dramatic, clingy and nocturnal. It shrieks when lonely, chirps when content and sings when happy.',
   palette: PAL,
@@ -849,26 +849,26 @@ export const SHRIEKSCALE: ElementSpec = {
   stages: {
     // the first marking is the eye mask (headMarkings), present from hatching; the baby carries it alone (D15)
     baby: {
-      tailRest: TAIL_REST.shriekscale.baby, horns: null, markings: [],
+      tailRest: TAIL_REST.slinkwing.baby, horns: null, markings: [],
       wing: wingParams({ style: 'bat' }), dorsal: null,
     },
     // + 1 "volume-bar" chevron on the tail
     young: {
-      tailRest: TAIL_REST.shriekscale.young, horns: null, markings: [chevron(0.4)],
+      tailRest: TAIL_REST.slinkwing.young, horns: null, markings: [chevron(0.4)],
       wing: wingParams({ style: 'bat', plus: true, scallop: 3 }), dorsal: null,
     },
     // + 2 chevrons; the adult-only nose-leaf: a 4 x 4 bump in the skull path. The spread wing's scallops are 3 px,
     // the young's (3.7 said 5: cut 5 px deep between the tips, its four dark spars stood well past the membrane and
     // the spread wing read as a raised hand, a rake)
     adult: {
-      tailRest: TAIL_REST.shriekscale.adult, horns: null, markings: [chevron(0.3, 6, 5), chevron(0.5)],
+      tailRest: TAIL_REST.slinkwing.adult, horns: null, markings: [chevron(0.3, 6, 5), chevron(0.5)],
       wing: wingParams({ style: 'bat', plus: true, scallop: 3, wristThorn: 3 }), dorsal: null,
       skullBumps: [{ x: 14, y: -1.5, r: 2 }],
     },
   },
   render: { farHead, nearHead, headMarkings, breath, ambient },
   anims: {
-    // 4.3 "Shriekscale": the walk's fan bob, the happy song, the hungry chirp with the fans pinned forward and the
+    // 4.3 "Slinkwing": the walk's fan bob, the happy song, the hungry chirp with the fans pinned forward and the
     // sleeping snore are renderer flourishes keyed on act / cue (fan(), breath(), ambient()); the shriek's event,
     // the chirping beg, the paws-forward sleep and the lonely call are overrides; the echo-ping is the fidget. Asleep
     // it holds its head up over its forepaws, the neck a little raised (chin 10 / 8 px: at the paws' 5.5 / 4.5 the

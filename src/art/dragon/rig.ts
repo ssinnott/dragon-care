@@ -1016,8 +1016,8 @@ function drawActEffects(ctx: CanvasRenderingContext2D, rig: DragonRig, P: Dragon
   if (!top) return;
   // "z": one every tune.sleep.z frames of sleep (the first 20 f after falling asleep), a light 7 x 8 "z" with an ink
   // edge (fx.ts), drifting up 12 px (and 3 px on along facing) over 60 f in 3 alpha steps, from above the SNOUT'S
-  // tip: from above the cranium it spawned on shriekscale's fan tips and between horns, and from over the snout's
-  // middle its first frames lay on the baby shriekscale's ear in the sleep bun
+  // tip: from above the cranium it spawned on slinkwing's fan tips and between horns, and from over the snout's
+  // middle its first frames lay on the baby slinkwing's ear in the sleep bun
   const zt = rig.sleepT - 20, every = rig.tune.sleep.z;
   if (zt >= 0) {
     const age = zt % every;

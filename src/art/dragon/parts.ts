@@ -457,7 +457,7 @@ export function drawGroundShadow(ctx: CanvasRenderingContext2D, rig: DragonRig, 
 /**
  * Root space: the neck as one n-node tube with the throat stripe (belly, lower 40 %) on its underside, which the
  * body's chest bib and the jaw's belly half continue (chin -> throat -> belly: 2.7). A gulp bulge (pose.gulp 1..3,
- * head -> chest) is an extra circle appended to the SAME path, so it changes the silhouette (1.2). (Shriekscale's
+ * head -> chest) is an extra circle appended to the SAME path, so it changes the silhouette (1.2). (Slinkwing's
  * throat sac is its own: drawn at its breath anchor 0.6 of the way up the neck, clipped behind the head. A sac
  * centred on the last node, under the jaw, hid under the head drawn after the neck and never showed.)
  *
@@ -502,7 +502,7 @@ const GB: Bulge = { x: 0, y: 0, r: 0, hex: '' };
 
 /**
  * Cranium space: the skull as ONE path (drawSkull's approach): cranium circle + snout taper + brow-ridge bump +
- * the element's optional bumps (rock's nose-horn root, shriekscale's nose-leaf). Bumps live in the contour, never
+ * the element's optional bumps (rock's nose-horn root, slinkwing's nose-leaf). Bumps live in the contour, never
  * as new outlined objects.
  */
 export function pathSkull(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
@@ -612,7 +612,7 @@ export function jawTopAt(rig: DragonRig, jawDeg: number, u: number, out: Point):
  * Cranium space: the hinged jaw, drawn UNDER the skull (1.2): a celTaper hinge -> tip rotated `jawDeg` open, upper
  * half `scale`, lower half `belly` so the chin continues the throat stripe. OPEN, it first drops `jaw.drop` px
  * (stages.ts: a jaw that only turned showed no mouth at its minimum). CLOSED, the belly half is tucked: all that
- * shows below the snout is a ~1 px sliver, and in belly it read as a lip line, or on shriekscale's near-white belly
+ * shows below the snout is a ~1 px sliver, and in belly it read as a lip line, or on slinkwing's near-white belly
  * as bared teeth at neutral; it is painted in the scale's shadow tone instead, the underside of the head.
  */
 export function drawJaw(ctx: CanvasRenderingContext2D, rig: DragonRig, jawDeg: number, pal: Readonly<DragonPalette>): void {

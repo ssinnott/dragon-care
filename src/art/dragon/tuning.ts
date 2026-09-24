@@ -64,13 +64,13 @@ export interface SleepTuning {
    */
   tailLift: number;
   /**
-   * Young / adult: how high the sleeping chin rests, px above the floor: 1.5 on the floor; shriekscale rests its head
+   * Young / adult: how high the sleeping chin rests, px above the floor: 1.5 on the floor; slinkwing rests its head
    * on its paws (paw height + 1.5) so its laid-back fans stand clear above the back and wing line (5.1 #1).
    */
   chin: number;
   /**
    * Where the forepaws rest asleep, px slid along the floor from their standing spot (+ forward): young and adult -2,
-   * drawn a little back under the settled chest (the sphinx fold), the baby's bun 1.5, under its chin; shriekscale's
+   * drawn a little back under the settled chest (the sphinx fold), the baby's bun 1.5, under its chin; slinkwing's
    * young and adult 10, forward under its raised head, so the head held up at `chin` rests over its paws instead of
    * floating in front of the chest. The wake's play-bow starts from it.
    */
@@ -85,7 +85,7 @@ export interface SleepTuning {
 
 /** The signature breath (4.2): wind-up, snap, sustain, recover; the baby always fizzles. */
 export interface BreathTuning {
-  /** Jaw at the snap, deg: adult 30, young 22, baby 20; rock's gravel roar 25, shriekscale's shriek 40. */
+  /** Jaw at the snap, deg: adult 30, young 22, baby 20; rock's gravel roar 25, slinkwing's shriek 40. */
   jaw: number;
   /** The face after a baby's fizzle: dazed (fire, lightning, spike), happy (rock's proud "ptoo", water's pop). */
   fizzleFace: DFaceName;
@@ -97,7 +97,7 @@ export interface BreathTuning {
    */
   puff: number;
   /**
-   * Baby: frames of the fan-flop gag after the fizzle (ledger E8: shriekscale's fans flop over its eyes for 24 f,
+   * Baby: frames of the fan-flop gag after the fizzle (ledger E8: slinkwing's fans flop over its eyes for 24 f,
    * then pop back up with a blink), 0 = none. The anim lifts the rig's eye clip for exactly those frames
    * (pose.eyeClip 0) and the element's fans draw the flop while it is off.
    */
@@ -111,7 +111,7 @@ export interface EatTuning {
   /**
    * Baby: the tail's droop through the bite, deg (+ droops toward the floor), cancelling most of the body's 24 deg
    * bow: riding the pitch, every baby tail rose about 10 px over its back line (spike's, lightning's, water's paddle
-   * a stick with a knob on top, shriekscale's), into fire's zone above the tail tip (3.0). Fire 0: its comma
+   * a stick with a knob on top, slinkwing's), into fire's zone above the tail tip (3.0). Fire 0: its comma
    * carries the flame, which is its own zone.
    */
   tailDroop: number;

@@ -77,7 +77,7 @@ export type WingStyle = 'bat' | 'leaf' | 'fin' | 'custom';
 
 export interface WingParams {
   style: WingStyle;
-  /** Use the stage's "+1 spar" set (water, shriekscale: 3 young / 4 adult) instead of the standard 2 / 3. */
+  /** Use the stage's "+1 spar" set (water, slinkwing: 3 young / 4 adult) instead of the standard 2 / 3. */
   plus: boolean;
   /** Trailing-edge cut between spar tips, px, x the fold channel (1.2). Negative = a convex bulge (leaf, fin). */
   scallop: number;
@@ -87,7 +87,7 @@ export interface WingParams {
   foldRise: number;
   /** Each spar pokes this far past the membrane as a thorn (spike adult 3); 0 = none. */
   thorn: number;
-  /** Wrist thorn / thumb claw length (spike adult 4, shriekscale adult 3); 0 = none. */
+  /** Wrist thorn / thumb claw length (spike adult 4, slinkwing adult 3); 0 = none. */
   wristThorn: number;
   /** Baby nub rest angle override (spike 200: along the flank below the quills). */
   nubRest?: number;
@@ -174,7 +174,7 @@ export interface ElementStageParams {
   wing: WingParams;
   dorsal: DorsalParams | null;
   /**
-   * Extra circles in the skull's contour, cranium space (rock's nose-horn root, shriekscale's nose-leaf): bumps in
+   * Extra circles in the skull's contour, cranium space (rock's nose-horn root, slinkwing's nose-leaf): bumps in
    * the one skull path, never new outlined objects (1.2).
    */
   skullBumps?: readonly { x: number; y: number; r: number }[];
@@ -183,7 +183,7 @@ export interface ElementStageParams {
   /**
    * The pet's seeded length variant, -1 / 0 / +1 px (2.8), set by build.ts on every stage (the seed survives
    * stage-ups). Shared horns already carry it; element renderers add it to their OWN length features -- spike's
-   * quills, shriekscale's fans -- never past a quiet-zone budget of 3.0.
+   * quills, slinkwing's fans -- never past a quiet-zone budget of 3.0.
    */
   lenVar?: number;
 }
@@ -298,11 +298,11 @@ export interface ElementRenderers {
    * and the near wing. Wing space. Only used when the stage's wing.style is 'custom'.
    */
   wing?: ElementDraw;
-  /** Step 12.4: face markings, clipped to the skull (shriekscale's mask). Cranium space. */
+  /** Step 12.4: face markings, clipped to the skull (slinkwing's mask). Cranium space. */
   headMarkings?: ElementDraw;
   /**
    * Step 12.6: near head features (horn-cues, ear-fans, fin-ears, rock's nose horn). Cranium space. Clipped to
-   * exclude info.eye + 1 px: nothing drawn here can cover the eye. (The one sanctioned exception, baby shriekscale's
+   * exclude info.eye + 1 px: nothing drawn here can cover the eye. (The one sanctioned exception, baby slinkwing's
    * fan-flop gag of ledger E8, lifts the clip through the stepped pose.eyeClip for exactly those frames.) For a pixel
    * construction on the head (a rib, a mask) that must stay device-aligned, rig.ts enterFaceFromCranium +
    * cranToRootPt enter face space from here (from any other anchor space: enterFaceFromLocal + localToRootPt
@@ -330,7 +330,7 @@ export interface ElementRenderers {
  *      the breath snap, the face after a baby's fizzle. The shared anims are rebuilt from them.
  *   2. RENDERERS that read pose.act / pose.cue (pose.ts ACT): the shared anim says what is playing and hands over a
  *      clock, so a flourish needs no anim of its own -- the happy flourish at cue 0 (fire's 3 embers, water's
- *      bubbles, shriekscale's notes), the walk's cue for rock's dust at each hind contact, the hungry tell while
+ *      bubbles, slinkwing's notes), the walk's cue for rock's dust at each hind contact, the hungry tell while
  *      act = beg, water's nostril bubble on each sleeping exhale, the breath tell while act = breath and cue < 0.
  *   3. `overrides`: a whole anim replaced (rock's 110 f roll-over happy, spike's stop-and-look walk). anims.ts
  *      exports its track authoring (bake, the stage timing, the shared builders) so an override is authored the

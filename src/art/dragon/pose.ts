@@ -35,7 +35,7 @@ export type DFaceRef = DFaceName | number;
  * Which shared animation is playing (stepped `act`), so an element renderer can add its flourish to the shared
  * motion without owning the anim (bible 4.3): fire's strut flame in walk, the happy flourish, the hungry tell in
  * beg, water's nostril bubble asleep, the breath stream. `cue` is that act's clock (DragonPose.cue). The acts past
- * `variant` are element anims the shared table has no builder for (fire's bath, rock's upset tuck, shriekscale's
+ * `variant` are element anims the shared table has no builder for (fire's bath, rock's upset tuck, slinkwing's
  * lonely call): one id each here, so no two elements' local numbers collide and no shared act triggers another's
  * flourish.
  */
@@ -104,7 +104,7 @@ export type DragonPose = {
   mood: number;
   /** 0..1 spike's alarm one-shot (3.3), separate from mood. */
   bristle: number;
-  /** -1..1 shriekscale's fan flare on top of its mood (3.7): -1 laid back, +1 upright; > 1 is the shriek dish. */
+  /** -1..1 slinkwing's fan flare on top of its mood (3.7): -1 laid back, +1 upright; > 1 is the shriek dish. */
   flare: number;
   /** Neck-bulge position for the eat gulp: 0 = none, 1..3 = head -> chest (stepped). */
   gulp: number;
@@ -132,7 +132,7 @@ export type DragonPose = {
    *   variant frames into a shared idle variant (look-around, yawn, scratch, topple, plop-sit)
    *   bath   frames since the bath began (fire's hiss and shake; the element's own one-shot)
    *   upset  frames into rock's upset tuck (its intro counts up from 0 as the hood swings down)
-   *   call   frames since the note starts (shriekscale's lonely call; the wind-up is negative)
+   *   call   frames since the note starts (slinkwing's lonely call; the wind-up is negative)
    */
   cue: number;
   /** 1 = asleep (stepped): fire banks its flame, lightning drops to the sad cock, eyes are drawn closed. */
@@ -145,7 +145,7 @@ export type DragonPose = {
   tuck: number;
   /**
    * 1 (always, by default) = the rig clips the near head features off the eye's largest box + 1 px (1.4 step 12.6:
-   * nothing covers the eye). 0 = no clip: ledger E8, baby shriekscale's fans flopping over its eyes after its squeak,
+   * nothing covers the eye). 0 = no clip: ledger E8, baby slinkwing's fans flopping over its eyes after its squeak,
    * the one sanctioned exception, and only for the frames that gag lasts (stepped).
    */
   eyeClip: number;
