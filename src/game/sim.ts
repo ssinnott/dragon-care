@@ -7,8 +7,8 @@
 import { makeRng } from '../lib/engine/rng.ts';
 import { NEEDS, QUEUE, ROOM_REGEN, OWN_NEED, drainRate, hasNeed, moodOf, tierOf, fullNeeds } from './needs.ts';
 import type { NeedKind, Needs } from './needs.ts';
-import { ROOM_INFO, placeRooms, postX, route, feetY, clampToFloor } from './layout.ts';
-import type { Room, RoomPlace, Leg, Spot } from './layout.ts';
+import { ROOM_INFO, REACH, placeRooms, postX, route, feetY, clampToFloor, standSpot, fitsSlot } from './layout.ts';
+import type { Room, RoomPlace, RoomKind, Leg, Spot, Slot } from './layout.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
 import { SAVE_VERSION, SaveVersionError, worldKey } from './save.ts';
 import type { SaveV } from './save.ts';
@@ -18,7 +18,7 @@ import type { KeeperId } from '../art/keeper/cast.ts';
 
 // ---------- tuning (4.9: first numbers, not law) ----------
 
-/** A keeper's pace, px per step: walking, climbing (a ladder or the hoist), and Rush's multiplier on both (4.5). */
+/** A keeper's pace, px per step: walking, climbing a ladder, and Rush's multiplier on both (4.5). */
 export const WALK = 1, CLIMB = 0.8, RUSH = 1.6;
 /** Steps to pick a supply up (the bowl, the ball, the bucket). */
 export const PICKUP = 40;
@@ -29,8 +29,8 @@ export const SPECIALIST_TIME = 0.75;
 export const SLEEP_STEPS = 900;
 /** An unclaimed job closes once its room has lifted the need this far back over QUEUE (4.6). */
 const CLOSE_OVER = 0.05;
-/** Where a keeper stands to work with a dragon: this far in front of its body centre, past the snout (2.4). */
-export const REACH: Readonly<Record<Stage, number>> = Object.freeze({ baby: 30, young: 46, adult: 58, elder: 60 });
+/** Where a keeper stands to work with a dragon: this far in front of its body's root, past the snout (2.4; layout.ts standSpot). */
+export { REACH };
 /** A specialist is worth this many px of walking when a keeper is chosen for a job (4.4). */
 const SPECIALIST_PX = 300;
 
@@ -65,8 +65,11 @@ export interface Dragon {
   element: DragonElement;
   stage: Stage;
   seed: number;
-  /** Its home room; it stands there, on the room's floor. */
-  room: Room;
+  /**
+   * The slot it stands in (layout.ts Slot: one of its room's, the same object): its room, floor, x and facing. In this
+   * slice a dragon stays in its slot; walking between slots is the next (S3).
+   */
+  slot: Slot;
   f: number;
   x: number;
   facing: 1 | -1;
@@ -128,6 +131,11 @@ export interface SimStats {
   preempted: number;
   /** Dragon-need-steps spent at 0. */
   emptySteps: number;
+  /**
+   * Each room's (and structure's) uses by kind (#11: a named room earns its name by being used): a need room each
+   * time a keeper starts meeting its need there, and a supply room each time its supply is picked up.
+   */
+  used: Record<string, number>;
 }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -145,7 +153,7 @@ export class CareSim {
   readonly dragons: Dragon[] = [];
   readonly keepers: Keeper[] = [];
   jobs: Job[] = [];
-  readonly stats: SimStats = { opened: 0, done: 0, closed: 0, waitSum: 0, started: 0, waitMax: 0, queueMax: 0, rushes: 0, preempted: 0, emptySteps: 0 };
+  readonly stats: SimStats = { opened: 0, done: 0, closed: 0, waitSum: 0, started: 0, waitMax: 0, queueMax: 0, rushes: 0, preempted: 0, emptySteps: 0, used: {} };
   /** What the last step did (cleared at the start of every step). */
   events: SimEvent[] = [];
   /** The id the next dragon gets, and the next job (public so a save can keep them). */
@@ -166,14 +174,26 @@ export class CareSim {
       if (!r) throw new Error(`${who}: no ${kind} in this base`);
       return r;
     };
+    // each dragon in its slot: one that fits its stage, free, in a module no one else's size clashes with (a module
+    // holds one grown dragon, or up to two babies)
+    const held = new Map<string, { grown: number; babies: number }>();
     for (const p of dragons) {
-      const room = roomOf(p.room, p.name);
+      const room = roomOf(p.slot.room, p.name);
       if (ROOM_INFO[room.kind].people) throw new Error(`${p.name}: the ${room.kind} is a room for people`);
+      const slot = room.slots[p.slot.i];
+      if (!slot) throw new Error(`${p.name}: the ${room.kind} has no slot ${p.slot.i}`);
+      if (!fitsSlot(slot, p.stage)) throw new Error(`${p.name}: ${/^[aeiou]/.test(p.stage) ? 'an' : 'a'} ${p.stage} doesn't fit the ${room.kind}'s ${slot.baby ? 'baby sub-slot' : 'module slot'} ${slot.i}`);
+      const taken = this.dragons.find((d) => d.slot === slot);
+      if (taken) throw new Error(`${p.name}: the ${room.kind}'s slot ${slot.i} is ${taken.name}'s`);
+      const key = `${room.id}/${slot.mod}`, h = held.get(key) ?? { grown: 0, babies: 0 };
+      if (slot.baby) h.babies++; else h.grown++;
+      if (h.grown > 1 || h.babies > 2 || (h.grown && h.babies)) throw new Error(`${p.name}: module ${slot.mod} of the ${room.kind} is full (one grown dragon, or two babies)`);
+      held.set(key, h);
       // the starting needs: seeded, most of them fine, a few already asking
       const needs = fullNeeds();
       for (const k of NEEDS) needs[k] = hasNeed(p.element, k) ? rng.range(0.42, 1) : 1;
-      this.dragons.push({ id: this.nextDragonId++, name: p.name, element: p.element, stage: p.stage, seed: p.seed, room, f: room.floor,
-        x: Math.round(room.x0 + p.at * (room.x1 - room.x0)), facing: p.facing, needs, mood: moodOf(p.element, needs), act: null, asleep: 0,
+      this.dragons.push({ id: this.nextDragonId++, name: p.name, element: p.element, stage: p.stage, seed: p.seed, slot, f: slot.f,
+        x: slot.x, facing: slot.facing, needs, mood: moodOf(p.element, needs), act: null, asleep: 0,
         stageSince: this.clock0 - Math.round((p.days ?? 0) * this.dayLen) });
     }
     keepers.forEach((p, id) => {
@@ -202,14 +222,19 @@ export class CareSim {
       if (!v) throw new Error(`save: no ${what} ${id}`);
       return v;
     };
-    for (const d of s.dragons) sim.dragons.push({ ...d, room: byId(sim.rooms, d.room, 'room'), needs: { ...d.needs }, act: d.act ? { ...d.act } : null });
+    const slotOf = (r: { room: number; i: number }): Slot => {
+      const slot = byId(sim.rooms, r.room, 'room').slots[r.i];
+      if (!slot) throw new Error(`save: no slot ${r.i} in room ${r.room}`);
+      return slot;
+    };
+    for (const d of s.dragons) sim.dragons.push({ ...d, slot: slotOf(d.slot), needs: { ...d.needs }, act: d.act ? { ...d.act } : null });
     const jobs: Job[] = s.jobs.map((j) => ({ ...j, dragon: byId(sim.dragons, j.dragon, 'dragon'), keeper: null }));
     for (const k of s.keepers) {
       sim.keepers.push({ ...k, station: byId(sim.rooms, k.station, 'room'), job: k.job == null ? null : byId(jobs, k.job, 'job'), legs: k.legs.map((l) => ({ ...l })) });
     }
     s.jobs.forEach((j, i) => { jobs[i].keeper = j.keeper == null ? null : byId(sim.keepers, j.keeper, 'keeper'); });
     sim.jobs = jobs;
-    Object.assign(sim.stats, s.stats);
+    Object.assign(sim.stats, s.stats, { used: { ...s.stats.used } });
     return sim;
   }
 
@@ -233,12 +258,13 @@ export class CareSim {
   step(): void {
     this.events = [];
     this.tick++;
-    // needs drain, rooms restore theirs (4.6), and a job under way refills its need
+    // needs drain, the room a dragon stands in restores the need it meets (4.6; gone in S3, when keepers alone meet
+    // needs), and a job under way refills its need
     for (const d of this.dragons) {
-      const restores = ROOM_INFO[d.room.kind].restores;
+      const meets = ROOM_INFO[this.rooms[d.slot.room].kind].meets;
       for (const k of NEEDS) {
         if (!hasNeed(d.element, k)) continue;
-        d.needs[k] = clamp01(d.needs[k] - drainRate(d.element, d.stage, k) + (restores === k ? ROOM_REGEN : 0));
+        d.needs[k] = clamp01(d.needs[k] - drainRate(d.element, d.stage, k) + (meets === k ? ROOM_REGEN : 0));
       }
       const a = d.act;
       if (a) {
@@ -340,7 +366,11 @@ export class CareSim {
     switch (k.phase) {
       case 'idle': return;
       case 'pickup':
-        if (++k.t >= PICKUP) { k.carrying = k.job!.need; this.walkTo(k, this.standAt(k.job!.dragon)); k.phase = 'go'; }
+        if (++k.t >= PICKUP) {
+          const need = k.job!.need, sup = this.rooms.find((r) => ROOM_INFO[r.kind].supplies === need && r.floor === k.f && k.x >= r.x0 && k.x <= r.x1);
+          if (sup) this.use(sup.kind);
+          k.carrying = need; this.walkTo(k, this.standAt(k.job!.dragon)); k.phase = 'go';
+        }
         return;
       case 'work':
         if (++k.t >= this.workLen(k, k.job!.need)) this.finish(k);
@@ -378,6 +408,9 @@ export class CareSim {
     k.facing = d.x >= k.x ? 1 : -1;
     const wait = this.tick - j.opened;
     this.stats.started++; this.stats.waitSum += wait; this.stats.waitMax = Math.max(this.stats.waitMax, wait);
+    // (#11: a need room is used when its own need is met in it)
+    const room = this.rooms[d.slot.room];
+    if (ROOM_INFO[room.kind].meets === j.need) this.use(room.kind);
     d.act = { need: j.need, t: 0, len: j.need === 'sleep' ? len + SLEEP_STEPS : len, from: d.needs[j.need] };
   }
 
@@ -395,13 +428,16 @@ export class CareSim {
 
   private workLen(k: Keeper, need: NeedKind): number { return Math.round(WORK[need] * (k.specialty === need ? SPECIALIST_TIME : 1)); }
 
+  /** Count one use of a room or structure (stats.used, #11). */
+  private use(kind: RoomKind | 'lift' | 'aerie'): void { this.stats.used[kind] = (this.stats.used[kind] ?? 0) + 1; }
+
   // ---------- where things are ----------
 
   /** Where a keeper is, for routing: a keeper on a ladder counts as already at the floor they're climbing to. */
   spotOf(k: Keeper): Spot { return k.climbing && k.legs.length ? { f: k.legs[0].f, x: k.x } : { f: k.f, x: k.x }; }
 
-  /** Where a keeper stands to work with a dragon: in front of its snout, kept on the floor. */
-  standAt(d: Dragon): Spot { return { f: d.f, x: clampToFloor(d.f, d.x + d.facing * REACH[d.stage]) }; }
+  /** Where a keeper stands to work with a dragon: its slot's stand spot (layout.ts standSpot), in front of its snout, inside the room. */
+  standAt(d: Dragon): Spot { return standSpot(d.slot, d.stage, this.rooms[d.slot.room]); }
 
   /** The room a need's supply comes from (the nearest, if there were more than one); null if it needs none. */
   private supplyRoom(need: NeedKind, from: Spot): Room | null {

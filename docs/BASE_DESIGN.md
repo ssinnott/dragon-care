@@ -10,7 +10,8 @@ dragons in them are the real rigs, the people the engine's humanoid rig; everyth
 `docs/base/`). The references were Fallout Shelter (the cutaway, rooms that merge), Two Point Museum (expeditions,
 rooms that earn their keep) and World of Warcraft's mission table (pick a team, counter the challenges, see the odds).
 
-**Status.** Designed, and being built in slices. The first, needs and jobs, runs as `view=base` in the gallery (section 8).
+**Status.** Designed, and being built in slices. The first, needs and jobs, runs as `view=base` in the gallery, in the
+building of sections 2 and 3: one room per need, the Dragon Lift and the Aerie (section 8).
 
 ![The whole base, one screen of it outlined](base/barn_cutaway.png)
 
@@ -66,52 +67,86 @@ elder). A new game therefore starts with seven dragons, one per element, each 0 
 
 - **The barn** (the dragons): six modules wide on three floors, the ground floor, the upper floor and the **hayloft**
   under the gambrel roof. A barn room is 1 to 3 modules wide; rooms merge like Fallout Shelter's.
-- **The hay hoist** runs up the barn's middle, between modules 2 and 3: it carries keepers (and, later, dragons)
-  between the barn's floors. The hayloft is reached by the hoist alone.
+- **The Dragon Lift** is barn module 2 (x 488 to 648) on every floor: a shaft from the ground floor up through the
+  roof to the Aerie. One car carries one dragon on a 152 px straw deck (an elder, at most 137 px, fits), between two
+  40 px side rails, on two cables from a headframe that stands over the Aerie a room's height above the deck. It stops
+  at the ground floor, the upper floor, the hayloft and the Aerie (floors 0, 1, 2 and 5; floors 3 and 4 are passed
+  through), and a straw landing runs across the shaft on each barn floor. Keepers never ride it. In this slice the
+  car stays parked at the ground floor; dragons ride it from the next (S3).
+- **The ladder bay** is where the hay hoist was, between modules 2 and 3 (64 px): the keepers' centre ladder through
+  the barn's three floors, a hatch in each slab, with straw floors running straight across it. The hoist went because
+  dragons are to walk across the middle of the barn: its dark shaft (`#5a4436`, L 0.07) failed the floor gate (1),
+  and a car passing through floors that dragons stand on would clash with them.
 - **The towers** (the people): one at each end of the barn, five floors, a ladder up each. Their doors into the barn
   are human-sized, on the ground and upper floors: dragons don't fit, which is the reason for the split.
-- **The aerie** on the left tower's roof: where teams leave and land.
+- **The Aerie** is walkable **floor 5** (feet at y 136): one straw deck from x 8 to 648, over the left tower's top,
+  then a gantry over the barn roof (x 168 to 488: a railing along its back, two trestles down to the roof and a knee
+  brace to the tower), then the lift's head. The left tower's ladder climbs on to it. Teams will leave and land here (5).
+- **Every floor is straw.** Every surface a dragon or a keeper stands on (a room's band, the landings, the ladder bay,
+  the towers' boards, the lift car's deck, the Aerie deck) is a `FLOORS` colour in `src/game/surfaces.ts`, and
+  `tools/palette-check.ts` gates every entry before anything stands on it: gate (i) against every dragon colour at every
+  stage, gate (Ki) against the keepers' shoes and trousers, and HSV saturation under 0.20. There is one entry so far,
+  straw `#e0d6b8` (L 0.674, S 0.18).
 
 | Measure (px, at scale 1) | Value | Why |
 |---|---|---|
-| Barn module | 160 wide | one adult and a baby with room to turn (2.4) |
+| Barn module | 160 wide | one adult, or two babies, with room to turn (2.4) |
 | Floor pitch | 112: 88 of wall, a 14 px straw band, a 10 px slab | 96 px of headroom over the feet; the tallest adult is 70, and a spread wing reaches about 20 over the shoulders (5.4) |
-| Hoist | 64 wide | a keeper and a lift car |
+| Dragon Lift | module 2 (160 wide), a 152 px car deck | the longest elder is 137 px |
+| Ladder bay | 64 wide | a keeper's ladder, and straw across it |
 | Tower | 112 wide, 96 inside | a human is 72 to 76 tall and about 30 wide |
+| Aerie | floor 5: x 8 to 648, feet at y 136 | one deck over the left tower, the roof and the lift's head |
 | World | 1360 x 760, ground at y 712 | about 2 x 2 screens; the player pans |
 
-**Moving around.** Keepers walk a floor, climb the tower ladders and ride the hoist; the towers and the barn meet on
-the ground and upper floors only. In v1 a dragon stays in its home room (the idle anim and its variants keep it
-lively); moving a dragon to another room is the player's call, later by dragging it.
+**Moving around.** Keepers walk a floor and climb the three ladders: up each tower (the left one on to the Aerie) and
+the centre ladder bay's through the barn; the towers and the barn meet on the ground and upper floors only. Dragons
+have ways of their own, a net per stage: the barn's floors kept half a body's length from the walls (30, 56, 72 and 76
+px, baby to elder: the measured extents), the hayloft between modules 1 and 5 only (clear of the low roof slopes), the
+Aerie deck, and the lift between them; never a tower. In this slice a dragon stays in its slot (the idle anim and its
+variants keep it lively); walking to its needs, and riding the lift, come next (S3).
 
 ---
 
 ## 3. Rooms
 
-**Barn rooms.** Each need room *restores* its need for the dragons that live there, a little at a time (4.6), and
-*supplies* the keepers who meet that need elsewhere.
+**Every named room has a purpose** (#11: "Rooms should only be named and have special furniture if the room has a
+real purpose"): a dragon need, met there by a keeper, or a human or other action. **Each need is met in exactly one
+kind of room.** A place with no purpose is not a room: it is left bare (an empty wall, no props, no name). The code
+holds each purpose (`src/game/layout.ts` `ROOM_INFO`, `STRUCTURES`), and `tools/sim-check.ts` proves every named room
+is used: every mechanic that uses one counts it (`sim.stats.used`), and over the whole check each must show a use, or
+be listed as planned for a later slice (and a planned one that shows a use fails, so the list is kept honest).
 
-| Room | Need (the element it suits) | Supplies | What living well there gives back |
+| Where | Room | Purpose | Built (the slice that uses it) |
 |---|---|---|---|
-| Hearth Kitchen | food (fire) | the bowl | warms the rooms beside it (fire is "a pet heater", 3.2) |
-| Grooming Parlour | love (spike: touch) | | an adult spike's shed quills, a crafting material (3.3) |
-| Sun Loft (top floor only) | love (rock: bond) | | rock's crystals grow with its bond (3.4); the elder's sunning |
-| Romp Room | play (lightning) | the ball | the play wheel turns the mill (feed); play drains lightning's static (3.5) |
-| Bathhouse | bath (water) | the bucket | fire won't go in (3.2); water floats belly-up (an anim to build) |
-| Song Roost | love (slinkwing: company) | | its song lifts nearby rooms; its lonely call carries through walls |
-| Lamp Dorm | sleep (dusk) | | the tuck-in (3.8); dusk's `hush` calms the rooms around it |
-| Hatchery | | | eggs become babies; faster beside the hearth |
-| Nursery | | | babies and the young; an elder living here mentors them |
-| Feed Store, Hay Store, Attic | | stock | storage |
+| Ground floor, modules 0-1 | Hearth Kitchen | meets **food**: a keeper feeds the dragon here, with the bowl taken at the hearth | S2: food met there, bowls picked up |
+| Module 2, floor to roof | Dragon Lift | carries dragons between the barn's floors and up to the Aerie | S3: dragons ride it |
+| Ground floor, modules 3-4 | Bathhouse | meets **bath**: a keeper washes the dragon here, with the bucket filled at the tub | S2: baths met there, buckets filled |
+| Ground floor, module 5 | Hatchery | eggs lie in its three nests and hatch into babies | S5: an egg laid or hatched |
+| Upper floor, modules 0-1 | Romp Room | meets **play**: a keeper plays with the dragon here, with a ball from the box by the wheel | S2: play met there, balls taken |
+| Upper floor, modules 3-5 | Grooming Parlour | meets **love**, the busiest need (the own need of spike, rock and slinkwing): a keeper grooms and pets the dragon here | S2: love met there |
+| Hayloft, modules 3-4 | Lamp Dorm | meets **sleep**: a keeper tucks the dragon in here | S2: sleep met there |
+| Left tower, ground floor | Tack Room | riders take their saddles here before a mission and hang them back after | S8 |
+| Left tower, floor 2 | Bunks | riders rest here after a mission | S8 |
+| Left tower, floor 4 | Map Room | the mission table: the world map and the mission chooser | S8 |
+| The roof (floor 5) | Aerie | teams gather here, leave and land | S8 |
+| Right tower, ground floor | Garden Gate | the dragons' way out to the garden | S6 |
+| Outside, east | Garden | the retired elders' home | S6 |
 
-**Tower rooms.** Bunks (how many people you can have), Mess Hall, Tack Room (mission gear), Map Room (the mission
-table), Lookout (finds new missions), Library (element lore), Workshop (crafts from quills and mission finds),
-Infirmary (a tired team recovers faster), and the Aerie.
+**Bare:** the hayloft's modules 0, 1 and 5; the left tower's floors 1 and 3; the right tower's five floors (its ground
+floor becomes the Garden Gate in S6). **Dropped:** the Nursery, the Feed Store, the Hay Store and the Attic (nothing
+used them); the Sun Loft and the Song Roost (love is met in one room, the Grooming Parlour); the Mess Hall, the
+Library, the Workshop, the Infirmary and the Lookout (no mechanic); and two of the three Bunks.
+
+**Slots.** A dragon room's dragons stand in fixed slots. Each module has one at its middle, facing the room's keepers
+(a one-module room faces its post; in a two-module room the two dragons face each other, so their keepers work between
+them; a three-module room faces +1, +1, -1), and two baby sub-slots 40 px in from its sides. A module holds either one
+grown dragon or up to two babies; the Hatchery has baby sub-slots only. A keeper meets a dragon at its slot's **stand
+spot**: in front of its snout (58 px for an adult), kept inside the room. The new game starts with one dragon per
+need room's first slot, the three love dragons filling the Grooming Parlour.
 
 **Neighbours** (later; all from traits the rig already has): slinkwing's shriek and lonely call carry one room over,
-so the Song Roost wants distance from the Lamp Dorm, or a dusk next door (`hush`); the hearth warms its neighbours (a
-Hatchery beside it hatches faster, a Bathhouse beside it is a hot spring); the Sun Loft needs the roof; spike's wary
-latch (5.4) already measures crowding, so spike wants a roomy room.
+and dusk's `hush` calms the rooms around it; the hearth warms its neighbours; spike's wary latch (5.4) already
+measures crowding, so spike wants a roomy room.
 
 ---
 
@@ -155,9 +190,10 @@ lightning's static (its crackle, then the zap: 3.5); a hungry dragon begs.
 
 It costs nothing but the job it bumps.
 
-**4.6 Rooms help.** A room restores its own need for the dragons living in it at 1.5 times the base drain. A dragon
-in a room that matches its needs asks for less; its own need, draining twice as fast, still falls, only slowly. Good
-placement shrinks the queue.
+**4.6 Rooms help (until S3).** For now the room a dragon stands in restores the need it meets at 1.5 times the base
+drain, so a dragon in its own need's room asks for less; its own need, draining twice as fast, still falls, only
+slowly. This regeneration goes in the next slice (S3): from then on only a keeper meets a need (#7), in that need's
+room, and the dragon walks there.
 
 **4.7 Capacity.** A queue that keeps growing means too few keepers or the wrong rooms: hire, or build. Riders away on
 a mission are not keeping, which is the price of sending a team (5.6).
@@ -183,7 +219,7 @@ a mission are not keeping, which is the price of sending a team (5.6).
 
 ![The mission table: pick the pairs, counter the challenges, see the odds](base/mission_table.png)
 
-- **5.1 The board.** The Lookout keeps 3 or 4 missions on the Map Room's table. Each has a region, a length (2 to 10
+- **5.1 The board.** The Map Room's table keeps 3 or 4 missions. Each has a region, a length (2 to 10
   minutes of play), 2 to 4 challenges and its rewards.
 - **5.2 The team.** 1 to 3 **pairs**, each a rider and a dragon. You pick the dragons; each takes a rider
   automatically (B7):
@@ -260,36 +296,42 @@ a mission are not keeping, which is the price of sending a team (5.6).
    does either); `t=` freezes it as in every gallery view. The gallery's own keys (the arrows, Space, E, the digits)
    do nothing here, and its arrows step over the base, so a debug view reached with them can still be left.
 
-   ![The built slice, 30 s in: six of the seven young adults in the start frame (WICK's tail at the right edge), all four keepers at work, the job strip](base/base_live.png)
+   ![The built slice, 30 s in, in the start frame: west to east the Hearth Kitchen and the Romp Room (EMBER, and ZAP tucked in by Iris), the Dragon Lift with its car parked at the ground floor, the keepers' ladder bay, and the first slots of the Bathhouse, the Grooming Parlour and the Lamp Dorm (RIPPLE, BRAMBLE and WICK); all four keepers at work, the job strip](base/base_live.png)
 
    | File | What it is |
    |---|---|
    | `src/game/pet.ts` | the pet code, moved out of `src/gallery.ts` unchanged (the gallery renders pixel for pixel as before) |
    | `src/game/needs.ts` | the five needs, the drains, the tiers, mood and lightning's charge |
-   | `src/game/layout.ts` | the grid, the rooms, the floor spans, the ladders and the hoist, and routes between any two spots |
-   | `src/game/start.ts` | the starting base: the mockups' rooms, seven newly adult dragons (one per element, 0 days into adulthood) and the four named keepers |
+   | `src/game/layout.ts` | the grid; the rooms, each with its purpose (#11), and their dragon slots and stand spots; the Dragon Lift and the Aerie; the keepers' net (the ladders) and a dragon net per stage (the lift); routes between any two spots on a net; the name plates' places |
+   | `src/game/surfaces.ts` | every floor anyone stands on (`FLOORS`: straw), each gated by `tools/palette-check.ts`, and the bare and lift-shaft walls |
+   | `src/game/start.ts` | the starting base: the rooms of section 3, seven newly adult dragons (one per element, 0 days into adulthood), each in a slot of its own need's room, and the four named keepers |
    | `src/game/presets.ts` | code-built starts for views that need what a new game hasn't got (`ages`: every stage) |
    | `src/game/sim.ts` | the care simulation: the queue, the keepers' trips and jobs, and Rush; no drawing, seeded, deterministic; dragons with stable ids, a clock, and its options (seed, day length, start time) |
    | `src/game/save.ts` | the save format: the whole world as JSON, every reference an id, loaded back exactly (`CareSim.fromSave`); the digest two runs compare |
    | `src/game/rand.ts` | stateless draws (`rngAt(seed, tag, ...keys)`): no RNG state is ever kept or saved |
-   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building, the keepers on the named cast's rig (`docs/KEEPERS.md`), the bubbles and chips |
+   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building (its rooms, the lift's shaft, car and headframe, the ladder bay, the Aerie's deck and gantry), the keepers on the named cast's rig (`docs/KEEPERS.md`), the bubbles and chips |
    | `src/game/base.ts` | the live view: the simulation driving the dragons' anims, the camera, the HUD and the input |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route, 30 minutes of play with its invariants, determinism, Rush, the start cast, saves (a loaded world steps on exactly as its original), `rngAt` |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play with its invariants, determinism, Rush, the start cast, saves (a loaded world steps on exactly as its original), `rngAt`, and the rooms (a purpose each, one room per need, every named room used over the check unless planned) |
 
-   Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play, 149
-   jobs opened and 148 were done. A keeper started on a job 14.2 s after it opened on average (40.5 s at most), and
-   no need ever emptied. (The first cast, twelve dragons, gave 274 opened, 271 done, 15.9 s and 53.4 s.) Not in this
-   slice:
-   - dragons stay where they stand (the idle and its variants keep them lively), in the mockups' rooms: the seven
-     span more than one screen, so the start camera frames six of them and the tail of the seventh (WICK, in the
-     Lamp Dorm), and a drag shows the rest;
+   Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play, 150
+   jobs opened and 148 were done. A keeper started on a job 13.8 s after it opened on average (41.4 s at most), and
+   no need ever emptied; the need rooms were used 31 (Bathhouse), 36 (Romp Room), 32 (Hearth Kitchen), 8 (Grooming
+   Parlour) and 2 (Lamp Dorm) times (a need met in its own room, or its supply taken there). (In the mockups' rooms,
+   before the building was rebuilt: 149 opened, 148 done, 14.2 s and 40.5 s; the first cast, twelve dragons, gave 274
+   opened, 271 done, 15.9 s and 53.4 s.) Not in this slice:
+   - dragons stay in their slots (the idle and its variants keep them lively), and the room a dragon stands in still
+     restores the need it meets (4.6): walking to a need's room, riding the lift and the end of that regeneration are
+     the next slice. The seven span more than one screen (world x 188 to 1177), so the start camera frames five of
+     them with every face whole (EMBER's and ZAP's tail tips at the left edge), and a drag shows COBBLE and ECHO;
+   - the lift's car stays parked at the ground floor, and nothing uses the Hatchery, the riders' rooms or the Aerie
+     yet (section 3's table says which slice does);
    - the base is the fixed starting one (or a preset), and nothing is stored yet: the save format exists and is
      checked, but nothing writes it to the browser;
-   - there is no building yet, and no missions.
+   - no building of rooms (the rooms are section 3's fixed set), and no missions.
 2. **Rooms you build:** place, merge and upgrade rooms; move dragons between them; save and load.
 3. **Missions:** the table, then the scene.
-4. **The rest of the world:** people's own lives (bunks, the mess hall), eggs and hatching, day and night, the
-   neighbour effects, the blueprint zoom-out.
+4. **The rest of the world:** people's own lives (the bunks), eggs and hatching, day and night, the neighbour
+   effects, the blueprint zoom-out.
 
 ## 9. Open questions
 

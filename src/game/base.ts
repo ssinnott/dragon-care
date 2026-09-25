@@ -16,10 +16,10 @@ import type { Dragon, Job } from './sim.ts';
 import { startSpec, buildSim } from './presets.ts';
 import { worldKey, fnv1a } from './save.ts';
 import type { Stage } from '../art/dragon/stages.ts';
-import { WORLD_W, WORLD_H, HOIST_CX, feetY } from './layout.ts';
+import { WORLD_W, WORLD_H, feetY } from './layout.ts';
 import { SOON, tierOf, chargeOf } from './needs.ts';
 import type { NeedKind } from './needs.ts';
-import { drawBuilding, drawPlates, drawHoistCar } from './building.ts';
+import { drawBuilding, drawPlates, drawLiftCar } from './building.ts';
 import { makeKeeperAgent, stepKeeperVisual, drawKeeperVisual } from './people.ts';
 import type { KeeperAgent } from '../care/keeper.ts';
 import { drawBubble, drawChip, hit } from './icons.ts';
@@ -28,10 +28,14 @@ import type { Rect } from './icons.ts';
 const INK = '#1a1018';
 export const VIEW_W = 640, VIEW_H = 360;
 /**
- * Where the camera starts: the barn's middle, where the new game's seven young adults stand in the mockups' rooms
- * (world x 344-962, wider than one screen): six of them whole, and WICK's tail in the Lamp Dorm at the right edge.
+ * Where the camera starts: the barn's three floors, the kitchen and the romp room (EMBER and ZAP), the Dragon Lift
+ * parked at the ground floor, the ladder bay, and the first slots of the bathhouse, the grooming parlour and the lamp
+ * dorm (RIPPLE, BRAMBLE and WICK). The new game's seven young adults stand in their need rooms' slots and span world
+ * x 188-1177 (measured over their idles), wider than one screen; the five west of the ladder bay span x 188-841, 14 px
+ * more than a screen, so the frame starts at 204: all five faces whole, EMBER's and ZAP's tail tips (at most 16 px)
+ * cut at the left edge. A drag shows COBBLE and ECHO.
  */
-const START_CAM = { x: 300, y: 376 };
+const START_CAM = { x: 204, y: 376 };
 /** Chips in the job strip (4.8). */
 const STRIP = 5;
 /** What a job has the dragon do (4.4, the rig's anims: ART_BIBLE 4.2); dusk's bedtime is its own tuck-in (3.8). */
@@ -77,8 +81,8 @@ export class BaseView {
   private readonly top = new TopPass(160);
   private readonly budget = new AmbientBudget();
   private frame = 0;
-  /** The hoist car's floor, world y: it rides with whoever is on it and waits where they left it. */
-  private carY = feetY(0);
+  /** The Dragon Lift's car, world y of its rider's feet: parked at the ground floor until dragons ride it (S3). */
+  private readonly carY = feetY(0);
   /** Last frame's bubbles (world px) and chips (screen px), for tapping. */
   private bubbles: { job: Job; r: Rect }[] = [];
   private chips: { job: Job; r: Rect }[] = [];
@@ -125,10 +129,7 @@ export class BaseView {
     const pets = this.pets;
     stepWary(pets);
     for (const p of pets) stepPet(p);
-    this.sim.keepers.forEach((k, i) => {
-      if (k.climbing && Math.abs(k.x - HOIST_CX) < 1) this.carY = k.y;
-      stepKeeperVisual(this.keeperAgents[i], k, k.climbing ? k.y : k.y - 3);
-    });
+    this.sim.keepers.forEach((k, i) => stepKeeperVisual(this.keeperAgents[i], k, k.climbing ? k.y : k.y - 3));
     if (this.camTo) {
       this.setCam(this.camX + (this.camTo.x - this.camX) / 6, this.camY + (this.camTo.y - this.camY) / 6);
       if (Math.abs(this.camTo.x - this.camX) < 0.5 && Math.abs(this.camTo.y - this.camY) < 0.5) { this.setCam(this.camTo.x, this.camTo.y); this.camTo = null; }
@@ -179,7 +180,7 @@ export class BaseView {
     ctx.drawImage(this.building, cx, cy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
     ctx.save();
     ctx.translate(-cx, -cy);
-    drawHoistCar(ctx, this.carY);
+    drawLiftCar(ctx, this.carY);
     // the cast, y-sorted by the feet; keepers stand a step behind the dragons they work with, so a dragon's head is
     // never covered (ART_BIBLE 1.4: nothing covers the eye)
     const cast: { y: number; pet?: Pet; keeper?: number }[] = [];

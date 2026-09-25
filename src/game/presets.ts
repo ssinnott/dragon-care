@@ -20,22 +20,23 @@ export interface StartSpec {
 }
 
 /**
- * The base's first cast, unchanged: twelve dragons, every element and every stage among them, where the greybox
- * mockups had them (docs/base/). The new game starts with seven newly adult dragons instead (start.ts, #9).
+ * The base's first cast: twelve dragons, every element and every stage among them (the greybox mockups', docs/base/),
+ * each in a slot: the grown ones in their need rooms' module slots, the babies in sub-slots (a module holds one grown
+ * dragon or two babies), PEBBLE in the hatchery. The new game starts with seven newly adult dragons instead (start.ts, #9).
  */
 export const AGES_DRAGONS: readonly DragonPlace[] = [
-  { name: 'EMBER', element: 'fire', stage: 'adult', seed: 11, room: 'kitchen', at: 0.62, facing: 1 },
-  { name: 'CINDER', element: 'fire', stage: 'baby', seed: 28, room: 'kitchen', at: 0.9, facing: -1 },
-  { name: 'PEBBLE', element: 'rock', stage: 'baby', seed: 62, room: 'hatchery', at: 0.78, facing: -1 },
-  { name: 'RIPPLE', element: 'water', stage: 'adult', seed: 79, room: 'bath', at: 0.3, facing: 1 },
-  { name: 'ZAP', element: 'lightning', stage: 'young', seed: 113, room: 'romp', at: 0.4, facing: 1 },
-  { name: 'BURR', element: 'spike', stage: 'baby', seed: 45, room: 'romp', at: 0.64, facing: -1 },
-  { name: 'SPLASH', element: 'water', stage: 'young', seed: 147, room: 'romp', at: 0.87, facing: -1 },
-  { name: 'BRAMBLE', element: 'spike', stage: 'adult', seed: 164, room: 'groom', at: 0.38, facing: 1 },
-  { name: 'WICK', element: 'dusk', stage: 'adult', seed: 181, room: 'dorm', at: 0.28, facing: 1 },
-  { name: 'ASH', element: 'fire', stage: 'elder', seed: 198, room: 'dorm', at: 0.8, facing: -1 },
-  { name: 'COBBLE', element: 'rock', stage: 'elder', seed: 215, room: 'sunloft', at: 0.55, facing: 1 },
-  { name: 'ECHO', element: 'slinkwing', stage: 'adult', seed: 266, room: 'roost', at: 0.35, facing: 1 },
+  { name: 'EMBER', element: 'fire', stage: 'adult', seed: 11, slot: { room: 'kitchen', i: 0 } },
+  { name: 'CINDER', element: 'fire', stage: 'baby', seed: 28, slot: { room: 'kitchen', i: 5 } },
+  { name: 'PEBBLE', element: 'rock', stage: 'baby', seed: 62, slot: { room: 'hatchery', i: 1 } },
+  { name: 'RIPPLE', element: 'water', stage: 'adult', seed: 79, slot: { room: 'bath', i: 0 } },
+  { name: 'ZAP', element: 'lightning', stage: 'young', seed: 113, slot: { room: 'romp', i: 0 } },
+  { name: 'BURR', element: 'spike', stage: 'baby', seed: 45, slot: { room: 'romp', i: 5 } },
+  { name: 'SPLASH', element: 'water', stage: 'young', seed: 147, slot: { room: 'bath', i: 1 } },
+  { name: 'BRAMBLE', element: 'spike', stage: 'adult', seed: 164, slot: { room: 'groom', i: 0 } },
+  { name: 'WICK', element: 'dusk', stage: 'adult', seed: 181, slot: { room: 'dorm', i: 0 } },
+  { name: 'ASH', element: 'fire', stage: 'elder', seed: 198, slot: { room: 'dorm', i: 1 } },
+  { name: 'COBBLE', element: 'rock', stage: 'elder', seed: 215, slot: { room: 'groom', i: 1 } },
+  { name: 'ECHO', element: 'slinkwing', stage: 'adult', seed: 266, slot: { room: 'groom', i: 2 } },
 ];
 
 /** The new game: the start's rooms, its seven young adults and the four keepers. */

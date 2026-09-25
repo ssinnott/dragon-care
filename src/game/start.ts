@@ -1,7 +1,7 @@
-// The base a new game starts from, and the one view=base and tools/sim-check.ts run: the greybox mockups' rooms
-// (docs/base/), seven dragons -- one of each element, every one newly adult, 0 days into the stage (#9: "start with a
-// young adult dragon of each kind"; BASE_DESIGN's Decisions: *young adult* is the adult stage's first day) -- and the
-// four named keepers. Views that need other stages build their own casts (src/game/presets.ts).
+// The base a new game starts from, and the one view=base and tools/sim-check.ts run: one room per need, the hatchery
+// and the riders' rooms (docs/BASE_DESIGN.md 3), seven dragons -- one of each element, every one newly adult, 0 days
+// into the stage (#9: "start with a young adult dragon of each kind"; BASE_DESIGN's Decisions: *young adult* is the
+// adult stage's first day), each in a slot of its own need's room -- and the four named keepers. Views that need other stages build their own casts (src/game/presets.ts).
 import type { RoomPlace, RoomKind } from './layout.ts';
 import type { NeedKind } from './needs.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
@@ -9,43 +9,40 @@ import type { Stage } from '../art/dragon/stages.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
 
 export const START_ROOMS: readonly RoomPlace[] = [
+  // the barn: one room per need (the ground floor's hatchery too); module 2 on every floor is the Dragon Lift, and
+  // the hayloft's modules 0, 1 and 5 are bare
   { kind: 'kitchen', part: 'barn', floor: 0, mod: 0, width: 2 },
-  { kind: 'hatchery', part: 'barn', floor: 0, mod: 2 },
   { kind: 'bath', part: 'barn', floor: 0, mod: 3, width: 2 },
-  { kind: 'store', part: 'barn', floor: 0, mod: 5 },
-  { kind: 'romp', part: 'barn', floor: 1, mod: 0, width: 3 },
-  { kind: 'groom', part: 'barn', floor: 1, mod: 3 },
-  { kind: 'dorm', part: 'barn', floor: 1, mod: 4, width: 2 },
-  { kind: 'sunloft', part: 'barn', floor: 2, mod: 0, width: 2 },
-  { kind: 'haystore', part: 'barn', floor: 2, mod: 2 },
-  { kind: 'roost', part: 'barn', floor: 2, mod: 3, width: 2 },
-  { kind: 'attic', part: 'barn', floor: 2, mod: 5 },
+  { kind: 'hatchery', part: 'barn', floor: 0, mod: 5 },
+  { kind: 'romp', part: 'barn', floor: 1, mod: 0, width: 2 },
+  { kind: 'groom', part: 'barn', floor: 1, mod: 3, width: 3 },
+  { kind: 'dorm', part: 'barn', floor: 2, mod: 3, width: 2 },
+  // the left tower: the riders' rooms (its floors 1 and 3, and all of the right tower, are bare)
   { kind: 'tack', part: 'towerL', floor: 0 },
-  { kind: 'mess', part: 'towerL', floor: 1 },
   { kind: 'bunks', part: 'towerL', floor: 2 },
-  { kind: 'bunks', part: 'towerL', floor: 3 },
   { kind: 'maproom', part: 'towerL', floor: 4 },
-  { kind: 'infirmary', part: 'towerR', floor: 0 },
-  { kind: 'library', part: 'towerR', floor: 1 },
-  { kind: 'bunks', part: 'towerR', floor: 2 },
-  { kind: 'workshop', part: 'towerR', floor: 3 },
-  { kind: 'lookout', part: 'towerR', floor: 4 },
 ];
 
 /**
- * A dragon at home: its room (the first of that kind), where it stands across the room (0..1) and which way it faces;
- * `days` is how far into its stage it is (game days, default 0: the stage has just begun).
+ * A dragon at home: which slot it stands in (a room kind -- the first room of that kind -- and the index into its
+ * slots: layout.ts slotsOf; it faces the slot's way), and `days`, how far into its stage it is (game days, default 0:
+ * the stage has just begun).
  */
-export interface DragonPlace { name: string; element: DragonElement; stage: Stage; seed: number; room: RoomKind; at: number; facing: 1 | -1; days?: number }
-/** One of each element, in the art bible's order, every one at the very start of the adult stage (ids 0-6 in this order). */
+export interface DragonPlace { name: string; element: DragonElement; stage: Stage; seed: number; slot: { room: RoomKind; i: number }; days?: number }
+/**
+ * One of each element, in the art bible's order, every one at the very start of the adult stage (ids 0-6 in this
+ * order), each in a slot of its own need's room: fire's food in the kitchen, water's bath in the bathhouse,
+ * lightning's play in the romp room, the love of spike, rock and slinkwing in the grooming parlour, dusk's sleep in
+ * the lamp dorm.
+ */
 export const START_DRAGONS: readonly DragonPlace[] = [
-  { name: 'EMBER', element: 'fire', stage: 'adult', seed: 11, room: 'kitchen', at: 0.62, facing: 1, days: 0 },
-  { name: 'BRAMBLE', element: 'spike', stage: 'adult', seed: 164, room: 'groom', at: 0.38, facing: 1, days: 0 },
-  { name: 'COBBLE', element: 'rock', stage: 'adult', seed: 215, room: 'sunloft', at: 0.55, facing: 1, days: 0 },
-  { name: 'ZAP', element: 'lightning', stage: 'adult', seed: 113, room: 'romp', at: 0.4, facing: 1, days: 0 },
-  { name: 'RIPPLE', element: 'water', stage: 'adult', seed: 79, room: 'bath', at: 0.3, facing: 1, days: 0 },
-  { name: 'ECHO', element: 'slinkwing', stage: 'adult', seed: 266, room: 'roost', at: 0.35, facing: 1, days: 0 },
-  { name: 'WICK', element: 'dusk', stage: 'adult', seed: 181, room: 'dorm', at: 0.28, facing: 1, days: 0 },
+  { name: 'EMBER', element: 'fire', stage: 'adult', seed: 11, slot: { room: 'kitchen', i: 0 }, days: 0 },
+  { name: 'BRAMBLE', element: 'spike', stage: 'adult', seed: 164, slot: { room: 'groom', i: 0 }, days: 0 },
+  { name: 'COBBLE', element: 'rock', stage: 'adult', seed: 215, slot: { room: 'groom', i: 1 }, days: 0 },
+  { name: 'ZAP', element: 'lightning', stage: 'adult', seed: 113, slot: { room: 'romp', i: 0 }, days: 0 },
+  { name: 'RIPPLE', element: 'water', stage: 'adult', seed: 79, slot: { room: 'bath', i: 0 }, days: 0 },
+  { name: 'ECHO', element: 'slinkwing', stage: 'adult', seed: 266, slot: { room: 'groom', i: 2 }, days: 0 },
+  { name: 'WICK', element: 'dusk', stage: 'adult', seed: 181, slot: { room: 'dorm', i: 0 }, days: 0 },
 ];
 
 /**

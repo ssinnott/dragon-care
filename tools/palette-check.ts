@@ -41,8 +41,10 @@
 //   (i) floor     : every scale, every belly, the outer colour of every effect that lands on the floor, every marking
 //                   that runs along the silhouette's edge (dusk's smoke tail tip and its band), dusk's lamp resting
 //                   on the floor asleep, and the elder's beard (a sleeping elder's chin rests on it; water's and
-//                   rock's are exempt, inked: bible 5.6 E14, E15) keep >= 25 % luminance from the reference habitat
-//                   floor. Hue cannot help: the floor's S is < 0.20.
+//                   rock's are exempt, inked: bible 5.6 E14, E15) keep >= 25 % luminance from EVERY floor anyone
+//                   stands on (src/game/surfaces.ts FLOORS: the straw of the base's rooms, landings, lift car and
+//                   Aerie deck, and any floor a later slice adds), and each floor's HSV S is < 0.20 (a counted gate:
+//                   hue cannot help on a floor, so none may carry one).
 //   (j) identity  : greying never takes a body's hue away: every scale keeps HSV S >= 0.30 at every stage, so gate
 //                   (b)'s B1 and the neutral ceiling (<= 40 % neutral area) keep holding for elders.
 //   (k) visible greying: each greying step (young -> adult, adult -> elder) moves the scale or its highlight band
@@ -65,6 +67,7 @@ import type { KeeperPalette } from '../src/art/keeper/palettes.ts';
 import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
 import type { KeeperId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
+import { FLOORS } from '../src/game/surfaces.ts';
 
 // ---------- thresholds ----------
 /** House ladder: adjacent parts separate by this relative luminance difference... */
@@ -108,11 +111,14 @@ const ID_SAT = 0.3;
 /** The engine's far-side defaults (rig.ts FAR_SHADE / FAR_DESAT), which gate (c) is written against. */
 const ENGINE_FAR = { shade: 0.62, desat: 0.25 };
 /**
- * Reference habitat floor for gate (i): a pale, low-saturation straw floor. The seven bodies span luminance
- * 0.05..0.49 on purpose (see gate (b)), so only a light floor can sit >= 25 % from all of them, and every belly
- * must then sit <= 0.50 or >= 0.90 in luminance.
+ * The floors of gates (i) and (Ki): every surface a dragon or a keeper stands on (src/game/surfaces.ts FLOORS), each a
+ * pale, low-saturation floor. The seven bodies span luminance 0.05..0.49 on purpose (see gate (b)), so only a light
+ * floor can sit >= 25 % from all of them, and every belly must then sit <= 0.50 or >= 0.90 in luminance. The straw,
+ * #e0d6b8, is the reference habitat floor (bible 5.4).
  */
-const FLOOR_REF = '#e0d6b8';
+const FLOOR_LIST: readonly (readonly [string, string])[] = Object.entries(FLOORS);
+/** A floor's saturation ceiling: hue never counts on a floor, so it must not carry one. */
+const FLOOR_S_MAX = 0.2;
 /** Elements whose head carries a PAIRED horn, so a far horn is drawn against the near head (bible section 3). */
 const PAIRED_HORNS: readonly DragonElement[] = ['fire', 'spike', 'lightning'];
 /**
@@ -599,24 +605,28 @@ for (const e of DRAGON_ELEMENTS) {
 }
 
 // (i) -----------------------------------------------------------------------------------------------------
-head(`(i) HABITAT FLOOR ${FLOOR_REF}  (L ${lumOf(FLOOR_REF).toFixed(2)}, S ${hsvOf(FLOOR_REF).s.toFixed(2)}: hue never counts, >= ${LUM_MIN * 100}% luminance; % b/y/a/e)`);
-for (const e of DRAGON_ELEMENTS) {
-  const cells: string[] = [];
-  let allOk = true;
-  const items: FloorItem[] = [{ what: 'scale', ref: 'scale' }, { what: 'belly', ref: 'belly' }, ...FLOOR_FX[e], ...FLOOR_ALL];
-  for (const it of items) {
-    const ex = it.except?.[e];
-    if (ex) { cells.push(`${it.what} exempt (${ex})`); continue; }
-    const ds: (number | null)[] = [], oks: (boolean | null)[] = [];
-    for (const st of STAGES) {
-      if (it.only && st !== it.only) { ds.push(null); oks.push(null); continue; }
-      const d = relDiff(colour(e, st, it.ref), FLOOR_REF);
-      ds.push(d); oks.push(d >= LUM_MIN);
-      if (!count(`(i) ${e} ${st} ${it.what}`, d >= LUM_MIN)) allOk = false;
+for (const [floorName, floorHex] of FLOOR_LIST) {
+  const fs = hsvOf(floorHex).s, sOk = count(`(i) ${floorName} saturation < ${FLOOR_S_MAX.toFixed(2)}`, fs < FLOOR_S_MAX);
+  head(`(i) HABITAT FLOOR ${floorName} ${floorHex}  (L ${lumOf(floorHex).toFixed(2)}, S ${fs.toFixed(2)}: hue never counts, >= ${LUM_MIN * 100}% luminance; % b/y/a/e)`);
+  out.push(`${sOk ? '  ok  ' : '  FAIL'} saturation ${fs.toFixed(3)} < ${FLOOR_S_MAX.toFixed(2)}`);
+  for (const e of DRAGON_ELEMENTS) {
+    const cells: string[] = [];
+    let allOk = true;
+    const items: FloorItem[] = [{ what: 'scale', ref: 'scale' }, { what: 'belly', ref: 'belly' }, ...FLOOR_FX[e], ...FLOOR_ALL];
+    for (const it of items) {
+      const ex = it.except?.[e];
+      if (ex) { cells.push(`${it.what} exempt (${ex})`); continue; }
+      const ds: (number | null)[] = [], oks: (boolean | null)[] = [];
+      for (const st of STAGES) {
+        if (it.only && st !== it.only) { ds.push(null); oks.push(null); continue; }
+        const d = relDiff(colour(e, st, it.ref), floorHex);
+        ds.push(d); oks.push(d >= LUM_MIN);
+        if (!count(`(i) ${floorName} ${e} ${st} ${it.what}`, d >= LUM_MIN)) allOk = false;
+      }
+      cells.push(`${it.what} ${perStage(ds, oks, n100)}%`);
     }
-    cells.push(`${it.what} ${perStage(ds, oks, n100)}%`);
+    out.push(`${allOk ? '  ok  ' : '  FAIL'} ${e.padEnd(10)} ${cells.join('  ')}`);
   }
-  out.push(`${allOk ? '  ok  ' : '  FAIL'} ${e.padEnd(10)} ${cells.join('  ')}`);
 }
 
 // (j) -----------------------------------------------------------------------------------------------------
@@ -668,7 +678,7 @@ if (!glowClose) out.push('   none');
 //                    (KEEPER_SKIN_SHADOW) sits >= 25 % luminance under its skin;
 //   (Kc) far side  : the far arm and leg (farPalette at KEEPER_FAR) keep >= 25 % luminance from the near side;
 //   (Ke) ink floor : and >= 25 % luminance AND >= OKL_MIN Oklab L from the outline;
-//   (Ki) floor     : the shoes and the trousers or skirt keep >= 25 % luminance from the straw floor;
+//   (Ki) floor     : the shoes and the trousers or skirt keep >= 25 % luminance from every floor (FLOORS);
 //   (Kf) told apart: the four keepers' tops pass RULE_B pairwise, as they are and under simulated deuteranopia and
 //                    protanopia (a player tells the keepers apart across the yard by the top first);
 //   (Kg) at work   : the night keeper's trousers and cardigan pass the ladder against dusk's scale at every stage
@@ -730,9 +740,9 @@ for (const id of KEEPER_IDS) {
     out.push(`${okC && okE ? '  ok  ' : '  FAIL'} (Kc/Ke) far ${slot.padEnd(10)} ${f}  vs near ${pct(dn)}  vs ink ${pct(di)} ${okf(dk)}`);
   }
   // (Ki)
-  for (const slot of ['dark', 'secondary'] as const) {
-    const d = relDiff(P[slot], FLOOR_REF), ok = kcount(`(Ki) ${id} ${slot} / floor`, d >= LUM_MIN);
-    out.push(`${ok ? '  ok  ' : '  FAIL'} (Ki) ${(slot === 'dark' ? 'shoes' : 'trousers') + ' / floor'}${' '.repeat(slot === 'dark' ? 5 : 2)} ${pct(d)}  ${P[slot]} on ${FLOOR_REF}`);
+  for (const [floorName, floorHex] of FLOOR_LIST) for (const slot of ['dark', 'secondary'] as const) {
+    const d = relDiff(P[slot], floorHex), ok = kcount(`(Ki) ${id} ${slot} / ${floorName} floor`, d >= LUM_MIN);
+    out.push(`${ok ? '  ok  ' : '  FAIL'} (Ki) ${(slot === 'dark' ? 'shoes' : 'trousers') + ' / floor'}${' '.repeat(slot === 'dark' ? 5 : 2)} ${pct(d)}  ${P[slot]} on ${floorName} ${floorHex}`);
   }
 }
 // (Kf)

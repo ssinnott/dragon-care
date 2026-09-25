@@ -67,9 +67,10 @@ import { beginFeed, beginPet, beginTuck, stepAct, approachSide } from './care/ac
 import type { ActKind, CareAct } from './care/acts.ts';
 import { Yard } from './care/yard.ts';
 import { REACH_MISS, ACT_MAX, YARD_ACT_MAX } from './care/limits.ts';
+import { FLOORS } from './game/surfaces.ts';
 
-/** The reference habitat floor (5.4, gate i). */
-export const STRAW = '#e0d6b8';
+/** The reference habitat floor (5.4, gate i): the base's straw (src/game/surfaces.ts, every floor gated by tools/palette-check.ts). */
+export const STRAW = FLOORS.straw;
 const LABEL = '#3a2a30';
 
 export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings', 'keepers', 'care', 'careaudit', 'yard', 'yardaudit', 'base'] as const;

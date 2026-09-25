@@ -6,11 +6,16 @@
 import type { CareSim, Dragon, Keeper, Job, SimStats } from './sim.ts';
 import type { RoomPlace } from './layout.ts';
 
-/** The format's version: every change to what a save holds bumps it, and a save of another version is not loaded. */
-export const SAVE_VERSION = 1;
+/**
+ * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded.
+ * 2 (S2): a dragon's slot (by room id and index) in place of its home room; the rooms' uses (stats.used).
+ */
+export const SAVE_VERSION = 2;
 
-/** A dragon as saved: every field, its room by id. */
-export type DragonSave = Omit<Dragon, 'room'> & { room: number };
+/** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
+export interface SlotRef { room: number; i: number }
+/** A dragon as saved: every field, its slot by room id and index. */
+export type DragonSave = Omit<Dragon, 'slot'> & { slot: SlotRef };
 /** A keeper as saved: every field, their station by room id and their job by job id. */
 export type KeeperSave = Omit<Keeper, 'station' | 'job'> & { station: number; job: number | null };
 /** A job as saved: its dragon and keeper by id. */
@@ -45,17 +50,17 @@ export class SaveVersionError extends Error {
 /**
  * The world as JSON-safe data, in the simulation's own order (dragons, keepers and jobs as they sit in its arrays).
  * Every field of every dragon, keeper and job is kept -- the top level of each is copied whole, so a field a later
- * slice adds is saved with it -- and the plain objects they hold (needs, the act, the route's legs) are copied, so
- * the save never changes as the world steps on.
+ * slice adds is saved with it -- and the plain objects they hold (needs, the act, the route's legs, the rooms' uses)
+ * are copied, so the save never changes as the world steps on.
  */
 export function serialize(sim: CareSim): SaveV {
   return {
     v: SAVE_VERSION, seed: sim.seed, dayLen: sim.dayLen, clock0: sim.clock0, tick: sim.tick, nextDragonId: sim.nextDragonId, nextJob: sim.nextJob,
     rooms: sim.roomPlaces.map((p) => ({ ...p })),
-    dragons: sim.dragons.map((d): DragonSave => ({ ...d, room: d.room.id, needs: { ...d.needs }, act: d.act ? { ...d.act } : null })),
+    dragons: sim.dragons.map((d): DragonSave => ({ ...d, slot: { room: d.slot.room, i: d.slot.i }, needs: { ...d.needs }, act: d.act ? { ...d.act } : null })),
     keepers: sim.keepers.map((k): KeeperSave => ({ ...k, station: k.station.id, job: k.job ? k.job.id : null, legs: k.legs.map((l) => ({ ...l })) })),
     jobs: sim.jobs.map((j): JobSave => ({ ...j, dragon: j.dragon.id, keeper: j.keeper ? j.keeper.id : null })),
-    stats: { ...sim.stats },
+    stats: { ...sim.stats, used: { ...sim.stats.used } },
   };
 }
 
