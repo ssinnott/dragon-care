@@ -29,7 +29,7 @@ import { stepKeeperAgent, toGround, coverage, dryRun, frameAt, shoulderAt, walke
 import { findPath, FOOT_BAND, REPLAN } from './path.ts';
 import type { Floor } from './path.ts';
 import type { DragonAgent } from './dragon.ts';
-import { playDragon, stepDragonAgent, turnDragon, quiet, craniumPoint, pointIn, neckTop, backTop, eyeBox, bowlScreenX, obstacleOf } from './dragon.ts';
+import { playDragon, stepDragonAgent, turnDragon, quiet, craniumPoint, pointIn, neckTop, backTop, eyeBox, bowlScreenX, obstacleOf, tailReach } from './dragon.ts';
 
 export type ActKind = 'feed' | 'pet' | 'tuck';
 
@@ -55,8 +55,9 @@ export interface CareAct {
   bowlAt: number;
   bowlX: number;
   eatX: number;
-  /** Feed: where the keeper waits while the dragon eats (screen x). */
+  /** Feed: where the keeper waits while the dragon eats (screen x); how far the fed dragon trots off (px). */
   backX: number;
+  trot: number;
   /** Bites eaten, strokes given; the frame index where a lying dragon's lie-down ends (a tuck-in). */
   count: number;
   lieEnd: number;
@@ -97,8 +98,10 @@ const ARC: Readonly<Record<string, readonly [number, number]>> = { baby: [-150, 
 const FEED_GAP: Readonly<Record<string, number>> = { baby: 9, young: 12, adult: 14, elder: 14 };
 /** Feed: how far the keeper steps back while the dragon eats, px. */
 const FEED_BACK = 20;
-/** Feed: how far the fed dragon trots off before the keeper comes back for the bowl, px. */
+/** Feed: how far the fed dragon trots off before the keeper comes back for the bowl, px, at least. */
 const FEED_TROT = 30;
+/** Feed: the floor between the trotted-off dragon's tail tip and the bowl, px. */
+const FEED_CLEAR = 10;
 /** Tuck-in: how far the keeper tiptoes away from the sleeping dragon before it walks, px. */
 const TIPTOE = 40;
 /**
@@ -311,7 +314,7 @@ function act(kind: ActKind, k: KeeperAgent, d: DragonAgent, exitX: number, exitY
     world: o.world ?? (() => own), walk: null,
     floor: o.floor ?? { x0: Math.min(k.x, d.x, exitX) - 80, y0: Math.min(k.y, d.y, exitY) - 40, x1: Math.max(k.x, d.x, exitX) + 80, y1: Math.max(k.y, d.y, exitY) + 30 },
     kind, k, d, phase: 'go', t: 0, standX: k.x, standY: k.y, face: 1, staging: 'side', low: false, groom: false,
-    mark: { on: 'crown', from: ARC[d.stage][0], to: ARC[d.stage][1] }, bowlAt: 0, bowlX: 0, eatX: d.x, backX: k.x, count: 0, lieEnd: 0, exitX, exitY, done: false, ownsDragon: true, met: false, strokeT: 0,
+    mark: { on: 'crown', from: ARC[d.stage][0], to: ARC[d.stage][1] }, bowlAt: 0, bowlX: 0, eatX: d.x, backX: k.x, trot: FEED_TROT, count: 0, lieEnd: 0, exitX, exitY, done: false, ownsDragon: true, met: false, strokeT: 0,
   };
 }
 
@@ -352,6 +355,10 @@ export function beginFeed(k: KeeperAgent, d: DragonAgent, exitX: number, exitY =
   a.bowlX = bowlScreenX(d) + f * gap;
   a.standX = a.bowlX + f * a.bowlAt * k.scale;
   a.backX = a.standX + f * FEED_BACK * k.scale;
+  // the trot off: far enough that, turned round, the whole tail clears the bowl by FEED_CLEAR (turned in place at a
+  // short trot, a long tail lay over the bowl, and the keeper knelt into it to take the bowl away)
+  const sc = d.scale * d.rig.scale;
+  a.trot = Math.max(FEED_TROT, Math.ceil(tailReach(d) - (d.spot.x - d.spot.w / 2) * sc + FEED_CLEAR));
   // (on the dragon's own floor line, so the bowl the keeper lowers and the bowl that stands there are one bowl; the
   // scene draws a keeper after a dragon on the same line, and the bowl between them)
   k.player.play('carry', { restart: true, blend: 6 });
@@ -609,7 +616,7 @@ export function stepAct(a: CareAct): void {
       if (d.turning < 0) {
         if (d.player.name !== 'walk') { playDragon(d, 'walk', { blend: 6 }); a.count = 0; }
         roam = true; a.count += Math.abs(d.player.move) * d.scale;
-        if (a.count >= FEED_TROT) { roam = false; playDragon(d, 'idle', { blend: 10 }); next(a, 'return'); }
+        if (a.count >= a.trot) { roam = false; playDragon(d, 'idle', { blend: 10 }); next(a, 'return'); }
       }
       stepKeeperAgent(k);
       break;

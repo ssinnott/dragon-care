@@ -263,6 +263,36 @@ export function obstacleOf(d: DragonAgent, pad: number, ahead = 0): Obstacle {
   return { y: d.y, top, x0, x1, eye: { x0: e.x0 - pad, y0: e.y0 - pad, x1: e.x1 + pad, y1: e.y1 + pad } };
 }
 
+/** How far each look's drawing reaches behind its body centre, px at scale 1 (tailReach), measured once per look. */
+const TAIL_REACH = new Map<string, number>();
+let reachCanvas: HTMLCanvasElement | null = null;
+/**
+ * How far behind its body centre a dragon's drawing reaches along the floor, on screen px: measured from the look
+ * drawn at rest (its idle's first frame, facing right, off screen: the leftmost covered pixel), since a tail's shape
+ * (water's fluke, fire's flame, dusk's smoke tip) runs on past the tail chain the dims describe.
+ */
+export function tailReach(d: DragonAgent): number {
+  const key = `${d.el}:${d.stage}:${d.seed}`;
+  let r = TAIL_REACH.get(key);
+  if (r == null) {
+    if (!reachCanvas) { reachCanvas = document.createElement('canvas'); reachCanvas.width = 320; reachCanvas.height = 160; }
+    const g = reachCanvas.getContext('2d', { willReadFrequently: true })!, X = 220, Y = 130;
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 320, 160);
+    const a = d.player.anims.idle, pose = a?.frames[0]?.pose ?? {};
+    // (solved and drawn `still`, so the dragon's tail chain and clocks are not stepped; then the rig put back)
+    const o = { x: X, y: Y, facing: 1, scale: 1, mood: 0, still: true, shadow: false };
+    solveDragon(d.rig, pose, o);
+    drawDragon(g, d.rig, pose, o);
+    solveDragon(d.rig, d.player.pose, drawOpts(d));
+    const px = g.getImageData(0, 0, 320, 160).data;
+    let x0 = X;
+    for (let y = 0; y < 160; y++) for (let x = 0; x < X; x++) if (px[(y * 320 + x) * 4 + 3] >= 128 && x < x0) x0 = x;
+    r = X - x0;
+    TAIL_REACH.set(key, r);
+  }
+  return r * d.scale;
+}
+
 /** The snout's tip on screen after the last step (cranium space: the snout taper's end), for keeping clear of it. */
 export function snoutTip(d: DragonAgent, out: { x: number; y: number }): { x: number; y: number } {
   const s = d.rig.dims.head.snout;
