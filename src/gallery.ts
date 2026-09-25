@@ -29,25 +29,35 @@
 //   the elders without their tears and hole (2.9's with / without measure)
 import { drawText } from './lib/engine/text.ts';
 import { dragonBuild } from './art/dragon/build.ts';
-import { buildDragon, drawDragon, stepDragon, solveDragon, rootToScreen } from './art/dragon/rig.ts';
+import { buildDragon, drawDragon, stepDragon, rootToScreen } from './art/dragon/rig.ts';
 import { legRadii } from './art/dragon/parts.ts';
 import type { DragonRig, DrawDragonOpts } from './art/dragon/rig.ts';
 import { DragonAnimPlayer, blinkFor } from './art/dragon/anim.ts';
 import { dragonAnims, ANIM_NAMES, ONE_SHOTS, VARIANT_NAMES, ELEMENT_ANIM_NAMES, ELEMENT_ANIM_FALLBACK, idleVariants, variantEvery, SPREAD_VARIANTS, CROWD_GAP } from './art/dragon/anims.ts';
 import { ELEMENTS, ELEMENT_IDS } from './art/dragon/elements/index.ts';
 import { STAGES } from './art/dragon/stages.ts';
-import { DP, DFACE, ACT } from './art/dragon/pose.ts';
+import { DP, DFACE } from './art/dragon/pose.ts';
 import type { DFaceName, PartialDragonPose } from './art/dragon/pose.ts';
 import type { Stage } from './art/dragon/stages.ts';
 import type { DragonElement } from './art/dragon/palettes.ts';
 import { TopPass, AmbientBudget } from './art/dragon/fx.ts';
+import { bowlFor, drawBowl as drawBowlAt } from './art/props.ts';
+import { KEEPERS, KEEPER_IDS } from './art/keeper/cast.ts';
+import type { KeeperId } from './art/keeper/cast.ts';
+import { KEEPER_ANIM_NAMES, KEEPER_ONE_SHOTS } from './art/keeper/anims.ts';
+import { makeKeeper, stepKeeperAgent, drawKeeperAgent } from './care/keeper.ts';
+import { keeperJoint } from './art/keeper/rig.ts';
+import type { KeeperAgent } from './care/keeper.ts';
+import { makeDragon, drawDragonAgent, stepDragonAgent, eyeBox } from './care/dragon.ts';
+import type { DragonAgent } from './care/dragon.ts';
+import { beginFeed, beginPet, beginTuck, stepAct, approachSide } from './care/acts.ts';
+import type { ActKind, CareAct } from './care/acts.ts';
 
 /** The reference habitat floor (5.4, gate i). */
 export const STRAW = '#e0d6b8';
-const INK = '#1a1018';
 const LABEL = '#3a2a30';
 
-export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings'] as const;
+export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings', 'keepers', 'care', 'careaudit'] as const;
 export type View = typeof VIEWS[number];
 
 export interface GalleryParams {
@@ -85,6 +95,10 @@ export interface GalleryParams {
   wear: boolean;
   /** post=grey | cvd: any view post-processed as view=grey / cvd do the lineup (the habitat's grey and CVD check: 5.4). */
   post: 'grey' | 'cvd' | null;
+  /** k=<keeper>: view=keepers shows that keeper's anim as a strip (docs/KEEPERS.md); view=care, the keeper doing it. */
+  k: KeeperId | null;
+  /** act=feed | pet | tuck: view=care plays that one care act (on el= / stage=) instead of the three. */
+  act: ActKind | null;
 }
 
 export function parseParams(search: string): GalleryParams {
@@ -116,6 +130,8 @@ export function parseParams(search: string): GalleryParams {
     stages: q.get('stages') ? (q.get('stages') || '').split(',').filter((s) => (STAGES as readonly string[]).includes(s)) as Stage[] : null,
     wear: q.get('wear') !== '0',
     post: q.get('post') === 'grey' || q.get('post') === 'cvd' ? q.get('post') as 'grey' | 'cvd' : null,
+    k: (KEEPER_IDS as readonly string[]).includes(q.get('k') || '') ? q.get('k') as KeeperId : null,
+    act: ['feed', 'pet', 'tuck'].includes(q.get('act') || '') ? q.get('act') as ActKind : null,
   };
 }
 
@@ -185,21 +201,6 @@ export function makePet(el: DragonElement, stage: Stage, seed: number, anim: str
   };
 }
 
-/**
- * Where the eat bowl stands (4.2: "the bowl is drawn after the dragon"): under the snout at the chomp (the frame
- * whose act clock is 0), its rim 2 px above the mouth line, so the snout tip dips in behind the rim.
- */
-function bowlFor(rig: DragonRig, frames: readonly { pose?: import('./art/dragon/pose.ts').PartialDragonPose | null }[]): { x: number; h: number; w: number } {
-  const f = frames.find((fr) => fr.pose && fr.pose.act === ACT.eat && Math.abs(fr.pose.cue ?? 1) < 0.5);
-  // (solved with the jaw shut: an open jaw moves the mouth anchor down into the opening)
-  const J = solveDragon(rig, f && f.pose ? { ...f.pose, jaw: 0 } : {}, { x: 0, y: 0 });
-  const w = rig.stage === 'adult' || rig.stage === 'elder' ? 17 : rig.stage === 'young' ? 15 : 11;
-  // the bowl is drawn AFTER the dragon, so its top (the food heaped 2 px over the rim) stays >= 2 px under the eye's
-  // largest box: at the rim the baby's eye sat on it (hard rule: nothing covers the eye)
-  const eyeBottom = J.eye.y + rig.info.eye.h / 2;
-  return { x: Math.round(J.mouth.x - 1), h: Math.max(4, Math.min(Math.round(-J.mouth.y) + 1, Math.floor(-(eyeBottom + 2) - 2))), w };
-}
-
 /** The query's static pose overlay, applied to every pet a scene makes (set by startGallery). */
 let STATIC_POSE: PartialDragonPose | null = null;
 /** The query's flash / tint, bond and charge, applied at draw time. */
@@ -240,10 +241,11 @@ function extentX(p: Pet): [number, number] {
   return p.facing < 0 ? [p.x - front, p.x + back] : [p.x - back, p.x + front];
 }
 
-/** One scene tick: the scene-wide state (the wary latch, where the scene has one), then every pet. */
+/** One scene tick: the scene-wide state (the wary latch, where the scene has one), then every pet, then its own step. */
 function stepScene(scene: Scene): void {
   if (scene.wary) stepWary(scene.pets);
   for (const p of scene.pets) stepPet(p);
+  if (scene.step) scene.step();
 }
 
 /** Frames a finished one-shot is held before the gallery replays it (a live view keeps showing the anim). */
@@ -285,6 +287,8 @@ interface Scene {
   pets: Pet[];
   /** The pets share a floor and react to each other (the habitat): stepScene runs the wary latch. */
   wary?: boolean;
+  /** Whatever else the scene steps once per tick, after its pets (the keepers). */
+  step?(): void;
   /** Draw the whole view (pets already stepped). */
   draw(ctx: CanvasRenderingContext2D): void;
 }
@@ -305,27 +309,13 @@ function drawPets(ctx: CanvasRenderingContext2D, pets: Pet[], extra: Partial<Dra
   top.flush(ctx);
 }
 
-const BOWL = '#8c4a3a', BOWL_SH = '#6a3428', FOOD_TOP = '#b87a3a';
 /**
- * A simple food bowl in front of an eating pet (drawn AFTER it, 4.2), whole game pixels at the pet's scale: an inked
- * clay bowl, widest at the rim and rounding in toward its foot, with a low mound of food over the rim. Its rim sits
- * a couple of px over the snout at the chomp, so the snout dips in behind it.
+ * The food bowl in front of an eating pet (drawn AFTER it, 4.2), at the pet's scale: props.ts drawBowl, the one bowl
+ * the keepers carry in and set down too (src/care/acts.ts).
  */
 function drawBowl(ctx: CanvasRenderingContext2D, p: Pet): void {
-  const b = p.bowl!, sc = p.scale * p.rig.scale, w = b.w, h = b.h;
-  const cx = Math.round(p.x + p.facing * b.x * sc), gy = Math.round(p.y);
-  const px = (x: number, y: number, ww: number, hh: number, c: string) => {
-    ctx.fillStyle = c; ctx.fillRect(Math.round(cx + x * sc), Math.round(gy + y * sc), Math.max(1, Math.round(ww * sc)), Math.max(1, Math.round(hh * sc)));
-  };
-  const half = w >> 1;
-  // row r (0 = the rim, h - 1 = the foot) is inset by a curve that rounds in toward the foot
-  const inset = (r: number) => Math.round(3 * Math.pow(r / Math.max(1, h - 1), 2.2));
-  for (let r = 0; r < h; r++) px(-half - 1 + inset(r), -h + r, w + 2 - 2 * inset(r), 1, INK);
-  px(-half + inset(h - 1), 0, w - 2 * inset(h - 1), 1, INK);
-  px(-half - 1, -h - 1, w + 2, 1, INK);
-  for (let r = 0; r < h; r++) px(-half + inset(r), -h + r, w - 2 * inset(r), 1, r === 0 ? BOWL_SH : r > h * 0.6 ? BOWL_SH : BOWL);
-  // the food: a low mound over the rim
-  px(-half + 2, -h - 2, w - 4, 1, INK); px(-half + 1, -h - 1, w - 2, 1, FOOD_TOP);
+  const b = p.bowl!, sc = p.scale * p.rig.scale;
+  drawBowlAt(ctx, Math.round(p.x + p.facing * b.x * sc), Math.round(p.y), b.w, b.h, sc);
 }
 
 function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color = LABEL, size = 1): void {
@@ -622,6 +612,200 @@ function habitatScene(P: GalleryParams): Scene {
     draw(ctx) {
       ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
       drawPets(ctx, pets);
+    },
+  };
+}
+
+// ---------- the keepers (docs/KEEPERS.md) ----------
+
+/** Step a gallery keeper, replaying a finished one-shot after a pause (so a live view keeps showing it). */
+function stepKeeperShown(k: KeeperAgent, anim: string, hold: { n: number }): void {
+  if (k.player.done && KEEPER_ONE_SHOTS.includes(anim) && ++hold.n >= REPLAY) { hold.n = 0; k.player.play(anim, { restart: true, blend: 8 }); }
+  stepKeeperAgent(k);
+}
+
+/**
+ * view=keepers: the four keepers side by side at game scale 1, blown up `scale` times (default 3), each labelled with
+ * name and job, playing `anim` (any keeper anim: idle, walk, carry, hold, watch, kneel, kneelIdle, rise, pet, petLow,
+ * shh, tiptoe, cheer, wave). A walking keeper walks in place: its root motion is taken off again each tick, and ground
+ * ticks under it scroll by the distance walked, so a planted foot must hold still against them (no skating).
+ * &k=<keeper>: that keeper's anim as a strip of n frames instead (from= / span= as view=strip).
+ */
+function keepersScene(P: GalleryParams): Scene {
+  const k = Math.max(1, Math.round(P.scale || 3)), anim = KEEPER_ANIM_NAMES.includes(P.anim) ? P.anim : 'idle';
+  const walking = ['walk', 'carry', 'tiptoe'].includes(anim);
+  const cw = P.k ? 58 : 80, ch = 112, gy = ch - 22;
+  type Cell = { a: KeeperAgent; x0: number; wx: number; hold: { n: number }; label: string };
+  const cells: Cell[] = [];
+  const add = (id: KeeperId, x0: number, seek: number, label: string) => {
+    const a = makeKeeper(id, anim, x0, gy, { facing: P.facing, seed: P.seed + cells.length, blinks: !P.k });
+    const c: Cell = { a, x0, wx: 0, hold: { n: 0 }, label };
+    for (let i = 0; i < seek; i++) stepCell(c);
+    cells.push(c);
+  };
+  const stepCell = (c: Cell) => { const x = c.a.x; stepKeeperShown(c.a, anim, c.hold); c.wx += (c.a.x - x) * c.a.facing; c.a.x = c.x0; };
+  if (P.k) {
+    const probe = makeKeeper(P.k, anim, 0, 0);
+    const L = P.span ?? (probe.player.length || 60);
+    for (let i = 0; i < P.n; i++) {
+      const f = P.from + Math.round((i * L) / P.n);
+      add(P.k, i * cw + Math.round(cw / 2), f, `F${f}`);
+    }
+  } else KEEPER_IDS.forEach((id, i) => add(id, i * cw + Math.round(cw / 2), 0, `${KEEPERS[id].name.toUpperCase()}`));
+  const off = document.createElement('canvas');
+  off.width = cw * cells.length; off.height = ch;
+  return {
+    w: off.width * k, h: off.height * k, pets: [],
+    step() { for (const c of cells) stepCell(c); },
+    draw(ctx) {
+      const g = off.getContext('2d')!;
+      g.fillStyle = P.bg || STRAW; g.fillRect(0, 0, off.width, off.height);
+      // ground ticks every 8 px of world under a walker, scrolled back by the distance walked (view=strip's check)
+      if (walking) for (const c of cells) for (let t = -8; t < 8; t++) {
+        const X = Math.round(c.x0 + c.a.facing * (t * 8 - (c.wx % 8)));
+        if (Math.abs(X - c.x0) < cw / 2 - 2) { g.fillStyle = '#b8ab88'; g.fillRect(X, gy, 1, 2); }
+      }
+      for (const c of cells) drawKeeperAgent(g, c.a);
+      for (const c of cells) label(g, c.label, c.x0, gy + 5, LABEL, 1);
+      if (!P.k) cells.forEach((c) => label(g, KEEPERS[c.a.id].title.replace(/^the /, '').toUpperCase(), c.x0, gy + 12, '#6a5a60', 1));
+      else label(g, `${KEEPERS[P.k].name.toUpperCase()} ${anim.toUpperCase()}`, off.width / 2, 2, LABEL, 1);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(off, 0, 0, off.width * k, off.height * k);
+    },
+  };
+}
+
+// ---------- the care acts (docs/KEEPERS.md 6) ----------
+
+/** The keeper whose job an act is (Bea feeds, Tomas grooms, Iris tucks in). */
+const ACT_KEEPER: Readonly<Record<ActKind, KeeperId>> = { feed: 'bea', pet: 'tomas', tuck: 'iris' };
+/** view=care's three vignettes: a cook and a young dragon, a groomer and a grown one (from the side), a tuck-in. */
+const CARE_SET: readonly (readonly [ActKind, DragonElement, Stage])[] = [['feed', 'fire', 'young'], ['pet', 'water', 'adult'], ['tuck', 'dusk', 'adult']];
+
+/** Draw a care scene's dragons and keepers y-sorted by the feet; on one floor line a dragon (and its bowl) goes first. */
+export function drawCareCast(ctx: CanvasRenderingContext2D, dragons: readonly DragonAgent[], keepers: readonly KeeperAgent[]): void {
+  const all: { y: number; o: number; draw: () => void }[] = [
+    ...dragons.map((d) => ({ y: d.y, o: 0, draw: () => drawDragonAgent(ctx, d, { top, budget }) })),
+    ...keepers.map((k) => ({ y: k.y, o: 1, draw: () => drawKeeperAgent(ctx, k) })),
+  ];
+  all.sort((a, b) => a.y - b.y || a.o - b.o);
+  budget.begin(dragons.length, frame);
+  for (const it of all) it.draw();
+  top.flush(ctx);
+}
+
+/**
+ * view=care: the care acts, each a vignette at game scale 1 blown up `scale` times (default 3): a keeper walks in and
+ * does its job with a dragon, which answers with its own anims (feed: beg -> eat -> happy; pet: pet -> happy; tuck:
+ * the lie-down -> asleep). Freeze any moment with t. act=feed | pet | tuck (with el=, stage=, k=) plays one.
+ */
+/** One care vignette: a dragon at (x0, gy) facing right and a keeper walking in from the right to do `kind`. */
+interface Vignette { act: CareAct; d: DragonAgent; kp: KeeperAgent; label: string }
+function makeVignette(kind: ActKind, el: DragonElement, st: Stage, kid: KeeperId, seed: number, x0: number, gy: number, left: number, right: number): Vignette {
+  const d = makeDragon(el, st, seed, kind === 'feed' ? 'beg' : 'idle', x0, gy, { facing: 1, mood: kind === 'feed' ? -0.3 : 0 });
+  // the keeper walks in from the side the act comes from (a feed from in front, the rest from behind: acts.ts
+  // approachSide) and leaves that way
+  const side = approachSide(kind, d), kx = side > 0 ? right : left;
+  const kp = makeKeeper(kid, 'walk', kx, gy, { facing: -side, seed });
+  const act: CareAct = kind === 'feed' ? beginFeed(kp, d, kx) : kind === 'pet' ? beginPet(kp, d, kx) : beginTuck(kp, d, kx);
+  const verb = kind === 'feed' ? 'FEEDS' : kind === 'pet' ? (KEEPERS[kid].tool === 'brush' ? 'GROOMS' : 'PETS') : 'TUCKS IN';
+  return { act, d, kp, label: `${KEEPERS[kid].name.toUpperCase()} ${verb} ${ELEMENTS[el].name.toUpperCase()} (${st.toUpperCase()})` };
+}
+/** One tick of a vignette: its act, or once it is done its two agents on their own. */
+function stepVignette(v: Vignette): void { if (!v.act.done) stepAct(v.act); else { stepKeeperAgent(v.kp); stepDragonAgent(v.d, false); } }
+
+function careScene(P: GalleryParams): Scene {
+  const k = Math.max(1, Math.round(P.scale || 3)), W = 260, H = 104;
+  const strip = !!P.act && P.n > 1;
+  const set = P.act ? [[P.act, P.el, P.stage] as const] : CARE_SET;
+  // a strip: the one act n times, each cell stepped to its own frame (from= / span=, default the first 900 f)
+  const cells = strip ? Array.from({ length: P.n }, (_, i) => P.from + Math.round((i * (P.span ?? 900)) / P.n)) : set.map(() => 0);
+  const cols = strip ? Math.min(P.n, 4) : 1;
+  const scenes = cells.map((f, i) => {
+    const [kind, el, st] = strip ? set[0] : set[i];
+    const x = (i % cols) * W, gy = Math.floor(i / cols) * H + H - 12;
+    const v = makeVignette(kind, el, st, P.act && P.k ? P.k : ACT_KEEPER[kind], P.seed + (strip ? 0 : i), x + 100, gy, x + 14, x + W - 14);
+    for (let t = 0; t < f; t++) stepVignette(v);
+    return { v, x, y: Math.floor(i / cols) * H, f };
+  });
+  const off = document.createElement('canvas');
+  off.width = W * cols; off.height = H * Math.ceil(scenes.length / cols);
+  return {
+    w: off.width * k, h: off.height * k, pets: [],
+    step() { for (const s of scenes) stepVignette(s.v); },
+    draw(ctx) {
+      const g = off.getContext('2d')!;
+      g.fillStyle = P.bg || STRAW; g.fillRect(0, 0, off.width, off.height);
+      for (const s of scenes) {
+        g.fillStyle = '#cfc4a4'; g.fillRect(s.x, s.y, W, 1); g.fillRect(s.x, s.y, 1, H);
+        drawCareCast(g, [s.v.d], [s.v.kp]);
+        if (!strip || s === scenes[0]) label(g, s.v.label, s.x + W / 2, s.y + 3, LABEL, 1);
+        label(g, `${strip ? `F${s.f} ` : ''}${s.v.act.done ? 'DONE' : s.v.act.phase.toUpperCase()}`, s.x + W / 2, s.y + H - 8, '#6a5a60', 1);
+      }
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(off, 0, 0, off.width * k, off.height * k);
+    },
+  };
+}
+
+// ---------- the care audit (docs/KEEPERS.md K7: a keeper never covers a dragon's eye) ----------
+
+/** The frames an act may take before the audit calls it stuck. */
+const ACT_MAX = 2400;
+/** The phases of an act where the keeper is walking, not at work (the eye audit leaves them out). */
+const WALKING: readonly string[] = ['go', 'back', 'return', 'leave'];
+/** How far a stroking hand may land from its mark, px (the joints snap to whole pixels). */
+export const REACH_MISS = 2.5;
+
+/**
+ * view=careaudit: every care act on every look (feed by Bea, a groom by Tomas, a pet by Pip, a tuck-in by Iris), run
+ * from the keeper's walk-in to its walk-off at game scale 1. Each frame the keeper is at work (not walking: WALKING),
+ * it is drawn alone on a clear canvas and the pixels it covers inside the dragon's eye box (its largest box:
+ * rig.info.eye) are counted: the hard rule, "nothing covers the eye", holds for a keeper at work too (bible 1.4; K7). It also measures how far a stroking hand lands from its mark
+ * (the crown, or the neck under the brush) and whether the act finishes. The rows go on window.__dragonCare.care for
+ * tools/smoke.ts, which fails an eye covered, a hand more than REACH_MISS px off, or an act that never ends.
+ */
+function careAuditScene(P: GalleryParams): Scene {
+  const W = 320, H = 200, GY = 150, MIN_A = 128;
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const g = off.getContext('2d', { willReadFrequently: true })!;
+  const runs: [ActKind, KeeperId][] = P.act ? [[P.act, P.k ?? ACT_KEEPER[P.act]]] : [['feed', 'bea'], ['pet', 'tomas'], ['pet', 'pip'], ['tuck', 'iris']];
+  const rows: { act: string; id: string; covered: number; frame: number; phase: string; miss: number; done: boolean; frames: number }[] = [];
+  const pt = { x: 0, y: 0 };
+  for (const [kind, kid] of runs) for (const el of P.els || ELEMENT_IDS) for (const st of P.stages || STAGES) {
+    const v = makeVignette(kind, el, st, kid, P.seed, 150, GY, 20, 300);
+    let covered = 0, at = 0, phase = '', miss = 0, f = 0;
+    for (; f < ACT_MAX && !v.act.done; f++) {
+      stepVignette(v);
+      // (walking in, out, back and round again is the scene's ordinary traffic: a keeper at WORK never covers the eye)
+      if (WALKING.includes(v.act.phase)) continue;
+      const b = eyeBox(v.d), x0 = Math.max(0, b.x0), y0 = Math.max(0, b.y0), w = Math.min(W, b.x1) - x0, h = Math.min(H, b.y1) - y0;
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+      drawKeeperAgent(g, v.kp, { shadow: false });
+      if (w > 0 && h > 0) {
+        const px = g.getImageData(x0, y0, w, h).data;
+        let n = 0;
+        for (let i = 3; i < px.length; i += 4) if (px[i] >= MIN_A) n++;
+        if (n > covered) { covered = n; at = f; phase = v.act.phase; }
+      }
+      const r = v.kp.reach;
+      if (r && v.act.phase === 'stroke') {
+        keeperJoint(v.kp.rig, 'handN', pt);
+        miss = Math.max(miss, Math.hypot(pt.x - (v.kp.x + v.kp.facing * r.x * v.kp.scale), pt.y - (v.kp.y + r.y * v.kp.scale)));
+      }
+    }
+    rows.push({ act: `${kind}:${kid}`, id: `${el}-${st}`, covered, frame: at, phase, miss: Math.round(miss * 10) / 10, done: v.act.done, frames: f });
+  }
+  if (window.__dragonCare) window.__dragonCare.care = rows;
+  const bad = rows.filter((r) => r.covered > 0 || r.miss > REACH_MISS || !r.done);
+  const lines = rows.map((r) => `${r.act} ${r.id}: ${r.covered ? `EYE COVERED ${r.covered} PX AT F${r.frame} (${r.phase})` : 'EYE CLEAR'}  HAND ${r.miss} PX  ${r.done ? `DONE AT F${r.frames}` : 'NEVER ENDS'}${r.covered > 0 || r.miss > REACH_MISS || !r.done ? '  FAIL' : ''}`);
+  return {
+    w: 560, h: Math.max(120, 24 + lines.length * 9), pets: [],
+    draw(ctx) {
+      ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
+      label(ctx, `CARE AUDIT: ${rows.length} ACT RUNS, ${bad.length} FAILING (EYE COVERED, HAND OFF ITS MARK BY MORE THAN ${REACH_MISS} PX, OR NEVER ENDS)`, this.w / 2, 4, LABEL, 1);
+      lines.forEach((t, i) => label(ctx, t.toUpperCase(), this.w / 2, 16 + i * 9, t.endsWith('FAIL') ? '#8a1c1c' : LABEL, 1));
     },
   };
 }
@@ -1126,6 +1310,9 @@ function makeScene(P: GalleryParams): Scene {
     case 'pour': return pourScene(P);
     case 'neutral': return neutralScene(P);
     case 'wings': return wingsScene(P);
+    case 'keepers': return keepersScene(P);
+    case 'care': return careScene(P);
+    case 'careaudit': return careAuditScene(P);
     default: return lineupScene(P);
   }
 }

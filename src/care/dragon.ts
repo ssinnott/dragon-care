@@ -1,0 +1,192 @@
+// A dragon in a care scene (docs/KEEPERS.md 6): the rig, its player and where it stands, stepped once per 60 Hz tick,
+// the way the gallery's pets are (src/gallery.ts makePet / stepPet) but owned by the game: a one-shot plays on into
+// its `next` anim (idle, with the idle-variant schedule of bible 4.2), a walker moves by its frames' `move`, and the
+// bowl a keeper set down stands in front of it (drawn after it: bible 4.2).
+import { dragonBuild } from '../art/dragon/build.ts';
+import { buildDragon, drawDragon, stepDragon, solveDragon, rootToScreen, cranToRootPt } from '../art/dragon/rig.ts';
+import type { DragonRig, DrawDragonOpts } from '../art/dragon/rig.ts';
+import { DragonAnimPlayer, blinkFor } from '../art/dragon/anim.ts';
+import type { DragonPlayOpts } from '../art/dragon/anim.ts';
+import { dragonAnims, ELEMENT_ANIM_FALLBACK, idleVariants, variantEvery, SPREAD_VARIANTS } from '../art/dragon/anims.ts';
+import type { Stage } from '../art/dragon/stages.ts';
+import type { DragonElement } from '../art/dragon/palettes.ts';
+import { bowlFor, drawBowl } from '../art/props.ts';
+import type { BowlSpot } from '../art/props.ts';
+import type { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
+import { resetChain } from '../lib/art/secondary.ts';
+
+export interface DragonAgent {
+  el: DragonElement;
+  stage: Stage;
+  rig: DragonRig;
+  player: DragonAnimPlayer;
+  /** Screen position of the ground point under the body centre, facing and draw scale. */
+  x: number;
+  y: number;
+  facing: number;
+  scale: number;
+  /** The pet's resting mood (-1..1); its anims add their own on top. */
+  mood: number;
+  /** Where its bowl goes (props.ts bowlFor: under the snout at the chomp) and the bowl standing there, if any. */
+  spot: BowlSpot;
+  /**
+   * The bowl a keeper set down, if any: full or eaten, and its screen x. A keeper sets it a little way out from a
+   * begging dragon (acts.ts), which then walks up to it, so `x` stays where it was put while the dragon moves.
+   */
+  bowl: { full: boolean; x: number } | null;
+  /** The desync of its loops (bible 4.1): the build's seeded phase and speed. */
+  phase: number;
+  speed: number;
+  /** Frames into a paper turn (turnDragon), or -1. */
+  turning: number;
+}
+
+/**
+ * A paper turn (bible 4.1's turn in place: in profile a turn is a mirror flip): TURN_HALF stepped frames narrowed to
+ * TURN_W, the flip, TURN_HALF more the other way. Only the 80 % frames of fire's flame chase: the face marks are never
+ * squashed (rig.ts faceTransform), and at 60 % a nostril ahead of the eye landed off the narrowed snout.
+ */
+export const TURN_HALF = 3, TURN_W = 0.8;
+
+/** Make a dragon at (x, y) playing `anim` (idle gets its variant schedule, as in the habitat). */
+export function makeDragon(el: DragonElement, stage: Stage, seed: number, anim: string, x: number, y: number, o: { facing?: number; mood?: number; scale?: number } = {}): DragonAgent {
+  const build = dragonBuild({ element: el, stage, seed });
+  const rig = buildDragon(build), anims = dragonAnims(stage, build.spec, build.dims);
+  const player = new DragonAnimPlayer(anims, seed, blinkFor(stage));
+  const [a, b] = variantEvery(stage);
+  player.setVariants('idle', idleVariants(stage, build.sp.wing), a, b, SPREAD_VARIANTS);
+  const d: DragonAgent = {
+    el, stage, rig, player, x, y, facing: o.facing ?? 1, scale: o.scale ?? 1, mood: o.mood ?? 0,
+    spot: bowlFor(rig, anims.eat ? anims.eat.frames : []), bowl: null, phase: build.phase, speed: build.speed, turning: -1,
+  };
+  playDragon(d, anim);
+  stepDragon(rig, player.pose, drawOpts(d));
+  return d;
+}
+
+/**
+ * Play an anim on a dragon: loops start at the pet's seeded phase and speed (so two dragons never breathe in
+ * lockstep), an element anim a look has not got plays its fallback (dusk's tuck-in is every other look's sleep).
+ */
+export function playDragon(d: DragonAgent, anim: string, o: DragonPlayOpts = {}): void {
+  const loop = d.player.anims[anim]?.loop ?? false;
+  d.player.play(anim, { restart: true, phase: loop ? d.phase : 0, speed: loop ? d.speed : 1, fallback: ELEMENT_ANIM_FALLBACK[anim] ?? 'idle', ...o });
+}
+
+function drawOpts(d: DragonAgent, extra: Partial<DrawDragonOpts> = {}): DrawDragonOpts {
+  return { x: d.x, y: d.y, facing: d.facing, scale: d.scale, mood: d.mood, ...extra };
+}
+
+/** Start a paper turn (the dragon faces the other way TURN_HALF frames from now). */
+export function turnDragon(d: DragonAgent): void { d.turning = 0; }
+
+/** Advance one 60 Hz step: a finished one-shot plays on into its `next` (idle), a walk carries the dragon. */
+export function stepDragonAgent(d: DragonAgent, roam: boolean): void {
+  const p = d.player;
+  // (an idle variant returns to idle on its own, reseeding its schedule: DragonAnimPlayer.tick)
+  if (p.done && p.def && !p.def.loop && !p.inVariant) playDragon(d, p.def.next ?? 'idle', { blend: 10 });
+  p.tick();
+  if (d.turning >= 0) {
+    // narrowed, stepped: a stretch set off 1 keeps the rig's volume-preserving 1 / |squash| from growing it taller
+    if (d.turning === TURN_HALF) { d.facing = -d.facing; resetChain(d.rig.tailChain); }
+    p.pose.squash = TURN_W; p.pose.stretch = 1.01;
+    if (++d.turning >= 2 * TURN_HALF) d.turning = -1;
+  }
+  if (roam && p.move) d.x += d.facing * p.move * d.scale;
+  stepDragon(d.rig, p.pose, drawOpts(d));
+}
+
+/** Draw a dragon (already stepped this tick), then its bowl in front of it. */
+export function drawDragonAgent(ctx: CanvasRenderingContext2D, d: DragonAgent, o: { top?: TopPass | null; budget?: AmbientBudget; slot?: number; silhouette?: boolean | string; shadow?: boolean } = {}): void {
+  drawDragon(ctx, d.rig, d.player.pose, drawOpts(d, { still: true, ...o }));
+  if (d.bowl && !o.silhouette) drawBowlOf(ctx, d);
+}
+
+/** A dragon's bowl where it was set down (full, or eaten). */
+export function drawBowlOf(ctx: CanvasRenderingContext2D, d: DragonAgent): void {
+  if (!d.bowl) return;
+  const sc = d.scale * d.rig.scale, s = d.spot;
+  drawBowl(ctx, Math.round(d.bowl.x), Math.round(d.y), s.w, s.h, sc, d.bowl.full);
+}
+
+/** The screen x of a dragon's bowl centre. */
+export function bowlScreenX(d: DragonAgent): number { return Math.round(d.x + d.facing * d.spot.x * d.scale * d.rig.scale); }
+
+const PT = { x: 0, y: 0 };
+/**
+ * A point on the dragon's cranium circle on screen, after its last step: `ang` degrees in cranium space (0 = toward
+ * the snout, -90 = the crown), `out` px outside the circle's edge (a hand's centre rests a hand's radius out). The
+ * head's pitch, a head that looks back (headFlip) and the facing are all in cranToRootPt / rootToScreen.
+ */
+export function craniumPoint(d: DragonAgent, ang: number, outside: number, out: { x: number; y: number }): { x: number; y: number } {
+  const r = d.rig.dims.head.cranR + outside, a = (ang * Math.PI) / 180;
+  cranToRootPt(d.rig, Math.cos(a) * r, Math.sin(a) * r, PT);
+  return rootToScreen(d.rig, PT.x, PT.y, out);
+}
+
+/**
+ * Where a point of the dragon would be on screen if it stood in a given pose (frame `frame` of `anim`): the joints are
+ * solved for that pose, `fn` reads the point (craniumPoint, neckTop), and the joints are solved back for the pose on
+ * screen, so the dragon is left as it was. The care acts use it to find where a head WILL be (a crown under a stroking
+ * hand once the pet anim leans it, a head laid on the floor once a sleep has lain the dragon down) before the keeper
+ * walks over.
+ */
+export function pointIn<T>(d: DragonAgent, anim: string, frame: number, fn: () => T): T {
+  const a = d.player.anims[anim] ?? d.player.anims[ELEMENT_ANIM_FALLBACK[anim] ?? 'idle'];
+  const fr = a?.frames[Math.min(Math.max(0, frame), (a?.frames.length ?? 1) - 1)];
+  solveDragon(d.rig, fr?.pose ?? {}, drawOpts(d));
+  const out = fn();
+  solveDragon(d.rig, d.player.pose, drawOpts(d));
+  return out;
+}
+
+/**
+ * A point over the top of the neck on screen after the last step: `u` runs from the head's end of the neck (0) to its
+ * root in the chest (1), `outside` px out from the neck's top contour (the underside normals of rig.j, turned over).
+ */
+export function neckTop(d: DragonAgent, u: number, outside: number, out: { x: number; y: number }): { x: number; y: number } {
+  const J = d.rig.j, n = J.neckN, f = (1 - Math.min(1, Math.max(0, u))) * n, i = Math.min(n - 1, Math.floor(f)), t = f - i;
+  const lerp = (a: Float32Array) => a[i] + (a[i + 1] - a[i]) * t;
+  const r = lerp(J.neckR) + outside, vx = lerp(J.neckVX), vy = lerp(J.neckVY), vl = Math.hypot(vx, vy) || 1;
+  return rootToScreen(d.rig, lerp(J.neckX) - (vx / vl) * r, lerp(J.neckY) - (vy / vl) * r, out);
+}
+
+/**
+ * A point over the dragon's back on screen after the last step: `u` runs from the withers (0: the top of the chest
+ * ball) to the top of the hips (1: the top of the hip ball) along the line between them, and on over the rump (1 .. 2:
+ * round the hip ball from its top to 60 deg behind it), `outside` px out (the body is two balls: stages.ts hipR /
+ * chestR; a ball's top is its top whatever the body's pitch). A baby's short back hides under its head: its rump is
+ * where a hand goes.
+ */
+export function backTop(d: DragonAgent, u: number, outside: number, out: { x: number; y: number }): { x: number; y: number } {
+  const J = d.rig.j, dm = d.rig.dims, t = Math.min(2, Math.max(0, u));
+  if (t > 1) {
+    // (root space: + x toward the head, so "behind" is - x)
+    const a = ((-90 - 60 * (t - 1)) * Math.PI) / 180, r = dm.hipR + outside;
+    return rootToScreen(d.rig, J.hip.x + Math.cos(a) * r, J.hip.y + Math.sin(a) * r, out);
+  }
+  const x = J.chest.x + (J.hip.x - J.chest.x) * t, y = J.chest.y - dm.chestR + (J.hip.y - dm.hipR - J.chest.y + dm.chestR) * t;
+  return rootToScreen(d.rig, x, y - outside, out);
+}
+
+/** The snout's tip on screen after the last step (cranium space: the snout taper's end), for keeping clear of it. */
+export function snoutTip(d: DragonAgent, out: { x: number; y: number }): { x: number; y: number } {
+  const s = d.rig.dims.head.snout;
+  cranToRootPt(d.rig, s.x1 + s.r1, s.y1, PT);
+  return rootToScreen(d.rig, PT.x, PT.y, out);
+}
+
+/**
+ * The dragon's eye box on screen after its last step: the eye's largest box (rig.info.eye: the eye in any state and a
+ * 1 px ring), placed as the rig places it, in face space (rig.ts faceTransform: centred on the eye joint's rounded
+ * screen pixel, device-aligned whatever the head's pitch, mirrored with the sprite and a head that looks back). The
+ * rig clips its own head features off this box grown 1 px (bible 1.4 step 12.6); a keeper keeps off it (K7).
+ */
+export function eyeBox(d: DragonAgent): { x0: number; y0: number; x1: number; y1: number } {
+  const J = d.rig.j, b = d.rig.info.eye, sc = d.scale * d.rig.scale, t = d.rig.tf;
+  rootToScreen(d.rig, J.eye.x, J.eye.y, PT);
+  const ex = Math.round(PT.x), ey = Math.round(PT.y), hx = Math.floor(b.w / 2), hy = Math.floor(b.h / 2);
+  const fx = Math.sign(t.fs) * J.headFlip < 0, fy = t.ss < 0;
+  const x0 = fx ? ex + (hx - b.w) * sc : ex - hx * sc, y0 = fy ? ey + (hy - b.h) * sc : ey - hy * sc;
+  return { x0: Math.floor(x0), y0: Math.floor(y0), x1: Math.ceil(x0 + b.w * sc), y1: Math.ceil(y0 + b.h * sc) };
+}
