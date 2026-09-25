@@ -7,7 +7,7 @@
 import { makeRng } from '../lib/engine/rng.ts';
 import { NEEDS, QUEUE, ROOM_REGEN, OWN_NEED, drainRate, hasNeed, moodOf, tierOf, fullNeeds } from './needs.ts';
 import type { NeedKind, Needs } from './needs.ts';
-import { ROOM_INFO, REACH, placeRooms, postX, route, feetY, clampToFloor, standSpot, fitsSlot } from './layout.ts';
+import { ROOM_INFO, REACH, placeRooms, postX, waitX, route, feetY, clampToFloor, standSpot, fitsSlot } from './layout.ts';
 import type { Room, RoomPlace, RoomKind, Leg, Spot, Slot } from './layout.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
 import { SAVE_VERSION, SaveVersionError, worldKey } from './save.ts';
@@ -89,6 +89,7 @@ export interface Keeper {
   look: KeeperId;
   specialty: NeedKind | null;
   station: Room;
+  /** Where they wait between jobs: their station's waiting spot (layout.ts waitX), not its post. */
   stationX: number;
   /** Their floor (while climbing, the floor they left), x, and feet y (between floors while climbing). */
   f: number;
@@ -198,9 +199,10 @@ export class CareSim {
     }
     keepers.forEach((p, id) => {
       const station = roomOf(p.station, p.name);
-      // keepers sharing a station stand side by side at its post
+      // a keeper waits at their room's waiting spot (layout.ts waitX: clear of every slot's body, so never hidden behind a
+      // dragon), and keepers sharing a station stand side by side there
       const mates = keepers.filter((q) => q.station === p.station), i = mates.indexOf(p);
-      const stationX = clampToFloor(station.floor, Math.round(postX(station) + (i - (mates.length - 1) / 2) * 22));
+      const stationX = clampToFloor(station.floor, Math.round(waitX(station) + (i - (mates.length - 1) / 2) * 22));
       this.keepers.push({ id, name: p.name, look: p.look, specialty: p.specialty, station, stationX, f: station.floor, x: stationX, y: feetY(station.floor),
         climbing: false, legs: [], phase: 'idle', t: 0, job: null, carrying: null, rushing: false, facing: 1, walked: 0 });
     });

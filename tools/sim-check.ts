@@ -5,8 +5,9 @@
 //
 // 1. Routes on both nets: every keeper, from their station, reaches every slot's stand spot (for every stage that fits
 //    the slot), every supply post, the riders' rooms and the Aerie deck, and back (the ladders, the doors); every stage's
-//    dragon net joins every slot that fits it to every other and to the deck, both ways, by the Dragon Lift and never
-//    through a tower; every stand spot is inside its room.
+//    dragon net joins every slot that fits it to every other and to the deck, both ways, by the Dragon Lift (each ride
+//    one leg) and never through a tower (every dragon span inside the barn or on the deck); every stand spot is inside
+//    its room.
 // 2. Thirty minutes of play on the starting base, with the invariants checked as it runs: needs stay in 0..1, one
 //    job per dragon and need, a claimed job and its keeper point at each other, one keeper per dragon at a time,
 //    nobody stands off a floor, nobody stalls; then the service it gave: no need ever empties, and the wait from a
@@ -20,9 +21,9 @@
 // 7. rngAt: the same keys give the same draws, different tags different ones, and the draws are even.
 // 8. Rooms (#11): every room kind and structure has a purpose, each need is met in exactly one kind of room, the plates
 //    name only rooms and structures there are (none on a bare slot), placing rooms and dragons keeps the building's
-//    rules (no room on the lift; a slot per dragon, fitting its stage); and over the whole suite every named room, the
-//    lift and the Aerie were used (sim.stats.used), unless their mechanic is still PLANNED -- and a PLANNED one that
-//    shows a use fails, so its entry must go.
+//    rules (no room on the lift; a slot per dragon, fitting its stage), a keeper waits clear of every slot's body; and
+//    over the whole suite every named room, the lift and the Aerie were used (sim.stats.used), unless their mechanic is
+//    still PLANNED -- and a PLANNED one that shows a use fails, so its entry must go.
 import { isDeepStrictEqual } from 'node:util';
 import { CareSim, REACH, DAY_STEPS, START_HOUR } from '../src/game/sim.ts';
 import type { DragonPlace } from '../src/game/start.ts';
@@ -32,8 +33,8 @@ import { startSpec, PRESETS } from '../src/game/presets.ts';
 import { serialize, SaveVersionError, SAVE_VERSION } from '../src/game/save.ts';
 import { rngAt, mix32, TAG } from '../src/game/rand.ts';
 import {
-  route, spanOf, postX, placeRooms, platesOf, standSpot, fitsSlot, dragonNet, feetY, floorTop, KEEPER_NET, ROOM_INFO, ROOM_KINDS, STRUCTURES,
-  AERIE_F, BARN_X, TOWER_R, DECK_X0, DECK_X1, LIFT_X0, LIFT_X1, LIFT_CX, CLIMB_COST, WALL_H,
+  route, spanOf, postX, placeRooms, platesOf, standSpot, fitsSlot, slotBody, dragonNet, feetY, floorTop, KEEPER_NET, ROOM_INFO, ROOM_KINDS, STRUCTURES,
+  AERIE_F, BARN_X, TOWER_R, TOWER_L, TOWER_W, DECK_X0, DECK_X1, LIFT_X0, LIFT_X1, LIFT_CX, CLIMB_COST, WALL_H,
 } from '../src/game/layout.ts';
 import type { Spot, RoomKind } from '../src/game/layout.ts';
 import { NEEDS, FPS, hasNeed } from '../src/game/needs.ts';
@@ -43,9 +44,14 @@ import { STAGES } from '../src/art/dragon/stages.ts';
 const fails: string[] = [];
 const fail = (m: string) => { if (fails.length < 40) fails.push(m); };
 const newSim = (seed = 1) => new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed });
-/** Every use of a room or structure (stats.used) over the whole suite: each section notes the worlds it ran (8 checks it). */
+/**
+ * Every use of a room or structure (stats.used) over the whole suite: each section notes the worlds it ran (8 checks
+ * it). A world loaded from a save is noted with the uses it was loaded with (`since`), so only its own are counted.
+ */
 const USED: Record<string, number> = {};
-const noteUse = (...sims: CareSim[]) => { for (const w of sims) for (const [k, v] of Object.entries(w.stats.used)) USED[k] = (USED[k] ?? 0) + v; };
+const noteUse = (w: CareSim, since: Readonly<Record<string, number>> = {}) => {
+  for (const [k, v] of Object.entries(w.stats.used)) if (v - (since[k] ?? 0)) USED[k] = (USED[k] ?? 0) + v - (since[k] ?? 0);
+};
 /**
  * The rooms and structures whose mechanic a later slice builds (plan 3.9): they must show no use yet, and each entry
  * goes when its mechanic lands (S3 the lift; S5 the hatchery; S8 the tack room, the bunks, the map room, the Aerie).
@@ -73,7 +79,8 @@ const PLANNED: ReadonlySet<string> = new Set(['lift', 'hatchery', 'tack', 'bunks
     if (!route(t.at, { f: k.f, x: k.x }, KEEPER_NET)) fail(`no route from ${t.what} (${at(t.at)}) back to ${k.name}'s station`);
   }
   // the dragons: per stage, every slot that fits to every other and to two deck spots, both ways, on its own net; every
-  // leg in the barn (x 168..1192 on floors 0-2) or on the deck (x 8..648 on floor 5), a floor changed only by the lift
+  // leg in the barn (x 168..1192 on floors 0-2) or on the deck (x 8..648 on floor 5), a floor changed only by the lift,
+  // and each ride one leg (boarding stop to alighting stop: never two floor changes in a row)
   let dragonRoutes = 0, liftRides = 0;
   for (const st of STAGES) {
     const net = dragonNet(st);
@@ -84,24 +91,40 @@ const PLANNED: ReadonlySet<string> = new Set(['lift', 'hatchery', 'tack', 'bunks
       const rt = route(a.at, b.at, net);
       if (!rt) { fail(`${st}: no dragon route from ${a.what} (${at(a.at)}) to ${b.what} (${at(b.at)})`); continue; }
       dragonRoutes++;
-      let f = a.at.f;
+      let f = a.at.f, rode = false;
       for (const l of rt.legs) {
         if (l.f <= 2 ? l.x < BARN_X || l.x > TOWER_R : l.f !== AERIE_F || l.x < DECK_X0 || l.x > DECK_X1) fail(`${st}: the route from ${a.what} to ${b.what} has a leg at ${at(l)}, off the barn and the deck`);
-        if (l.f !== f) { liftRides++; if (l.x !== LIFT_CX) fail(`${st}: the route from ${a.what} to ${b.what} changes floor at x ${l.x}, not the lift's ${LIFT_CX}`); }
-        f = l.f;
+        const rides = l.f !== f;
+        if (rides) { liftRides++; if (l.x !== LIFT_CX) fail(`${st}: the route from ${a.what} to ${b.what} changes floor at x ${l.x}, not the lift's ${LIFT_CX}`); }
+        if (rides && rode) fail(`${st}: the route from ${a.what} to ${b.what} rides the lift in two legs in a row (${rt.legs.map(at).join(' / ')}), not one ride`);
+        f = l.f; rode = rides;
       }
     }
   }
-  // the lift's hayloft-to-Aerie run is one edge (floors 3 and 4 passed through), costed at its rise
+  // the lift's hayloft-to-Aerie run is one edge and one leg (floors 3 and 4 passed through), costed at its rise
   const up = route({ f: 2, x: 792 }, { f: AERIE_F, x: 280 }, dragonNet('adult'));
   const upCost = (792 - LIFT_CX) + (feetY(2) - feetY(AERIE_F)) * CLIMB_COST + (LIFT_CX - 280);
   if (!up || up.legs.map(at).join(' / ') !== `f2 x ${LIFT_CX} / f5 x ${LIFT_CX} / f5 x 280` || Math.abs(up.cost - upCost) > 1e-9) fail(`the lift from the hayloft to the Aerie: ${up ? `${up.legs.map(at).join(' / ')} costing ${up.cost}` : 'no route'}, not one ride costing ${upCost}`);
-  // no dragon net reaches a tower, and no keeper rides the lift
-  for (const st of STAGES) if (route({ f: 0, x: 792 }, { f: 3, x: 112 }, dragonNet(st))) fail(`${st}: a dragon route reaches the left tower's floor 3`);
+  // a ride from the ground floor to the Aerie is one leg too (floors 1, 2, 3 and 4 passed through)
+  const trip = route({ f: 0, x: 792 }, { f: AERIE_F, x: 280 }, dragonNet('adult'));
+  if (!trip || trip.legs.map(at).join(' / ') !== `f0 x ${LIFT_CX} / f5 x ${LIFT_CX} / f5 x 280`) fail(`the lift from the ground floor to the Aerie: ${trip ? trip.legs.map(at).join(' / ') : 'no route'}, not one ride`);
+  // no dragon net reaches a tower: every span of every stage's net lies inside the barn (floors 0-2) or on the deck
+  // (floor 5), floors 3 and 4 have none, and no route reaches a tower room on the floors where the towers open into
+  // the barn; and no keeper rides the lift
+  for (const st of STAGES) {
+    const net = dragonNet(st);
+    net.spans.forEach((sp, f) => {
+      const [lo, hi] = f <= 2 ? [BARN_X, TOWER_R] : f === AERIE_F ? [DECK_X0, DECK_X1] : [Infinity, -Infinity];
+      for (const [a, b] of sp) if (a < lo || b > hi) fail(`${st}: the dragon net's floor ${f} runs ${a}..${b}, outside ${f <= 2 ? 'the barn' : f === AERIE_F ? 'the deck' : 'any floor a dragon has'}`);
+    });
+    for (const t of [{ f: 0, x: TOWER_L + TOWER_W / 2 }, { f: 1, x: TOWER_L + TOWER_W / 2 }, { f: 0, x: TOWER_R + TOWER_W / 2 }, { f: 1, x: TOWER_R + TOWER_W / 2 }, { f: 3, x: TOWER_L + TOWER_W / 2 }]) {
+      if (spanOf(t.f, t.x, net) >= 0 || route({ f: 0, x: 792 }, t, net)) fail(`${st}: a dragon can reach the tower room at ${at(t)}`);
+    }
+  }
   if (KEEPER_NET.links.some((l) => l.name === 'lift')) fail('the keepers\' net has the lift in it');
   for (const d of sim.dragons) if (spanOf(d.f, d.x, dragonNet(d.stage)) < 0) fail(`${d.name} stands off its stage's dragon floor (${at(d)})`);
   noteUse(sim);
-  console.log(`  1 routes: keepers ${sim.keepers.length} x ${targets.length} places (every stand spot, post and the deck), both ways; dragons ${dragonRoutes} routes on ${STAGES.length} stages' nets, ${liftRides} lift rides among them, none through a tower; hayloft to Aerie ${up ? up.cost : '-'} px in one ride`);
+  console.log(`  1 routes: keepers ${sim.keepers.length} x ${targets.length} places (every stand spot, post and the deck), both ways; dragons ${dragonRoutes} routes on ${STAGES.length} stages' nets, ${liftRides} lift rides among them (one leg each), none through a tower; hayloft to Aerie ${up ? up.cost : '-'} px in one ride`);
 }
 
 // ---------- 2. thirty minutes of play ----------
@@ -238,7 +261,7 @@ const PLANNED: ReadonlySet<string> = new Set(['lift', 'hatchery', 'tack', 'bunks
   // more saves, taken from one run whenever something is under way that no save so far has caught (a keeper fetching,
   // picking up, on the way, at work, going home or halfway up a ladder; a dragon mid-act or asleep; a rushed job),
   // each stepped 5000 on in lockstep with the run it came from (the Rush reaching every world alive then) and compared
-  const ref = newSim(1), forks: { sim: CareSim; at: number }[] = [], live: typeof forks = [], caught = new Set<string>();
+  const ref = newSim(1), forks: { sim: CareSim; at: number; used: Record<string, number> }[] = [], live: typeof forks = [], caught = new Set<string>();
   const WANT = ['fetch', 'pickup', 'go', 'work', 'home', 'climbing', 'act', 'asleep', 'rushed'];
   const under = (w: CareSim) => new Set([...w.keepers.map((k) => (k.climbing ? 'climbing' : k.phase)), ...w.dragons.filter((d) => d.act).map((d) => (d.asleep ? 'asleep' : 'act')),
     ...(w.jobs.some((j) => j.rushed) ? ['rushed'] : [])]);
@@ -260,11 +283,13 @@ const PLANNED: ReadonlySet<string> = new Set(['lift', 'hatchery', 'tack', 'bunks
     }
     if (s >= 5000 && s <= 20000 && forks.length < 16) {
       const now = [...under(ref)].filter((p) => WANT.includes(p) && !caught.has(p));
-      if (now.length) { const f = { sim: CareSim.fromSave(through(serialize(ref))), at: s }; forks.push(f); live.push(f); for (const p of now) caught.add(p); }
+      if (now.length) { const sim = CareSim.fromSave(through(serialize(ref))), f = { sim, at: s, used: { ...sim.stats.used } }; forks.push(f); live.push(f); for (const p of now) caught.add(p); }
     }
   }
   if (live.length) fail(`save: ${live.length} loaded worlds were never compared`);
-  noteUse(a, b, ref, ...forks.map((f) => f.sim));
+  // (a loaded world counts only its own uses, not the ones it was loaded with)
+  noteUse(a); noteUse(b, blob.stats.used); noteUse(ref);
+  for (const f of forks) noteUse(f.sim, f.used);
   for (const p of WANT) if (!caught.has(p)) fail(`save: no save caught a world with something ${p}`);
   let threw: unknown = null;
   try { CareSim.fromSave({ ...serialize(a), v: 999 }); } catch (e) { threw = e; }
@@ -323,6 +348,16 @@ const PLANNED: ReadonlySet<string> = new Set(['lift', 'hatchery', 'tack', 'bunks
   throws('a baby in a module slot', () => new CareSim(START_ROOMS, [one({ stage: 'baby', slot: { room: 'kitchen', i: 0 } })], START_KEEPERS));
   throws('a baby beside a grown dragon in one module', () => new CareSim(START_ROOMS, [one({ slot: { room: 'kitchen', i: 0 } }), one({ name: 'U', stage: 'baby', slot: { room: 'kitchen', i: 2 } })], START_KEEPERS));
   throws('a grown dragon in the hatchery', () => new CareSim(START_ROOMS, [one({ slot: { room: 'hatchery', i: 0 } })], START_KEEPERS));
+  // a keeper waits between jobs clear of the body of a dragon of any stage in any slot on their floor (their extent is
+  // x +- 10), so a keeper at rest is never hidden behind a dragon; the waiting spot is in the keeper's own room
+  for (const k of sim.keepers) {
+    if (k.stationX < k.station.x0 + 10 || k.stationX > k.station.x1 - 10) fail(`keepers: ${k.name} waits at x ${k.stationX}, outside the ${k.station.kind}`);
+    for (const r of sim.rooms) if (r.floor === k.station.floor) for (const sl of r.slots) for (const st of STAGES) {
+      if (!fitsSlot(sl, st)) continue;
+      const [x0, x1] = slotBody(sl, st);
+      if (k.stationX + 10 > x0 && k.stationX - 10 < x1) fail(`keepers: ${k.name} waits at x ${k.stationX}, behind ${/^[aeiou]/.test(st) ? 'an' : 'a'} ${st} in the ${r.kind}'s slot ${sl.i} (its body x ${x0.toFixed(1)}..${x1.toFixed(1)})`);
+    }
+  }
   // the start stands in the start slots of plan 3.3, facing its slot's way
   const want: Readonly<Record<string, string>> = { EMBER: 'kitchen 0', RIPPLE: 'bath 0', ZAP: 'romp 0', BRAMBLE: 'groom 0', COBBLE: 'groom 1', ECHO: 'groom 2', WICK: 'dorm 0' };
   for (const d of sim.dragons) {
@@ -336,7 +371,7 @@ const PLANNED: ReadonlySet<string> = new Set(['lift', 'hatchery', 'tack', 'bunks
     if (PLANNED.has(k) ? n > 0 : n === 0) fail(PLANNED.has(k) ? `rooms: the ${k} is PLANNED but was used ${n} times: its mechanic has landed, take it off PLANNED` : `rooms: the ${k} is named and furnished but nothing used it (#11)`);
   }
   for (const k of PLANNED) if (!named.includes(k)) fail(`rooms: PLANNED names ${k}, which the building hasn't got`);
-  console.log(`  8 rooms: ${ROOM_KINDS.length} kinds and ${Object.keys(STRUCTURES).length} structures, each with a purpose; ${NEEDS.length} needs, one room each; ${plates.length} plates, none on a bare slot; used over the suite: ${named.filter((k) => !PLANNED.has(k)).map((k) => `${k} ${USED[k] ?? 0}`).join(', ')}; planned: ${[...PLANNED].join(', ')}`);
+  console.log(`  8 rooms: ${ROOM_KINDS.length} kinds and ${Object.keys(STRUCTURES).length} structures, each with a purpose; ${NEEDS.length} needs, one room each; ${plates.length} plates, none on a bare slot; keepers wait at ${sim.keepers.map((k) => `${k.name} ${k.stationX}`).join(', ')}, clear of every slot; used over the suite: ${named.filter((k) => !PLANNED.has(k)).map((k) => `${k} ${USED[k] ?? 0}`).join(', ')}; planned: ${[...PLANNED].join(', ')}`);
 }
 
 if (fails.length) { console.log('SIM: FAIL\n' + fails.map((f) => '  ' + f).join('\n')); process.exit(1); }

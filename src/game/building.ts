@@ -5,7 +5,8 @@
 // for the room art to come. Every surface anyone stands on -- a room's band, a landing, a tower's floor, the deck, the
 // lift car's deck -- is a FLOORS colour (surfaces.ts; gated by tools/palette-check.ts, gates i and Ki). A room's
 // identity is its wall colour and its props; a slot no room fills is bare (an empty wall, no props, no name, #11). The
-// names go on a separate layer, drawn over the cast; the lift's car is drawn in the world layer (drawLiftCar).
+// names go on a separate layer the view draws over the building and under the lift's car and the cast (so a name never
+// covers a face); the car is drawn in the world layer (drawLiftCar).
 import { makeTones } from '../lib/art/shading.ts';
 import { drawText, measureText } from '../lib/engine/text.ts';
 import {
@@ -191,14 +192,15 @@ function props(g: CanvasRenderingContext2D, r: Room): void {
       break;
     }
     case 'hatchery':
-      // the heat lamp, and the three nests the eggs will lie in
-      line(g, x + 40, t, x + 40, t + 30, INK); poly(g, [x + 30, t + 30, x + 50, t + 30, x + 46, t + 38, x + 34, t + 38], '#f2c14e');
+      // the heat lamp on its cord, and the three nests the eggs will lie in
+      rect(g, x + 40, t, 1, 30, INK); poly(g, [x + 30, t + 30, x + 50, t + 30, x + 46, t + 38, x + 34, t + 38], '#f2c14e');
       for (const nx of [x + 30, x + 80, x + 130]) nest(g, nx, t + WALL_H);
       break;
     case 'bath': {
       for (let y = t + 18; y < t + WALL_H; y += 10) rect(g, x, y, r.x1 - x, 1, '#a0adb6');
-      // the tub (the bathhouse's post: the buckets are filled here)
-      const bx = x + 150, w = 150, bf = t + WALL_H + 8;
+      // the tub (the bathhouse's post: the buckets are filled here), standing on the band's back edge like the hearth,
+      // so a dragon in the slot in front of it has straw under its paws, not the tub
+      const bx = x + 150, w = 150, bf = t + WALL_H;
       box(g, bx, bf - 34, w, 34, '#8e6240');
       for (let i = 1; i < 4; i++) rect(g, bx + 1, bf - 34 + i * 8, w - 2, 1, '#6e4a30');
       rect(g, bx + 3, bf - 38, w - 6, 5, INK); rect(g, bx + 4, bf - 37, w - 8, 3, '#bfe3e0');
@@ -208,7 +210,7 @@ function props(g: CanvasRenderingContext2D, r: Room): void {
     case 'romp': {
       // bunting, and the play wheel that turns the mill (the romp room's post: the balls are kept in the box by it)
       const by = t + 8;
-      line(g, x + 110, by, r.x1 - 10, by, '#6e4a30');
+      rect(g, x + 110, by, r.x1 - 10 - (x + 110), 1, '#6e4a30');
       const cs = ['#e0664a', '#f2c14e', '#5aa0c8', '#7bbf6a'];
       for (let bx = x + 116, i = 0; bx < r.x1 - 18; bx += 16, i++) poly(g, [bx, by, bx + 10, by, bx + 5, by + 8], cs[i % 4]);
       const cx = x + 50, cy = t + 46, R = 36;
@@ -229,7 +231,8 @@ function props(g: CanvasRenderingContext2D, r: Room): void {
       // hanging from the rafters (under the room's plate, which hangs at t + 20 in the hayloft)
       for (const s of r.slots) if (!s.baby) pallet(g, s.x, t, s.facing);
       box(g, x + 157, t + 50, 6, WALL_H - 50, TIMBER, false);
-      for (const lx of [x + 40, x + 280]) { const ly = t + (r.floor === 2 ? 32 : 16); line(g, lx, r.floor === 2 ? RIDGE_Y - 20 : t, lx, ly, INK); box(g, lx - 4, ly, 8, 10, '#ffa98c'); }
+      // (each cord a flat 1 px ink column)
+      for (const lx of [x + 40, x + 280]) { const ly = t + (r.floor === 2 ? 32 : 16), cy = r.floor === 2 ? RIDGE_Y - 20 : t; rect(g, lx, cy, 1, ly - cy, INK); box(g, lx - 4, ly, 8, 10, '#ffa98c'); }
       break;
     case 'tack':
       box(g, x + 6, t + 40, 40, 4, TIMBER, false);
@@ -344,7 +347,7 @@ export function drawBuilding(rooms: readonly Room[]): HTMLCanvasElement {
   // the right tower's cone roof and flag
   const rt = floorTop(TOWER_FLOORS - 1);
   poly(g, [TOWER_R - 8, rt + 2, TOWER_R + TOWER_W + 8, rt + 2, TOWER_R + TOWER_W / 2, 56], '#4f5f7f');
-  line(g, TOWER_R + TOWER_W / 2, 56, TOWER_R + TOWER_W / 2, 30, INK); poly(g, [TOWER_R + TOWER_W / 2, 30, TOWER_R + TOWER_W / 2 + 18, 35, TOWER_R + TOWER_W / 2, 40], '#e0664a');
+  rect(g, TOWER_R + TOWER_W / 2, 30, 1, 26, INK); poly(g, [TOWER_R + TOWER_W / 2, 30, TOWER_R + TOWER_W / 2 + 18, 35, TOWER_R + TOWER_W / 2, 40], '#e0664a');
 
   // the Aerie (floor 5): one straw deck from the flag at its west end over the left tower, a gantry on trestles over
   // the barn roof, and the lift head
@@ -378,7 +381,11 @@ export function drawBuilding(rooms: readonly Room[]): HTMLCanvasElement {
   return c;
 }
 
-/** The room names (layout.ts platesOf: one per named room, and the lift's and the Aerie's), on a transparent layer the view draws over the cast. */
+/**
+ * The room names (layout.ts platesOf: one per named room, and the lift's and the Aerie's), on a transparent layer the
+ * view draws over the building and under the lift's car and the cast: a name is on the wall, so whoever passes in
+ * front of it covers it for a moment, and it never covers a face.
+ */
 export function drawPlates(rooms: readonly Room[]): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = WORLD_W; c.height = WORLD_H;

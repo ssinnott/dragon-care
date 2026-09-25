@@ -31,9 +31,10 @@ export const VIEW_W = 640, VIEW_H = 360;
  * Where the camera starts: the barn's three floors, the kitchen and the romp room (EMBER and ZAP), the Dragon Lift
  * parked at the ground floor, the ladder bay, and the first slots of the bathhouse, the grooming parlour and the lamp
  * dorm (RIPPLE, BRAMBLE and WICK). The new game's seven young adults stand in their need rooms' slots and span world
- * x 188-1177 (measured over their idles), wider than one screen; the five west of the ladder bay span x 188-841, 14 px
- * more than a screen, so the frame starts at 204: all five faces whole, EMBER's and ZAP's tail tips (at most 16 px)
- * cut at the left edge. A drag shows COBBLE and ECHO.
+ * x 188-1177 (measured over their idles), wider than one screen; the five in the west rooms and the first slots east
+ * of the ladder bay span x 188-841, 14 px more than a screen, so the frame starts at 204: all five faces whole, EMBER's
+ * and ZAP's tail tips (at most 16 px) cut at the left edge, and every plate in it whole (the kitchen's and the romp
+ * room's sit 44 px in from the barn's west wall: layout.ts platesOf). A drag shows COBBLE and ECHO.
  */
 const START_CAM = { x: 204, y: 376 };
 /** Chips in the job strip (4.8). */
@@ -178,6 +179,9 @@ export class BaseView {
     const seen = (x0: number, x1: number, y0: number, y1: number) => x1 >= cx && x0 <= cx + VIEW_W && y1 >= cy && y0 <= cy + VIEW_H;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(this.building, cx, cy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
+    // the names are on the walls: under the lift's car and the cast, so a name never covers a face (a keeper passing
+    // under the Lamp Dorm's plate hides part of it for a moment instead)
+    ctx.drawImage(this.plates, cx, cy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
     ctx.save();
     ctx.translate(-cx, -cy);
     drawLiftCar(ctx, this.carY);
@@ -210,7 +214,6 @@ export class BaseView {
       this.bubbles.push({ job: j, r: drawBubble(ctx, pt.x, pt.y - 2, j.need, tierOf(d.needs[j.need]), !!j.keeper) });
     }
     ctx.restore();
-    ctx.drawImage(this.plates, cx, cy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
     this.hud(ctx);
     if (typeof window !== 'undefined' && window.__dragonCare) {
       const st = this.sim.stats;

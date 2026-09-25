@@ -55,6 +55,12 @@ export interface RoomInfo {
   supplies?: NeedKind;
   /** Where the supply is, or the keepers' post, px from the room's left edge (default: the middle). */
   post?: number;
+  /**
+   * Where the room's keepers wait between jobs, px from its left edge (default: the post): clear of the body of a
+   * dragon of any stage in any of its slots, so a waiting keeper is never hidden behind one (the post, where a supply
+   * is picked up, may lie behind a slot).
+   */
+  wait?: number;
   /** A room for people (the towers'); no dragon stands in one. */
   people?: boolean;
   /** Its dragon slots: 'module' (one per module, and two baby sub-slots each), 'baby' (the sub-slots only), or none. */
@@ -62,11 +68,11 @@ export interface RoomInfo {
 }
 /** Every room there is (#11: a room is named and furnished only for a real purpose; the rest of the building is bare). */
 export const ROOM_INFO: Readonly<Record<RoomKind, RoomInfo>> = Object.freeze({
-  kitchen: { name: 'HEARTH KITCHEN', purpose: 'meets food: a keeper feeds the dragon here, with the bowl taken at the hearth', meets: 'food', supplies: 'food', post: 64, slots: 'module' },
+  kitchen: { name: 'HEARTH KITCHEN', purpose: 'meets food: a keeper feeds the dragon here, with the bowl taken at the hearth', meets: 'food', supplies: 'food', post: 64, wait: 160, slots: 'module' },
   bath: { name: 'BATHHOUSE', purpose: 'meets bath: a keeper washes the dragon here, with the bucket filled at the tub', meets: 'bath', supplies: 'bath', post: 226, slots: 'module' },
   hatchery: { name: 'HATCHERY', purpose: 'eggs lie in its three nests and hatch into babies', slots: 'baby' },
-  romp: { name: 'ROMP ROOM', purpose: 'meets play: a keeper plays with the dragon here, with a ball from the box by the wheel', meets: 'play', supplies: 'play', post: 107, slots: 'module' },
-  groom: { name: 'GROOMING PARLOUR', purpose: 'meets love, the busiest need (the own need of spike, rock and slinkwing): a keeper grooms and pets the dragon here', meets: 'love', post: 120, slots: 'module' },
+  romp: { name: 'ROMP ROOM', purpose: 'meets play: a keeper plays with the dragon here, with a ball from the box by the wheel', meets: 'play', supplies: 'play', post: 107, wait: 160, slots: 'module' },
+  groom: { name: 'GROOMING PARLOUR', purpose: 'meets love, the busiest need (the own need of spike, rock and slinkwing): a keeper grooms and pets the dragon here', meets: 'love', post: 120, wait: 320, slots: 'module' },
   dorm: { name: 'LAMP DORM', purpose: 'meets sleep: a keeper tucks the dragon in here', meets: 'sleep', slots: 'module' },
   tack: { name: 'TACK ROOM', purpose: 'riders take their saddles here before a mission and hang them back after', people: true },
   bunks: { name: 'BUNKS', purpose: 'riders rest here after a mission', people: true },
@@ -135,6 +141,8 @@ export function placeRooms(places: readonly RoomPlace[]): Room[] {
 
 /** A room's supply spot or post, world x. */
 export function postX(r: Room): number { return r.x0 + (ROOM_INFO[r.kind].post ?? (r.x1 - r.x0) / 2); }
+/** Where a room's keepers wait between jobs, world x (RoomInfo.wait; default the post): clear of every slot's body. */
+export function waitX(r: Room): number { const w = ROOM_INFO[r.kind].wait; return w == null ? postX(r) : r.x0 + w; }
 
 /** Whether a dragon of this stage fits a slot: a baby takes a sub-slot, anyone older a module slot. */
 export function fitsSlot(slot: Slot, stage: Stage): boolean { return slot.baby === (stage === 'baby'); }
@@ -174,7 +182,19 @@ export const KEEPER_NET: Net = Object.freeze<Net>({
   ],
 });
 
-/** Half a dragon's body, by stage, from the measured extents (every element and seed: back 26.5 / 54.4 / 70.7 / 74.7 px). */
+/**
+ * A dragon's body behind and ahead of its root x, by stage: the most over every element and seed (measured headless
+ * over the idles; the art's extentX). A body facing +1 spans x - back .. x + front.
+ */
+export const DRAGON_BODY: Readonly<Record<Stage, { readonly back: number; readonly front: number }>> = Object.freeze({
+  baby: { back: 26.5, front: 29.8 }, young: { back: 54.4, front: 41.8 }, adult: { back: 70.7, front: 50.8 }, elder: { back: 74.7, front: 52.0 },
+});
+/** Where the body of a dragon of this stage in this slot reaches, [x0, x1]. */
+export function slotBody(slot: Slot, stage: Stage): Span {
+  const b = DRAGON_BODY[stage];
+  return slot.facing > 0 ? [slot.x - b.back, slot.x + b.front] : [slot.x - b.front, slot.x + b.back];
+}
+/** Half a dragon's body, by stage, from the measured extents (DRAGON_BODY's larger side, rounded up). */
 export const DRAGON_PAD: Readonly<Record<Stage, number>> = Object.freeze({ baby: 30, young: 56, adult: 72, elder: 76 });
 const DRAGON_NETS = new Map<Stage, Net>();
 /**
@@ -236,16 +256,18 @@ export function standSpot(slot: Slot, stage: Stage, room: Room): Spot {
  * The cheapest route between two spots on a net (the keepers' by default), as legs, with its cost in walked px; null
  * if there is none. Dijkstra over one node per link and stop: along a link, each stop to the next costs its rise x
  * CLIMB_COST (the lift's 2 -> 5 is one edge), and along a floor, nodes in the same span of that net are joined.
- * Ties go to the lower node index, so a route is the same every run.
+ * Ties go to the lower node index, so a route is the same every run. A ride on the lift is always one leg, from the
+ * stop it boards at straight to the one it alights at (the stops passed on the way are dropped: a rider never gets
+ * off between); a ladder climb stays one leg per floor, so a keeper sent elsewhere mid-climb can stop at the next.
  */
 export function route(from: Spot, to: Spot, net: Net = KEEPER_NET): { legs: Leg[]; cost: number } | null {
   const fs = spanOf(from.f, from.x, net), ts = spanOf(to.f, to.x, net);
   if (fs < 0 || ts < 0) return null;
   if (from.f === to.f && fs === ts) return { legs: [{ f: to.f, x: to.x }], cost: Math.abs(to.x - from.x) };
   const nodes: Spot[] = [from, to];
-  /** Each link node's stop below it on its link (-1: the lowest, or not a link node). */
-  const below: number[] = [-1, -1];
-  for (const l of net.links) l.stops.forEach((f, i) => { below.push(i > 0 ? nodes.length - 1 : -1); nodes.push({ f, x: l.x }); });
+  /** Each link node's stop below it on its link (-1: the lowest, or not a link node), and its link (null: from, to). */
+  const below: number[] = [-1, -1], link: (Link | null)[] = [null, null];
+  for (const l of net.links) l.stops.forEach((f, i) => { below.push(i > 0 ? nodes.length - 1 : -1); link.push(l); nodes.push({ f, x: l.x }); });
   const n = nodes.length, dist = new Array<number>(n).fill(Infinity), prev = new Array<number>(n).fill(-1), done = new Array<boolean>(n).fill(false);
   const span = nodes.map((s) => spanOf(s.f, s.x, net));
   const rise = (a: number, b: number) => Math.abs(feetY(nodes[a].f) - feetY(nodes[b].f)) * CLIMB_COST;
@@ -263,8 +285,13 @@ export function route(from: Spot, to: Spot, net: Net = KEEPER_NET): { legs: Leg[
     if (above >= 0 && !done[above]) relax(above, rise(u, above));
   }
   if (dist[1] === Infinity) return null;
+  const path: number[] = [];
+  for (let v = 1; v > 0; v = prev[v]) path.unshift(v);
+  path.unshift(0);
+  /** Whether the step from path[i - 1] to path[i] is a ride between two of the lift's stops. */
+  const ride = (i: number) => link[path[i]]?.name === 'lift' && link[path[i - 1]] === link[path[i]] && nodes[path[i]].f !== nodes[path[i - 1]].f;
   const legs: Leg[] = [];
-  for (let v = 1; v > 0; v = prev[v]) legs.unshift({ f: nodes[v].f, x: nodes[v].x });
+  for (let i = 1; i < path.length; i++) if (!(ride(i) && i + 1 < path.length && ride(i + 1))) legs.push({ f: nodes[path[i]].f, x: nodes[path[i]].x });
   return { legs, cost: dist[1] };
 }
 
@@ -282,8 +309,9 @@ export function platesOf(rooms: readonly Room[]): Plate[] {
   const out = rooms.map((r) => {
     const t = floorTop(r.floor), barn = r.part === 'barn';
     // (a hayloft plate hangs lower, clear of the HUD's top bar when the start camera shows the hayloft's floor; one at
-    // the barn's west end sits under the roof's slope, so it moves in clear of it)
-    const loft = barn && r.floor === 2, x = loft && r.x0 === BARN_X ? r.x0 + 44 : r.x0 + (barn ? 5 : 3);
+    // the barn's west end moves 44 px in: in the hayloft clear of the roof's slope, and on every floor whole in the
+    // opening frame, whose left edge is at x 204: base.ts START_CAM)
+    const loft = barn && r.floor === 2, x = barn && r.x0 === BARN_X ? r.x0 + 44 : r.x0 + (barn ? 5 : 3);
     return mk(ROOM_INFO[r.kind].name, x, loft ? t + 20 : t + 3, r.kind, r.id);
   });
   out.push(mk(STRUCTURES.lift.name, LIFT_X0 + 7, floorTop(0) + 3, 'lift', null));

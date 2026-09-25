@@ -13,7 +13,12 @@ rooms that earn their keep) and World of Warcraft's mission table (pick a team, 
 **Status.** Designed, and being built in slices. The first, needs and jobs, runs as `view=base` in the gallery, in the
 building of sections 2 and 3: one room per need, the Dragon Lift and the Aerie (section 8).
 
-![The whole base, one screen of it outlined](base/barn_cutaway.png)
+![The whole base, one screen of it outlined: the first greybox mockup, from before the room set was settled](base/barn_cutaway.png)
+
+*The first greybox mockup (this image and section 2's), drawn before the rooms were settled (#11): its Sun Loft, Hay
+Store, Song Roost, Attic, Hoist, Feed Store, Mess Hall, Lookout, Workshop, Library and Infirmary are gone, and module 2
+is now the Dragon Lift. Sections 2 and 3 describe the building as built; section 8's picture (`base/base_live.png`)
+shows it.*
 
 ---
 
@@ -63,7 +68,11 @@ elder). A new game therefore starts with seven dragons, one per element, each 0 
 
 ## 2. The building
 
-![One screen of the base: need bubbles, a keeper carrying a bowl, the job queue](base/barn_screen.png)
+![One screen of the base in the first greybox mockup (before the rooms were settled, #11): need bubbles, a keeper carrying a bowl, the job queue](base/barn_screen.png)
+
+*The mockup's screen, for the bubbles, the queue and the scale; its rooms are the old set (the Sun Loft, the Hay
+Store, the Mess Hall, the Hoist, the Hatchery on module 2). The building as built is below, and in section 8's
+picture.*
 
 - **The barn** (the dragons): six modules wide on three floors, the ground floor, the upper floor and the **hayloft**
   under the gambrel roof. A barn room is 1 to 3 modules wide; rooms merge like Fallout Shelter's.
@@ -142,7 +151,11 @@ Library, the Workshop, the Infirmary and the Lookout (no mechanic); and two of t
 them; a three-module room faces +1, +1, -1), and two baby sub-slots 40 px in from its sides. A module holds either one
 grown dragon or up to two babies; the Hatchery has baby sub-slots only. A keeper meets a dragon at its slot's **stand
 spot**: in front of its snout (58 px for an adult), kept inside the room. The new game starts with one dragon per
-need room's first slot, the three love dragons filling the Grooming Parlour.
+need room's first slot, the three love dragons filling the Grooming Parlour. Between jobs a keeper waits in their own
+room at a spot clear of every slot's body, whatever the stage in it (the middle of the Hearth Kitchen, the Romp Room
+and the Lamp Dorm; the Grooming Parlour's between its second and third slots), so a keeper at rest is never hidden
+behind a dragon; the supplies are still taken at the hearth, the ball box and the tub. The room names hang on the
+walls, drawn behind the dragons and keepers, so a name never covers a face.
 
 **Neighbours** (later; all from traits the rig already has): slinkwing's shriek and lonely call carry one room over,
 and dusk's `hush` calms the rooms around it; the hearth warms its neighbours; spike's wary latch (5.4) already
@@ -296,7 +309,7 @@ a mission are not keeping, which is the price of sending a team (5.6).
    does either); `t=` freezes it as in every gallery view. The gallery's own keys (the arrows, Space, E, the digits)
    do nothing here, and its arrows step over the base, so a debug view reached with them can still be left.
 
-   ![The built slice, 30 s in, in the start frame: west to east the Hearth Kitchen and the Romp Room (EMBER, and ZAP tucked in by Iris), the Dragon Lift with its car parked at the ground floor, the keepers' ladder bay, and the first slots of the Bathhouse, the Grooming Parlour and the Lamp Dorm (RIPPLE, BRAMBLE and WICK); all four keepers at work, the job strip](base/base_live.png)
+   ![The built slice, 30 s in, in the start frame: west to east the Hearth Kitchen and the Romp Room (EMBER; ZAP asleep, Tomas walking back to his parlour), the Dragon Lift with its car parked at the ground floor, the keepers' ladder bay (Pip taking a ball down to RIPPLE), and the first slots of the Bathhouse, the Grooming Parlour and the Lamp Dorm (RIPPLE, BRAMBLE and WICK; Iris passing behind BRAMBLE on her way to the tub); the job strip](base/base_live.png)
 
    | File | What it is |
    |---|---|
@@ -313,8 +326,8 @@ a mission are not keeping, which is the price of sending a team (5.6).
    | `src/game/base.ts` | the live view: the simulation driving the dragons' anims, the camera, the HUD and the input |
    | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play with its invariants, determinism, Rush, the start cast, saves (a loaded world steps on exactly as its original), `rngAt`, and the rooms (a purpose each, one room per need, every named room used over the check unless planned) |
 
-   Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play, 150
-   jobs opened and 148 were done. A keeper started on a job 13.8 s after it opened on average (41.4 s at most), and
+   Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play, 149
+   jobs opened and 146 were done. A keeper started on a job 14.5 s after it opened on average (41.0 s at most), and
    no need ever emptied; the need rooms were used 31 (Bathhouse), 36 (Romp Room), 32 (Hearth Kitchen), 8 (Grooming
    Parlour) and 2 (Lamp Dorm) times (a need met in its own room, or its supply taken there). (In the mockups' rooms,
    before the building was rebuilt: 149 opened, 148 done, 14.2 s and 40.5 s; the first cast, twelve dragons, gave 274
