@@ -32,6 +32,12 @@ interface Window {
     pour?: { id: string; frame: number; top: number; lip: number; column: boolean }[];
     /** view=neutral (src/gallery.ts): per look, the share of its pixels that are neutral (HSV S < 0.25); `over` > 40 % (3.1). */
     neutral?: { id: string; share: number; over: boolean }[];
+    /**
+     * view=base (src/game/base.ts), as of the last frame drawn: the care simulation's step, the camera, the open jobs,
+     * the jobs done and the Rushes so far, and the job strip's chips (canvas px) for tapping.
+     */
+    base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
+      chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[] };
   };
 }
 

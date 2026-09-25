@@ -18,6 +18,8 @@
 // the hip (3.0: fire's zone), the pour-column audit (view=pour) any breath frame with one effect mark from 3 px under
 // the mouth down to the floor (3.8: Nightfall is breathed out, never poured), and the neutral-area recorder
 // (view=neutral) any look more than 40 % neutral at rest (3.1). All five run over all 28 looks.
+// The base (view=base, docs/BASE_DESIGN.md): frozen, a minute in, the care simulation must have got jobs done; live,
+// a drag must pan the camera and a tap on the first job chip must Rush that job.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -44,7 +46,34 @@ async function launch(chromium: any): Promise<any> {
  * One view. `allScales`: every element's body colour must be on the canvas, at each of `stages` (default all four:
  * the lineup's rows) -- a one-stage view (cast, mood) names its stage.
  */
-interface Case { query: string; minColours: number; allScales: boolean; stages?: readonly AgeStage[]; timeout?: number; floor?: boolean; roots?: boolean; tails?: boolean; pour?: boolean; neutral?: boolean }
+interface Case { query: string; minColours: number; allScales: boolean; stages?: readonly AgeStage[]; timeout?: number; floor?: boolean; roots?: boolean; tails?: boolean; pour?: boolean; neutral?: boolean;
+  /** view=base: the care simulation must have done jobs by the frozen frame. */
+  base?: boolean;
+  /** A live page to drive (pointer input); returns what went wrong. */
+  act?: (page: any) => Promise<string[]> }
+
+/** view=base, live: a drag pans the camera the other way, and a tap on the first job chip Rushes that job. */
+async function baseInput(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = () => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.chips?.length ?? 0) > 0, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox();
+  const k = box.width / 640;
+  const a = await st();
+  await page.mouse.move(box.x + 700, box.y + 400);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 400, box.y + 300, { steps: 8 });
+  await page.mouse.up();
+  const b = await st();
+  if (!(b.camX > a.camX + 100)) out.push(`a drag to the left did not pan the camera right (x ${a.camX} -> ${b.camX})`);
+  const c = b.chips[0];
+  if (!c) return [...out, 'the job strip was empty'];
+  await page.mouse.click(box.x + (c.x + c.w / 2) * k, box.y + (c.y + c.h / 2) * k);
+  await page.waitForTimeout(300);
+  const d = await st();
+  if (d.rushes !== b.rushes + 1) out.push(`tapping ${c.dragon}'s ${c.need} chip Rushed ${d.rushes - b.rushes} jobs, not 1`);
+  return out;
+}
 const CASES: Case[] = [
   { query: 'view=lineup&t=0', minColours: 150, allScales: true },
   { query: 'view=lineup&t=45&mood=-1', minColours: 150, allScales: true },
@@ -106,6 +135,10 @@ const CASES: Case[] = [
   { query: 'view=pour&t=0', minColours: 2, allScales: false, timeout: 120000, pour: true },
   // the neutral-area recorder (3.1, a hard rule): no look's pixels more than 40 % neutral (HSV S < 0.25) at rest
   { query: 'view=neutral&t=0', minColours: 2, allScales: false, neutral: true },
+  // the base: its first seconds, a minute of care (jobs got done), and live input (a drag pans, a chip tap Rushes)
+  { query: 'view=base&t=600', minColours: 150, allScales: false },
+  { query: 'view=base&t=3600', minColours: 150, allScales: false, base: true },
+  { query: 'view=base', minColours: 150, allScales: false, act: baseInput },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -155,6 +188,12 @@ for (const c of CASES) {
       if (rows.length !== 28) errors.push(`the neutral-area recorder measured ${rows.length} looks, not 28`);
       for (const r of rows) if (r.over) errors.push(`${r.id} is ${Math.round(r.share * 100)} % neutral (the ceiling is 40 %)`);
     }
+    if (c.base) {
+      const b: { tick: number; done: number } | undefined = await page.evaluate(() => (window as any).__dragonCare?.base);
+      if (!b) errors.push('the base reported nothing');
+      else if (b.done < 1) errors.push(`the keepers finished no job in ${b.tick} steps`);
+    }
+    if (c.act) errors.push(...await c.act(page));
     const colours: number[] = await page.evaluate(() => {
       const cv = document.getElementById('stage') as HTMLCanvasElement;
       const d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
