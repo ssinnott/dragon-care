@@ -29,11 +29,14 @@ runs the keeper palette gates (156 of 156 pass, counted apart from the dragons' 
 care audits among them (every act on all 28 looks: 112 runs; the same mirrored on two elements: 32; and every act
 the yard plays in two and a half minutes, walks included). `npm run shots` renders the keeper sheets. The
 yard also brings the game side of one care hook: **dusk's `tuckin` is played on a tuck-in** (the bible's status noted
-that nothing did). **Not built:** a player-facing game loop (the yard runs itself: nothing lets a player send a
-keeper), props for the keepers' stations, keepers in the habitat view, and night: Iris tucks in whoever is sleepy.
-Nor are these keepers in **the base** (`view=base`, `docs/BASE_DESIGN.md`), which has its own on the plain engine
-rig with a procedural walk: its care simulation could drive these keepers' walks and care acts, but that is not
-wired up.
+that nothing did). **Also built:** **the base** (`view=base`, and the game's default page: `docs/BASE_DESIGN.md`)
+draws its keepers as this cast too (`src/game/people.ts`), each in the anim closest to its job (walking, carrying,
+`watch`, `kneelIdle`, `pet`) while sim.ts's own care simulation walks it along the barn's routes and decides what job
+it is doing; the anim plays with its root motion pinned (`KeeperAgent.pinX`), since the base already moves the keeper
+itself. This is a plainer join than the yard's: it skips the plan (6.3), so a base keeper's stand and stroke are not
+proven eye-clear or on the mark the way the yard's and the two audits' are. **Not built:** a player-facing game loop
+for the yard itself (it still runs on its own: nothing lets a player send one of these keepers to a dragon from it),
+props for the keepers' stations, keepers in the habitat view, and night: Iris tucks in whoever is sleepy.
 A plan (6.3) is made the first time a keeper does a job for a look, in the tick the job starts (tens of ms; a game
 would make them while it loads).
 

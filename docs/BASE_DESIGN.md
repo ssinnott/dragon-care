@@ -247,8 +247,10 @@ a mission are not keeping, which is the price of sending a team (5.6).
 
 ## 8. Build order
 
-1. **Needs and jobs.** Built. Run `npm run dev` and open `index.html?view=base`: drag to look around, and tap a bubble,
-   a job chip or a dragon to Rush it.
+1. **Needs and jobs.** Built. Run `npm run dev` and open `index.html` (this is the game's default page; `?view=base`
+   still names it, for the gallery's other debug views): drag to look around, and tap a bubble, a job chip or a
+   dragon to Rush it. The four keepers are the named cast of `docs/KEEPERS.md`, each in the anim closest to its job
+   while this slice's own simulation walks it and picks what it's doing (KEEPERS.md's status has the join).
 
    ![The built slice, 30 s in: keepers on their way, the handler fetching a ball, the job strip](base/base_live.png)
 
@@ -257,15 +259,15 @@ a mission are not keeping, which is the price of sending a team (5.6).
    | `src/game/pet.ts` | the pet code, moved out of `src/gallery.ts` unchanged (the gallery renders pixel for pixel as before) |
    | `src/game/needs.ts` | the five needs, the drains, the tiers, mood and lightning's charge |
    | `src/game/layout.ts` | the grid, the rooms, the floor spans, the ladders and the hoist, and routes between any two spots |
-   | `src/game/start.ts` | the starting base: the mockups' rooms, twelve dragons and five keepers |
+   | `src/game/start.ts` | the starting base: the mockups' rooms, twelve dragons and the four named keepers |
    | `src/game/sim.ts` | the care simulation: the queue, the keepers' trips and jobs, and Rush; no drawing, seeded, deterministic |
-   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building, the keepers on the engine rig, the bubbles and chips |
+   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building, the keepers on the named cast's rig (`docs/KEEPERS.md`), the bubbles and chips |
    | `src/game/base.ts` | the live view: the simulation driving the dragons' anims, the camera, the HUD and the input |
    | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route, 30 minutes of play with its invariants, determinism, Rush |
 
-   Measured by `npm run sim` on the starting base: over 30 minutes of play, 274 jobs opened and 272 were done. A
-   keeper started on a job 14 s after it opened on average (47 s at most), and no need ever emptied. Not in this
-   slice:
+   Measured by `npm run sim` on the starting base (its four keepers): over 30 minutes of play, 274 jobs opened and
+   271 were done. A keeper started on a job 15.9 s after it opened on average (53.4 s at most), and no need ever
+   emptied. Not in this slice:
    - dragons stay where they stand (the idle and its variants keep them lively);
    - the base is the fixed starting one, and nothing is saved;
    - there is no building yet, and no missions.
