@@ -27,8 +27,11 @@ import type { Rect } from './icons.ts';
 
 const INK = '#1a1018';
 export const VIEW_W = 640, VIEW_H = 360;
-/** Where the camera starts: the left tower, the kitchen, the hatchery, the romp room and the sun loft. */
-const START_CAM = { x: 48, y: 376 };
+/**
+ * Where the camera starts: the barn's middle, where the new game's seven young adults stand in the mockups' rooms
+ * (world x 344-962, wider than one screen): six of them whole, and WICK's tail in the Lamp Dorm at the right edge.
+ */
+const START_CAM = { x: 300, y: 376 };
 /** Chips in the job strip (4.8). */
 const STRIP = 5;
 /** What a job has the dragon do (4.4, the rig's anims: ART_BIBLE 4.2); dusk's bedtime is its own tuck-in (3.8). */
@@ -44,7 +47,7 @@ export interface BaseViewOpts {
   cam?: { x: number; y: number } | null;
   /** A start from presets.ts by name (null, or a name no preset has: the new game). */
   preset?: string | null;
-  /** A live page that loads and autosaves (the gallery sets it only without t= and without save=0). Unused until S4. */
+  /** A live page that loads and autosaves (the gallery sets it only without t=, save=0 or preset=). Unused until S4. */
   persist?: boolean;
 }
 
@@ -304,5 +307,10 @@ export class BaseView {
     });
   }
 
-  detach(): void { for (const f of this.detachers) f(); this.detachers = []; }
+  /** Give the page back: the pointer and the resize, and the hook (it describes a base that is running). */
+  detach(): void {
+    for (const f of this.detachers) f();
+    this.detachers = [];
+    if (typeof window !== 'undefined' && window.__dragonCare) delete window.__dragonCare.base;
+  }
 }

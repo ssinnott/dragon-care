@@ -93,20 +93,31 @@ function everyStage(b: BaseHook): string[] {
 
 /**
  * view=base, live: the gallery's keys are not the game's. Every one that once rebuilt the world (E, the digits) or
- * left it (the arrows, Space) is pressed; the base must still be there, the same world, still running.
+ * left it (the arrows, Space) is pressed; the base must still be there, the same world, still running. Each key is
+ * judged on its own, by the clock and not by how long it took: a rebuilt world's tick starts again from 0 (any fall
+ * fails), and leaving the base detaches it, which takes its hook away.
  */
 async function baseKeys(page: any): Promise<string[]> {
   const out: string[] = [];
-  const st = () => page.evaluate(() => (window as any).__dragonCare?.base);
+  const st = (): Promise<BaseHook | undefined> => page.evaluate(() => (window as any).__dragonCare?.base);
   await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
-  const a = (await st()).tick;
-  for (const key of ['e', 'E', 'ArrowRight', 'ArrowLeft', 'Space', '5']) { await page.keyboard.press(key); await page.waitForTimeout(50); }
+  const a = (await st())!, ids = a.dragons.map((d) => d.id).join(',');
+  let last = a.tick;
+  for (const key of ['e', 'E', 'ArrowRight', 'ArrowLeft', 'Space', '5']) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(50);
+    const b = await st();
+    if (!b) { out.push(`the base hook is gone after ${key}: the page left the base`); break; }
+    if (b.tick < last) out.push(`${key} restarted the world (tick ${last} -> ${b.tick})`);
+    last = b.tick;
+  }
   await page.waitForTimeout(300);
   const size = await page.evaluate(() => { const c = document.getElementById('stage') as HTMLCanvasElement; return [c.width, c.height]; });
   if (size[0] !== 640 || size[1] !== 360) out.push(`the canvas is ${size[0]} x ${size[1]} after the keys, not the base's 640 x 360`);
   const b = await st();
-  if (!b) return [...out, 'the base hook is gone after the keys'];
-  if (!(b.tick >= a + 10)) out.push(`the world restarted or stopped under the keys (tick ${a} -> ${b.tick})`);
+  if (!b) return out.length ? out : ['the base hook is gone after the keys'];
+  if (!(b.tick >= a.tick + 10)) out.push(`the world restarted or stopped under the keys (tick ${a.tick} -> ${b.tick})`);
+  if (b.dragons.map((d) => d.id).join(',') !== ids) out.push(`the dragons changed under the keys (${ids} -> ${b.dragons.map((d) => d.id).join(',')})`);
   return out;
 }
 

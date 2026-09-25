@@ -160,6 +160,10 @@ const newSim = (seed = 1) => new CareSim(START_ROOMS, START_DRAGONS, START_KEEPE
   a.keepers.forEach((k, i) => missing(k, blob.keepers[i], `keeper ${k.name}`));
   a.jobs.forEach((j, i) => missing(j, blob.jobs[i], `job ${j.id}`));
   missing(a.stats, blob.stats, 'stats');
+  // and every field of the world itself: a field a later slice adds to CareSim (a lift, a garden, a board) fails here
+  // until it is saved, or listed below with the reason it needn't be (the digest is the save, so it can't see one left out)
+  const UNSAVED: Readonly<Record<string, string>> = { rooms: 'placed again from roomPlaces', roomPlaces: 'saved as rooms', events: 'one step\'s output, cleared by the next' };
+  for (const k of Object.keys(a)) if (!(k in blob) && !(k in UNSAVED)) fail(`save: the world's ${k} is not in its save (save it, or say in sim-check why not)`);
   const b = CareSim.fromSave(through(serialize(a)));
   if (b.digest() !== a.digest()) fail('save: a loaded world differs from its save at once');
   if (b.seed !== a.seed || b.clock !== a.clock) fail('save: the seed or the clock was not kept');

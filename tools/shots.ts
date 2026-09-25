@@ -46,8 +46,8 @@ const pairs: string[] = [
   ...STAGES.map((st) => `shots/cast_${st}.png=view=cast&stage=${st}&t=0&scale=1`),
   // the elders' wing wear (2.9): the hole at full spread and at home (the airing), the tears in the preen
   'shots/wings_elder.png=view=wings&t=0',
-  // the base (docs/BASE_DESIGN.md): its first seconds (the start camera, and the barn's east half: the seven young
-  // adults between them), a minute of care, and every stage at once (the ages preset)
+  // the base (docs/BASE_DESIGN.md): its first seconds (the start camera: six of the seven young adults whole; and the
+  // barn's east half, WICK whole), a minute of care, and every stage at once (the ages preset)
   'shots/base_t600.png=view=base&t=600',
   'shots/base_t600_east.png=view=base&t=600&cam=560,376',
   'shots/base_t3600.png=view=base&t=3600',

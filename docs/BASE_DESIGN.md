@@ -256,10 +256,11 @@ a mission are not keeping, which is the price of sending a team (5.6).
    dragon to Rush it. The four keepers are the named cast of `docs/KEEPERS.md`, each in the anim closest to its job
    while this slice's own simulation walks it and picks what it's doing (KEEPERS.md's status has the join). The page
    takes `seed=`, `cam=x,y` (where the camera starts, world px), `preset=ages` (a code-built start with every stage:
-   the base's first twelve-dragon cast) and `save=0` (a live page that never loads or saves); `t=` freezes it as in
-   every gallery view. The gallery's own keys (the arrows, Space, E, the digits) do nothing here.
+   the base's first twelve-dragon cast) and `save=0` (a live page that never loads or saves; a preset page never
+   does either); `t=` freezes it as in every gallery view. The gallery's own keys (the arrows, Space, E, the digits)
+   do nothing here, and its arrows step over the base, so a debug view reached with them can still be left.
 
-   ![The built slice, 30 s in: keepers on their way, the handler fetching a ball, the job strip](base/base_live.png)
+   ![The built slice, 30 s in: six of the seven young adults in the start frame (WICK's tail at the right edge), all four keepers at work, the job strip](base/base_live.png)
 
    | File | What it is |
    |---|---|
@@ -279,7 +280,9 @@ a mission are not keeping, which is the price of sending a team (5.6).
    jobs opened and 148 were done. A keeper started on a job 14.2 s after it opened on average (40.5 s at most), and
    no need ever emptied. (The first cast, twelve dragons, gave 274 opened, 271 done, 15.9 s and 53.4 s.) Not in this
    slice:
-   - dragons stay where they stand (the idle and its variants keep them lively);
+   - dragons stay where they stand (the idle and its variants keep them lively), in the mockups' rooms: the seven
+     span more than one screen, so the start camera frames six of them and the tail of the seventh (WICK, in the
+     Lamp Dorm), and a drag shows the rest;
    - the base is the fixed starting one (or a preset), and nothing is stored yet: the save format exists and is
      checked, but nothing writes it to the browser;
    - there is no building yet, and no missions.

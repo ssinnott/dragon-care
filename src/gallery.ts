@@ -3,7 +3,7 @@
 // THE CONTRACT with tools/shot.ts: the query string picks the view, the anim and a frozen time `t` (60 Hz steps from
 // the anim's start); with `t` the page draws exactly that frame and then sets window.__dragonCare.ready. Without `t`
 // it runs live (keyboard: arrows / space cycle views, number keys pick anims; not on view=base, the game, whose keys
-// are its own) and sets ready after the first frame.
+// are its own -- the cycle steps over it, so every view it reaches keeps them) and sets ready after the first frame.
 //
 //   (no view=, or an unknown one)   the game: view=base, below -- this is the page a plain index.html load runs
 //   view=lineup                28 dragons: seven element columns (bible order) x baby / young / adult / elder rows
@@ -32,6 +32,7 @@
 //                              and tap a bubble, a job or a dragon to Rush it; seed= seeds the world, cam=x,y starts the
 //                              camera there (world px), preset=<name> starts from a code-built world instead of the new
 //                              game (src/game/presets.ts: ages = every stage), save=0 keeps a live page from saving
+//                              (a preset page, like a frozen one, never loads or saves: it isn't the player's barn)
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
 //   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
@@ -73,6 +74,8 @@ const LABEL = '#3a2a30';
 
 export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings', 'keepers', 'care', 'careaudit', 'yard', 'yardaudit', 'base'] as const;
 export type View = typeof VIEWS[number];
+/** The views the arrows and Space cycle through: every one but the game's (view=base keeps its keys, so it could never be left). */
+const RING: readonly View[] = VIEWS.filter((v) => v !== 'base');
 
 export interface GalleryParams {
   view: View;
@@ -1326,8 +1329,9 @@ function makeScene(P: GalleryParams): Scene {
     case 'careaudit': return careAuditScene(P);
     case 'yard': return yardScene(P);
     case 'yardaudit': return yardAuditScene(P);
-    // (a frozen view never loads or saves: G4)
-    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save });
+    // (a frozen view never loads or saves (G4), and nor does a preset: loading would hide it, autosaving would put it
+    // in place of the player's barn)
+    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset });
     default: return lineupScene(P);
   }
 }
@@ -1367,9 +1371,9 @@ export function startGallery(canvas: HTMLCanvasElement, search: string, onReady:
   window.addEventListener('keydown', (e) => {
     // (the base is the game: its keys are its own, and E or an arrow must never rebuild or leave it)
     if (P.view === 'base') return;
-    const vi = VIEWS.indexOf(P.view);
-    if (e.key === 'ArrowRight' || e.key === ' ') { P = { ...P, view: VIEWS[(vi + 1) % VIEWS.length] }; rebuild(); }
-    else if (e.key === 'ArrowLeft') { P = { ...P, view: VIEWS[(vi + VIEWS.length - 1) % VIEWS.length] }; rebuild(); }
+    const vi = RING.indexOf(P.view);
+    if (e.key === 'ArrowRight' || e.key === ' ') { P = { ...P, view: RING[(vi + 1) % RING.length] }; rebuild(); }
+    else if (e.key === 'ArrowLeft') { P = { ...P, view: RING[(vi + RING.length - 1) % RING.length] }; rebuild(); }
     else if (e.key === 'e' || e.key === 'E') { P = { ...P, el: ELEMENT_IDS[(ELEMENT_IDS.indexOf(P.el) + 1) % ELEMENT_IDS.length] }; rebuild(); }
     else if (/^[0-9]$/.test(e.key) && ANIM_NAMES[(Number(e.key) + 9) % 10]) { P = { ...P, anim: ANIM_NAMES[(Number(e.key) + 9) % 10] }; rebuild(); }
     else return;
