@@ -5,21 +5,28 @@
 // What is only Zap's, and where it lives in this file:
 //   - the bolts (wing, style 'custom') and every angle they take: cockNow() is the one place the cock is decided
 //     (mood, asleep, the breath's flare, the happy / wake spread, the hungry twitch, the dream twitch, the zoomies'
-//     sweep), and boltTip() finds the tip the sparks sit on through the same transform the renderer draws with;
+//     sweep, the storm-watch's tip forward; that V's opening is watchOpen()), and boltTip() / boltPt() find the tip
+//     the sparks sit on through the same transform the renderer draws with;
+//   - the ELDER's bolts (3.5, 2.9): the elder-only THIRD TOOTH (BOLT.elder), the far bolt's TEAR cut from the stage's
+//     wing data, opened as the storm-watch fans that bolt back (boltPath, boltTear), and the far bolt stepping further
+//     back as they cock up (farOffset);
 //   - sparks: flat signal yellow (`membrane`, D20: in the pale `glow` they were the dazed stars' white), whole
 //     pixels in face space, drawn as a tiny inked stepped bolt (spark(): why not 3.5's bare or scale-ringed 2 x 2,
 //     nor a "+" star);
-//   - the ambient crackle, the adult's charge, and the flourishes the shared anims hand over through pose.act /
-//     pose.cue (4.3): the happy crackles and spark shower, the hungry tell's sputtering sparks, the dream-twitch
-//     spark, the zoomies' skid sparks (ambient());
-//   - the signature Spark Bolt and the baby's static pop (breath());
-//   - the anims of its own: the zoomies fidget, the sleep loop with its dream-twitch every 6 breaths, the baby
-//     breath's hair-on-end jolt, the adult breath's shorter sustain.
+//   - the ambient crackle, the adult's (and elder's) charge, the elder's arc hopping tip to tip, and the flourishes
+//     the shared anims hand over through pose.act / pose.cue (4.3): the happy crackles and spark shower, the hungry
+//     tell's sputtering sparks, the dream-twitch spark, the zoomies' skid sparks, the storm-watch's ladder
+//     (ambient());
+//   - the signature Spark Bolt, the elder's slower 1.1x one ending in its turning ring of sparks, and the baby's pop
+//     (breath());
+//   - the anims of its own: the zoomies fidget (the elder's a content lope), the sleep loop with its dream-twitch
+//     every 6 breaths, the baby breath's hair-on-end jolt, the adult's and elder's shorter sustains (cutBreath), and
+//     the elder's airing, a STORM-WATCH (stormWatch()).
 import { DRAGON_PALETTES } from '../palettes.ts';
-import { TAIL_REST, grown } from '../stages.ts';
+import { TAIL_REST, FIDGET_TIMING, grown } from '../stages.ts';
 import type { Stage } from '../stages.ts';
 import { hornParams, wingParams } from '../element.ts';
-import type { ElementSpec, ElementDraw, DragonInfo } from '../element.ts';
+import type { ElementSpec, ElementDraw, DragonInfo, WingTear } from '../element.ts';
 import { pathPts, hornTip, hornRefClamped, mouthToRoot } from '../features.ts';
 import { ACT, DFACE } from '../pose.ts';
 import type { DragonPose, PartialDragonPose } from '../pose.ts';
@@ -42,6 +49,9 @@ type Pt = { x: number; y: number };
  * leading edge (the first 3 vertices), then the zigzag trailing edge. The tip (the top vertex, pts[4], pts[5]) is
  * where the sparks sit.
  *   - Adult: 3.5's simple polygon, 15 x 28, its two shelves ending 5.7 and 9.2 px behind the leading edge.
+ *   - Elder: the adult's leading edge and height, 16.5 x 28, with the elder-only THIRD TOOTH (3.5): its shelves end
+ *     5.7, 9.2 and 11.3 px behind the leading edge, so the 3 px spar and >= 2 px of yellow survive at every step, the
+ *     teeth 7-8 px apart. Its TEAR (2.9) is the stage's data (sp.wing.tears), cut into the FAR bolt by boltPath.
  *   - Young: hand-authored, 16 x 10, the shelves ending 4.8 and 6.4 px behind the leading edge (at the 9 / 15
  *     scale of the adult's they ended 3.4 and 5.5 px back, and past the 2 px spar only 0-2 px of yellow survived:
  *     the far bolt's olive outweighed the near one's yellow, and the sprout read as a brown pine cone).
@@ -53,8 +63,9 @@ type Pt = { x: number; y: number };
  * language on spike's back line (3.0; the cast review). `spar`: the leading spar's line, running up the leading
  * edge from under the root to 70 % of the height (sparTo), so the spire's peak is yellow.
  */
-interface BoltShape { pts: readonly number[]; spar: readonly number[]; at: number; sparR: number; farDx: number; farDy: number }
+interface BoltShape { pts: readonly number[]; spar: readonly number[]; at: number; sparR: number; farDx: number; farDy: number; farBack: number }
 const ADULT = [0, 0, -3, -13, -8, -28, -14, -17, -10, -17, -15, -8, -11, -8, -8, 0];
+const ELDER = [0, 0, -3, -13, -8, -28, -15, -20, -11, -20, -16, -12, -12, -12, -16.5, -5, -12.5, -5, -8.5, 0];
 const YOUNG = [0, 0, -2, -7, -5, -16, -10, -9, -7.5, -9, -10, -4, -7.5, -4, -5, 0];
 /** The spar's line: from 1 px under the root up the leading edge (pts' first 3 vertices) to `k` of the height. */
 function sparTo(p: readonly number[], k: number): number[] {
@@ -64,15 +75,78 @@ function sparTo(p: readonly number[], k: number): number[] {
   return [p[0], 1, p[2], p[3], p[2] + (p[4] - p[2]) * t, ye];
 }
 const BOLT: Readonly<Record<Stage, BoltShape>> = {
-  baby: { pts: [0, 0, -1.5, -6, -3, -12, -5.5, -5.4, -3.5, -5.4, -5, 0], spar: [], at: 105, sparR: 0, farDx: -1, farDy: 1 },
-  young: { pts: YOUNG, spar: sparTo(YOUNG, 0.7), at: 115, sparR: 1, farDx: -2.5, farDy: 0 },
-  adult: { pts: ADULT, spar: sparTo(ADULT, 0.7), at: 115, sparR: 1.5, farDx: -4, farDy: 0 },
-  // FIRST PASS (elder): the adult's bolt at the adult's 115 deg rest cock. 3.5's elder bolt keeps the adult's height
-  // and leading edge and grows 1.1x as wide, 28 x 16.5, with its elder-only extra, the THIRD TOOTH (its trailing edge
-  // stepping three times), and one ragged tear on each bolt's upper trailing edge (2.9: parts.ts pathTearEdge, with
-  // sp.wing.tears; no hole); the elder AMBIENT arc (a 3-segment spark from bolt tip to bolt tip at mood >= 0.5) too
-  elder: { pts: ADULT, spar: sparTo(ADULT, 0.7), at: 115, sparR: 1.5, farDx: -4, farDy: 0 },
+  baby: { pts: [0, 0, -1.5, -6, -3, -12, -5.5, -5.4, -3.5, -5.4, -5, 0], spar: [], at: 105, sparR: 0, farDx: -1, farDy: 1, farBack: 0 },
+  young: { pts: YOUNG, spar: sparTo(YOUNG, 0.7), at: 115, sparR: 1, farDx: -2.5, farDy: 0, farBack: 0 },
+  adult: { pts: ADULT, spar: sparTo(ADULT, 0.7), at: 115, sparR: 1.5, farDx: -4, farDy: 0, farBack: 0 },
+  elder: { pts: ELDER, spar: sparTo(ELDER, 0.7), at: 115, sparR: 1.5, farDx: -4, farDy: 0, farBack: 3 },
 };
+
+/**
+ * Path the bolt `p` (wing space, as authored), with the elder's TEAR cut into its trailing edge (2.9, sp.wing.tears)
+ * `open` of its full depth: a tear's `panel` counts the bolt's TEETH from the tip, 1-based -- the trailing edge's
+ * slanting run from one tooth's point down to the next (the tip -> the first tooth is panel 1) -- and `at` is the
+ * fraction along it from its upper end. The notch is boltTear's slot, so the bolt's one stroke inks it.
+ * The tear is the FAR bolt's (wing()), and it opens as the storm-watch fans that bolt back (`open`: watchOpen, 0 at
+ * rest), the way a membrane elder's tears open with its spread (2.9 "When it shows"): in the V its trailing edge
+ * faces the room with the bolt's whole width behind it. At rest the far bolt shows only a 4-6 px band past the near
+ * one, and a 5 px tear there cut it nearly through (1 px olive necks; at the sad cock and asleep the slot ran across
+ * the band and left the far tip floating over an "F"); shallower it was an ink nick with 1-2 px of background. The
+ * first pass's tear on the near bolt lay over the far one, and the room cut through behind it showed as a closed pale
+ * pocket, an eye, with the tooth point under it cut loose as a 1-3 px speck.
+ */
+function boltPath(ctx: CanvasRenderingContext2D, p: readonly number[], tears: readonly WingTear[] | undefined, open: number): void {
+  ctx.beginPath(); ctx.moveTo(p[0], p[1]);
+  for (let i = 2; i < p.length; i += 2) {
+    const k = tears && open > 0 ? tearOn(tears, i - 2) : -1;
+    if (!tears || k < 0) { ctx.lineTo(p[i], p[i + 1]); continue; }
+    tearNormal(p, i - 2);
+    boltTear(ctx, p[i - 2], p[i - 1], p[i], p[i + 1], tears[k].at, tears[k].depth * open);
+  }
+  ctx.closePath();
+}
+
+/**
+ * The bolt's tear slot (2.9's shape, re-aimed for a tooth run): TEAR_MOUTH px wide between its sides, `d` deep, its
+ * LOWER side stepped TEAR_STEP px toward the upper halfway down, the sides running into the bolt along the run's
+ * normal turned TEAR_TILT deg up. A tooth run is 8-10 px long, and square to it (parts.ts pathTearEdge) the slot's
+ * sides aimed down at the next shelf's inner corner: at 4 deep its bottom crossed the shelf, the tooth point below it
+ * was cut loose as a separate flag, and the far bolt read as an "E". Turned up and stepped on the lower side, the
+ * tooth keeps a neck of about 3 px. From the current point on the edge (x0, y0) -> (x1, y1), appended; TN is the run's
+ * normal into the bolt.
+ */
+const TEAR_MOUTH = 6.5, TEAR_STEP = 1.5, TEAR_TILT = 20;
+function boltTear(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, at: number, d: number): void {
+  if (d < 0.5) { ctx.lineTo(x1, y1); return; }
+  const L = Math.hypot(x1 - x0, y1 - y0) || 1, ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+  const a = Math.atan2(TN.y, TN.x) - TEAR_TILT * D2R, dx = Math.cos(a), dy = Math.sin(a), st = TEAR_STEP;
+  // the mouth's span along the run, so the slot is TEAR_MOUTH wide square to its turned sides
+  const h = TEAR_MOUTH / Math.abs(ux * dy - uy * dx) / 2 / L, t0 = at - h, t1 = at + h;
+  const ax = x0 + (x1 - x0) * t0, ay = y0 + (y1 - y0) * t0, bx = x0 + (x1 - x0) * t1, by = y0 + (y1 - y0) * t1;
+  // square to the sides, from the lower side B toward the upper A
+  let px = -dy, py = dx;
+  if ((ax - bx) * px + (ay - by) * py < 0) { px = -px; py = -py; }
+  ctx.lineTo(ax, ay);
+  ctx.lineTo(ax + dx * d, ay + dy * d);
+  ctx.lineTo(bx + px * st + dx * d, by + py * st + dy * d);
+  ctx.lineTo(bx + px * st + dx * d / 2, by + py * st + dy * d / 2);
+  ctx.lineTo(bx + dx * d / 2, by + dy * d / 2);
+  ctx.lineTo(bx, by);
+  ctx.lineTo(x1, y1);
+}
+/** The index into `tears` of the tear on the edge from vertex pair `v` (an index into pts, even) on, or -1. */
+function tearOn(tears: readonly WingTear[], v: number): number {
+  // (the teeth's slanting runs start at the tip, pts[4], and at every shelf's end after it: 4, 8, 12...)
+  if (v < 4 || v % 4) return -1;
+  for (let k = 0; k < tears.length; k++) if (tears[k].panel === v / 4) return k;
+  return -1;
+}
+/** The unit normal into the bolt (toward the leading edge, +x) of the edge from pts[v] on, into TN. */
+const TN: Pt = { x: 0, y: 0 };
+function tearNormal(p: readonly number[], v: number): void {
+  const dx = p[v + 2] - p[v], dy = p[v + 3] - p[v + 1], L = Math.hypot(dx, dy) || 1;
+  TN.x = dy / L; TN.y = -dx / L;
+  if (TN.x < 0) { TN.x = -TN.x; TN.y = -TN.y; }
+}
 
 /** The shared breath's wind-up, frames (anims.ts breathAnim: 18 / 14 / 10, the elder's 22): cue runs from -WINDUP to the snap. */
 const WINDUP: Readonly<Record<Stage, number>> = { baby: 10, young: 14, adult: 18, elder: 22 };
@@ -96,7 +170,9 @@ function cockOf(stage: Stage, mood: number, asleep: boolean, spread: number): nu
  *   - otherwise the wing channel is the spread (happy 0.8, the wake's full spread: both read as "excited");
  *   - begging (the hungry tell): an irregular stepped twitch, up 6 or down 4 for 3 f, about one beat in five;
  *   - the zoomies (fidget()): swept back to 130 (baby 125) through the gallop, snapped to 95 at the skid. Left at
- *     the fidget's excited 95 the whole way, nothing in the cue sold the speed.
+ *     the fidget's excited 95 the whole way, nothing in the cue sold the speed;
+ *   - the elder's storm-watch (its airing, stormWatch()): raised to 95 on the keyed spread and tipped WATCH.tip
+ *     further forward as the V opens (watchOpen), the far bolt fanned WATCH.fan back (wing()).
  */
 function cockNow(rig: DragonRig, pose: DragonPose, info: DragonInfo): number {
   const st = info.stage;
@@ -111,6 +187,8 @@ function cockNow(rig: DragonRig, pose: DragonPose, info: DragonInfo): number {
     // the zoomies: swept back into the wind through the gallop (over its first 6 f), snapped up at the skid's whoa
     const z = ZOOM[st], back = st === 'baby' ? 125 : 130, u = Math.min(1, (pose.cue - z.dash0) / 6);
     if (pose.cue >= z.dash0 && pose.cue < z.dashEnd) c += (back - c) * u * u * (3 - 2 * u);
+  } else if (pose.act === ACT.airing && st === 'elder') {
+    c -= WATCH.tip * watchOpen(pose, info);
   } else if (pose.act === ACT.beg) {
     const h = hash01(info.seed * 7 + 1, Math.floor(info.tick / 3));
     if (h > 0.8) c += h > 0.9 ? -6 : 4;
@@ -130,11 +208,15 @@ function popLift(pose: DragonPose, info: DragonInfo): number {
  * The far bolt's offset in the renderer's own frame (before the cock turns it), into `out`: its step back and down
  * (BoltShape.farDx, farDy) and, as the bolts cock up past rest, a drop of up to 3 px. The rig roots the far wing
  * 2 px higher and turns it 8 deg further back, so at the excited 95 its tip stood 1.5 px ABOVE the near one's and
- * the far bolt took the spire's peak -- olive over yellow.
+ * the far bolt took the spire's peak -- olive over yellow. The elder's also steps up to `farBack` (3) px further
+ * back: dropped 3 px with three teeth, the far bolt's teeth fell between the near one's, and the excited spire was
+ * a crumpled saw of six jags; stepped back as well, it stays a whole second bolt behind the first. `open`: this
+ * frame's watchOpen (the storm-watch's fan parts the pair on its own, so the step and the drop ease out as it opens).
  */
-function farOffset(info: DragonInfo, cock: number, out: Pt): Pt {
+function farOffset(info: DragonInfo, cock: number, open: number, out: Pt): Pt {
   const rest = info.stage === 'baby' ? 105 : 115;
-  out.x = BOLT[info.stage].farDx; out.y = BOLT[info.stage].farDy + 3 * Math.max(0, Math.min(1, (rest - cock) / (rest - 95)));
+  const B = BOLT[info.stage], ex = Math.max(0, Math.min(1, (rest - cock) / (rest - 95))) * (1 - open);
+  out.x = B.farDx - B.farBack * ex; out.y = B.farDy + 3 * ex;
   return out;
 }
 const FO: Pt = { x: 0, y: 0 };
@@ -148,6 +230,7 @@ const FO: Pt = { x: 0, y: 0 };
  * SHADING: none -- each bolt is one FLAT tone, inked, like the signal colour's other shapes (D20). Cel-banded as a
  * bat membrane is (1.2: matte, one shadow band), the near bolt's band `#a88f30` sat about 20 % from the far bolt
  * `#96803d` behind it, under the 25 % ladder, and the two bolts' bases fused into one olive mass on the adult.
+ * ELDER: the FAR bolt carries the tear (boltPath), opened as the storm-watch fans it back (watchOpen).
  */
 /**
  * How much of the rig's `flap` turn the bolts give back: half in flight, all of it in the preen and the wake,
@@ -158,13 +241,15 @@ function flapBack(pose: DragonPose): number { return pose.act === ACT.happy || p
 
 const wing: ElementDraw = (ctx, rig, pose, info) => {
   const B = BOLT[info.stage], cock = cockNow(rig, pose, info), flap = pose.wing.flap * flapBack(pose);
+  const open = info.far ? watchOpen(pose, info) : 0;
   ctx.save();
   if (flap) ctx.rotate(flap * D2R);
   const lift = popLift(pose, info);
   if (lift) ctx.translate(0, -lift);
-  if (info.far) { farOffset(info, cock, FO); ctx.translate(FO.x, FO.y); }
-  ctx.rotate(-(cock - B.at) * D2R);
-  pathPts(ctx, B.pts);
+  if (info.far) { farOffset(info, cock, open, FO); ctx.translate(FO.x, FO.y); }
+  ctx.rotate(-(cock + WATCH.fan * open - B.at) * D2R);
+  // (rig.sp, not info.sp: the gallery's wear=0 replaces rig.sp alone)
+  boltPath(ctx, B.pts, info.far ? rig.sp.wing.tears : undefined, open);
   flat(ctx, rig, info.pal.membrane);
   if (B.spar.length && !rig.override && !info.far) {
     // one leading spar in scale, no ink of its own, CLIPPED to the bolt just inside its leading edge, up to 70 % of
@@ -182,19 +267,36 @@ const wing: ElementDraw = (ctx, rig, pose, info) => {
   ctx.restore();
 };
 
+/**
+ * The storm-watch's opening this frame, 0..1 (stormWatch(): eased in over WATCH.open0..open1, out over
+ * shut0..shut1), 0 in any other act: the far bolt fans back WATCH.fan deg by it and the near one tips forward
+ * WATCH.tip (cockNow), so the pair opens into a V from the tips, and the far bolt's tear opens with it (boltPath).
+ */
+function watchOpen(pose: DragonPose, info: DragonInfo): number {
+  if (pose.act !== ACT.airing || info.stage !== 'elder') return 0;
+  const c = pose.cue, W = WATCH;
+  const u = c < W.open0 || c >= W.shut1 ? 0 : c < W.open1 ? (c - W.open0) / (W.open1 - W.open0) : c < W.shut0 ? 1 : (W.shut1 - c) / (W.shut1 - W.shut0);
+  return u * u * (3 - 2 * u);
+}
+
 // ---------- where the sparks sit ----------
 
 const HT: Pt = { x: 0, y: 0 }, WT: Pt = { x: 0, y: 0 }, TP: Pt = { x: 0, y: 0 }, SP: Pt = { x: 0, y: 0 }, GP: Pt = { x: 0, y: 0 };
 
 /**
  * The bolt's tip this frame, ROOT space, into `out`: the wing renderer's own transform (the halved flap, the pop's
- * lift, farOffset, the cock) applied to the polygon's top vertex, then the rig's wing space. `cock` overrides
- * this frame's (a spark's birth pose, so its source holds still once the bolts have moved on).
+ * lift, farOffset, the cock, the far bolt's fan) applied to the polygon's top vertex (or the polygon-space point
+ * (vx, vy): boltPt), then the rig's wing space. `cock` overrides this frame's (a spark's birth pose, so its source
+ * holds still once the bolts have moved on).
  */
 function boltTip(rig: DragonRig, pose: DragonPose, info: DragonInfo, far: boolean, out: Pt, cock = 0): Pt {
-  const B = BOLT[info.stage], J = rig.j, ck = cock || cockNow(rig, pose, info);
-  const a = -(ck - B.at) * D2R, vx = B.pts[4], vy = B.pts[5];
-  if (far) farOffset(info, ck, FO); else { FO.x = 0; FO.y = 0; }
+  const B = BOLT[info.stage];
+  return boltPt(rig, pose, info, far, B.pts[4], B.pts[5], out, cock);
+}
+function boltPt(rig: DragonRig, pose: DragonPose, info: DragonInfo, far: boolean, vx: number, vy: number, out: Pt, cock = 0): Pt {
+  const B = BOLT[info.stage], J = rig.j, ck = cock || cockNow(rig, pose, info), open = far ? watchOpen(pose, info) : 0;
+  const a = -(ck + WATCH.fan * open - B.at) * D2R;
+  if (far) farOffset(info, ck, open, FO); else { FO.x = 0; FO.y = 0; }
   const x = vx * Math.cos(a) - vy * Math.sin(a) + FO.x, y = vx * Math.sin(a) + vy * Math.cos(a) + FO.y - popLift(pose, info);
   const f = pose.wing.flap * flapBack(pose) * D2R, c = Math.cos(f), s = Math.sin(f);
   return localToRootPt(far ? J.wingF.x : J.wingN.x, far ? J.wingF.y : J.wingN.y, far ? J.wingAngF : J.wingAngN, x * c - y * s, x * s + y * c, out);
@@ -329,28 +431,34 @@ function crawl(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, 
 
 // ---------- the ambient and the act flourishes (root space) ----------
 
-const AG = new Float32Array(4), ID = new Int32Array(4), AG2 = new Float32Array(2), ID2 = new Int32Array(2);
+const AG = new Float32Array(4), ID = new Int32Array(4), AG2 = new Float32Array(2), ID2 = new Int32Array(2), AG3 = new Float32Array(2), ID3 = new Int32Array(2);
 
 /** The adult's charge: one horn -> bolt trip of 6 hops, 3 f each (18 f), every 90 +- 30 f while excited. */
 const TRIP = 18;
 
 /**
- * 3.5 "Ambient": the idle crackle and the adult's CHARGE, one budget between them (5.4: 6 per dragon, 12 per
- * habitat, every interval stretched 1.5 x in a crowd).
+ * 3.5 "Ambient": the idle crackle, the adult's CHARGE and the elder's ARC, one budget between them (5.4: 6 per
+ * dragon, 12 per habitat, every interval stretched 1.5 x in a crowd).
  *   - CRACKLE: a spark on a bolt tip for 4 f, hopping 3 px for 4 more (on the horn's tip it sat where the dazed
  *     stars circle, and read as one), every 120 +- 40 f,
  *     faster as boredom charge builds (info.charge 0 -> 1: down to every 40 +- 13 f), every 30 +- 10 f when
  *     excited (`mood` > 0.5).
- *   - CHARGE (adult only, `mood` > 0.5): now and then a spark crawls from the near horn's tip to a bolt tip, the
+ *   - CHARGE (grown, `mood` > 0.5): now and then a spark crawls from the near horn's tip to a bolt tip, the
  *     near and the far one in turn ("horn tips and wing tips") -- a seeded burst, one 18 f trip every 90 +- 30 f.
  *     Crawling every frame (two sparks hopping for good) a well-kept adult, above 0.5 most of its life, flickered
- *     all the time and never rested.
+ *     all the time and never rested. The elder keeps it.
+ *   - ARC (elder only, `mood` >= 0.5, 3.5 "Ambient (elder)"): every ARC_EVERY +- 40 f, a spark jumps from the near
+ *     bolt's tip over the gap onto the far one's, three hops of ARC_HOP f (tipHop), the grown charge.
  */
 function idleSparks(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, info: DragonInfo): void {
   const hot = info.mood > 0.5, st = rig.budget.stretch, every = hot ? 30 : 120 - 80 * Math.max(0, Math.min(1, info.charge));
-  const n = liveSpawns(info.seed * 13 + 5, info.tick, every * st, every / 3, 8, AG, ID);
+  let n = liveSpawns(info.seed * 13 + 5, info.tick, every * st, every / 3, 8, AG, ID);
   const m = grown(info.stage) && hot ? liveSpawns(info.seed * 19 + 7, info.tick, 90 * st, 30, TRIP, AG2, ID2) : 0;
-  let ok = rig.budget.take(rig.slot, n + m);
+  const a = info.stage === 'elder' && info.mood >= 0.5 ? liveSpawns(info.seed * 23 + 11, info.tick, ARC_EVERY * st, 40, 3 * ARC_HOP, AG3, ID3) : 0;
+  // (an arc stands in for the tip crackle while it lasts: a crackle on a tip beside it made one yellow knot of the two)
+  if (a) n = 0;
+  let ok = rig.budget.take(rig.slot, n + m + a);
+  for (let i = 0; i < a && ok > 0; i++, ok--) tipHop(ctx, rig, pose, info, AG3[i]);
   for (let i = 0; i < n && ok > 0; i++, ok--) {
     const h = hash01(info.seed + 3, ID[i]);
     crackleAt(ctx, rig, pose, info, 1 + Math.min(1, Math.floor(h * 2)), AG[i], hash01(info.seed + 9, ID[i]));
@@ -362,6 +470,120 @@ function idleSparks(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonP
     const step = Math.min(5, Math.floor(AG2[i] / 3)), u = step / 5;
     spark(ctx, rig, info, Math.round(HT.x + (WT.x - HT.x) * u), Math.round(HT.y + (WT.y - HT.y) * u), step & 1 ? ZAG : ZIG);
   }
+}
+
+/**
+ * The elder's idle arc (3.5 "Ambient (elder)", tipHop): one every ARC_EVERY +- 40 f while excited, three hops of
+ * ARC_HOP f. The storm-watch's rungs (airingArcs): ARC_LIFE f each, their kinks swapped after ARC_FLIP f (two keys of
+ * 3, 5.1 #12).
+ */
+const ARC_EVERY = 150, ARC_HOP = 3, ARC_LIFE = 6, ARC_FLIP = 3;
+
+/**
+ * The ELDER's idle arc (3.5, the grown charge): the spark glyph JUMPS from the near bolt's tip to a point over the gap
+ * between the tips and down onto the far one's, ARC_HOP f a hop (5.1 #12's keys), turning over at each; 9 f in all.
+ * `age` 0 .. 3 ARC_HOP. As a 3-segment stroke run tip to tip the 5-7 px between the tips took it whole: straight it
+ * lay on them as a flat yellow lid (a crown), and bowed 3-5 px over them it was a yellow hoop, a bag's handle.
+ */
+function tipHop(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, info: DragonInfo, age: number): void {
+  const k = Math.floor(age / ARC_HOP);
+  if (k < 0 || k > 2) return;
+  boltTip(rig, pose, info, false, HT); boltTip(rig, pose, info, true, WT);
+  // the apex: over the middle of the gap, the glyph's foot 2 px clear of the higher tip
+  const x = k === 0 ? HT.x : k === 2 ? WT.x : (HT.x + WT.x) / 2, y = k === 0 ? HT.y : k === 2 ? WT.y : Math.min(HT.y, WT.y) - 5;
+  spark(ctx, rig, info, Math.round(x), Math.round(y), k === 1 ? ZAG : ZIG);
+}
+
+/** A rung's cells, face space round its near end (ARC_C, ARC_C): a module scratch bitmap, cleared per draw. */
+const ARC_N = 40, ARC_C = 20, ARC = new Uint8Array(ARC_N * ARC_N);
+/** Stamp a 2 x 2 brush along the cells from (x0, y0) to (x1, y1) into ARC (pixelStroke's walk). */
+function arcSeg(x0: number, y0: number, x1: number, y1: number): void {
+  const n = Math.max(1, Math.round(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))));
+  for (let i = 0; i <= n; i++) {
+    const x = Math.round(x0 + (x1 - x0) * i / n) + ARC_C - 1, y = Math.round(y0 + (y1 - y0) * i / n) + ARC_C - 1;
+    for (let q = 0; q < 2; q++) for (let r = 0; r < 2; r++) {
+      if (x + q >= 0 && x + q < ARC_N && y + r >= 0 && y + r < ARC_N) ARC[(y + r) * ARC_N + x + q] = 1;
+    }
+  }
+}
+function arcOn(q: number, r: number): boolean { return q >= 0 && q < ARC_N && r >= 0 && r < ARC_N && ARC[r * ARC_N + q] === 1; }
+
+/**
+ * A storm-watch rung (airingArcs): a 3-segment stepped spark in the signal yellow jumping between two ROOT points,
+ * HT (on the near bolt) and WT (on the far one), 2 px strokes in a 1 px ink outline on 4-neighbours (the spark
+ * glyph's construction), whole pixels in face space; its kinks, a third and two thirds along, jog `amp` px either
+ * side of the chord, and swap after ARC_FLIP f. `age` 0..ARC_LIFE, `id` its rung.
+ */
+function arcSpark(ctx: CanvasRenderingContext2D, rig: DragonRig, info: DragonInfo, age: number, id: number, amp: number): void {
+  // WT in face space round HT (enterFace's origin: HT snapped to the device grid; one unit a sprite px, mirrored)
+  const t = rig.tf, kx = (t.fs < 0 ? -1 : 1) * (rig.pxScale || 1), ky = (t.ss < 0 ? -1 : 1) * (rig.pxScale || 1);
+  const x0 = Math.round(t.fs * (t.rx + HT.x * t.c - HT.y * t.s)), y0 = Math.round(t.ss * (t.ry + HT.x * t.s + HT.y * t.c));
+  const dx = Math.round((t.fs * (t.rx + WT.x * t.c - WT.y * t.s) - x0) / kx), dy = Math.round((t.ss * (t.ry + WT.x * t.s + WT.y * t.c) - y0) / ky);
+  const L = Math.hypot(dx, dy) || 1;
+  // the chord's normal pointing up the screen, and the kinks' side (seeded, swapped for the second key)
+  let nx = -dy / L, ny = dx / L;
+  if (ny > 0) { nx = -nx; ny = -ny; }
+  const k = (hash01(info.seed + 61, id) > 0.5 ? 1 : -1) * (age < ARC_FLIP ? 1 : -1) * amp;
+  const ax = dx / 3 + nx * k, ay = dy / 3 + ny * k, bx = dx * 2 / 3 - nx * k, by = dy * 2 / 3 - ny * k;
+  ARC.fill(0);
+  arcSeg(0, 0, ax, ay); arcSeg(ax, ay, bx, by); arcSeg(bx, by, dx, dy);
+  enterFace(ctx, rig, HT.x, HT.y);
+  ctx.fillStyle = rig.col(rig.outline);
+  for (let r = 0; r < ARC_N; r++) for (let q = 0; q < ARC_N; q++) {
+    if (!arcOn(q, r) && (arcOn(q - 1, r) || arcOn(q + 1, r) || arcOn(q, r - 1) || arcOn(q, r + 1))) ctx.fillRect(q - ARC_C, r - ARC_C, 1, 1);
+  }
+  ctx.fillStyle = rig.col(info.pal.membrane);
+  for (let r = 0; r < ARC_N; r++) for (let q = 0; q < ARC_N; q++) if (arcOn(q, r)) ctx.fillRect(q - ARC_C, r - ARC_C, 1, 1);
+  ctx.restore();
+}
+
+/**
+ * The storm-watch's sparks (stormWatch): a slow JACOB'S LADDER on WATCH.arcs, drawn from the ambient budget in place
+ * of the idle crackle and the charge. Two RUNGS (arcSpark, ARC_LIFE f each) zigzag across the V, from the near bolt's
+ * trailing edge to the far one's leading edge (WATCH_RUNS): the first where the two stand 9-10 px apart, the second
+ * 4 px higher, 11-13 px apart under the tips; then the ladder BREAKS OFF the top: a spark flies up off each tip, SNAP px
+ * over it and SNAP_HOP more after ARC_FLIP f, 4 px over the second rung again. Each rung stops 2 px short of either
+ * bolt (arcEnds), so its ink meets their edges and it never lies on the near bolt's yellow. The first build ran three
+ * rungs 0.6 / 0.45 / 0.3 down the tips' runs, where a V opened only 20 deg by the far bolt's fan was 3-5 px across:
+ * each landed on the near bolt as a yellow knot, and the ladder climbed 3 px in all; a third rung tip to tip lay over
+ * both tips like a headband, and bowed over them it was a 21 px bucket handle.
+ */
+function airingArcs(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, info: DragonInfo): void {
+  const A = WATCH.arcs;
+  for (let k = 0; k < A.length; k++) {
+    const age = pose.cue - A[k];
+    if (age < 0 || age >= ARC_LIFE) continue;
+    if (k < WATCH_RUNS.length) {
+      if (rig.budget.take(rig.slot, 1) <= 0) continue;
+      arcEnds(rig, pose, info, WATCH_RUNS[k]);
+      arcSpark(ctx, rig, info, age, k, WATCH_RUNS[k].amp);
+      continue;
+    }
+    const n = rig.budget.take(rig.slot, 2);
+    for (let j = 0; j < n; j++) {
+      boltTip(rig, pose, info, j === 1, SP);
+      const up = SNAP + (age < ARC_FLIP ? 0 : SNAP_HOP);
+      spark(ctx, rig, info, Math.round(SP.x), Math.round(SP.y - up), (age < ARC_FLIP) !== (j === 1) ? ZIG : ZAG);
+    }
+  }
+}
+/** The break-off sparks' rise over their tips, px, and their second hop (airingArcs). */
+const SNAP = 4, SNAP_HOP = 3;
+/**
+ * Where each rung of the storm-watch's ladder runs, in the order they jump: from the NEAR bolt's edge that starts at
+ * pts[`nv`], `nu` of the way along it (the first rung leaps from its first tooth's point, the second from halfway down
+ * its tip run), to the FAR bolt's upper leading edge, `fu` of the way down from its tip; `amp`, the kinks' jog. From
+ * the inner corner under the first tooth instead, the first rung's end lay 3 px into the near bolt's yellow.
+ */
+interface ArcRun { nv: number; nu: number; fu: number; amp: number }
+const WATCH_RUNS: readonly ArcRun[] = [{ nv: 4, nu: 1, fu: 0.25, amp: 1 }, { nv: 4, nu: 0.45, fu: 0.06, amp: 2 }];
+/** A rung's two ends (ArcRun) into HT and WT, root space, on the bolts as they stand this frame, each 2 px in. */
+function arcEnds(rig: DragonRig, pose: DragonPose, info: DragonInfo, run: ArcRun): void {
+  const P = BOLT.elder.pts, v = run.nv;
+  boltPt(rig, pose, info, false, P[v] + (P[v + 2] - P[v]) * run.nu, P[v + 1] + (P[v + 3] - P[v + 1]) * run.nu, HT);
+  boltPt(rig, pose, info, true, P[4] + (P[2] - P[4]) * run.fu, P[5] + (P[3] - P[5]) * run.fu, WT);
+  const dx = WT.x - HT.x, dy = WT.y - HT.y, L = Math.hypot(dx, dy) || 1;
+  HT.x += dx * 2 / L; HT.y += dy * 2 / L; WT.x -= dx * 2 / L; WT.y -= dy * 2 / L;
 }
 
 /**
@@ -463,8 +685,8 @@ function skidSparks(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonP
  * Root space: the idle crackle and the adult's charge (idleSparks), and the flourishes of 4.3 that the shared anims
  * hand over by act / cue. An act's own sparks stand in for the idle ones: while it is happy (the flourish's 3
  * crackles ARE its crackle; with the charge and the hot crackle on top, 6 to 8 sparks hung round the head at
- * once), begging (the hungry tell's sputter) or breathing (the wind-up's crawlers). Asleep only the dream spark
- * shows (a lamp switched off).
+ * once), begging (the hungry tell's sputter), breathing (the wind-up's crawlers) or, an elder, airing (the
+ * storm-watch's arcs). Asleep only the dream spark shows (a lamp switched off).
  */
 const ambient: ElementDraw = (ctx, rig, pose, info) => {
   if (rig.override) return;
@@ -472,6 +694,7 @@ const ambient: ElementDraw = (ctx, rig, pose, info) => {
   if (info.asleep) { if (act === ACT.sleep) dreamSpark(ctx, rig, pose, info); return; }
   if (act === ACT.happy) happyFlourish(ctx, rig, pose, info);
   else if (act === ACT.beg) begTell(ctx, rig, pose, info);
+  else if (act === ACT.airing && info.stage === 'elder') airingArcs(ctx, rig, pose, info);
   else if (act !== ACT.breath) {
     if (act === ACT.fidget) skidSparks(ctx, rig, pose, info);
     idleSparks(ctx, rig, pose, info);
@@ -486,9 +709,12 @@ const BX = new Float32Array(6), BY = new Float32Array(6), OUT = new Float32Array
  * The bolt's segment lengths per stage: the adult's 4, 10 / 8 / 10 / 8, about 28 px out (at 8 / 6 / 8 / 6 it was the
  * young's 20 px zigzag again, and the adult breath no reward: the cast review, round 2); the young's 3, 6 / 5 / 6
  * (3.5's "2 segments", one kink, was a pale bent stick with a knob on it: a pipe or a bone in the mouth, and no
- * zigzag; at 5 / 4 / 5, 40 deg kinks, a 14 px pale stick with a pip still read as a bone); the baby pop's 2.
+ * zigzag; at 5 / 4 / 5, 40 deg kinks, a 14 px pale stick with a pip still read as a bone); the baby pop's 2; the
+ * elder's the adult's at 1.1x reach (4.2), 11 / 9 / 11 / 9, about 31 px out.
  */
-const SEGS: Readonly<Record<Stage, readonly number[]>> = { baby: [5, 4], young: [6, 5, 6], adult: [10, 8, 10, 8], elder: [10, 8, 10, 8] };
+const SEGS: Readonly<Record<Stage, readonly number[]>> = { baby: [5, 4], young: [6, 5, 6], adult: [10, 8, 10, 8], elder: [11, 9, 11, 9] };
+/** The adult fork's length (3.5: 8 px), the elder's at 1.1x. */
+const FORK: Readonly<Record<Stage, number>> = { baby: 0, young: 0, adult: 8, elder: 9 };
 /** Each segment's kink off the bolt's line, radians: the least, and the seeded spread on top (young >= 45 deg). */
 const KINK: Readonly<Record<Stage, readonly [number, number]>> = { baby: [0.7, 0.15], young: [0.79, 0.1], adult: [0.7, 0.15], elder: [0.7, 0.15] };
 
@@ -554,8 +780,24 @@ function impact(ctx: CanvasRenderingContext2D, rig: DragonRig, info: DragonInfo,
   ctx.restore();
 }
 
-/** Bolt lifetime (3.5: 20 f) and the burst's after it (3 steps of 3 f). */
-const BOLT_LIFE = 20, BURST = 9;
+/**
+ * Bolt lifetime (3.5: 20 f) and its re-roll, frames; the elder's at its x 1.25 tempo (4.1), 25 f re-rolled every 5
+ * (still inside 5.1 #12's 3 to 6 f), so the slow, wise strike holds each shape a beat longer. BURST: the burst's
+ * 3 steps of 3 f after it (young and adult).
+ */
+const BOLT_LIFE: Readonly<Record<Stage, number>> = { baby: 4, young: 20, adult: 20, elder: 25 };
+const ROLL: Readonly<Record<Stage, number>> = { baby: 4, young: 4, adult: 4, elder: 5 };
+const BURST = 9;
+/**
+ * The elder's FINALE (4.2 "ends in one ring"; 3.5): 5 steps of 3 f from the bolt's end. Step 0 the impact collapses
+ * into one spark; steps 1-4 it is RING_N sparks on a circle round where the impact was, the circle widening (RING_R)
+ * and drifting up 2 px a step (RING_UP) as the jaw eases shut, each spark turning over on every step; then gone.
+ * The ring TURNS 45 deg a step, from the diagonals to the compass points and back, so its four sparks trace the circle
+ * as it widens: held on the diagonals they were a square burst of four, the adult's. From r 7: at r 6 the upper and
+ * lower pairs' ink rings touched (the glyph is 6 x 8 with its ink) and the first step was one X-shaped scribble.
+ */
+const RING_R: readonly number[] = [0, 7, 9, 11, 13];
+const RING_N = 4, RING_UP = 2, RING_STEP = 3;
 
 /** A spark at MOUTH-space point (x, y) (the breath anchor), whole pixels, of form `f` (spark()). */
 function mouthSpark(ctx: CanvasRenderingContext2D, rig: DragonRig, info: DragonInfo, x: number, y: number, f: number): void {
@@ -569,14 +811,17 @@ function mouthSpark(ctx: CanvasRenderingContext2D, rig: DragonRig, info: DragonI
 /**
  * Bible 3.5 "Signature: Spark Bolt". Mouth space, clipped off the eye by the rig.
  *   WIND-UP (cue < 0): the bolts flare to 95 (cockNow) and spark crawlers hop between the horn and bolt tips
- *   (crawl()) over its last 18 f. BOLT (cue 0..20): a zig polyline from the mouth (SEGS: adult 8 / 6 / 8 / 6, young
- *   6 / 5 / 6), kinked 40-49 deg alternately (the young 45-51: boltNodes, re-rolled every 4 f), filled in the
- *   signal yellow as a taper from 3.5 px to 40 % with ink, a 5 x 5 impact diamond at its tip; the adult's with a
- *   6 px fork off the middle node (3 px wide: at 2 px to a point it was an ink hair) and a 1 px hot core of `glow`
- *   in its thick first segment. BURST (cue 20..29): the impact
+ *   (crawl()) over its last 18 f. BOLT (cue 0..20): a zig polyline from the mouth (SEGS: adult 10 / 8 / 10 / 8,
+ *   young 6 / 5 / 6), kinked 40-49 deg alternately (the young 45-51: boltNodes, re-rolled every 4 f), filled in the
+ *   signal yellow as a taper from 3.5 px to 40 % with ink, a 5 x 5 impact diamond at its tip; the adult's 4.5 px to
+ *   60 %, with an 8 px fork off the middle node (3 px wide: at 2 px to a point it was an ink hair) and a 1.6 px hot
+ *   core of `glow` down all but its last segment. BURST (cue 20..29): the impact
  *   collapses into one spark that splits into 3 (young 2) flying out, while static flickers between the still-open
- *   jaws; the jaw starts closing at cue 28 (adultBreath; the young's shared sustain already ends at 27), so the
+ *   jaws; the jaw starts closing at cue 28 (cutBreath; the young's shared sustain already ends at 27), so the
  *   mouth never hangs open over nothing. Nothing of it reaches the floor.
+ *   ELDER (4.2, slow and wise, never failing): the adult's bolt and fork at 1.1x reach (SEGS, FORK), living 25 f
+ *   and re-rolled every 5 (the x 1.25 tempo), then the FINALE in place of the burst: the impact collapses into one
+ *   spark and becomes a ring of 4 that widens and drifts up as the jaw eases shut (finale(), RING_R; cutBreath).
  *   BABY, the fizzle: static builds on its nub tips and horn buds through the wind-up (its nubs flare), then a 4 f
  *   "static pop" -- one 2-segment spark off the nose with a pop diamond at its tip while every feature jolts up
  *   (babyBreath's stretch and tail, the nubs' popLift: hair on end) -- then the dazed face (babyBreath brings it
@@ -610,19 +855,17 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
     }
     return;
   }
-  // FIRST PASS (elder): the adult's bolt and fork, drawn at 1.1x reach nowhere yet (4.2); its finale is 4 sparks on
-  // a circle (cue 32 to 44), and its elder breath's jaw still hangs open past the bolt's life (adultBreath's cut)
-  const adult = grown(st);
-  if (c < BOLT_LIFE) {
-    const n = boltNodes(info.seed, Math.floor(c / 4), st);
+  const adult = grown(st), life = BOLT_LIFE[st], roll = ROLL[st];
+  if (c < life) {
+    const n = boltNodes(info.seed, Math.floor(c / roll), st);
     if (adult) {
-      // the fork first, so the main bolt's ink runs over its root: one 8 px segment off the second kink, splitting
-      // away from the main line's next segment (3.5). The young's has none: at its half reach a fork and a knob
-      // left no zigzag to read
+      // the fork first, so the main bolt's ink runs over its root: one 8 px segment (the elder's 9) off the second
+      // kink, splitting away from the main line's next segment (3.5). The young's has none: at its half reach a fork
+      // and a knob left no zigzag to read
       MX.set(BX); MY.set(BY);
-      const fk = n >> 1, fx = MX[fk], fy = MY[fk], nx = MX[fk + 1] - fx, ny = MY[fk + 1] - fy;
+      const fk = n >> 1, fx = MX[fk], fy = MY[fk], nx = MX[fk + 1] - fx, ny = MY[fk + 1] - fy, fl = FORK[st];
       const a = Math.atan2(ny, nx) + (ny > 0 ? -0.8 : 0.8);
-      BX[0] = fx; BY[0] = fy; BX[1] = Math.round(fx + Math.cos(a) * 8); BY[1] = Math.round(fy + Math.sin(a) * 8);
+      BX[0] = fx; BY[0] = fy; BX[1] = Math.round(fx + Math.cos(a) * fl); BY[1] = Math.round(fy + Math.sin(a) * fl);
       zig(ctx, rig, 1, info.pal.membrane, 3);
       BX.set(MX); BY.set(MY);
       // the adult's bolt stays 3 px or more to its tip (4.5 -> 2.7), a hot 1-2 px core of the pale `glow` down all
@@ -632,44 +875,70 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
     } else zig(ctx, rig, n, info.pal.membrane, 3.5);
     impact(ctx, rig, info, BX[n], BY[n], DIAMOND, 5, true);
   }
-  const age = c - BOLT_LIFE;
+  const age = c - life;
+  if (st === 'elder') { finale(ctx, rig, pose, info, age); return; }
   if (age >= 0 && age < BURST) {
     // the burst, on 3 f steps (5.1 #12): the impact collapses into one spark on the last roll's tip, which splits
     // into 3 (young 2) flying out 6 then 10 px, fanned 75 deg apart with a seeded wobble (on seeded headings alone,
     // starting 2 px out, two or three often stacked into one scribble), each turning over on every step
-    const n = boltNodes(info.seed, Math.floor((BOLT_LIFE - 1) / 4), st), step = Math.floor(age / 3);
+    const n = boltNodes(info.seed, Math.floor((life - 1) / roll), st), step = Math.floor(age / 3);
     const tx = BX[n], ty = BY[n], r = step ? 2 + 4 * step : 0, m = step ? (adult ? 3 : 2) : 1;
     for (let k = 0; k < m; k++) {
       const a = (k - (m - 1) / 2) * 1.3 + (hash01(info.seed * 9 + 1, k) - 0.5) * 0.4;
       mouthSpark(ctx, rig, info, Math.round(tx + Math.cos(a) * r), Math.round(ty + Math.sin(a) * r), (k + step) & 1 ? ZAG : ZIG);
     }
   }
-  if (age >= 0 && age < BURST && pose.jaw > 0) {
-    // static between the jaws while the burst flies: a bare 2 x 2 spark every 3 f, flickering over the mouth's dark
-    // interior (x -1..1: at +2..5 it sat out on the straw in front of the lips, pale on pale, and was not there)
-    const beat = Math.floor(age / 3);
-    if (hash01(info.seed + 41, beat) > 0.2) {
-      mouthSpark(ctx, rig, info, Math.floor(hash01(info.seed + 43, beat) * 3) - 1, Math.floor(hash01(info.seed + 47, beat) * 3) - 1, BARE);
+  if (age >= 0 && age < BURST) jawStatic(ctx, rig, pose, info, age);
+};
+
+/**
+ * Static between the jaws after the bolt: a bare 2 x 2 spark every 3 f, flickering over the mouth's dark interior
+ * (x -1..1: at +2..5 it sat out on the straw in front of the lips, pale on pale, and was not there), while the jaw is
+ * open. `age` frames since the bolt's end.
+ */
+function jawStatic(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, info: DragonInfo, age: number): void {
+  const beat = Math.floor(age / 3);
+  if (pose.jaw <= 0 || hash01(info.seed + 41, beat) <= 0.2) return;
+  mouthSpark(ctx, rig, info, Math.floor(hash01(info.seed + 43, beat) * 3) - 1, Math.floor(hash01(info.seed + 47, beat) * 3) - 1, BARE);
+}
+
+/**
+ * The elder's finale (RING_R): `age` frames since its bolt's end, mouth space. Round the last roll's impact: one
+ * spark, then the ring of RING_N sparks widening and drifting up (4.2's "the last puff becomes one ring", in the
+ * spark glyph's floor-safe yellow and ink, 5.4), while static flickers between the jaws until they shut.
+ */
+function finale(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, info: DragonInfo, age: number): void {
+  if (age < 0) return;
+  const st = info.stage, step = Math.floor(age / RING_STEP);
+  if (step < RING_R.length) {
+    const n = boltNodes(info.seed, Math.floor((BOLT_LIFE[st] - 1) / ROLL[st]), st);
+    const tx = BX[n], ty = BY[n] - RING_UP * step, r = RING_R[step], m = step ? RING_N : 1;
+    for (let k = 0; k < m; k++) {
+      // (turned 45 deg a step: diagonals, compass points, diagonals...)
+      const a = (k + step * 0.5) * Math.PI * 2 / RING_N;
+      mouthSpark(ctx, rig, info, Math.round(tx + Math.cos(a) * r), Math.round(ty + Math.sin(a) * r), (k + step) & 1 ? ZAG : ZIG);
     }
   }
-};
+  jawStatic(ctx, rig, pose, info, age);
+}
 
 // ---------- the anims of its own ----------
 
 /**
- * Zoomies timing per stage (frames, adult x 1 / young x 0.85 / baby x 0.6), reach, gallop cycle, paw lift and the
- * suspension's rise, px.
+ * Zoomies timing per stage (frames, adult x 1 / young x 0.85 / baby x 0.6 / elder x 1.2: 4.2's 28 px in 60 f), reach,
+ * gallop cycle, paw lift and the suspension's rise, px. The ELDER lopes: the adult's gallop at FIDGET_TIMING's x 1.3
+ * and 0.8x, a 13 f cycle, 4.8 px paw lift, 1.6 px rise. On the young's 9 f cycle, at the elder's 1.3 px/f, its strides
+ * were 3.4 px: a scurry of short quick steps under the big old body.
  */
 interface ZoomTiming { len: number; dash0: number; dashEnd: number; skidEnd: number; dist: number; cycle: number; lift: number; air: number }
 const zoomTiming = (stage: Stage): ZoomTiming => {
-  // (the elder's zoomies go 28 px in 60 f, 4.2: FIRST PASS (elder) its gallop cycle, paw lift and rise are the young's)
   const elder = stage === 'elder', k = stage === 'adult' ? 1 : stage === 'young' ? 0.85 : elder ? 1.2 : 0.6, t = (f: number) => Math.round(f * k);
   return {
     len: t(50), dash0: t(5), dashEnd: t(23), skidEnd: t(29),
     dist: stage === 'adult' ? 40 : stage === 'young' ? 32 : elder ? 28 : 18,
-    cycle: stage === 'adult' ? 10 : stage === 'young' || elder ? 9 : 6,
-    lift: stage === 'adult' ? 6 : stage === 'young' || elder ? 4 : 2.5,
-    air: stage === 'adult' ? 2 : stage === 'young' || elder ? 1.5 : 1,
+    cycle: stage === 'adult' ? 10 : stage === 'young' ? 9 : elder ? 13 : 6,
+    lift: stage === 'adult' ? 6 : stage === 'young' ? 4 : elder ? 4.8 : 2.5,
+    air: stage === 'adult' ? 2 : stage === 'young' ? 1.5 : elder ? 1.6 : 1,
   };
 };
 const ZOOM: Readonly<Record<Stage, ZoomTiming>> = { baby: zoomTiming('baby'), young: zoomTiming('young'), adult: zoomTiming('adult'), elder: zoomTiming('elder') };
@@ -714,7 +983,9 @@ function runLeg(u: number, S: number, c: number, lift: number, out: { slide: num
  * back is what a puppy does anyway.
  */
 function fidget(stage: Stage): DragonAnim {
-  const z = ZOOM[stage], L = z.len, R0 = z.dash0, R1 = z.dashEnd, SK = z.skidEnd;
+  const z = ZOOM[stage], L = z.len, R0 = z.dash0, R1 = z.dashEnd, SK = z.skidEnd, elder = stage === 'elder';
+  // (the elder's gestures at FIDGET_TIMING's 0.8x: the head's fling and bob, the tail, the lean, the bounces)
+  const g = FIDGET_TIMING[stage].amp, G = (keys: Key[]): Key[] => keys.map((k) => [k[0], k[1] * g]);
   const v = z.dist / (R1 - R0), S = v * RUN_STANCE * z.cycle, ph = (t: number) => (((t - R0) / z.cycle) % 1 + 1) % 1;
   // the skid eases out from the dash's speed: an 'out' cube starts at 3x its mean speed, so it covers v T / 3
   const xs = Math.round(z.dist + v * (SK - R1) / 3);
@@ -750,23 +1021,70 @@ function fidget(stage: Stage): DragonAnim {
     // the gallop's suspension (every paw lifted then, so the sprite rises with them) and the three bounces
     'root.y': (t) => {
       if (inDash(t)) { const p = ph(t); return p >= RUN_AIR0 && p < RUN_AIR1 ? -z.air * Math.sin(Math.PI * (p - RUN_AIR0) / (RUN_AIR1 - RUN_AIR0)) : 0; }
-      return inHop(t) ? -3 * Math.sin(Math.PI * Math.min(1, hopU(t) * hl / (hl - 1))) : 0;
+      return inHop(t) ? -3 * g * Math.sin(Math.PI * Math.min(1, hopU(t) * hl / (hl - 1))) : 0;
     },
-    'body.rot': (t) => (t < R0 ? 5 * t / R0 : inDash(t) ? 2 + 4 * pitch(t) : t < SK ? -8 : inHop(t) ? -3 : -3 * (1 - (t - hop(3)) / 3)),
+    'body.rot': (t) => (t < R0 ? 5 * t / R0 : inDash(t) ? 2 + 4 * pitch(t) : t < SK ? -8 * g : inHop(t) ? -3 * g : -3 * g * (1 - (t - hop(3)) / 3)),
     'body.y': (t) => (t < R0 ? 1.5 * t / R0 : inDash(t) ? 0.4 + 0.6 * Math.abs(pitch(t)) : t < SK ? 1 : 0),
     // head low and stretched out through the dash, flung up at the skid ("whoa"), bobbing on the bounces
-    'neck.a0': [[0, 0], [R0, 4], [R0 + 2, 10], [R1, 10], [R1 + 3, -8], [SK, -6], [hop(1), -3], [L, 0]],
-    'head.rot': [[0, 0], [R0, -2], [R0 + 2, -8], [R1, -8], [R1 + 3, -4], [SK, -2], [L, 0]],
-    'tail.lift': [[0, 0], [R0, -8], [R1, -6], [R1 + 3, -14], [SK, -12], [hop(3), -6], [L, 0]],
+    'neck.a0': G([[0, 0], [R0, 4], [R0 + 2, 10], [R1, 10], [R1 + 3, -8], [SK, -6], [hop(1), -3], [L, 0]]),
+    'head.rot': G([[0, 0], [R0, -2], [R0 + 2, -8], [R1, -8], [R1 + 3, -4], [SK, -2], [L, 0]]),
+    'tail.lift': G([[0, 0], [R0, -8], [R1, -6], [R1 + 3, -14], [SK, -12], [hop(3), -6], [L, 0]]),
     'tail.stiff': [[0, 0], [R0, 0.6], [hop(3), 0.6], [L, 0]],
     // the mouth shut and the eyes on the goal through the dash (open-mouthed with the fangs out and neutral eyes it
     // read as a charge, not play), a "whoa" at the skid (surprised, the jaw at its minimum), then happy bounces with
-    // the tongue out
-    jaw: [[0, 0], [R1, 0], [R1 + 1, 16], [SK - 1, 16], [SK, 20], [hop(3) - 2, 20], [hop(3), 0]],
-    face: [[0, N], [R1, O], [SK, H], [L - 2, N]],
+    // the tongue out. The ELDER stops content (D21; fire's elder chase too): no "whoa", `happy` from the skid, and a
+    // chuckle for the bounces, the jaw at its 16 on each hop and easing to 4 as it lands (its happy's 3-bob chuckle)
+    jaw: elder ? [[0, 0], [SK - 2, 0], [SK + 1, 16], [hop(1) - 1, 16], [hop(1) + 1, 4], [hop(1) + 3, 16], [hop(2) - 1, 16], [hop(2) + 1, 4], [hop(2) + 3, 16], [hop(3) - 2, 16], [hop(3), 0]]
+      : [[0, 0], [R1, 0], [R1 + 1, 16], [SK - 1, 16], [SK, 20], [hop(3) - 2, 20], [hop(3), 0]],
+    face: elder ? [[0, N], [R1, H], [L - 2, N]] : [[0, N], [R1, O], [SK, H], [L - 2, N]],
     mood: [[0, 0], [Math.max(1, R0 - 2), 1], [L - 3, 1], [L, 0]],
     act: [[0, ACT.fidget]], cue: [[0, 0], [L, L]],
   }, { stage, len: L, next: 'idle', ease: 'inout' });
+}
+
+/**
+ * The elder's STORM-WATCH timing (stormWatch), frames (= cue): the bolts rise over `up0..up1`; over `open0..open1` the
+ * far one fans `fan` deg back and the near one tips `tip` forward (watchOpen), and they close over `shut0..shut1`;
+ * the ladder's two rungs and its break-off jump at `arcs` (airingArcs). The V opens from the tips: fanned back 20 deg
+ * alone, the far bolt's straight leading edge lay under the near one's teeth and the pair read as an olive fir tree
+ * beside a yellow half-bolt, with 3-5 px between them where the arcs crossed. Tipped 5 and fanned 32, the far bolt's
+ * leading edge shows 10 px above the overlap, 9 to 13 px from the near one where the rungs cross. The near bolt tips
+ * no further: at 7 the head's swept-back horn came within 1 px of its leading edge (3 px here).
+ */
+const WATCH = { len: 106, up0: 16, up1: 30, open0: 26, open1: 40, shut0: 72, shut1: 86, fan: 32, tip: 5, arcs: [44, 54, 64] } as const;
+
+/**
+ * The ELDER's AIRING (4.2's "airing the wings", 106 f): a STORM-WATCH. Where the membrane elders sit back and sun
+ * their worn wings with their eyes shut (the sit-back only leans a full spread under the tip rule, anims.ts
+ * airingFit, and bolts that never spread have nothing to lean), Zap stands tall and WATCHES the weather: the chest
+ * lifts 8 deg and the body 2 px on straightened legs (0-24), the head rises until the snout points 18 deg up into the
+ * wind, EYES OPEN, the tail held out straight behind like a weathervane; the bolts rise to the excited 95 (the keyed
+ * spread: cockNow) and open into a V (WATCH: the far one fans back, its excited step and drop easing out as it opens,
+ * farOffset; the near one tips forward), the far bolt's torn edge against the room and the third tooth against the
+ * sky; a slow Jacob's ladder climbs the V, 10 f a rung, and breaks off the tips (ambient: airingArcs), a storm dragon
+ * charging up; a slow breath under it, then the V closes, the face goes `happy` and it stands easy (72-106).
+ * act = ACT.airing, cue = frames. Lifted 4 deg and 1 px with `happy` eyes throughout, it was idle with its eyes shut
+ * at game scale, the membrane elders' sunning; the shared airing only flexed the bolts to 95 for 40 f, the look of any
+ * happy moment.
+ */
+const K = (v: number): Key[] => [[0, v]];
+function stormWatch(): DragonAnim {
+  const W = WATCH, L = W.len, H = DFACE.happy, N = DFACE.neutral;
+  return bake({
+    'body.rot': [[0, 0], [24, -8], [72, -8], [96, 0]],
+    'body.y': [[0, 0], [24, -2], [40, -2.5], [54, -2], [68, -2.5], [74, -2], [96, 0]],
+    'neck.a0': [[0, 0], [24, -2], [50, -3], [72, -2], [98, 0]],
+    // (the head's world pitch is the rest's + neck + head + body: -2 - 8 - 8 puts the snout 18 up, 20 at the
+    // breath's top; raised on the neck instead, its swept-back horn came within 1 px of the near bolt's leading edge)
+    'head.rot': [[0, 0], [26, -8], [52, -9], [74, -8], [100, 0]],
+    'tail.lift': [[0, 0], [24, -3], [74, -3], [100, 0]],
+    'tail.stiff': [[0, 0], [16, 0.5], [80, 0.5], [100, 0]],
+    'tail.sway': [[0, 0], [34, 0], [48, 4], [62, -3], [74, 0]],
+    'wing.fold': [[0, 0], [W.up0, 0], [W.up1, 1], [W.shut0, 1], [W.shut1 + 2, 0]],
+    face: [[0, N], [W.shut0, H], [W.shut1 + 8, N]],
+    mood: [[0, 0], [W.up1, 1], [W.shut0, 1], [W.shut1 + 2, 0]],
+    act: K(ACT.airing), cue: [[0, 0], [L, L]],
+  }, { stage: 'elder', len: L, next: 'idle' });
 }
 
 /**
@@ -840,15 +1158,18 @@ function babyBreath(): DragonAnim {
  * the mouth hung open over nothing for 8 f before the recover -- the strike read as a fizzle. The frames of cue
  * 28..36 go and the rest close up, their cue counted on without the gap. (The young's sustain already ends at cue
  * 27; the baby's is babyBreath.) 62 f in all.
+ * The ELDER breath (4.2, slow and wise): the shared elder one cut the same way, cue 28..38, so the jaw starts easing
+ * shut at cue 28 as its finale ring (cue 25..40: finale()) rises off the 25 f bolt, and shuts at cue 40 as the ring
+ * goes; the recover (`happy`, the 2 deg nod) follows. 74 f in all, 1.2x the adult's: uncut, the jaw hung open 13 f
+ * past the bolt, and the finale's window (cue 38..50) came after the strike was long gone.
  */
-const CLOSE_AT = 28, SUSTAIN_END = 36;
-function adultBreath(): DragonAnim {
-  const base = breathAnim('adult', animTuning('adult', LIGHTNING)), cut = SUSTAIN_END - CLOSE_AT;
+function cutBreath(stage: Stage, closeAt: number, sustainEnd: number): DragonAnim {
+  const base = breathAnim(stage, animTuning(stage, LIGHTNING)), cut = sustainEnd - closeAt;
   const frames: DragonFrame[] = [];
   for (const f of base.frames) {
     const c = f.pose && f.pose.cue != null ? f.pose.cue : -1;
-    if (c >= CLOSE_AT && c < SUSTAIN_END) continue;
-    frames.push(c >= SUSTAIN_END ? { ...f, pose: { ...f.pose, cue: c - cut } } : f);
+    if (c >= closeAt && c < sustainEnd) continue;
+    frames.push(c >= sustainEnd ? { ...f, pose: { ...f.pose, cue: c - cut } } : f);
   }
   return { ...base, frames };
 }
@@ -891,13 +1212,16 @@ export const LIGHTNING: ElementSpec = {
       dorsal: null,
     },
     // the elder (3.5's Elder column): its tail straight, stepped and at the adult's rest (2.3: EL's level 0 deg read
-    // as a lower mood), the adult's horns and Zs; the bolt's tear is the data here (2.9: 55 % down from the tip,
-    // 5 px x 2 deep) for its renderer to cut (FIRST PASS: BOLT above)
+    // as a lower mood), the adult's horns and Zs. Its TEAR (2.9), cut by boltPath into the FAR bolt and opened by the
+    // storm-watch's V: on the second tooth's run (panel 2), halfway along, a 6.5 px mouth 4.5 deep (boltTear), 4 px of
+    // background across its top half and 2 across its bottom half in the V at game scale. At 5 px the mouth showed
+    // 1-2 px between its ink lines on a 9 px run. On the first run (2.9's "55 % down from the tip") the bolt is 3-5 px
+    // across and a notch made its tip a knob, the chipped cue D21 bans
     elder: {
       tailRest: TAIL_REST.lightning.elder, tailR: [4.7, 0.5],
       horns: hornParams({ len: 8, kinkAt: 0.6, bend: 35, sweep: -6 }),
       markings: [{ kind: 'zstripe', at: 'tail', t: 0.14, size: 5, h: 7 }, { kind: 'zstripe', at: 'haunch', size: 6, h: 8 }, { kind: 'zstripe', at: 'shoulder', size: 6, h: 8 }],
-      wing: wingParams({ style: 'custom', rootDx: -3, tears: [{ panel: 1, at: 0.55, depth: 2 }] }),
+      wing: wingParams({ style: 'custom', rootDx: -3, tears: [{ panel: 2, at: 0.5, depth: 4.5 }] }),
       dorsal: null,
     },
   },
@@ -913,7 +1237,7 @@ export const LIGHTNING: ElementSpec = {
     // hungry tell and the dream spark are renderers on act / cue (ambient()); the dream-twitch's kick and the baby
     // pop's jolt are overrides; the zoomies are fidget().
     fidget,
-    overrides: (st, dims) => ({ sleep: sleepOverride(st, dims), ...(st === 'baby' ? { breath: babyBreath() } : st === 'adult' ? { breath: adultBreath() } : {}) }),
+    overrides: (st, dims) => ({ sleep: sleepOverride(st, dims), ...(st === 'baby' ? { breath: babyBreath() } : st === 'adult' ? { breath: cutBreath('adult', 28, 36) } : st === 'elder' ? { breath: cutBreath('elder', 28, 38), airing: stormWatch() } : {}) }),
     tuning: (st) => ({
       // (the elder's 54 f at 0.38 px/f: 4.2)
       walk: st === 'adult' ? { cycle: 40, speed: 0.54 } : st === 'young' ? { cycle: 34, speed: 0.6 } : st === 'elder' ? { cycle: 54, speed: 0.38 } : { cycle: 20, speed: 0.36 },

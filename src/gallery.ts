@@ -28,7 +28,7 @@ import { buildDragon, drawDragon, stepDragon, solveDragon, rootToScreen } from '
 import { legRadii } from './art/dragon/parts.ts';
 import type { DragonRig, DrawDragonOpts } from './art/dragon/rig.ts';
 import { DragonAnimPlayer, blinkFor } from './art/dragon/anim.ts';
-import { dragonAnims, ANIM_NAMES, ONE_SHOTS, VARIANT_NAMES, ELEMENT_ANIM_NAMES, idleVariants, variantEvery } from './art/dragon/anims.ts';
+import { dragonAnims, ANIM_NAMES, ONE_SHOTS, VARIANT_NAMES, ELEMENT_ANIM_NAMES, ELEMENT_ANIM_FALLBACK, idleVariants, variantEvery } from './art/dragon/anims.ts';
 import { ELEMENTS, ELEMENT_IDS } from './art/dragon/elements/index.ts';
 import { STAGES } from './art/dragon/stages.ts';
 import { DP, DFACE, ACT } from './art/dragon/pose.ts';
@@ -155,15 +155,18 @@ export function makePet(el: DragonElement, stage: Stage, seed: number, anim: str
   opts: { scale?: number; facing?: number; mood?: number; desync?: boolean; blink?: boolean } = {}): Pet {
   const build = dragonBuild({ element: el, stage, seed });
   const rig = buildDragon(build);
-  // (wear=0: the same elder without its tears and hole, the other half of 2.9's with / without measure)
-  if (!WEAR) rig.sp = { ...rig.sp, wing: { ...rig.sp.wing, tears: undefined, hole: undefined } };
+  // (wear=0: the same elder without its tears and hole, the other half of 2.9's with / without measure; the renderers'
+  // info.sp too, or an element that reads its wear there -- a custom wing's tear -- ignored it)
+  if (!WEAR) { rig.sp = { ...rig.sp, wing: { ...rig.sp.wing, tears: undefined, hole: undefined } }; rig.info.sp = rig.sp; }
   const anims = dragonAnims(stage, build.spec, build.dims);
   const player = new DragonAnimPlayer(anims, seed, blinkFor(stage));
   player.blink = opts.blink !== false;
   const desync = opts.desync !== false;
-  player.play(anim, { restart: true, phase: desync ? build.phase : 0, speed: desync ? build.speed : 1 });
+  // (an element anim the look has not got plays its fallback: dusk's tuck-in is every other look's sleep)
+  player.play(anim, { restart: true, phase: desync ? build.phase : 0, speed: desync ? build.speed : 1, fallback: ELEMENT_ANIM_FALLBACK[anim] });
   // an idle pet cuts to a look-around, a yawn, a scratch or its element's fidget every 6-10 s (the elder to its back
-  // stretch, reminisce or airing too, every 8-12 s; rock's elder, with no hole to air, reminisces), seeded: 4.2
+  // stretch, reminisce or airing too, every 8-12 s; rock's elder, with no hole to air, airs its own way: its sunning),
+  // seeded: 4.2
   if (anim === 'idle') { const [a, b] = variantEvery(stage); player.setVariants('idle', idleVariants(stage, build.sp.wing), a, b); }
   if (STATIC_POSE) player.setStaticPose(STATIC_POSE);
   return {
@@ -348,8 +351,11 @@ function stagesScene(P: GalleryParams): Scene {
   const sc = P.scale || 3;
   // baby, young, adult, elder left to right, spaced by their real extents (tail back, snout front) at this scale
   const pets = STAGES.map((st) => makePet(P.el, st, P.seed, P.anim, 0, 400, { scale: sc, mood: P.mood }));
-  const ext = pets.map((p) => {
-    const d = p.rig.dims, tail = d.hipR + d.gap / 2 + d.tail.n * d.tail.len + 6, head = d.gap / 2 + d.chestR + d.headLen + 4;
+  // (the head's side takes the cue's reach past the snout too: dusk's lantern, and the elder's moth ahead of it, were
+  // cut at the canvas edge)
+  const reach = ELEMENTS[P.el].reach;
+  const ext = pets.map((p, i) => {
+    const d = p.rig.dims, tail = d.hipR + d.gap / 2 + d.tail.n * d.tail.len + 6, head = d.gap / 2 + d.chestR + d.headLen + 4 + (reach?.[STAGES[i]] ?? 0);
     return [tail * sc, head * sc];
   });
   const total = ext.reduce((a, e) => a + e[0] + e[1], 0), gap = Math.max(8, (960 - total) / (STAGES.length + 1));
@@ -463,13 +469,15 @@ function moodScene(P: GalleryParams): Scene {
 function facesScene(P: GalleryParams): Scene {
   const k = Math.max(1, Math.round(P.scale || 6));
   const names = Object.keys(DFACE) as DFaceName[];
-  // cells wide enough for the adult head (skull + snout ~ 30 px) and the longest label ("SURPRISED", ~54 px)
-  const cell = 64, cellH = 46, lab = 9, cols = 6, rows = Math.ceil(names.length / cols);
   const pets = names.map((f) => {
     const p = makePet(P.el, P.stage, P.seed, 'rest', 0, 0, { mood: P.mood, blink: false, desync: false });
     p.player.setStaticPose({ ...(STATIC_POSE || {}), face: DFACE[f], jaw: f === 'happy' && P.stage === 'baby' ? 20 : f === 'surprised' ? 40 : (STATIC_POSE?.jaw ?? 0) });
     return p;
   });
+  // cells wide enough for the adult head (skull + snout ~ 30 px) and the longest label ("SURPRISED", ~54 px), and for
+  // the cue's reach past the snout (ElementSpec.reach: dusk's lantern and the elder's moth, cropped to one ink line)
+  const reach = ELEMENTS[P.el].reach?.[P.stage] ?? 0;
+  const cell = Math.max(64, Math.ceil(pets[0].rig.dims.headLen) + 18 + reach), cellH = 46, lab = 9, cols = 6, rows = Math.ceil(names.length / cols);
   const off = document.createElement('canvas');
   off.width = cell * cols; off.height = (cellH + lab) * rows;
   return {
@@ -486,8 +494,9 @@ function facesScene(P: GalleryParams): Scene {
         // a HEAD-sized window (the head's length + 9 px each side, so the brow, horns and fans fit), centred on the
         // head (cranium + snout) and centred in its cell: a full-cell crop showed a baby's whole body with its
         // face small in one corner
-        const J = p.rig.j, hd = p.rig.dims.head, hx = J.cran.x + (hd.snout.x1 + hd.snout.r1 - hd.cranR) / 2;
-        const cw = Math.min(cell, Math.ceil(p.rig.dims.headLen) + 18), ch = Math.min(cellH, Math.round(hd.cranR * 2 + 24));
+        // (widened forward by the reach)
+        const J = p.rig.j, hd = p.rig.dims.head, hx = J.cran.x + (hd.snout.x1 + hd.snout.r1 - hd.cranR + reach) / 2;
+        const cw = Math.min(cell, Math.ceil(p.rig.dims.headLen) + 18 + reach), ch = Math.min(cellH, Math.round(hd.cranR * 2 + 24));
         const sx = Math.round(200 + hx - cw / 2), sy = Math.round(150 + J.cran.y - ch / 2 - 4);
         g.drawImage(tmp, sx, sy, cw, ch, (i % cols) * cell + Math.round((cell - cw) / 2), Math.floor(i / cols) * (cellH + lab) + cellH - ch, cw, ch);
         label(g, names[i].toUpperCase(), (i % cols) * cell + cell / 2, Math.floor(i / cols) * (cellH + lab) + cellH + 1, LABEL, 1);
@@ -510,8 +519,10 @@ function stripScene(P: GalleryParams): Scene {
   const back = d.hipR + d.gap / 2 + d.tail.n * d.tail.len + 14, front = d.gap / 2 + d.chestR + d.headLen + 10 + (P.anim === 'breath' ? 46 : 0);
   // the cell's height from the anim's own extent: the highest head top or tail node over its frames (+ 20 px for a
   // tip feature and horns), at least the standing look's; a fidget that raises the tail (fire's flame chase) or a
-  // wake's spread ran off the cell's top
-  let high = d.bodyY + 38;
+  // wake's spread ran off the cell's top. A breath gets 36 px more: its effects rise past the head (spike's volley
+  // about 55 px over the neck base, the elder's finale ring up to about 88 px over the ground) and landed in the
+  // row above, read as the wrong frame's
+  let high = d.bodyY + 38 + (P.anim === 'breath' ? 36 : 0);
   for (let t = 0, n = Math.min(600, L + from); t < n; t++) {
     stepPet(probe);
     const J = probe.rig.j;
@@ -555,21 +566,24 @@ function stripScene(P: GalleryParams): Scene {
 }
 
 /**
- * view=habitat (5.1 #13, 5.4): 8 dragons on straw, y-sorted. The cast carries the risky looks -- adult lightning (the
- * tallest cue) standing just BEHIND an adult slinkwing (spire behind fan), and an adult water with its baby
- * overlapping in front of it (parent over baby, one element) -- plus a young rock, and two ELDERS: spike's, roaming
- * with a baby spike (an elder shares the habitat with babies: 5.8's cross-stage gates), and fire's; those two pairs
- * hold their places (`fixed`), the others roam. (The first cast had no young or adult lightning, no adult slinkwing,
- * no young or baby water or rock, and no overlap that stayed put.)
+ * view=habitat (5.1 #13, 5.4): 9 dragons on straw, y-sorted, every element among them. The cast carries the risky
+ * looks -- adult lightning (the tallest cue) standing just BEHIND an adult slinkwing (spire behind fan), and an adult
+ * water with its baby overlapping in front of it (parent over baby, one element) -- plus a young rock, an adult dusk
+ * (its coral lamp ahead of the face, E12's neighbour of fire's glow; its Nightfall on the floor in the mix), and two
+ * ELDERS: spike's, roaming with a baby spike (an elder shares the habitat with babies: 5.8's cross-stage gates), and
+ * fire's; those two pairs hold their places (`fixed`), the others roam. (The first cast had no young or adult
+ * lightning, no adult slinkwing, no young or baby water or rock, and no overlap that stayed put; the v1 cast had no
+ * dusk.)
  */
 function habitatScene(P: GalleryParams): Scene {
   const cast: [DragonElement, Stage, number, number, number, boolean][] = [
     ['spike', 'elder', 470, 170, -1, false], ['lightning', 'adult', 196, 176, 1, true], ['slinkwing', 'adult', 214, 186, 1, true],
+    ['dusk', 'adult', 552, 218, -1, false],
     ['rock', 'young', 110, 262, 1, false], ['fire', 'elder', 340, 236, 1, false], ['water', 'adult', 520, 290, -1, true],
     ['water', 'baby', 506, 306, -1, true], ['spike', 'baby', 90, 336, 1, false],
   ];
   // anim=mix: every act at once (the top pass carries the "z", the dazed stars and the embers; eat brings a bowl)
-  const MIX = ['walk', 'happy', 'sleep', 'eat', 'breath', 'beg', 'pet', 'walk'];
+  const MIX = ['walk', 'happy', 'sleep', 'breath', 'eat', 'breath', 'beg', 'pet', 'walk'];
   const pets = cast.map(([el, st, x, y, f, fixed], i) => {
     const p = makePet(el, st, P.seed + i * 17, P.anim === 'mix' ? MIX[i] : P.anim, x, y, { facing: f, mood: P.mood });
     p.roam = fixed ? null : [-40, 680];
@@ -734,16 +748,19 @@ function rootsScene(P: GalleryParams): Scene {
 /**
  * view=wings: every elder's wing wear (2.9) at game scale 1 blown up `scale` times (default 3), seven columns and three
  * rows: FULL SPREAD (wing 1, flap 0: the flight's spread, where the notched 4 x 3 hole, seated against the forearm, shows
- * the straw through both wings), the AIRING's hold (the elder's idle variant: the hole seen at home, where the look can sit back far enough)
- * and the RESTING SPREAD of the preen (0.6 leaning back 48: the tears). Lightning's bolts and rock's stubby wings have
- * no hole (no room: 2.9); their tears are the element's (lightning) or one small notch (rock).
+ * the straw through both wings), the AIRING's hold (the elder's idle variant: the hole seen at home, where the look can
+ * sit back far enough; lightning's storm-watch and rock's sunning are their own airings) and THE PREEN'S HOLD (the
+ * happy anim at f 30, in the elder preen's hold: each look's real resting spread, 0.6 leaning back 48 or slinkwing's
+ * own 0.9 leaning back 60, where the tears show; a static 0.6 / 48 showed slinkwing at a spread it never takes, and
+ * rock rolls over instead). Lightning's bolts and rock's stubby wings have no hole (no room: 2.9); their tears are the element's
+ * (lightning's, shown in its storm-watch) or one small notch (rock).
  */
 function wingsScene(P: GalleryParams): Scene {
   const k = Math.max(1, Math.round(P.scale || 3)), cw = 150, ch = 100, n = ELEMENT_IDS.length;
   const rows: { name: string; pose: PartialDragonPose | null; anim: string; t: number }[] = [
     { name: 'FULL SPREAD (THE HOLE)', pose: DP({ wing: [1, 0], face: 'happy' }), anim: 'rest', t: 0 },
     { name: 'AIRING, THE HOLD (THE HOLE AT HOME)', pose: null, anim: 'airing', t: 40 },
-    { name: 'RESTING SPREAD 0.6 / 48 (THE TEARS)', pose: DP({ wing: [0.6, 48] }), anim: 'rest', t: 0 },
+    { name: "THE PREEN'S HOLD (THE TEARS)", pose: null, anim: 'happy', t: 30 },
   ];
   const pets: Pet[] = [];
   rows.forEach((r, j) => ELEMENT_IDS.forEach((el, i) => {

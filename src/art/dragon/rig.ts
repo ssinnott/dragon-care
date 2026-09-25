@@ -995,11 +995,18 @@ function drawParts(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonPose)
   if (rig.farLegs) { drawLegN(ctx, rig, 2, rig.palLegFar, false); drawLegN(ctx, rig, 3, rig.palLegFar, false); }
   // 5. tail, then the tail-tip feature
   drawTailGroup(ctx, rig, P);
-  // 6. back row (before the body: the body contour hides the roots)
+  // 6. back row (before the body: the body contour hides the roots). The elder's hole window is cut out of it as out
+  //    of the far wing (2.9): the window sits above the back line + 1 px (holeFrame), so only a back row can stand
+  //    behind it, and spike's taller mid-back quills, behind the arm panel at the airing's hold and at full spread,
+  //    showed their bone and an ink column through the window instead of the room
+  if (HOLE.on) { ctx.save(); clipOffHole(ctx, rig); }
   enter(ctx, rig, J.body.x, J.body.y, J.bodyAng);
   if (sp.dorsal) drawDorsalRow(ctx, rig, sp.dorsal, pal);
   if (R.backRow) R.backRow(ctx, rig, P, fillInfo(rig, 'backRow', false, pal, d.hipR, d.bodyLen, J.bodyAng));
+  leave(ctx, rig);
+  if (HOLE.on) ctx.restore();
   // 7. body, belly band, body markings
+  enter(ctx, rig, J.body.x, J.body.y, J.bodyAng);
   drawBody(ctx, rig, pal);
   leave(ctx, rig);
   drawBodyMarkings(ctx, rig, pal, P);

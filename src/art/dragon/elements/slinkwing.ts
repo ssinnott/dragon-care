@@ -3,13 +3,17 @@
 //
 // What is its own, and where it lives:
 //   - the ear-fans (farHead / nearHead: fan()), the mood gauge, with everything that moves them: the shriek's dish
-//     and rib rattle, the fan twitch, the walk's bob, the hungry tell's pinned-forward fans, the curled sleeping
-//     fans and the baby's fan flop (ledger E8);
+//     and rib rattle, the fan twitch, the walk's bob and the slink's listening swivel, the hungry tell's pinned-forward
+//     fans, the curled sleeping fans and the baby's fan flop (ledger E8); the elder's grown 19 px fans with their
+//     elder-only extra, the FROSTED rim (drawFrost);
 //   - the lilac eye mask (headMarkings) and the throat sac (drawSac, at the breath anchor);
 //   - every sound arc (breath: the shriek, the squeak, the hungry chirp, the snore, the lonely call, the fidget's
-//     echo-ping) and the ambient chirp and song notes (ambient);
-//   - its anims: the shriek with its 'shriek' flinch event, the chirping beg, the echo-ping fidget and the lonely
-//     call ('call', an anim of its own).
+//     echo-ping, the elder shriek's finale, the ECHO CIRCLE) and the ambient chirp and song notes (ambient);
+//   - its anims: the SLINK (its walk, stop-and-go), the shriek with its 'shriek' flinch event, the chirping beg, the
+//     echo-ping fidget, the lonely call ('call', an anim of its own), and the elder's preen, wake and airing, each
+//     spread and leaned so its worn wing's arm-panel tear is seen (wideSpread, AIR_FIT).
+// The elder's wing wear is data on its stage (ELDER_WING: its one tear and the hole, 2.9), drawn by the shared bat
+// wing.
 import { DRAGON_PALETTES } from '../palettes.ts';
 import { STAGE_TIMING, FIDGET_TIMING, TAIL_REST, grown } from '../stages.ts';
 import type { Stage } from '../stages.ts';
@@ -23,9 +27,9 @@ import { pathTaperedCapsule } from '../../../lib/art/shapes.ts';
 import { celPath, outlinePath, tones } from '../../../lib/art/shading.ts';
 import { ACT, DFACE } from '../pose.ts';
 import type { DragonPose } from '../pose.ts';
-import { bake, begAnim, breathAnim } from '../anims.ts';
-import type { Key } from '../anims.ts';
-import type { DragonAnim } from '../anim.ts';
+import { airingAnim, bake, begAnim, breathAnim, happyAnim, walkAnim, ELDER_FINALE, ELDER_SPREAD_FOLD, ELDER_SPREAD_BACK } from '../anims.ts';
+import type { Key, Track, Tracks } from '../anims.ts';
+import type { DragonAnim, DragonFrame } from '../anim.ts';
 import type { DragonDims } from '../build.ts';
 import { animTuning } from '../tuning.ts';
 import { liveSpawns, stepAlpha } from '../fx.ts';
@@ -113,14 +117,15 @@ const FANS: Readonly<Record<Stage, FanSpec>> = {
     // edge runs out to a scallop's cusp, a bat wing's spar to its point
     pleats: [[-2, 18], [38, 90]],
   },
-  // FIRST PASS (elder): the adult's fans. 3.7's elder fans grow to 19 px with 3 pleats, whole (other head features
-  // may then reach 9.5 px), and carry its elder-only extra, the FROSTED FAN TIPS: a 2 px pigment band along the near
-  // fan's top edge in rig.greys.fanFrost (palettes.ts fanFrostOf), at every mood
+  // the elder's (3.7): grown to 19 px, whole (never nicked: wear is the wings' alone, D21), its four ribs the edges of
+  // THREE pleats, shadow and plain by turns from front to back -- the front one running to the front edge, the back
+  // one to the back edge -- a hand fan opened wider; its two scallops cusp to cusp on the back three ribs' ends. Its
+  // frosted rim (drawFrost) is its elder-only extra
   elder: {
-    h: 17, pz: 4, root: 2, depth: 3, mid: 24, at: 128, rr: 0.88, lean0: 0, spread: 1.35, grow: 1,
+    h: 19, pz: 4.5, root: 2, depth: 3, mid: 24, at: 128, rr: 0.88, lean0: 0, spread: 1.35, grow: 1,
     env: [-20, 0.6, -6, 0.94, 6, 1, 18, 0.97, 32, 0.93, 46, 0.86, 58, 0.78, 68, 0.66],
-    ribs: [[-2, 7.5], [18, 10.4], [38, 7.5]], scal: [[18, 38], [38, 60]],
-    pleats: [[-2, 18], [38, 90]],
+    ribs: [[-4, 8], [14, 11], [32, 11], [50, 8]], scal: [[32, 50], [50, 68]],
+    pleats: [[-30, -4], [14, 32], [50, 90]],
   },
 };
 
@@ -255,6 +260,54 @@ function ribClear(px: number, py: number): boolean {
   return true;
 }
 
+/**
+ * The elder's FROSTED FAN TIPS (3.7, its elder-only extra): the free edge from the front up to FROST_TO deg back from
+ * straight up (the tall front-top, the fan's crown, before its scallops), FROST_W px deep.
+ */
+const FROST_TO = 32, FROST_W = 2;
+/** Map a fan-space point into face px (FP), through the rib frame (ribFrame). */
+function fanToFace(x: number, y: number): void {
+  cranToRootPtRF(RF.tx + x * RF.c - y * RF.s, RF.ty + x * RF.s + y * RF.c);
+  FP.x = FP.x - RT.x + RO.x; FP.y = FP.y - RT.y + RO.y;
+}
+/**
+ * The frost band, face space entered at the fan's root (ribFrame's RT) under a clip to the fan, the outline
+ * fanOutline last built: a 2 px PIGMENT band (clipped, never inked), every face pixel whose centre lies within
+ * FROST_W of the frosted run of its free edge filled whole (the clip trims the ones the edge cuts), so its inner edge
+ * stays a crisp 2 px step at any lean and through the dish, never an anti-aliased smear (5.2: the frost band 2 px).
+ * Walked segment by segment, testing only the pixels round each one. Its grey sits 35 % from the membrane (gate a:
+ * frost / membrane).
+ */
+function drawFrost(ctx: CanvasRenderingContext2D, F: FanSpec): void {
+  const t0 = F.env[0], t1 = F.env[F.env.length - 2];
+  const i1 = Math.min(EDGE_N, Math.round(EDGE_N * (FROST_TO - t0) / (t1 - t0)));
+  const w2 = FROST_W * FROST_W;
+  for (let i = 0; i < i1; i++) {
+    const ax = OLX[i + 1], ay = OLY[i + 1], bx = OLX[i + 2] - ax, by = OLY[i + 2] - ay, L2 = bx * bx + by * by;
+    fanToFace(ax, ay);
+    const fx0 = FP.x, fy0 = FP.y;
+    fanToFace(ax + bx, ay + by);
+    const x0 = Math.floor(Math.min(fx0, FP.x)) - 3, x1 = Math.floor(Math.max(fx0, FP.x)) + 3;
+    const y0 = Math.floor(Math.min(fy0, FP.y)) - 3, y1 = Math.floor(Math.max(fy0, FP.y)) + 3;
+    for (let py = y0; py <= y1; py++) for (let px = x0; px <= x1; px++) {
+      // the pixel centre: face -> root -> cranium -> fan (ribClear's walk)
+      const X = RT.x + px + 0.5 - RO.x - RF.cx, Y = RT.y + py + 0.5 - RO.y - RF.cy;
+      const lx = X * RF.hc + Y * RF.hs - RF.tx, ly = -X * RF.hs + Y * RF.hc - RF.ty;
+      const u = lx * RF.c + ly * RF.s, v = -lx * RF.s + ly * RF.c;
+      const k = L2 > 0 ? Math.max(0, Math.min(1, ((u - ax) * bx + (v - ay) * by) / L2)) : 0;
+      const dx = u - ax - bx * k, dy = v - ay - by * k;
+      if (dx * dx + dy * dy < w2) ctx.fillRect(px, py, 1, 1);
+    }
+  }
+}
+
+/**
+ * How far past the rest lean the gauge lays the fans back at mood -1, deg: 48 (88 back from the head's up), the
+ * elder's 40 (80 back). The elder carries its head lower and level (2.1), its neck and back rising behind it, so laid
+ * the full 88 its fans sank into that line and kept 58 % of their resting silhouette (D7: >= 60 %); at 80 they keep
+ * 66 % (fans on against off, seeds 1, 2 and 5), still flat back against the rest's 40.
+ */
+const LAY_ELDER = 40;
 /** Beg (4.3 "hungry tell"): the fans pinned FORWARD of upright, deg (the baby's lean offset comes on top). */
 const BEG_LEAN = -28;
 /** The dish tips its rim this far forward of upright at a full shriek, deg: cupped toward the sound it throws. */
@@ -333,6 +386,20 @@ function walkBob(rig: DragonRig, cue: number, st: Stage): number {
 }
 
 /**
+ * The walk's fans, deg added to the lean: the bob through the slink's cycles (walkBob), and through its FREEZE (the
+ * walk's clock run on past the cycle: slinkWalk) a SWIVEL, listening: the near fan turns SWIVEL forward and back
+ * while the far one turns the other way, twice, easing in and out with the freeze (the anim lifts both half way to
+ * upright from the mood on `flare`: LISTEN).
+ */
+function slinkFans(rig: DragonRig, c: number, st: Stage, far: boolean): number {
+  const C = Math.max(1, Math.round(rig.tune.walk.cycle));
+  if (c < C) return walkBob(rig, c, st);
+  const u = (c - C) / SLINK[st].stop;
+  if (u >= 1) return 0;
+  return (far ? SWIVEL : -SWIVEL) * Math.sin(4 * Math.PI * u) * Math.sin(Math.PI * u);
+}
+
+/**
  * THE CUE: bible 3.7 "The cue: ear-fans". Cranium space, near and far. Pink membrane with 2 px `horn` ribs (none on
  * the far fan: 1.5), rooted on the skull's top-back behind the eye (the baby's on top of its cranium), at 0.88 of
  * the cranium's radius: rooted at 0.62 a third of the fan lay over the skull and the pair read as mouse ears, not a
@@ -341,8 +408,9 @@ function walkBob(rig: DragonRig, cue: number, st: Stage): number {
  * echo-ping's flick): the ribs splay open (1.3x the area) and the rim cups forward, with the adult's ribs rattling
  * +-1 px every 2 f (its adult-only extra). Measured on the silhouette (fans on against off, pet seeds 1, 2 and 5),
  * mood -1 keeps >= 76 / 74 / 71 % (baby / young / adult) of the resting fans' area and asleep >= 88 / 88 / 85 % (D7:
- * >= 60 %; laid back the full 95 deg, the adult kept 61 %). The far fan: root 4 px behind and 1 px above, turned
- * 14 deg further back, so it widens the head's silhouette instead of hiding behind the near one.
+ * >= 60 %; laid back the full 95 deg, the adult kept 61 %), the elder's, laid back only 80 (LAY_ELDER), 66 / 83 %.
+ * The far fan: root 4 px behind and 1 px above, turned 14 deg further back, so it widens the head's silhouette
+ * instead of hiding behind the near one.
  */
 function fan(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, info: DragonInfo): void {
   const st = info.stage, F = FANS[st], r = info.r, far = info.far, act = pose.act, c = pose.cue;
@@ -360,9 +428,9 @@ function fan(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, in
   else if (act === ACT.beg && !info.asleep) lean = BEG_LEAN + F.lean0;
   else {
     const g = fanGauge(rig, pose, info);
-    let awake = (dish > 0 ? -DISH_TIP * Math.min(1, dish) : g >= 0 ? 40 - 40 * g : 40 - 48 * g) + F.lean0;
+    let awake = (dish > 0 ? -DISH_TIP * Math.min(1, dish) : g >= 0 ? 40 - 40 * g : 40 - (st === 'elder' ? LAY_ELDER : 48) * g) + F.lean0;
     if (dish > 0) { spread = 1 + (F.spread - 1) * dish; grow = 1 + (F.grow - 1) * dish; }
-    if (act === ACT.walk) awake += walkBob(rig, c, st);
+    if (act === ACT.walk) awake += slinkFans(rig, c, st, far);
     // Asleep (4.3) the young and adult head lies level over its paws, so "back along the neck" is level and a fan
     // laid back there only reached the back line: the asleep silhouette lost the cue (5.1 #1). They lean SLEEP_LEAN
     // back from the WORLD's vertical (the head's own pitch taken out), their tips curled SLEEP_CURL down: drowsy,
@@ -397,6 +465,18 @@ function fan(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: DragonPose, in
   const rattle = grown(st) && act === ACT.breath && c >= 0 && pose.fx > 0.5;
   if (pleats) drawPleats(ctx, rig, F, pleats, H, spread, curl, info.pal.membrane, rattle ? Math.floor(c / 2) : -1);
   else celPath(ctx, rig, info.pal.membrane, 0, -H / 2, H / 2, 0.36, 0);
+  if (!far && st === 'elder' && !rig.override) {
+    // the elder-only FROST along the near fan's rim (3.7), whole pixels in face space like the ribs
+    // (clipped to the fan's path, as the muzzle is to the skull: the band then meets the fan's ink wherever it runs,
+    // with no anti-aliased membrane rim between them)
+    ribFrame(rig, tx, ty, th);
+    ctx.save(); fanPath(ctx); ctx.clip();
+    ctx.rotate(-th); ctx.translate(-tx, -ty);
+    enterFaceFromCranium(ctx, rig, RT.x, RT.y);
+    ctx.fillStyle = rig.col(rig.greys.fanFrost);
+    drawFrost(ctx, F);
+    ctx.restore(); ctx.restore();
+  }
   if (!far && !pleats && !rig.override) {
     // ribs: 2 px horn as WHOLE-PIXEL 2 x 2 stamps in face space (a rotated 2 px stroke anti-aliases into a pale
     // smear), sampled every 0.5 px up the longest run of the rib that clears the edges by RIB_SIDE (a rib shorter
@@ -578,6 +658,29 @@ function soundArc(ctx: CanvasRenderingContext2D, rig: DragonRig, info: DragonInf
   }
   ctx.restore();
 }
+/**
+ * The elder breath's FINALE (4.2: "the last puff becomes one ring"), frames of the act clock: from the window anims.ts
+ * elderBreath hands the element, the end of the stream (cue 0 at the snap's start, f 22, then its 6 f and the 32 f
+ * sustain: cue 38, where `fx` starts to fall: anims.ts ELDER_FINALE), on through the recover for FINALE f, ending 2 f
+ * before the anim does (cue 62), the jaw easing shut under it. Its 12 f window alone, the ring was a 0.2 s pink "o".
+ */
+const FINALE0 = ELDER_FINALE.at, FINALE = 22;
+/**
+ * The ECHO CIRCLE (3.7, 4.2), `age` frames into the finale: the shriek's last word, one whole sound ring in the arcs'
+ * own floor-safe colours (2 px `membrane`, a 1 px `scale` outer edge: soundArc), leaving the open mouth 13 px out along
+ * its aim (clear of the snout: at 8 its first frames lay on the muzzle) and drifting 14 px up and 10 on as it widens,
+ * r 4 -> 12 (at r 3 its middle was a 2 px speck: a pink ring with a dot for a hole; at r 8 over 12 f, smaller than
+ * every arc before it, it read as a pop, not a finale). Whole for half its life, then it fades as an arc does, by
+ * NARROWING, never by alpha (3.7): +-150, then +-120, opening at the back into one last arc going out; at its full size
+ * it vanished in one frame. Anchor space entered at root (ox, oy) rotated `ang`.
+ */
+function echoCircle(ctx: CanvasRenderingContext2D, rig: DragonRig, info: DragonInfo, ox: number, oy: number, ang: number, age: number): void {
+  if (age < 0 || age >= FINALE) return;
+  const f = age / FINALE, dir = rig.j.mouthAng + rig.tf.rot, d = 13 + 10 * f, a = dir * DEG;
+  const span = f < 0.5 ? 180 : f < 0.75 ? 150 : 120;
+  soundArc(ctx, rig, info, ox, oy, ang, rig.j.mouth.x + Math.cos(a) * d, rig.j.mouth.y + Math.sin(a) * d - 14 * f, dir, Math.round(4 + 8 * f), span);
+}
+
 /** The arc's span by life thirds: +-hi, then +-mid, then +-lo. */
 const spanAt = (f: number, hi: number, mid: number, lo: number): number => (f < 1 / 3 ? hi : f < 2 / 3 ? mid : lo);
 
@@ -601,6 +704,11 @@ const noseDir = (rig: DragonRig): number => Math.max(-12, Math.min(10, rig.j.hea
 
 /** A chirp's life, frames. */
 const CHIRP = 12;
+/**
+ * The hungry tell's chirp, every this many frames of the beg loop: twice a loop (anims.ts begAnim: 120 f, the elder's
+ * 140). Keyed every 60 on the elder's loop, its chirps fell at 0, 60 and 120 and again at 0, the last two 20 f apart.
+ */
+const CHIRP_EVERY: Readonly<Record<Stage, number>> = { baby: 60, young: 60, adult: 60, elder: 70 };
 /**
  * One CHIRP `age` frames old off the nose (the echolocation chirp and the hungry tell, 3.7 / 4.3): r 5 -> 10 over
  * 12 f, narrowing +-45 -> +-38 -> +-30. A small arc needs span to show its curve: at the bible's r 3 and +-15 it was
@@ -630,7 +738,8 @@ const PING_OUT = 12, PING_OUT_LIFE = 14, PING_BACK = 30, PING_BACK_LIFE = 12, PI
  *     a straight bar, 1 px of bow). The adult's ribs rattle (fan()); neighbours flinch on the anim's 'shriek' event
  *     (overrides). BABY: a squeak, one arc r 4 -> 14 over 12 f at +-45 -> +-38 -> +-30, then its fans flop over its
  *     eyes (fan(), E8).
- *   BEG (4.3 hungry tell): one short chirp arc every 60 f off the nose (chirp()), the jaw popping open for it.
+ *   BEG (4.3 hungry tell): one short chirp arc off the nose twice a loop, every CHIRP_EVERY f (chirp()), the jaw
+ *     popping open for it.
  *   SLEEP (4.3): a snore arc off the nose on each exhale, tipped 20 deg up: r 6 -> 9 over 24 f, narrowing
  *     +-50 -> +-34 (at a flat r 3 and +-15 it was a 2 x 2 pink dot, and at r 4 -> 6 and +-25 a tick).
  *   CALL (3.7 lonely call): ONE long, slow arc from the open mouth, out to 40 px over the whole call (young 30,
@@ -644,18 +753,19 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
   if (rig.override) return;
   if (act === ACT.breath) {
     if (c < 0) return;
-    // (FIRST PASS (elder): the adult's shriek; its finale is one echo circle, 4.2, cue 32 to 44)
-    const n = grown(st) ? 3 : st === 'young' ? 2 : 1, life = st === 'baby' ? 12 : 24;
-    const r0 = st === 'baby' ? 4 : 6, r1 = grown(st) ? 34 : st === 'young' ? 24 : 14;
+    // (the elder's: the adult's three arcs at 1.1x reach, a little slower, then its finale, the ECHO CIRCLE)
+    const elder = st === 'elder', n = grown(st) ? 3 : st === 'young' ? 2 : 1, life = st === 'baby' ? 12 : elder ? 26 : 24;
+    const r0 = st === 'baby' ? 4 : 6, r1 = elder ? 37 : grown(st) ? 34 : st === 'young' ? 24 : 14;
     for (let k = 0; k < n; k++) {
       const age = c - 8 * k;
       if (age < 0 || age >= life) continue;
       const f = age / life, sp = st === 'baby' ? spanAt(f, 45, 38, 30) : spanAt(f, 35, 28, 22);
       soundArc(ctx, rig, info, mx, my, ma, mx, my, ma + rig.tf.rot, Math.round(r0 + (r1 - r0) * f), sp);
     }
+    if (elder) echoCircle(ctx, rig, info, mx, my, ma, c - FINALE0);
     return;
   }
-  if (act === ACT.beg) { chirp(ctx, rig, info, mx, my, ma, c % 60); return; }
+  if (act === ACT.beg) { chirp(ctx, rig, info, mx, my, ma, c % CHIRP_EVERY[st]); return; }
   if (act === ACT.sleep) {
     const B = Math.round(rig.tune.sleep.breath), age = c - Math.round(B / 2);
     if (c < 0 || age < 0 || age >= 24) return;
@@ -821,12 +931,91 @@ function callAnim(stage: Stage): DragonAnim {
 }
 
 /**
+ * The SLINK (4.3, the rename's VC21: "slinkwing" names its gait as well as its wings), per stage: the body carried
+ * `low` px lower on bent legs, the neck `neck` deg lower and the head `head` deg back up so the snout stays level
+ * (low and forward, a stalking cat's), the tail `tail` deg lower, trailing; and every second cycle a `stop` f FREEZE.
+ */
+const SLINK: Readonly<Record<Stage, { low: number; neck: number; head: number; tail: number; stop: number }>> = {
+  // (the baby's 4 px legs have 1 px of crouch in them: a 2 px dip folds them into a frog crouch, 4.2's baby idle)
+  baby: { low: 1, neck: 6, head: -5, tail: 4, stop: 14 },
+  // (the young's as the adult's: at neck +15 / head -11 its head rode only 2 px under the old walk's, and the freeze
+  // carried the whole read, the element pass v2 review)
+  young: { low: 2, neck: 18, head: -13, tail: 5, stop: 20 },
+  adult: { low: 2, neck: 18, head: -13, tail: 6, stop: 24 },
+  // (the elder's at its 0.8x gestures and x 1.25 tempo; its head is already carried low and forward, 2.1)
+  elder: { low: 1.5, neck: 12, head: -9, tail: 4, stop: 30 },
+};
+/** How far the fans swivel through the slink's freeze, deg each way (slinkFans: near and far in counter-phase). */
+const SWIVEL = 12;
+/**
+ * The freeze's `flare`: the fans lift HALF way to upright from the mood (fanGauge), so a sad pet's come up to the rest
+ * lean, a content one's half up and a happy one's upright, and the gauge still reads through the stop. At flare 1 they
+ * stood upright at every stop whatever the mood, a happy pet's fans on a sad one for a fifth of its walk (the element
+ * pass v2 review: D7).
+ */
+const LISTEN = 0.5;
+
+/**
+ * Bible 4.3 "Slinkwing" walk: the SLINK, a low, crouched bat crawl, stop-and-go. The shared walk (its gait, its
+ * no-skate stride, the baby's waddle and stumble) with the body lowered on its planted legs, the head held low and
+ * forward and the tail trailing low, at the slink's slower tuning; then every second cycle it FREEZES on its phase-0
+ * stride (move 0, the far front paw left raised mid-step, a pointer's pause): the head comes up, the fans lift half
+ * way to upright (LISTEN) and swivel to listen (fan(): the walk's clock runs on past the cycle, C + f) and the tail
+ * tip twitches, and it sinks back into the slink. A baby keeps its stumble, one cycle in six: cycle, cycle, stop,
+ * cycle, cycle, stop, cycle, stumble, stop. (The elder's freeze is a listening pause with its head, fans and tail
+ * moving through it, never a held key: 4.1.)
+ */
+function slinkWalk(stage: Stage, dims: DragonDims | null): DragonAnim {
+  const w = animTuning(stage, SLINKWING).walk, C = Math.round(w.cycle), S = SLINK[stage], baby = stage === 'baby';
+  const base = walkAnim(stage, w, dims);
+  const cycle: DragonFrame[] = [], stumble: DragonFrame[] = [];
+  let t = 0;
+  for (const f of base.frames) {
+    const p = f.pose;
+    if (p) {
+      p.body = { ...p.body, y: (p.body?.y ?? 0) + S.low };
+      p.neck = { ...p.neck, a0: (p.neck?.a0 ?? 0) + S.neck };
+      p.head = { ...p.head, rot: (p.head?.rot ?? 0) + S.head };
+      p.tail = { ...p.tail, lift: (p.tail?.lift ?? 0) + S.tail };
+    }
+    if (t < C) cycle.push(f); else if (t >= 5 * C) stumble.push(f);
+    t += f.dur || 1;
+  }
+  // the freeze: every channel of the stride's first frame held (it starts and ends where the cycle wraps), with the
+  // head lifting out of the slink to listen and sinking back, the fans lifting (flare), the tail tip's twitch
+  const p0 = (base.frames[0].pose || {}) as unknown as Record<string, number | Record<string, number> | undefined>;
+  const tr: Record<string, Track> = {};
+  for (const ch of Object.keys(p0)) {
+    const v = p0[ch];
+    if (typeof v === 'number') tr[ch] = [[0, v]];
+    else if (v) for (const sk of Object.keys(v)) tr[`${ch}.${sk}`] = [[0, v[sk]]];
+  }
+  const L = S.stop, T = (f: number) => Math.round(f * L / 24), g = FIDGET_TIMING[stage].amp;
+  const n0 = typeof p0.neck === 'object' ? p0.neck.a0 || 0 : 0, h0 = typeof p0.head === 'object' ? p0.head.rot || 0 : 0;
+  const up = -S.neck - 2 * g, hu = -S.head - 4 * g;
+  // (a loop's keys wrap: the last one eases back to the first at L, where the cycle picks up again; a key AT L would
+  // fold onto frame 0 and shadow its ease)
+  tr['neck.a0'] = [[0, n0, 'out'], [T(5), n0 + up], [T(17), n0 + up, 'inout']] as Key[];
+  tr['head.rot'] = [[0, h0, 'out'], [T(6), h0 + hu], [T(11), h0 + hu - 3 * g, 'inout'], [T(17), h0 + hu, 'inout']] as Key[];
+  tr.flare = [[0, 0, 'out'], [T(5), LISTEN], [T(17), LISTEN, 'inout']] as Key[];
+  const s0 = typeof p0.tail === 'object' ? p0.tail.sway || 0 : 0;
+  tr['tail.sway'] = [[0, s0], [T(8), s0], [T(10), s0 - 6 * g], [T(13), s0 + 3 * g], [T(16), s0]] as Key[];
+  tr.cue = (f: number) => C + f;
+  const stop = bake(tr as Tracks, { stage, len: L, loop: true, res: baby ? 1 : 2, ease: 'linear' });
+  const two = [...cycle, ...cycle, ...stop.frames];
+  return { loop: true, frames: baby ? [...two, ...two, ...cycle, ...stumble, ...stop.frames] : two };
+}
+
+/**
  * The anim overrides (4.3), each the shared builder's own output with its element additions:
  *   breath: the shriek raises `event: 'shriek'` at the snap (young, adult), so up to 2 neighbours flinch (5.4); the
  *     baby's squeak does not;
- *   beg: the hungry tell's chirp opens the jaw (its stage minimum) for 6 f at each chirp, f 0 and f 60 (breath()
+ *   beg: the hungry tell's chirp opens the jaw (its stage minimum) for 6 f at each chirp, f 0 and half way (breath()
  *     draws the arc; fan() pins the fans forward);
- *   call: the lonely call, an anim of its own (callAnim).
+ *   call: the lonely call, an anim of its own (callAnim);
+ *   walk: the slink (slinkWalk);
+ *   the elder's happy and wake re-spread (wideSpread) and its airing sat further back (AIR_FIT), so the worn wing's
+ *     tear is seen.
  * (The paws-forward sleep is tuning: sleep.frontTuck.)
  */
 function overrides(stage: Stage, dims: DragonDims | null): Partial<Record<string, DragonAnim>> {
@@ -838,13 +1027,77 @@ function overrides(stage: Stage, dims: DragonDims | null): Partial<Record<string
   const beg = begAnim(stage, tune), jaw = dims ? dims.head.jawMin : STAGE_JAW_MIN[stage];
   let t = 0;
   for (const f of beg.frames) {
-    if (f.pose && t % 60 < 6) f.pose.jaw = jaw;
+    if (f.pose && t % CHIRP_EVERY[stage] < 6) f.pose.jaw = jaw;
     t += f.dur;
   }
-  return { breath: br, beg, call: callAnim(stage) };
+  const walk = slinkWalk(stage, dims);
+  if (stage !== 'elder') return { walk, breath: br, beg, call: callAnim(stage) };
+  return {
+    walk, breath: br, beg, call: callAnim(stage),
+    happy: wideSpread(happyAnim(stage), REST_FOLD, REST_BACK),
+    airing: airingAnim(stage, dims, { ...ELDER_WING, hole: AIR_FIT }),
+  };
+}
+
+/**
+ * Echo's ELDER PREEN spread (1.3, 2.9), in place of the shared 0.6 leaning back 48: open to 0.9 leaning back 60, so the
+ * four-finger hand fans and the pink ARM PANEL shows its broad face over the back with its tear, a dark stepped bite
+ * (at the shared 0.6 the fingers close into a dark hand over a small pink wedge the tear cuts in two). Every preen
+ * spread that keeps the tip rule lays the arm panel over the flank (measured, 0.6-0.94 x 20-90 deg: 0 px of the room
+ * in the tear wherever the lead tip stays 7 px under the head's top), so there it shows the body, as 2.9 allows.
+ * The WAKE is the shared one, 0.6 leaning back 60 (anims.ts wakeAnim's elder WAKE_BACK, on top of its bow's own extra
+ * 12; Echo's own override until the element pass v2 integration): at 48 the lead tip came within 2.7 px of the head's
+ * top; opened to 0.9 and leaned 90 (the element pass) its tear opened onto the belly band for 12 f, a white shard
+ * standing in the pink that read as a claw or a quill; at 0.6 / 60 it shows the dark flank (no belly pixel over f 6-24).
+ */
+const REST_FOLD = 0.9, REST_BACK = 60;
+/**
+ * Echo's AIRING (1.3, 2.9, 4.2): the shared airing, fitted (anims.ts airingFit) to AIR_FIT, a spot 5 px lower on the arm
+ * panel than its hole's own and 2 px nearer the bone: held above the back line + 1 px, it sits back 28 deg with the
+ * wings leaned 22 (the tip rule and the trailing spar checked by the fit as ever), where fitted to the hole alone it sat
+ * back 20 and leaned 34. Sat up further, the spread wing stands up off the back and the arm panel's tear opens on the
+ * room behind the rump (11-12 px every frame of the hold), where at 20 it opened on the rump itself, a dark bite. The
+ * hole, higher still, clears the back line with room to spare.
+ */
+const AIR_FIT = { x: -7, y: -9, from: 0.95 };
+/**
+ * The shared elder preen or wake with its resting spread opened to `fold` and leaned `back` (the wake's bow keeps its
+ * extra lean on top), in step with the shared keys: each frame's spread u = fold / 0.6 of the way there. Measured every
+ * frame, the lead tip stays the tip rule's 7 px or more below the head's top (1.3: the preen >= 11 px, the wake
+ * >= 9.5), and under 0.95 no hole is drawn: the hole is the full spread's (the airing, flight).
+ */
+function wideSpread(a: DragonAnim, fold: number, back: number): DragonAnim {
+  for (const f of a.frames) {
+    const w = f.pose && f.pose.wing;
+    if (!w || w.fold == null) continue;
+    const u = w.fold / ELDER_SPREAD_FOLD;
+    w.fold = fold * u;
+    w.flap = (w.flap ?? 0) + (back - ELDER_SPREAD_BACK) * u;
+  }
+  return a;
 }
 /** The open jaw's stage minimum (1.2), deg, for a dims-less table (the build's `head.jawMin` otherwise). */
 const STAGE_JAW_MIN: Readonly<Record<Stage, number>> = { baby: 20, young: 20, adult: 16, elder: 16 };
+
+/**
+ * The elder's worn wing (2.9): ONE ragged tear, in the ARM PANEL (panel 4: the trail tip -> the flank attach) at 0.55,
+ * and the notched hole at full spread, its spot up the arm panel by the wrist. The finger panels take no tear: between
+ * four finger bones a panel is 3 to 5 px of membrane, and at every spread, fraction and depth (to 10 px) a notch there
+ * opened at most 6 px of the room, one 1 px column at full spread, under ink and anti-aliasing: an ink tick that only
+ * darkened the panel (2.9's floor; the element pass v2 review). The arm panel is the wing's one broad pink face, and
+ * at full spread a 5 px notch and the window with its ring fit in it only one above the other, 2 px of membrane
+ * between them: the hole high by the wrist, as high as its ring and 2 px of membrane clear the trail finger, the tear
+ * below it (at 0.6 it opened only 6 px of the room in the airing and 2 at 0.65, the rest on the rump; at 0.5 just
+ * 1 px of membrane stood between it and the ring, and nearer the trail tip none). Where it opens: on the room at full
+ * spread (12 px) and in the airing (11-12 px, every frame of the hold: its sit-back, AIR_FIT); on the flank, a dark
+ * stepped bite in the pink, in the preen and the wake (every preen spread that keeps the tip rule lays the arm panel
+ * over the body: wideSpread).
+ */
+const ELDER_WING = wingParams({
+  style: 'bat', plus: true, scallop: 3, wristThorn: 3,
+  tears: [{ panel: 4, at: 0.55, depth: 5 }],
+  hole: { x: -9, y: -14, from: 0.95 },
+});
 
 /**
  * A "volume-bar" chevron on the tail (3.7 table), a chunky filled caret (5.2). The adult's pair steps DOWN in size
@@ -881,40 +1134,31 @@ export const SLINKWING: ElementSpec = {
       skullBumps: [{ x: 14, y: -1.5, r: 2 }],
     },
     // the elder (3.7's Elder column): the adult's tail LENGTH (2.3: 6 x 7, for the 1.10 length cap), the jaw's 36 deg,
-    // the adult's chevrons and nose-leaf, the wing worn (2.9: tears in panels 1 and 3, the notched hole at full
-    // spread). FIRST PASS (elder, 2.9): its tears read at the airing and at full spread but not at the resting spread
-    // (the preen, the wake): there its four finger bones stand 3-3.5 px apart and close any notch between them (0-2 px
-    // of the room at 0.6-0.8 / 40-48 deg); a slinkwing-only resting spread or tear shape is this file's to find, inside
-    // the tip rule (1.3). Its fans: the FIRST PASS note on FANS
+    // the adult's chevrons and nose-leaf, the wing worn (ELDER_WING: its one tear in the arm panel, the notched hole)
     elder: {
       tailRest: TAIL_REST.slinkwing.elder, tailLen: 7 / 7.4, jawMax: 36, horns: null, markings: [chevron(0.3, 6, 5), chevron(0.5)],
-      wing: wingParams({
-        style: 'bat', plus: true, scallop: 3, wristThorn: 3,
-        tears: [{ panel: 1, at: 0.35, depth: 5 }, { panel: 3, at: 0.45, depth: 5 }],
-        // (2.9's spot re-measured for the notched window AND the airing: at 2.9's (-9.5, -5) its bottom row met the back
-        // line + 1 px at the elder's settled chest even at full spread, and leaned back for the tip rule (1.3) it lay
-        // on the back; here, up the arm panel toward the forearm, it keeps the ring and 2 px of membrane round it and
-        // clears the back line at the airing's 20 deg sit-back, anims.ts airingFit)
-        hole: { x: -7, y: -11.5, from: 0.95 },
-      }),
+      wing: ELDER_WING,
       dorsal: null,
       skullBumps: [{ x: 14, y: -1.5, r: 2 }],
     },
   },
   render: { farHead, nearHead, headMarkings, breath, ambient },
   anims: {
-    // 4.3 "Slinkwing": the walk's fan bob, the happy song, the hungry chirp with the fans pinned forward and the
-    // sleeping snore are renderer flourishes keyed on act / cue (fan(), breath(), ambient()); the shriek's event,
-    // the chirping beg, the paws-forward sleep and the lonely call are overrides; the echo-ping is the fidget. Asleep
-    // it holds its head up over its forepaws, the neck a little raised (chin 10 / 8 px: at the paws' 5.5 / 4.5 the
-    // asleep silhouette was a mound with a 3 px knob at ÷3, 5.1 #1), so the curled fans stand clear above the back
-    // and wing. The shriek opens the jaw to 40 deg (the young too: the element's jawMax 40 replaces the stage's 34);
-    // the baby's squeak ends in the fan flop over its eyes, 24 f (ledger E8), then a blink.
+    // 4.3 "Slinkwing": the walk's fan bob and the slink's listening swivel, the happy song, the hungry chirp with the
+    // fans pinned forward and the sleeping snore are renderer flourishes keyed on act / cue (fan(), breath(),
+    // ambient()); the slink, the shriek's event, the chirping beg, the paws-forward sleep, the lonely call and the
+    // elder's preen, wake and airing (its tear in view) are overrides; the echo-ping is the fidget. Asleep it holds its
+    // head up over its forepaws, the neck a little raised (chin 10 / 8 px: at the paws' 5.5 / 4.5 the asleep
+    // silhouette was a mound with a 3 px knob at ÷3, 5.1 #1), so the curled fans stand clear above the back and wing.
+    // The shriek opens the jaw to 40 deg (the young too: the element's jawMax 40 replaces the stage's 34); the baby's
+    // squeak ends in the fan flop over its eyes, 24 f (ledger E8), then a blink.
     tuning: (st) => ({
       breath: { jaw: st === 'baby' ? 24 : st === 'elder' ? 36 : 40, flop: st === 'baby' ? 24 : 0, fizzleFace: st === 'baby' ? 'sheepish' : 'dazed' },
       // (the head held up over forepaws slid 10 px forward: at the shared sphinx fold's -2 the raised head floated in
       // front of the chest over nothing)
       sleep: st === 'baby' ? {} : { chin: grown(st) ? 10 : 8, frontTuck: 10 },
+      // the slink's slower pace (slinkWalk): x 0.88 of the shared speeds
+      walk: { speed: st === 'baby' ? 0.26 : st === 'young' ? 0.44 : st === 'elder' ? 0.3 : 0.4 },
     }),
     overrides: (st, dims) => overrides(st, dims),
     fidget: (st) => fidget(st),

@@ -386,10 +386,14 @@ export function walkAnim(stage: Stage, w: Readonly<WalkTuning>, dims: DragonDims
   tracks['tail.sway'] = (t) => (elder ? 3 : 5) * Math.cos(2 * Math.PI * (phase(t) - 0.4));
   tracks['wing.fold'] = (t) => (elder ? 0.04 * Math.max(0, Math.cos(2 * Math.PI * (phase(t - 2) - 0.4))) : 0.04 * dip(phase(t - 2)));
   if (w.wave > 0) {
-    // water's slink: an S-wave through neck and tail, trailing the legs
-    tracks['neck.a1'] = (t) => 4 * Math.sin(2 * Math.PI * (phase(t) - w.wave / C));
-    tracks['tail.curl'] = (t) => 3 * Math.sin(2 * Math.PI * (phase(t) - (w.wave + 4) / C));
+    // water's slink: an S-wave through neck and tail, trailing the legs (the elder's at 0.75x: 4.1's lower amplitude)
+    const wa = elder ? 0.75 : 1;
+    tracks['neck.a1'] = (t) => 4 * wa * Math.sin(2 * Math.PI * (phase(t) - w.wave / C));
+    tracks['tail.curl'] = (t) => 3 * wa * Math.sin(2 * Math.PI * (phase(t) - (w.wave + 4) / C));
   }
+  // (the elder's tail held at the airing's stiffness through the walk: the chain's whip at each contact flung the long
+  // tails 15-18 px over the back, water's fluke into fire's zone: D21, 3.0; the element pass v2 review)
+  if (elder) tracks['tail.stiff'] = () => AIR_TAIL_STIFF;
   if (baby) {
     tracks['root.rot'] = (t) => 4 * Math.sin(2 * Math.PI * (phase(t) - 0.15)) + plant(st(t)) * 12;
     tracks['squash'] = (t) => 1.02 + 0.04 * Math.cos(8 * Math.PI * (phase(t) - 0.15)) + plant(st(t)) * 0.12;
@@ -446,6 +450,9 @@ export function happyAnim(stage: Stage): DragonAnim {
       'wing.fold': [[0, 0], [8, 0], [18, ELDER_SPREAD_FOLD], [40, ELDER_SPREAD_FOLD], [56, 0]],
       'wing.flap': [[0, 0], [8, 0], [18, ELDER_SPREAD_BACK], [40, ELDER_SPREAD_BACK], [56, 0]],
       'tail.lift': [[0, 0], [18, -6], [68, -6], [84, 0]],
+      // (the chain held at the airing's stiffness through the chest puff and the spread, let go before the sway: the
+      // puff's pitch whipped the long tails 10-18 px over the back, water's fluke flicking up; the element pass v2)
+      'tail.stiff': [[0, 0], [4, AIR_TAIL_STIFF], [40, AIR_TAIL_STIFF], [56, 0]],
       'tail.sway': [[0, 0], [40, 0], [47, 14], [54, -14], [61, 14], [68, 0]],
       jaw: chuckle,
       face: [[0, N], [12, H], [72, N]],
@@ -751,18 +758,30 @@ function elderSleep(sl: Readonly<AnimTuning['sleep']>, SP: SleepPose, L: number,
  * them, so fire's flame un-banks and lightning's bolts lift as the eyes open, never behind shut eyes; the STRETCH
  * 0-12 is a play-bow -- rump up, chest down (body rot +12), the front paws pushed forward flat along the floor, the
  * neck reaching forward and down with the head level -- a wing spread 5-17, the preen's SPREAD_FOLD leaning back
- * SPREAD_BACK (a baby flutters its nubs), a yawn 4-20 (jaw 30, the eyes squeezed shut at its peak), then a shake
- * (root +-3, 3 x 4 f) back to standing.
+ * SPREAD_BACK + WAKE_BACK (a baby flutters its nubs), a yawn 4-20 (jaw 30, the eyes squeezed shut at its peak), then a
+ * shake (root +-3, 3 x 4 f) back to standing. The tail's chain is held stiff until the shake is done.
  */
+/**
+ * How much further than the preen the wake's stretch leans its spread back, deg (1.3's tip rule): the play-bow lowers
+ * the head while the wings are up, and at the preen's lean the wing's top stood 1-6 px OVER the head's top through the
+ * bow's hold (spike 6, fire 4, slinkwing 3, dusk 2, water 1; the elders 1-4 px under it). Leaned 18 more (the elders
+ * 12, where slinkwing's elder measured its lead tip >= 9.5 px under), the adults' wing tops stay 4-10 px under the
+ * head's top through the hold and the elders' 2-9 (the wing's topmost inked pixel against the skull's top and brow),
+ * and the stretch still shows the membrane's face (the element pass v2 review; lightning's bolts are its spire as ever;
+ * leaned 25 more, the elder's wing lay flat among spike's quills). The first 3 f, the wings opening while the head
+ * still lies where it slept, stay over it.
+ */
+const WAKE_BACK = { adult: 18, elder: 12 } as const;
 export function wakeAnim(stage: Stage, dims: DragonDims | null, tune: AnimTuning): DragonAnim {
   const baby = stage === 'baby', elder = stage === 'elder';
   // (the elder's 36 f: stretch 0-14, spread 6-20, yawn 4-24, shake 22-36 -- the adult's beats x 1.2, 4.2)
   const k = baby ? 24 / 30 : stage === 'young' ? 26 / 30 : elder ? 36 / 30 : 1, L = Math.round(30 * k), s = (keys: Key[]) => stretchKeys(keys, k);
   const sl = tune.sleep, SP = sleepPose(stage, dims, tune), settle = SP.settle, { a0, a1, head: hr } = SP.head;
   const reach = baby ? 2 : stage === 'young' ? 5 : 7;
-  // the resting spread of the stretch: the elder's 0.6 leaning back 48 (its tears show), the others' 0.7 / 40, x the
-  // element's wakeSpread (rock's 0: its stub stays folded under the rim, 1.3)
-  const ws = sl.wakeSpread, sf = (elder ? ELDER_SPREAD_FOLD : SPREAD_FOLD) * ws, sb = elder ? ELDER_SPREAD_BACK : SPREAD_BACK;
+  // the resting spread of the stretch: the elder's 0.6 (its tears show), the others' 0.7, x the element's wakeSpread
+  // (rock's 0: its stub stays folded under the rim, 1.3), leaned back WAKE_BACK further than the preen's
+  const ws = sl.wakeSpread, sf = (elder ? ELDER_SPREAD_FOLD : SPREAD_FOLD) * ws;
+  const sb = elder ? ELDER_SPREAD_BACK + WAKE_BACK.elder : SPREAD_BACK + WAKE_BACK.adult;
   const tracks: Tracks = {
     'body.y': s([[0, settle], [10, settle * 0.5], [14, settle * 0.45], [20, 0, 'out'], [30, 0]]),
     'body.rot': s([[0, SP.bodyRot], [8, 12], [13, 12], [20, 0], [30, 0]]),
@@ -774,9 +793,12 @@ export function wakeAnim(stage: Stage, dims: DragonDims | null, tune: AnimTuning
     'legNH.slide': s([[0, SP.hindTuck], [8, 0]]), 'legFH.slide': s([[0, SP.hindTuck], [8, 0]]),
     'legNF.slide': s([[0, SP.frontTuck], [8, reach], [14, reach], [22, 0]]), 'legFF.slide': s([[0, SP.frontTuck], [8, reach], [14, reach], [22, 0]]),
     'tail.curl': s([[0, sl.tailCurl], [14, 0]]), 'tail.lift': s([[0, sl.tailLift], [12, 0], [30, 0]]),
-    'tail.stiff': s([[0, 1], [12, 0.6], [30, 0]]),
+    // (the chain held at the airing's stiffness until the body has risen and un-pitched: let go at f 12 as the bow's
+    // pitch lifted off it, every long tail whipped 15-29 px over the back, water's fluke into fire's zone, the fling D21
+    // and the airing's cure rule out; the element pass v2 review)
+    'tail.stiff': s([[0, 1], [12, AIR_TAIL_STIFF], [26, AIR_TAIL_STIFF], [30, 0]]),
     'wing.fold': baby ? s([[0, sl.nubFold], [5, 1], [8, 0.2], [11, 1], [14, 0.2], [17, 1], [20, 0]]) : s([[0, 0], [5, sf], [17, sf], [22, 0]]),
-    // (leaned back SPREAD_BACK from the bowed body: the bow's +12 chest-down pitch turns the wings forward with it)
+    // (leaned back sb from the bowed body, and more through the bow: its +12 chest-down pitch turns the wings forward)
     ...(baby ? {} : { 'wing.flap': s([[0, 0], [5, (sb + 7) * ws], [8, (sb + 12) * ws], [13, (sb + 12) * ws], [17, (sb + 5) * ws], [22, 0]]) }),
     jaw: s([[0, 0], [4, 0], [7, 30], [18, 30], [20, 0]]),
     // (the elder's shake is 2 deg: a steady shake, never a tremor)
@@ -790,6 +812,16 @@ export function wakeAnim(stage: Stage, dims: DragonDims | null, tune: AnimTuning
 }
 
 // ---------- breath ----------
+
+/** The elder breath's phases, frames: wind-up, snap, sustain, recover (breathAnim's row; the finale opens the recover).*/
+const ELDER_BREATH: readonly [number, number, number, number] = [22, 6, 32, 24];
+/**
+ * The elder breath's FINALE window in its act clock (4.2): cue `at` is f 60, the stream's end (cue 0 is the snap's
+ * first frame, f 22, as on every stage, so the finale's f 60-72 is cue 38 to 50), and it lasts `len` f. fx falls from
+ * 1 at cue 38 to 0 by cue 41 and the jaw eases 28 -> 16 over cue 38-44 and shuts at cue 50. An element keys its ring
+ * from this, never from a hard-coded cue (the seam once documented the window as cue 32 to 44: the element pass v2).
+ */
+export const ELDER_FINALE: { readonly at: number; readonly len: number } = { at: ELDER_BREATH[1] + ELDER_BREATH[2], len: 12 };
 
 /**
  * BREATH (4.2, the signature one-shot). pose.fx is the stream's envelope and pose.cue the frames since the snap,
@@ -807,7 +839,7 @@ export function breathAnim(stage: Stage, tune: AnimTuning): DragonAnim {
   const b = tune.breath, H = DFACE.happy, N = DFACE.neutral;
   const baby = stage === 'baby', elder = stage === 'elder', flop = baby ? Math.round(b.flop) : 0;
   // (the elder's 84 f: wind-up 0-22, snap 22-28, sustain 28-60, then the finale ring's 12 f and the recover 72-84)
-  const [w, sn, su, rc] = stage === 'adult' ? [18, 6, 30, 16] : stage === 'young' ? [14, 5, 22, 15] : elder ? [22, 6, 32, 24] : [10, 4, 8, 14 + flop];
+  const [w, sn, su, rc] = stage === 'adult' ? [18, 6, 30, 16] : stage === 'young' ? [14, 5, 22, 15] : elder ? ELDER_BREATH : [10, 4, 8, 14 + flop];
   const s0 = w, s1 = w + sn, e0 = s1 + su, L = e0 + rc;
   const recoil = stage === 'young' ? 3 : 1;
   if (elder) return elderBreath(b, s0, s1, e0, L);
@@ -848,9 +880,10 @@ export function breathAnim(stage: Stage, tune: AnimTuning): DragonAnim {
 /**
  * The ELDER's breath (4.2): slow and wise, never failing (not strong-but-wheezy, which reads as sick). 84 f: a wind-up
  * 0-22 (the head back, the chest up), the SNAP 22-28 (jaw 28), the sustain 28-60 (the adult stream: the element draws
- * it at 1.1x reach while fx is 1), then the FINALE 60-72, the last puff becoming one ring that widens and drifts up
- * (the element's, in its floor-safe colours: cue 32 to 44 with fx 0), the jaw easing shut; and the recover 72-84,
- * `happy` with a 2 deg nod. A 1 px recoil, eased; the tail stiff through the stream.
+ * it at 1.1x reach while fx is 1, cue 2 to 38), then the FINALE 60-72, the last puff becoming one ring that widens and
+ * drifts up (the element's, in its floor-safe colours: cue 38 to 50, ELDER_FINALE, fx 0 from cue 41), the jaw easing
+ * shut; and the recover 72-84, `happy` with a 2 deg nod (a ring may live on into it, to cue 62). A 1 px recoil, eased;
+ * the tail stiff through the stream.
  */
 function elderBreath(b: Readonly<AnimTuning['breath']>, s0: number, s1: number, e0: number, L: number): DragonAnim {
   const H = DFACE.happy, N = DFACE.neutral, f0 = e0 + 12;
@@ -1075,8 +1108,8 @@ export function airingFit(d: DragonDims, wp: Readonly<WingParams>): AiringFit {
   const Wd = d.wing, out: AiringFit = { B: 0, F: 0, dy: 0, wing: 0, hole: false };
   // (no hole to show -- rock's stubby wing: 2.9 -- nothing to air: its wings stay folded under the dome's rim (1.3), and
   // it only sits back and suns its face. Spread to the resting 0.6, the stub poked a 3-4 px slate wedge below the rim
-  // over the belly for 40 f, a defect and nothing else: the elder core review. Its pool plays reminisce instead,
-  // idleVariants)
+  // over the belly for 40 f, a defect and nothing else: the elder core review. Rock airs its own way instead: its
+  // element override sits it up to sun its crystals, rock.ts sunning)
   if (!Wd || !wp.hole) return out;
   out.F = 0; out.wing = 1;
   const A = WING_ANGLES.adult, spars = wp.plus ? Wd.sparsPlus : Wd.spars, ang = wp.plus ? A.sparsPlus : A.spars, span = wp.span, n = spars.length;
@@ -1160,7 +1193,8 @@ const AIR_SIT_MAX = 30;
  * LOWERED to the floor behind it), spreads its wings FULL over 12 f (20-32) leaned back by the fit, holds them 40 f
  * (32-72) with its eyes `happy` and the tail sweeping once along the floor, a cormorant sunning, a slow breath keeping
  * it alive (no key holds), then folds them over 16 f (72-88) and stands back up over 24 f (82-106).
- * act = ACT.airing, cue 0 as the spread begins: lightning's bolts never spread and flex to 95 deg on it instead (3.5).
+ * act = ACT.airing, cue 0 as the spread begins (lightning's elder overrides this variant with its storm-watch, and
+ * rock's with its sunning: elements/lightning.ts and rock.ts, where cue = frames from the start).
  * A look that cannot take a full spread under the tip rule airs at the resting spread (airingFit's `wing`).
  * (The first build sat back in 10 f with the tail keyed only for its sway: the rump dropping 4-6 px and the pitch
  * turning 20-30 deg in 10 f were a kick to the tail chain, which flung every tail up to the vertical, fire's flame
@@ -1168,7 +1202,7 @@ const AIR_SIT_MAX = 30;
  * tremor-like jerks", and in fire's zone (3.0). The elder core review, round 2.)
  */
 export function airingAnim(stage: Stage, dims: DragonDims | null, wp: Readonly<WingParams> | null): DragonAnim {
-  // (a 'custom' wing -- lightning's bolts, which never spread -- flexes to 95 on the spread instead: no sit, no lean)
+  // (a 'custom' wing -- lightning's bolts -- takes no sit and no lean here; lightning's elder overrides this variant)
   const fit = dims && wp && wp.style !== 'custom' ? airingFit(dims, wp) : { B: 0, F: 0, dy: 0, wing: 1, hole: false };
   const full = fit.wing, B = fit.B;
   const L = 106, H = DFACE.happy, N = DFACE.neutral;
@@ -1202,7 +1236,8 @@ const AIR_TAIL_STIFF = 0.85;
  * (the baby's plop-sit comes up about one idle loop in four; the elder's airing about one cut in four). 'fidget' is
  * the element's own (ElementAnimHooks.fidget) and is skipped where the element has none. `wing` is the stage's
  * (ElementStageParams.wing): an elder whose wing has no hole to air and is not lightning's custom bolt (rock's stubby
- * wing, 2.9) reminisces in the airing's place.
+ * wing, 2.9) airs once in six, where its element draws its own airing (rock's sunning: rock.ts), and reminisces once
+ * (without an override, the shared airing's holeless fit only raises the face to the sun: airingFit).
  */
 export function idleVariants(stage: Stage, wing: Readonly<WingParams> | null = null): readonly string[] {
   if (stage === 'baby') return ['lookAround', 'yawn', 'topple', 'plopSit', 'plopSit', 'fidget'];
@@ -1210,7 +1245,7 @@ export function idleVariants(stage: Stage, wing: Readonly<WingParams> | null = n
   return ['lookAround', 'yawn', 'scratch', 'fidget'];
 }
 const ELDER_POOL: readonly string[] = ['lookAround', 'yawn', 'backStretch', 'reminisce', 'airing', 'airing', 'fidget'];
-const ELDER_POOL_NO_HOLE: readonly string[] = ['lookAround', 'yawn', 'backStretch', 'reminisce', 'reminisce', 'fidget'];
+const ELDER_POOL_NO_HOLE: readonly string[] = ['lookAround', 'yawn', 'backStretch', 'reminisce', 'airing', 'fidget'];
 
 /** How often the idle cuts to a variant, frames [min, max] (4.1: every 6 to 10 s; the elder's every 8 to 12 s). */
 export function variantEvery(stage: Stage): readonly [number, number] { return stage === 'elder' ? [480, 720] : [360, 600]; }
@@ -1267,9 +1302,15 @@ export const VARIANT_NAMES: readonly string[] = ['lookAround', 'yawn', 'scratch'
 
 /**
  * The element anims past the shared table (ElementAnimHooks.overrides): fire's 'bath', rock's 'upset' tuck (a loop),
- * slinkwing's lonely 'call'. A look without one plays idle in its place.
+ * slinkwing's lonely 'call', dusk's 'tuckin' (a loop: it lies down awake, is petted, its lamp dims out and it sleeps,
+ * 3.8). A look without one plays ELEMENT_ANIM_FALLBACK's anim in its place (idle when none is named).
  */
-export const ELEMENT_ANIM_NAMES: readonly string[] = ['bath', 'upset', 'call'];
+export const ELEMENT_ANIM_NAMES: readonly string[] = ['bath', 'upset', 'call', 'tuckin'];
+/**
+ * What a look without an element anim plays instead, for DragonAnimPlayer.play's `fallback`: the game's tuck-in action
+ * plays 'tuckin' and every element but dusk simply goes to sleep.
+ */
+export const ELEMENT_ANIM_FALLBACK: Readonly<Record<string, string>> = { tuckin: 'sleep' };
 
 /** The one-shots: they end (the owner then plays `next`), everything else loops. */
 export const ONE_SHOTS: readonly string[] = ['happy', 'eat', 'wake', 'breath', 'bath', 'call', ...VARIANT_NAMES];

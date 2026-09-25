@@ -327,6 +327,7 @@ const ELDER_EXTRA: Readonly<Partial<Record<DragonElement, readonly Pair[]>>> = {
   slinkwing: [
     { a: 'muzzle', b: 'marking', why: 'the muzzle meets the lilac eye mask' },
     { a: 'frost', b: 'membrane', why: 'the frosted tips along the near fan\'s top edge' },
+    { a: 'frost', b: 'membrane.sh', why: 'the frost band crosses the elder fan\'s pleats' },
   ],
 };
 /** Colours a mood swaps between (gate h). */

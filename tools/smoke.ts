@@ -10,9 +10,10 @@
 // grey, an elder clearly grey), so an element or a stage that silently fails to draw -- or draws in the wrong
 // stage's colours -- is caught too.
 // The floor audit (view=floor) plays every core anim on every look and fails any frame where something the dragon
-// draws, ground shadow aside, is >= 40 % covered more than 1 px under y = 0 (1.1, 5.1 #14). The leg-root audit
-// (view=roots) fails any walk, idle or rest frame where a far leg's sunk root lies outside the body (1.2). Both run
-// over all 28 looks, the elders' own anims and idle variants (the back stretch, reminisce, the airing) included.
+// draws, ground shadow aside, is >= 40 % covered more than 1 px under y = 0 (1.1, 5.1 #14): the idle variants (the
+// elders' back stretch, reminisce and airing), every look's fidget at every stage and the element anims (dusk's
+// tuck-in among them) included. The leg-root audit (view=roots) fails any walk, idle or rest frame where a far leg's
+// sunk root lies outside the body (1.2). Both run over all 28 looks.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -80,6 +81,13 @@ const CASES: Case[] = [
   { query: 'view=strip&el=spike&stage=elder&anim=sleep&n=6&t=0', minColours: 40, allScales: false },
   { query: 'view=strip&el=water&stage=elder&anim=breath&n=6&t=0', minColours: 40, allScales: false },
   { query: 'view=strip&el=dusk&stage=elder&anim=airing&n=6&t=0', minColours: 40, allScales: false },
+  // the elders' own airings and finales (the element pass v2): lightning's storm-watch (the far bolt's tear, the
+  // ladder, the break-off) and its turning ring, rock's sunning, dusk's lamp and moth in the face sheet, its tuck-in
+  { query: 'view=strip&el=lightning&stage=elder&anim=airing&n=6&t=0', minColours: 40, allScales: false },
+  { query: 'view=strip&el=lightning&stage=elder&anim=breath&n=6&t=0', minColours: 40, allScales: false },
+  { query: 'view=strip&el=rock&stage=elder&anim=airing&n=6&t=0', minColours: 40, allScales: false },
+  { query: 'view=faces&el=dusk&stage=elder&t=0', minColours: 20, allScales: false },
+  { query: 'view=strip&el=dusk&stage=adult&anim=tuckin&n=6&t=0', minColours: 40, allScales: false },
   // the floor audit (1.1, 5.1 #14): every look plays every core anim frame by frame; nothing it draws (ground shadow
   // aside) may reach more than 1 row under the ground line -- the sole's own ink row
   { query: 'view=floor&t=0', minColours: 2, allScales: false, timeout: 240000, floor: true },

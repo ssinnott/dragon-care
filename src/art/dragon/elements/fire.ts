@@ -2,28 +2,30 @@
 // flame on an up-curling tail, which is also its mood meter.
 //
 // Everything Ember is beyond the shared rig lives here:
-//   - the FLAME (tailTip): seed / sprout / signature (1 / 2 / 3 tongues), the mood gauge, the banked ember asleep,
-//     and every act that changes it (the strut, the happy flare, the hungry gutter, the bath, the wake);
-//   - the BREATH (breath): the nostril-smoke tell, the fire jet (young: a short lick), the baby's hiccup; the beg's
-//     smoke sighs and the bath's hiss share that anchor, since they leave the same nostrils;
+//   - the FLAME (tailTip): seed / sprout / signature (1 / 2 / 3 tongues) and the elder's HEARTH with its elder-only
+//     extra, the COAL BED; the mood gauge, the banked ember asleep, and every act that changes it (the strut, the
+//     happy flare, the hungry gutter, the bath, the wake);
+//   - the BREATH (breath): the nostril-smoke tell, the fire jet (young: a short lick), the baby's hiccup, the elder's
+//     finale SMOKE RING; the beg's smoke sighs and the bath's hiss share that anchor, since they leave the same
+//     nostrils;
 //   - the rising EMBERS (ambient): the idle ember, the happy flourish's burst, the bath's steam off the flame;
 //   - the ANIMS: the strut and the sigh laid over the shared walk and beg, the rekindle marked on the shared wake,
 //     the bath, and the tail-chase fidget.
 import { DRAGON_PALETTES, DRAGON_SHARED } from '../palettes.ts';
-import { NO_MODIFIERS, TAIL_REST, FIDGET_TIMING, grown } from '../stages.ts';
+import { NO_MODIFIERS, TAIL_REST, FIDGET_TIMING, STAGE_TIMING, grown } from '../stages.ts';
 import type { Stage } from '../stages.ts';
 import { hornParams, wingParams } from '../element.ts';
 import type { ElementSpec, ElementDraw, DragonInfo } from '../element.ts';
 import { emitterFill, emitterCore, pathPts, disc, mouthToRoot } from '../features.ts';
 import { ACT, DFACE } from '../pose.ts';
 import type { DragonPose, PartialDragonPose } from '../pose.ts';
-import { bake, walkAnim, begAnim, wakeAnim } from '../anims.ts';
+import { bake, stretchKeys, walkAnim, begAnim, wakeAnim, ELDER_FINALE } from '../anims.ts';
 import type { Key, Tracks } from '../anims.ts';
 import type { DragonAnim, DragonFrame } from '../anim.ts';
 import { animTuning } from '../tuning.ts';
 import { hash01, liveSpawns, stepAlpha } from '../fx.ts';
 import type { TopItem } from '../fx.ts';
-import { rootToScreen } from '../rig.ts';
+import { rootToScreen, enterFaceFromLocal } from '../rig.ts';
 import type { DragonRig } from '../rig.ts';
 import type { DragonDims } from '../build.ts';
 import { tones } from '../../../lib/art/shading.ts';
@@ -33,15 +35,17 @@ const D2R = Math.PI / 180;
 
 // ---------- the flame: the torch tail (3.2), the mood meter ----------
 
-/** Flame box (w x h) and tongue count per stage (3.2 table): seed, sprout, signature (the third tongue is adult-only). */
-const FLAME: Readonly<Record<Stage, { w: number; h: number; tongues: number }>> = {
-  baby: { w: 5, h: 7, tongues: 1 },
-  young: { w: 7, h: 10, tongues: 2 },
-  adult: { w: 10, h: 14, tongues: 3 },
-  // FIRST PASS (elder): the adult's signature flame. 3.2's elder column is THE HEARTH -- 12 x 14 (wider, not
-  // taller), the middle tongue tallest, a 65 % core, the flicker 2 f slower, 9 x 9 at mood -1 with 3 tongues -- and
-  // its elder-only extra, the COAL BED (the bottom 2 rows in glow.sh with two 2 x 2 glow.hi specks, at every mood)
-  elder: { w: 10, h: 14, tongues: 3 },
+/**
+ * Flame box (w x h), tongue count, core size and how many frames slower it flickers, per stage (3.2 table): seed,
+ * sprout, signature (the third tongue is adult-only) and THE HEARTH, the elder's: wider but not taller (12 x 14), its
+ * three tongues a campfire's with the middle one tallest (HEARTH), a 65 % core (its area: HEART) standing on its coal
+ * bed, the flicker 2 f slower (steadier). The hearth's elder-only extra, the COAL BED, is drawn in tailTip.
+ */
+const FLAME: Readonly<Record<Stage, { w: number; h: number; tongues: number; core: number; slow: number }>> = {
+  baby: { w: 5, h: 7, tongues: 1, core: 0.55, slow: 0 },
+  young: { w: 7, h: 10, tongues: 2, core: 0.55, slow: 0 },
+  adult: { w: 10, h: 14, tongues: 3, core: 0.55, slow: 0 },
+  elder: { w: 12, h: 14, tongues: 3, core: 0.65, slow: 2 },
 };
 /**
  * The smallest flame box awake, per stage: the width never drops a stage's tongues (3 need >= 9 px, 2 need >= 6:
@@ -78,8 +82,64 @@ const SHAPES: readonly (readonly (readonly number[])[])[] = [
   ],
 ];
 
+/**
+ * THE HEARTH (3.2, the elder): a campfire's flame, one broad middle tongue over two side licks, drawn so it never
+ * reads as a crown (a box with three even points over a straight band and its two jewels, the elder review's):
+ *   - a ROUND BOTTOM: widest at its notches, it rounds in over its bottom 3 rows (8, 11 and 12 px across at 12 wide),
+ *     so the coal bed in them is the bowl of the fire, not a band across a box;
+ *   - the licks never match: in each key one stands tall (0.72 to 0.76 of it) and the other short (0.6 to 0.62), their
+ *     tips inboard of the flanks, and the middle tip leans away from the tall one; the keys trade them, as the
+ *     signature's licks trade heights.
+ * Every tongue is >= 3 px wide where it parts from its neighbour at the 9 x 9 of mood -1 too (3.2: 3 tongues kept):
+ * the notches sit at +-0.17, where the flame is widest.
+ */
+const HEARTH: readonly (readonly number[])[] = [
+  [0, 0, 0.2, 0, 0.36, -0.04, 0.45, -0.1, 0.5, -0.2, 0.5, -0.44, 0.44, -0.6, 0.34, -0.76, 0.17, -0.46, 0.23, -0.68, 0.19, -0.84, 0.1, -1, -0.08, -0.8, -0.17, -0.62, -0.17, -0.44, -0.36, -0.6, -0.47, -0.5, -0.5, -0.38, -0.5, -0.2, -0.45, -0.1, -0.36, -0.04, -0.2, 0],
+  [0, 0, 0.2, 0, 0.36, -0.04, 0.45, -0.1, 0.5, -0.2, 0.5, -0.4, 0.46, -0.52, 0.36, -0.6, 0.17, -0.44, 0.17, -0.62, 0.08, -0.8, -0.1, -1, -0.2, -0.84, -0.24, -0.68, -0.17, -0.46, -0.34, -0.76, -0.44, -0.6, -0.5, -0.44, -0.5, -0.2, -0.45, -0.1, -0.36, -0.04, -0.2, 0],
+  [0, 0, 0.2, 0, 0.36, -0.04, 0.45, -0.1, 0.5, -0.2, 0.5, -0.42, 0.46, -0.52, 0.38, -0.62, 0.17, -0.44, 0.24, -0.7, 0.18, -0.88, 0.04, -1, -0.1, -0.86, -0.17, -0.66, -0.17, -0.44, -0.36, -0.72, -0.45, -0.58, -0.5, -0.42, -0.5, -0.2, -0.45, -0.1, -0.36, -0.04, -0.2, 0],
+];
+/**
+ * The hearth's HEART, its core: one tongue per key, its tip leaning with the flame's middle tongue, its foot a 2 px
+ * point standing on the coal bed. 0.58 x 0.73 of the flame's box, from the bed's top edge (HEART_UP): the area of the
+ * table's 65 % core, drawn narrower and taller, so the heat stands on the coals as one flame. (The scaled three-tongue
+ * core, as the signature's, pushed its side tips out through the notches once lifted; a row of flame between it and
+ * the coals stacked band, line and block, the crown again; a blunt foot left the specks no room.)
+ */
+const HEART: readonly (readonly number[])[] = [
+  [0, 0, 0.14, -0.03, 0.34, -0.14, 0.5, -0.32, 0.46, -0.5, 0.3, -0.72, 0.14, -1, -0.14, -0.74, -0.38, -0.52, -0.5, -0.32, -0.34, -0.14, -0.14, -0.03],
+  [0, 0, 0.14, -0.03, 0.34, -0.14, 0.5, -0.32, 0.38, -0.52, 0.14, -0.74, -0.14, -1, -0.3, -0.72, -0.46, -0.5, -0.5, -0.32, -0.34, -0.14, -0.14, -0.03],
+  [0, 0, 0.14, -0.03, 0.34, -0.14, 0.5, -0.3, 0.44, -0.52, 0.24, -0.76, 0.06, -1, -0.2, -0.74, -0.42, -0.5, -0.5, -0.3, -0.34, -0.14, -0.14, -0.03],
+];
+const HEART_W = 0.58, HEART_H = FLAME.elder.core ** 2 / HEART_W, HEART_UP = 2;
+/**
+ * The coal bed's two lit specks per flicker key, [end, inset, lift] twice: the speck stands `inset` px in from the
+ * bed's left (-1) or right (+1) end, low in the bed (lift 0: rows 0-1, measured on the narrower bottom row) or a row
+ * up on its top edge (lift 1: rows 1-2). Never a matched pair: one lies low at one end, the other stands up at the
+ * other, so the bed's top edge is broken, and each key moves both (a pair level on a straight band read as a crown's
+ * jewels). At 12 wide they keep off the heart's 2 px foot (the third key's touch its rows 2 and 3 at a corner). With
+ * no core (mood -1, the hungry gutter, the bath) only the first is lit: one ember left in the coals, since a lit pair
+ * was the only glow.hi in a coreless flame and blunted the low-mood read.
+ */
+const COALS: readonly (readonly number[])[] = [[-1, 0, 0, 1, 0, 1], [1, 0, 0, -1, 0, 1], [1, 1, 0, -1, 1, 1]];
+/** The round bottom every HEARTH key shares, (half-width, height) up its side: bedEnds reads the bed's rows off it. */
+const BOTTOM: readonly number[] = [0.2, 0, 0.36, 0.04, 0.45, 0.1, 0.5, 0.2];
+/** The coal bed's row `r` (0 = the bottom) of a w x h hearth standing `ox` over: its first and last whole columns. */
+const BED = { a: 0, b: 0 };
+function bedEnds(w: number, h: number, ox: number, r: number): void {
+  const y = (r + 0.5) / h;
+  let x = BOTTOM[6];
+  for (let i = 2; i < BOTTOM.length; i += 2) {
+    if (y > BOTTOM[i + 1]) continue;
+    x = BOTTOM[i - 2] + (BOTTOM[i] - BOTTOM[i - 2]) * (y - BOTTOM[i - 1]) / (BOTTOM[i + 1] - BOTTOM[i - 1]);
+    break;
+  }
+  BED.a = Math.ceil(ox - x * w); BED.b = Math.floor(ox + x * w) - 1;
+}
+
 /** Scratch: the current flame polygon in px (the tail's flame, or the breath jet's leading tongue). */
-const PTS: number[] = new Array(24).fill(0);
+const PTS: number[] = new Array(44).fill(0);
+/** Scratch: the hearth's heart (HEART, in px). */
+const CORE: number[] = new Array(24).fill(0);
 
 /**
  * The flame this frame, as flameState leaves it: the size multiplier and its px box, the tongue count and the
@@ -96,8 +156,9 @@ const FS = { k: 1, w: 5, h: 7, tongues: 1, key: 0, core: true, banked: false, pi
  *           sleeping inhale it grows a step to 0.7x and the ember to the core's shape (it breathes with the pet,
  *           alight but resting);
  *   beg     the hungry tell: guttered to 0.6x, no core, whatever the resting mood;
- *   bath    the mood key has it at 0.6x; while the water hits (cue 4-24) it sputters on 3 f swaps;
- *   happy   the flourish: 1.4x for 30 f from cue 0, roaring on 3 f swaps;
+ *   bath    the mood key has it at 0.6x; while the water hits (4-24 of its 60 f clock, bathClock) it sputters on
+ *           3 f swaps;
+ *   happy   the flourish: 1.4x for 30 f from cue 0 (the elder's 38), roaring on 3 f swaps;
  *   walk    the strut: swapping every 4 f, the tip leaning back into the stride;
  *   wake    the rekindle: 1.2x on 3 f swaps while the wake's fx envelope is up (rekindleAnim: the 10 f from the
  *           first open eye).
@@ -112,8 +173,10 @@ function flameState(rig: DragonRig, pose: DragonPose, info: DragonInfo): void {
   } else if (act === ACT.beg) {
     k = Math.min(k, 0.6); period = 8; core = false;
   } else if (act === ACT.bath) {
-    if (c >= 4 && c < 24) period = 3;
-  } else if (act === ACT.happy && c >= 0 && c < 30) {
+    const bc = bathClock(info.stage, c);
+    if (bc >= 4 && bc < 24) period = 3;
+  } else if (act === ACT.happy && c >= 0 && c < (info.stage === 'elder' ? 38 : 30)) {
+    // (the elder's flare x 1.25, its timing: 4.3's elders)
     k = 1.4; period = 3;
   } else if (act === ACT.walk) {
     period = 4; lean = 0.14;
@@ -124,7 +187,7 @@ function flameState(rig: DragonRig, pose: DragonPose, info: DragonInfo): void {
   const w = Math.max(lo.w, gauge(f.w, k)), h = Math.max(lo.h, gauge(f.h, k));
   FS.k = k; FS.w = w; FS.h = h; FS.core = core; FS.banked = info.asleep; FS.pip = pip;
   FS.tongues = info.asleep ? 1 : Math.min(f.tongues, w >= 9 ? 3 : w >= 6 ? 2 : 1);
-  FS.key = flickerKey(info.seed, info.tick, period);
+  FS.key = flickerKey(info.seed, info.tick, period + f.slow);
   FS.lean = Math.round(lean * h);
 }
 /** One flame axis at size k, px: shrunk it rounds up, so no axis ever shows under 60 % (D7). */
@@ -149,28 +212,56 @@ function flickerKey(seed: number, tick: number, period: number): number {
 function flameBase(r: number): number { return Math.max(1, Math.round(r * 0.5)); }
 
 /**
- * The cue: the torch tail (3.2). Tail-tip space, counter-rotated by the tail's angle AND the sprite's root rotation
- * so the flame always stands upright on screen ("fire rises": the baby's waddle, the dizzy wobble), and scaled out
- * of the body's squash and stretch, so an emitter keeps its shape through a breath or a paper turn's 60 % frame
- * (squashed with the body, a turning flame's tongues fell under the mark floor). One inked flat outer shape in
- * `glow` (part of the silhouette), a `glow.hi` core at 55 % size sitting low in it with no ink; banked asleep, the
- * whole flame is `glow.sh` with no core, which marks sleep at a glance (gate h), with a 2 x 2 `glow` ember always
- * lit low in its base, grown on each sleeping inhale to the core's shape (>= 2 px), so the bud reads as alight.
+ * The cue: the torch tail (3.2). Drawn in FACE space at the tail tip (rig.ts enterFaceFromLocal): upright on screen
+ * whatever the tail's angle and the sprite's root rotation ("fire rises": the baby's waddle, the dizzy wobble),
+ * never squashed, so an emitter keeps its shape through a breath or a paper turn's 60 % frame (squashed with the
+ * body, a turning flame's tongues fell under the mark floor), mirrored with the sprite, and with its base on a whole
+ * pixel, so a swaying tail carries it in whole-pixel steps instead of re-antialiasing its edges every frame (5.1 #12)
+ * and the coal bed's rows are pixel rows. One inked flat outer shape in `glow` (part of the silhouette), a `glow.hi`
+ * core at 55 % size sitting low in it with no ink; banked asleep, the whole flame is `glow.sh` with no core, which
+ * marks sleep at a glance (gate h), with a 2 x 2 `glow` ember always lit low in its base, grown on each sleeping
+ * inhale to the core's shape (>= 2 px), so the bud reads as alight.
+ * THE HEARTH (the elder, HEARTH) has its own core, the HEART (the 65 % core's area, one tongue standing on the
+ * coals), and carries its elder-only extra at every mood awake, the COAL BED: the flame's bottom 2 rows in `glow.sh`
+ * inside its ink, a bowl in its round bottom, with two 2 x 2 `glow.hi` specks that move with the flicker's key
+ * (COALS; one with the core out). A banked hearth still has coals, so the bed stays at mood -1 and through the hungry
+ * gutter and the bath; asleep the whole flame banks to `glow.sh`, the coals merge into it and the ember carries on.
  */
 const tailTip: ElementDraw = (ctx, rig, pose, info) => {
   flameState(rig, pose, info);
-  const shape = SHAPES[FS.tongues - 1][FS.key], n = shape.length, w = FS.w, h = FS.h, lean = FS.lean;
+  const hearth = info.stage === 'elder' && FS.tongues === 3;
+  const shape = hearth ? HEARTH[FS.key] : SHAPES[FS.tongues - 1][FS.key], n = shape.length, w = FS.w, h = FS.h, lean = FS.lean;
   // the tip leans back (-x) by `lean` px at the top, sheared in from the base
-  for (let i = 0; i < n; i += 2) { PTS[i] = shape[i] * w + shape[i + 1] * lean; PTS[i + 1] = shape[i + 1] * h; }
-  const T = tones(rig, info.pal.glow);
-  ctx.save();
-  ctx.rotate(-(info.ang + pose.root.rot) * D2R);
-  ctx.scale(rig.pxScale / Math.abs(rig.tf.fs), rig.pxScale / Math.abs(rig.tf.ss));
+  // (an odd-width hearth stands half a pixel over, so its edges and its coal rows are whole pixels too)
+  const ox = hearth ? (w & 1) * 0.5 : 0;
+  for (let i = 0; i < n; i += 2) { PTS[i] = shape[i] * w + shape[i + 1] * lean + ox; PTS[i + 1] = shape[i + 1] * h; }
+  const T = tones(rig, info.pal.glow), J = rig.j, tn = J.tailN;
+  enterFaceFromLocal(ctx, rig, J.tailX[tn], J.tailY[tn], info.ang, J.tailX[tn], J.tailY[tn]);
   ctx.translate(0, -flameBase(info.r));
   pathPts(ctx, PTS, 1, 0, 0, n);
   emitterFill(ctx, rig, FS.banked ? T.sh : info.pal.glow);
-  if (FS.core && !FS.banked) {
-    pathPts(ctx, PTS, 0.55, 0, 0, n);
+  if (hearth && !rig.override) {
+    ctx.save();
+    pathPts(ctx, PTS, 1, 0, 0, n);
+    ctx.clip();
+    if (FS.core) {
+      // (sheared with the flame's lean, as the flame is)
+      const cs = HEART[FS.key], cn = cs.length, ch = HEART_H * h;
+      for (let i = 0; i < cn; i += 2) { CORE[i] = cs[i] * w * HEART_W + (cs[i + 1] * ch - HEART_UP) / h * lean; CORE[i + 1] = cs[i + 1] * ch; }
+      pathPts(ctx, CORE, 1, ox, -HEART_UP, cn);
+      emitterCore(ctx, rig, T.hi);
+    }
+    // the coal bed: the flame's bottom 2 rows, a bowl in its round bottom (clipped to the flame), and its specks
+    ctx.fillStyle = T.sh; ctx.fillRect(-w, -2, 2 * w, 2);
+    ctx.fillStyle = T.hi;
+    const sp = COALS[FS.key];
+    for (let i = 0; i < (FS.core ? 6 : 3); i += 3) {
+      bedEnds(w, h, ox, sp[i + 2]);
+      ctx.fillRect(sp[i] < 0 ? BED.a + sp[i + 1] : BED.b - 1 - sp[i + 1], -2 - sp[i + 2], 2, 2);
+    }
+    ctx.restore();
+  } else if (FS.core && !FS.banked) {
+    pathPts(ctx, PTS, FLAME[info.stage].core, 0, 0, n);
     emitterCore(ctx, rig, T.hi);
   } else if (FS.banked) {
     // the banked ember never goes out: a 2 x 2 of `glow` low in the bud on every sleeping frame, grown to the
@@ -265,7 +356,7 @@ const ambient: ElementDraw = (ctx, rig, pose, info) => {
     const max = info.stage === 'baby' ? 3 : 4;
     for (let pass = 0; pass < 2; pass++) {
       for (let i = 0; i < 3; i++) {
-        const age = c - 4 - i * 6;
+        const age = c - Math.round((4 + i * 6) * BATH_K[info.stage]);
         if (age < 0 || age >= 30) continue;
         const f = age / 30, sway = (Math.floor(age / 8) % 2 ? 1 : -1) * (i % 2 ? 1 : -1);
         const it = rig.top.push(pass ? drawSteamFill : drawSteamRing, x0 + (sway + (i - 1) * 2) * s * rig.facing, y0 - Math.round(age * 14 / 30) * s, s, rig.facing);
@@ -297,17 +388,28 @@ const PUFF_R: Readonly<Record<Stage, readonly number[]>> = {
 /**
  * The jet per stage: puffs, frames between them, how many of the last are all smoke, and its speed (px/f). Adult
  * 10 every 3 f at 5 px spacing, the last two smoke (3.2); young 3 fire puffs at 3 px spacing and then 2 of smoke:
- * one short lick that breaks up and sputters out.
+ * one short lick that breaks up and sputters out; the elder the adult's jet at 1.1x reach (4.2: 5.5 px apart) over
+ * its longer sustain, 11 puffs, all fire: its one smoke is the finale's ring (smokeRing), the last puff out.
  */
 const STREAM: Readonly<Record<Stage, { n: number; every: number; smoke: number; v: number }>> = {
   baby: { n: 1, every: 3, smoke: 0, v: 1 }, young: { n: 5, every: 3, smoke: 2, v: 1 }, adult: { n: 10, every: 3, smoke: 2, v: 5 / 3 },
-  // FIRST PASS (elder): the adult's jet over the elder's 32 f sustain (4.2: "the adult stream at 1.1x reach"); the
-  // finale's one smoke RING (cue 32 to 44, fx 0: anims.ts elderBreath) is not drawn yet
-  elder: { n: 11, every: 3, smoke: 2, v: 5 / 3 },
+  elder: { n: 11, every: 3, smoke: 0, v: 5.5 / 3 },
 };
 /** The breath wind-up per stage, frames (anims.ts breathAnim): the tell's puffs are timed inside it. */
 const WINDUP: Readonly<Record<Stage, number>> = { baby: 10, young: 14, adult: 18, elder: 22 };
-/** A jet puff's life: 6 fire steps and a smoke step, 3 f each. */
+/**
+ * The elder's FINALE (4.2): the cue its smoke ring leaves the mouth at, the ring's life and the clock its drift is
+ * timed on, frames. anims.ts elderBreath ends the stream at its e0, f 60 (the wind-up 22, the snap 6 and the sustain
+ * 32 of breathAnim's elder row), and plays the finale over f 60-72, the jaw easing from 28 to 16 deg and held there
+ * (the ring is blown through it) and shut at f 72. The breath's cue runs from the snap's first frame, f 22 (the
+ * wind-up, WINDUP), so the finale is cue 38-50 (anims.ts ELDER_FINALE). The ring lives on 6 f into the recover,
+ * where the old dragon watches it go, `happy`, and is gone at cue 56, before the breath ends (cue 62).
+ */
+const FINALE_AT = ELDER_FINALE.at, RING_LIFE = 18, RING_DRIFT = 20;
+/**
+ * A jet puff's life: 6 fire steps and a smoke step, 3 f each. The elder's burns all 7 steps, its last in the red
+ * rim alone (r 4), so no smoke of the jet's shares the air with the finale's ring: the ring is its smoke.
+ */
 const PUFF_LIFE = 21, FIRE_LIFE = 18;
 
 /** The breath stream's frame of reference, in ROOT space (streamFrame): its origin and unit direction. */
@@ -384,6 +486,8 @@ function nostrilSmoke(ctx: CanvasRenderingContext2D, rig: DragonRig, info: Drago
  *     smoke;
  *   YOUNG: 3 fire puffs 3 px apart (max r 4) and the same leading tongue: one short lick that breaks up, then 2
  *     smoke puffs (half strength, still learning);
+ *   ELDER: the adult's jet at 1.1x reach, 11 puffs, all fire to its end (step 6 in the red rim alone), then the
+ *     FINALE's one smoke ring (smokeRing);
  *   BABY: the HICCUP (hiccup, below), and the anim goes `dazed` ("did I do that?").
  * The same anchor draws two other things out of the nostrils and mouth:
  *   BEG (4.3 hungry tell): a sigh of 2 smoke puffs (r 3) from the nostril on each of the loop's two sighs;
@@ -394,7 +498,7 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
   const act = pose.act, c = pose.cue, st = info.stage;
   if (act === ACT.beg) {
     for (let pass = 0; pass < 2; pass++) {
-      for (let s = 0; s < 2; s++) for (let k = 0; k < 2; k++) nostrilSmoke(ctx, rig, info, c - SIGH_AT[s] - 8 - k * 4, 20, 3, 0.4, pass);
+      for (let s = 0; s < 2; s++) for (let k = 0; k < 2; k++) nostrilSmoke(ctx, rig, info, c - SIGH_AT[s] - Math.round((8 + k * 4) * SIGH_Q[st]), 20, 3, 0.4, pass);
     }
     return;
   }
@@ -402,7 +506,7 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
     const a = info.ang * D2R, upx = -Math.sin(a), upy = -Math.cos(a);
     for (let pass = 0; pass < 2; pass++) {
       for (let k = 0; k < 2; k++) {
-        const age = c - 6 - k * 7;
+        const age = c - Math.round((6 + k * 7) * BATH_K[st]);
         if (age < 0 || age >= 14) continue;
         // a steam wisp in its 1 px scale ring, shrinking a step (r 1.5 -> 1: never under the 2 px mark floor)
         const d = 2 + age * 0.5, x = Math.round(1 + d * 0.6 + upx * d), y = Math.round(upy * d), r = age < 7 ? 1.5 : 1;
@@ -423,26 +527,27 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
   mouthToRoot(ctx, rig, info.ang);
   streamFrame(rig, pose);
   if (st === 'baby') { hiccup(ctx, rig, info, c); ctx.restore(); return; }
-  const S = STREAM[st], R = PUFF_R[st], fire = S.n - S.smoke, seed = info.seed;
-  // smoke first (it trails the fire, behind it): the all-smoke puffs and every fire puff's last step
+  const S = STREAM[st], R = PUFF_R[st], fire = S.n - S.smoke, seed = info.seed, fl = st === 'elder' ? PUFF_LIFE : FIRE_LIFE;
+  // smoke first (it trails the fire, behind it): the all-smoke puffs and every fire puff's last step (the elder's
+  // burns that step too: fl)
   for (let pass = 0; pass < 2; pass++) {
     for (let k = 0; k < S.n; k++) {
       const age = c - k * S.every;
-      if (age < 0 || age >= PUFF_LIFE || (k < fire && age < FIRE_LIFE)) continue;
+      if (age < 0 || age >= PUFF_LIFE || (k < fire && age < fl)) continue;
       puffAt(age, k, seed, S.v);
       smokeDisc(ctx, rig, info, P.x, P.y, k < fire ? R[6] : smokeR(age, PUFF_LIFE, R[Math.min(6, Math.floor(age / 3))]), pass);
     }
   }
   // the leading fire puff (the oldest still burning) is the tongue
   let lead = -1;
-  for (let k = 0; k < fire && lead < 0; k++) { const age = c - k * S.every; if (age >= 0 && age < FIRE_LIFE) lead = k; }
+  for (let k = 0; k < fire && lead < 0; k++) { const age = c - k * S.every; if (age >= 0 && age < fl) lead = k; }
   const T = tones(rig, info.pal.glow);
   for (let layer = 0; layer < 3; layer++) {
     const hex = layer === 0 ? info.pal.scale : layer === 1 ? info.pal.glow : T.hi, kr = layer === 0 ? 1 : layer === 1 ? 0.75 : 0.5;
     let px = 0, py = 0, pr = -1;
     for (let k = 0; k < fire; k++) {
       const age = c - k * S.every, step = Math.floor(age / 3);
-      if (age < 0 || age >= FIRE_LIFE || (layer === 1 && step > 4) || (layer === 2 && step > 2)) { pr = -1; continue; }
+      if (age < 0 || age >= fl || (layer === 1 && step > 4) || (layer === 2 && step > 2)) { pr = -1; continue; }
       puffAt(age, k, seed, S.v);
       const r = layer === 2 ? Math.max(1, R[step] * kr) : R[step] * kr;
       // each layer runs on unbroken from the puff before (a stroke as wide as the smaller of the two), so the hot
@@ -456,8 +561,43 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
       px = P.x; py = P.y; pr = r;
     }
   }
+  if (st === 'elder') smokeRing(ctx, rig, info, c - FINALE_AT);
   ctx.restore();
 };
+
+/**
+ * Fill the elliptical ring between radii (rx1, ry1) and (rx0, ry0) about (x, y) in `hex` (through rig.col), the middle
+ * left open (rx0 0: filled): the finale ring's band and its ink.
+ */
+function annulus(ctx: CanvasRenderingContext2D, rig: DragonRig, x: number, y: number, rx1: number, ry1: number, rx0: number, ry0: number, hex: string): void {
+  ctx.beginPath(); ctx.ellipse(x, y, rx1, ry1, 0, 0, Math.PI * 2);
+  if (rx0 > 0) ctx.ellipse(x, y, rx0, ry0, 0, 0, Math.PI * 2, true);
+  ctx.fillStyle = rig.col(hex); ctx.fill('evenodd');
+}
+
+/**
+ * The elder's breath FINALE (4.2, required: 2.6's "ends in one ring", the last grow-up's reward), root space in the
+ * stream's frame, `a` frames after the jet ends (FINALE_AT): one SMOKE RING, blown slow and wise through the jaw
+ * easing shut. The last puff out of the mouth (the jet before it all fire, so it is the one smoke in the air) leaves
+ * as a puff (r 2, 2 f), opens into a ring and widens as it drifts out and up, slowing, curling up as the jet's end
+ * does: a band of fire's smoke 2 px thick (the catchlight's shadow tone, opaque) between two 1 px `horn` lines, its
+ * floor-safe colours (5.4), round a hole of the room (R 4, 5, 6 at 2 / 5 / 10 f; the hole 2, 4 and 6 px across).
+ * From 16 f it goes as a smoke ring does, spreading flat until its hole is a slit (7 x 4), and is gone at 18 f (5.1
+ * #14: smoke fades by shrinking, never by alpha). (Broken into four wisps on the ring, it read as four bubbles, a
+ * die's face; ended as a flat 5 x 2 wisp in its ink, it read as a pill.)
+ */
+function smokeRing(ctx: CanvasRenderingContext2D, rig: DragonRig, info: DragonInfo, a: number): void {
+  if (a < 0 || a >= RING_LIFE) return;
+  const u = a / RING_DRIFT, d = 5 + 11 * (1 - (1 - u) * (1 - u)), rise = 3 * u + 7 * u * u;
+  const x = Math.round(SF.x + SF.dx * d), y = Math.round(SF.y + SF.dy * d - rise);
+  const smoke = tones(rig, STEAM).sh, ink = info.pal.horn;
+  if (a < 2) { for (let pass = 0; pass < 2; pass++) smokeDisc(ctx, rig, info, x, y, 2, pass); return; }
+  const R = a < 5 ? 4 : a < 10 ? 5 : 6;
+  // its size (rx, ry) and hole (hx, hy), the ink inside the band (ix, iy): round, then spread flat as it goes
+  const rx = a < 16 ? R : 7, ry = a < 16 ? R : 4, hx = rx - 2, hy = ry - 2, ix = hx - 1, iy = hy - 1;
+  annulus(ctx, rig, x, y, rx + 1, ry + 1, ix, iy, ink);
+  annulus(ctx, rig, x, y, rx, ry, hx, hy, smoke);
+}
 
 /**
  * The jet's leading puff as a flame tongue (root space, at P): SHAPES[0] 2r wide and 2.4r long, its base 0.8r
@@ -482,9 +622,9 @@ function jetTongue(ctx: CanvasRenderingContext2D, rig: DragonRig, r: number, age
  * (tuning.breath.puff 1.10) until a puff (the three fire discs) pops out of its mouth, r 2 at 3 px, then r 3.5
  * hopping out to 6 px and up a pixel ("hic!"); at cue 6 it POPS: a hollow ring of `glow` in its `scale` rim
  * bursts out to r 4 and r 5 over 2 f, a smoke cloud (smokeDisc: a puff and two lobes) swells r 3 -> 4 where it
- * was and shrinks away drifting up, and 2 embers (glow.hi in their scale ring) hop out of it, one on forward, one back up over its own
- * snout, falling as they fade (the rig's eye clip keeps them off the eye). All over by cue 28, as the dazed stars
- * circle.
+ * was and shrinks away drifting up, and 2 embers (glow.hi in their scale ring) hop out of it, one on forward, one
+ * back up over its own snout, falling as they fade (the rig's eye clip keeps them off the eye). All over by cue 28,
+ * as the dazed stars circle.
  */
 function hiccup(ctx: CanvasRenderingContext2D, rig: DragonRig, info: DragonInfo, c: number): void {
   const T = tones(rig, info.pal.glow), out = c < 2 ? 3 : 6;
@@ -556,6 +696,11 @@ function strutAnim(stage: Stage, dims: DragonDims | null): DragonAnim {
 
 /** The two sighs of the 120 f beg loop, cue frames: clear of the stomach growl at f 80-88. */
 const SIGH_AT: readonly number[] = [22, 92];
+/**
+ * How much slower each sigh is drawn out, per stage: the elder's beg loop runs 140 f (4.2), so its sighs take
+ * 140 / 120 as long (35 f), at the same two spots, still clear of the growl (f 80-88) and of the loop's end.
+ */
+const SIGH_Q: Readonly<Record<Stage, number>> = { baby: 1, young: 1, adult: 1, elder: 140 / 120 };
 
 /**
  * BEG (4.3 hungry tell): the shared sit-and-plead loop, with the torch held up and two SIGHS laid over it. Sitting,
@@ -564,13 +709,14 @@ const SIGH_AT: readonly number[] = [22, 92];
  * sitting rump, over the hips (the baby's comma already carries it). Each sigh is a breath in (the chest up
  * 0.5 px, the head up 2), then a long breath out: the body sinks 1 px, the head droops 5 deg and 2 smoke puffs
  * leave the nostrils (breath, above), then it lifts its head to plead again. The flame gutters to 0.6x
- * (flameState). A breath out through the nose is how a fire dragon sighs.
+ * (flameState). A breath out through the nose is how a fire dragon sighs. The elder sighs slower (SIGH_Q) through its
+ * 140 f loop, the guttered hearth keeping its coals.
  */
 function sighAnim(stage: Stage): DragonAnim {
-  const a = begAnim(stage, animTuning(stage, FIRE)), baby = stage === 'baby';
+  const a = begAnim(stage, animTuning(stage, FIRE)), baby = stage === 'baby', q = SIGH_Q[stage];
   const sigh = (t: number): number => {
     for (const s of SIGH_AT) {
-      const u = t - s;
+      const u = (t - s) / q;
       if (u < 0 || u >= 30) continue;
       // in 0-6 (-0.5), out 6-16 (to +1), held to 22, back by 30
       return u < 6 ? -0.5 * u / 6 : u < 16 ? -0.5 + 1.5 * (u - 6) / 10 : u < 22 ? 1 : 1 - (u - 22) / 8;
@@ -604,25 +750,35 @@ function rekindleAnim(stage: Stage, dims: DragonDims | null): DragonAnim {
  * and HISSES (jaw 10 deg -- the rig opens it to the stage minimum -- `grumpy`, head pulled back, a hunch) while
  * its flame shrinks to 0.6x (mood -2 pins the gauge at -1) and sputters, 3 steam puffs coming off it (ambient)
  * and 2 hiss wisps from its mouth (breath); then a dog-style SHAKE (root rot +-5 on 3 f beats, the head against
- * it, eyes shut, the tail stiff) and a grumpy settle. act = ACT.bath, cue = frames since it began.
+ * it, eyes shut, the tail stiff) and a grumpy settle. act = ACT.bath, cue = frames since it began. The elder's is
+ * the same at its own timing (4.2): 75 f, the shake +-4 on ~4 f beats, a shake, never a tremor (D21).
  */
 function bathAnim(stage: Stage): DragonAnim {
-  const L = 60, G = DFACE.grumpy, N = DFACE.neutral;
+  const k = BATH_K[stage], g = stage === 'elder' ? 0.8 : 1, L = Math.round(60 * k), G = DFACE.grumpy, N = DFACE.neutral;
+  const s = (keys: Key[]) => stretchKeys(keys, k);
   const rot: Key[] = [[0, 0], [26, 0]], hd: Key[] = [[0, 0], [6, -8], [22, -8], [26, 0]];
-  for (let f = 28, i = 0; f < 50; f += 3, i++) { rot.push([f, i % 2 ? -5 : 5]); hd.push([f + 1, i % 2 ? 8 : -8]); }
-  rot.push([52, 0]); hd.push([53, 0], [L, 0]);
+  for (let f = 28, i = 0; f < 50; f += 3, i++) { rot.push([f, (i % 2 ? -5 : 5) * g]); hd.push([f + 1, (i % 2 ? 8 : -8) * g]); }
+  rot.push([52, 0]); hd.push([53, 0], [60, 0]);
   return bake({
-    'root.rot': rot, 'head.rot': hd,
-    'neck.a0': [[0, 0], [6, -8], [22, -8], [28, 0]],
-    'body.y': [[0, 0], [4, 1], [22, 1], [26, 0]],
-    squash: [[0, 1], [4, 0.96], [22, 0.96], [26, 1], [28, 1.03], [50, 1.03], [54, 1]],
-    jaw: [[0, 0], [5, 0], [6, 10], [22, 10], [23, 0]],
-    'tail.stiff': [[0, 0], [4, 0.5], [50, 0.5], [L, 0]],
-    face: [[0, N], [3, G], [26, DFACE.closed], [50, G], [L - 2, N]],
-    mood: [[0, 0], [3, -2], [L - 4, -2], [L, 0]],
+    'root.rot': s(rot), 'head.rot': s(hd),
+    'neck.a0': s([[0, 0], [6, -8], [22, -8], [28, 0]]),
+    'body.y': s([[0, 0], [4, 1], [22, 1], [26, 0]]),
+    squash: s([[0, 1], [4, 0.96], [22, 0.96], [26, 1], [28, 1.03], [50, 1.03], [54, 1]]),
+    jaw: s([[0, 0], [5, 0], [6, 10], [22, 10], [23, 0]]),
+    'tail.stiff': s([[0, 0], [4, 0.5], [50, 0.5], [60, 0]]),
+    face: s([[0, N], [3, G], [26, DFACE.closed], [50, G], [58, N]]),
+    mood: s([[0, 0], [3, -2], [56, -2], [60, 0]]),
     act: [[0, ACT.bath]], cue: [[0, 0], [L, L]],
   }, { stage, len: L, next: 'idle' });
 }
+/**
+ * The bath's length per stage over its 60 f (3.2: 60 f at every stage; 4.2's elder column: the same at the elder's
+ * timing, x 1.25, 75 f, its shake at 0.8x). The flame's sputter reads the bath's clock through bathClock; the steam
+ * and the hiss start on its beats scaled by it.
+ */
+const BATH_K: Readonly<Record<Stage, number>> = { baby: 1, young: 1, adult: 1, elder: STAGE_TIMING.elder.dur };
+/** The bath's clock on its 60 f timeline (the steam, the hiss and the sputter are timed on it). */
+function bathClock(stage: Stage, cue: number): number { return cue / BATH_K[stage]; }
 
 /**
  * The head's world pitch (deg, + = snout down) that stands the rig's nostril plumb over the eye (rig.ts
@@ -660,8 +816,10 @@ const TURN_NARROW = 0.6, TURN_EASE = 0.8;
  * opens out over 2 f facing the other way -- the flame always just behind it. Then it stops, dizzy (`dazed`, the
  * stars circling, a wobble), shakes it off, pleased with itself (`happy`). Adult 72 f, young 61, baby 43.
  * The ELDER (4.2: x 1.3 and 0.8x, FIDGET_TIMING; D21) plays it as a gentle game: 2 half-turns, not 4, at the chase's
- * first and third beats, with no hops (its paws stay planted) and its eyes `happy`, the tail and the look back at
- * 0.8x; it stops content, never dizzy (no `dazed`, no stars, no wobble: a confused old dragon is banned, VC14). 94 f.
+ * first and third beats, with no hops (its paws stay planted) and its eyes `happy`, the tail's lift and curl at 0.8x;
+ * it stops content, never dizzy (no `dazed`, no stars, no wobble: a confused old dragon is banned, VC14). 94 f. Its
+ * look back keeps the whole aim, the snout on the flame, since that is the reach the chase needs (4.1: the elder's
+ * 0.8x is on the gestures, never on such a reach): at 0.8x (-120) it stared up at the sky past its flame.
  * The turns are laid over the baked tracks (bake clamps squash to the stage's range): a turn frame keys its own
  * stretch (the volume-preserving 1 / |squash| would stretch a 60 % sprite to 1.7x its height). The face marks
  * mirror with the sprite but are never squashed (rig.ts faceTransform), so on each turn's narrow frames the head
@@ -681,7 +839,7 @@ function fidget(stage: Stage, dims: DragonDims | null): DragonAnim {
   const look = t(12), stop = t(50), done = t(64), C = CHASE[stage];
   const pitch = dims ? dims.neck.headPitch : grown(stage) ? (elder ? 0 : 10) : stage === 'young' ? 4 : 0;
   // head.rot is on top of the neck's arch and the head's rest pitch (rig.ts: headAng); the body stays level
-  const off = pitch + C.a0 + (baby ? 0 : C.a1), aim = C.aim * g - off, plumb = plumbPitch(dims, stage) - off;
+  const off = pitch + C.a0 + (baby ? 0 : C.a1), aim = C.aim - off, plumb = plumbPitch(dims, stage) - off;
   const curl = (baby ? -10 : -18) * g, lift = -30 * g;
   const N = DFACE.neutral, face: Key[] = elder
     ? [[0, N], [flips[0] - 2, DFACE.happy], [L - 2, N]]
@@ -766,9 +924,9 @@ export const FIRE: ElementSpec = {
       wing: wingParams({
         style: 'bat', scallop: 3,
         tears: [{ panel: 1, at: 0.35, depth: 5 }, { panel: 2, at: 0.6, depth: 5 }],
-        // (2.9's spot re-measured for the notched window AND the airing: at 2.9's (-9.5, -8.5) the window lay on the back once
-        // the airing leaned the spread back far enough for the tip rule (1.3); here, up the arm panel toward the
-        // forearm, it keeps the ring and 2 px of membrane round it and clears the back line at the airing's 20 deg
+        // (2.9's spot re-measured for the notched window AND the airing: at 2.9's (-9.5, -8.5) the window lay on the
+        // back once the airing leaned the spread back far enough for the tip rule (1.3); here, up the arm panel toward
+        // the forearm, it keeps the ring and 2 px of membrane round it and clears the back line at the airing's 20 deg
         // sit-back, anims.ts airingFit)
         hole: { x: -7, y: -12, from: 0.95 },
       }),
@@ -784,9 +942,11 @@ export const FIRE: ElementSpec = {
     fidget,
     overrides: (st, dims) => ({ walk: strutAnim(st, dims), beg: sighAnim(st), wake: rekindleAnim(st, dims), bath: bathAnim(st) }),
     tuning: (st) => ({
-      // FIRST PASS (elder): a 3 px strut on the elder's slower 64 f walk (4.3: an elder keeps its element's column at
-      // the elder's timing; the adult's 5 px at that tempo lifted each paw high and slow, a stalk, not a strut)
-      walk: { lift: st === 'adult' ? 5 : st === 'elder' ? 3 : st === 'young' ? 4 : 2.5, head: st === 'baby' ? -2 : -4 },
+      // the strut (4.3): paw lift 5 (young 4, baby 2.5), head up 4 (baby 2). The elder keeps its element's column at
+      // its own timing and amplitude (4.1, 4.3): 3.5 px on its slower 64 f walk, its gait's 2 px lifted as the
+      // adult's 3 is (x 1.7), and the head up 3 (0.8x) over its level carriage. (The adult's 5 px at that tempo lifted
+      // each paw high and slow, a stalk, not a strut; at 3 the strut hardly showed beside the shared elder gait.)
+      walk: { lift: st === 'adult' ? 5 : st === 'elder' ? 3.5 : st === 'young' ? 4 : 2.5, head: st === 'baby' ? -2 : st === 'elder' ? -3 : -4 },
       sleep: st === 'baby' ? { tailCurl: 0, tailLift: 0 } : { tailLift: 72, tailCurl: grown(st) ? -21 : -24 },
       // the baby holds its breath before the hiccup: puffed up round, 1.10 wide, until the puff pops out; and its
       // comma keeps riding the eating bow (no tail droop, tuning.eat): the flame above the tail tip is fire's zone

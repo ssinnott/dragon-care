@@ -39,19 +39,23 @@
 //     (rock's adult 38 %). The beard's depth is fitted to each head by the rig (parts.ts fitBeard).
 //   - WING WEAR: WingParams.tears / .hole on the elder stage (2.9's table), drawn by the shared bat / leaf / fin wing
 //     (parts.ts drawBatWing), the rig's whole-pixel hole stamp and its cut of the far wing under the near tears (so a
-//     tear shows the room, not the far membrane). A 'custom' wing (lightning's bolt) draws its own tear from the same
-//     data with parts.ts pathTearEdge and wearOf.
+//     tear shows the room, not the far membrane) and of the back row under the hole (so a quill behind the arm panel
+//     never shows through the window). A 'custom' wing draws its own tear from the same data (lightning: its own slot,
+//     turned up off a tooth run, on the FAR bolt, opened by its storm-watch's V; elements/lightning.ts boltTear).
 //   - FIDGET: an element's idle fidget plays at stages.ts FIDGET_TIMING (the elder's x 1.3, its gestures at 0.8x), and
-//     so does any renderer keyed on the fidget's clock. Rock's elder, with no hole to air, reminisces instead of airing
-//     (anims.ts idleVariants(stage, wing)).
+//     so does any renderer keyed on the fidget's clock. Rock's elder, with no hole to air, suns its crystals instead
+//     (its own 'airing' override, which its pool schedules once in six: anims.ts idleVariants(stage, wing)).
 //   - ANIMS: the shared set has an elder column (anims.ts: x 1.25 tempo, the soft ease, no key holds, the 10 f head
 //     lag), the elder's idle variants (the back stretch, reminisce and AIRING THE WINGS, act = ACT.airing, the one
-//     spread at idle: lightning flexes its bolts instead) and its breath (never fails; cue 0 = the snap at f 28, the
-//     stream to cue 32 with fx 1, then the finale ring's window, cue 32 to 44, fx 0: the element draws its ring).
-//     STAGE_TIMING.elder.dur scales an element's own anims.
+//     spread at idle: lightning's elder overrides it with a storm-watch and rock's with its sunning, each keeping the
+//     act) and its breath (never fails; cue 0 = the snap's first frame, f 22, as on every stage; the stream with fx 1
+//     to cue 38, then the finale ring's window, cue 38 to 50 (anims.ts ELDER_FINALE: key a ring from it), fx falling
+//     to 0 by cue 41 while the jaw eases shut: the element draws its ring, and may keep it into the recover, to cue
+//     62). STAGE_TIMING.elder.dur scales an element's own anims.
 //   - The element's ELDER CUE and ELDER-ONLY EXTRA (section 3: the hearth and coal bed, sap-buds, the fourth crystal,
-//     the third tooth, the pearls, the frosted fans, the resident moth) are the element's renderers' work; each file
-//     marks the spots where its elder still draws as its adult with "FIRST PASS (elder):".
+//     the third tooth, the pearls, the frosted fans, the resident moth) are the element's renderers' work, built in
+//     the element pass v2 (the bible's Review log); what each element still leaves to shared anims that do not exist
+//     yet (the grow-up, the glide) its file's header lists.
 import type { DragonElement, DragonPalette } from './palettes.ts';
 import type { ElementModifiers, Stage, TailRest } from './stages.ts';
 import type { DragonPose } from './pose.ts';
@@ -120,7 +124,7 @@ export interface WingTear { panel: number; at: number; depth: number; bite?: boo
 /**
  * The elder's see-through HOLE (2.9): a whole-pixel 4 x 3 window with its top-back corner notched (11 px of background,
  * parts.ts HOLE_PX), in the arm panel. (x, y) is its SPOT, wing space of the FULL spread (it moves with the membrane:
- * fire (-7, -12), dusk (-5.5, -13), slinkwing (-7, -11.5), spike (-5, -13), water (-7.5, -10)); the rig seats the
+ * fire (-7, -12), dusk (-5.5, -13), slinkwing (-9, -14), spike (-5, -13), water (-7.5, -10)); the rig seats the
  * window from there against the leading-edge bone, within 3 px, and inks its ring only on the sides away from the bone
  * (rig.ts holeFrame). Drawn from `wing` >= `from` (0.95 bat, 0.90 leaf and fin), stamped at the ROUNDED position in face
  * space (rotated, a 2 px window anti-aliased to 1 px and shimmered) and cut through the far wing too, so it shows the
@@ -449,6 +453,13 @@ export interface ElementSpec {
   render: Readonly<ElementRenderers>;
   /** Rock: draw the near wing before bodyOver so the dome's rim tucks it under (bible 1.4 step 8). */
   wingUnderBodyOver?: boolean;
+  /**
+   * How far the element's cue reaches past the snout tip, px per stage, when it hangs ahead of the face (dusk's
+   * lantern, the elder's moth 4 px ahead of it, the baby's nightlight 4 px further out): the gallery's stage and face
+   * sheets widen the head's side by it, and it is the number for pen spacing and a tap box. Omitted = 0 (the cue
+   * lies within the head's extent).
+   */
+  reach?: Readonly<Record<Stage, number>>;
   /**
    * The colour the shared markings are painted in, per frame: water's pearl spots swap marking -> glow (mood >= 0.5)
    * or -> the dim spot (mood <= -0.3), pulse with the sleeping breath and dim on the hungry beg (3.6, gate h).

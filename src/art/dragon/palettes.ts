@@ -366,9 +366,13 @@ export function dragonTones(e: DragonElement, slot: DragonSlot, ramp: Readonly<R
 // beard read as a buck tooth, so its beard is a mid sea-slate; on every other element they are one grey.
 // ---------------------------------------------------------------------------------------------------------------
 
-/** Relative luminance of the elder muzzle and brow tuft, per element (dusk's is its smoke marking: MUZZLE_SLOT). */
+/**
+ * Relative luminance of the elder muzzle and brow tuft, per element (dusk's is its smoke marking: MUZZLE_SLOT). Rock's
+ * is a white old dog's muzzle, 0.86 (#efefed): at 0.72 the muzzle and tuft were a pale smudge on its tan face beside
+ * the silvered crown, 33 % from the scale (now 44 %; the element pass v2 review).
+ */
 export const MUZZLE_LUM: Readonly<Partial<Record<DragonElement, number>>> = Object.freeze({
-  fire: 0.48, spike: 0.265, rock: 0.72, lightning: 0.315, water: 0.92, slinkwing: 0.285,
+  fire: 0.48, spike: 0.265, rock: 0.86, lightning: 0.315, water: 0.92, slinkwing: 0.285,
 });
 /**
  * Relative luminance of the elder beard, where it differs from the muzzle's: rock's mid stone grey (its muzzle window
