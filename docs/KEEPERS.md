@@ -29,6 +29,8 @@ apart from the dragons' 2255) and seven new smoke cases, the two care audits amo
 yard also brings the game side of one care hook: **dusk's `tuckin` is played on a tuck-in** (the bible's status noted
 that nothing did). **Not built:** a player-facing game loop (the yard runs itself: nothing lets a player send a
 keeper), props for the keepers' stations, keepers in the habitat view, and night: Iris tucks in whoever is sleepy.
+A plan (6.3) is made the first time a keeper does a job for a look, in the tick the job starts (tens of ms; a game
+would make them while it loads).
 
 ---
 
@@ -190,7 +192,7 @@ per keeper, act and look, so the yard makes each at most once.
 `src/care/yard.ts`, gallery `view=yard`: six dragons (Bramble the spike adult, Wick the dusk adult, Ripple the water
 young, Ember the fire baby, Echo the slinkwing baby and Cobble the rock elder) in two rows with room round each, and
 the four keepers at stations at the sides: Bea's kitchen and Tomas's shed on the left, Iris's lamp and Pip's bench on
-the right. A caption says what each keeper is doing.
+the right. A caption along the top says what each keeper is doing.
 
 ### 7.1 Needs
 

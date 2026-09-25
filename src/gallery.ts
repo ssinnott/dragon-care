@@ -823,7 +823,7 @@ function careAuditScene(P: GalleryParams): Scene {
 /**
  * view=yard: the keepers at work (src/care/yard.ts). 640 x 360 on the straw floor, six dragons whose needs rise and
  * show, and the four keepers, each sent by the yard's director to the neediest dragon its job covers; y-sorted by the
- * feet, the top pass over all. A caption at the bottom says what each keeper is doing.
+ * feet, the top pass over all. A caption along the top says what each keeper is doing.
  */
 function yardScene(P: GalleryParams): Scene {
   const yard = new Yard(P.seed);
@@ -833,7 +833,8 @@ function yardScene(P: GalleryParams): Scene {
     draw(ctx) {
       ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
       drawCareCast(ctx, yard.dragons.map((y) => y.d), yard.keepers.map((k) => k.k));
-      label(ctx, yard.captions().join('    '), this.w / 2, this.h - 9, '#6a5a60', 1);
+      // (along the top: the live gallery's key hint runs along the bottom)
+      label(ctx, yard.captions().join('    '), this.w / 2, 4, '#6a5a60', 1);
     },
   };
 }
