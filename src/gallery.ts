@@ -17,6 +17,8 @@
 //                              (two overlapping pairs hold their places); anim=mix plays every act at once
 //   view=floor | view=roots    the floor audit (nothing sinks through y = 0) and the leg-root audit (no far leg floats
 //                              free of the body); els= / stages= / anims= narrow them
+//   view=tails                 the tail-ceiling audit (a fluke never rises over 3 px above the back: 3.0), narrowed the same
+//   view=neutral               the neutral-area recorder (each look's share of HSV S < 0.25 pixels, <= 40 %: 3.1)
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
 //   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
@@ -42,7 +44,7 @@ export const STRAW = '#e0d6b8';
 const INK = '#1a1018';
 const LABEL = '#3a2a30';
 
-export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'wings'] as const;
+export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'neutral', 'wings'] as const;
 export type View = typeof VIEWS[number];
 
 export interface GalleryParams {
@@ -72,7 +74,7 @@ export interface GalleryParams {
   /** Draw-option checks: the flash and tint offscreen passes. */
   flash: boolean;
   tint: string | null;
-  /** view=floor: which anims, elements and stages to audit (comma lists; null = all). */
+  /** view=floor / roots / tails: which anims, elements and stages to audit (comma lists; null = all). */
   anims: string[] | null;
   els: DragonElement[] | null;
   stages: Stage[] | null;
@@ -743,6 +745,135 @@ function rootsScene(P: GalleryParams): Scene {
   };
 }
 
+// ---------- the tail-ceiling audit (3.0: fire's zone above the tail tip) ----------
+
+/**
+ * The most a tail that ENDS IN A SHAPE (a look with a `tipBox`: water's fluke) may rise over the back at the hip, px,
+ * on any frame of a core anim (3.0: "no other tail rises > 3 px above the back line"). The fluke carried up to head
+ * height is fire's "U" at / 3 (cast review v2: the adult walk peaked 23 px over the back on 45 of 96 frames, the
+ * happy 26, the pet, eat and wake 16 to 23). A plain taper is reported, not gated: lightning's and slinkwing's thin
+ * tails lift 10 to 15 px in the eat, happy and pet with no tip shape to name another element.
+ */
+export const TAIL_CEIL = 3;
+/** view=tails: the core set (4.2); a loop runs twice its length (the chain's steady state), a one-shot 16 f past its end. */
+const TAIL_ANIMS = ANIM_NAMES;
+
+/**
+ * view=tails: how far each look's tail rises over its back (3.0, 5.1 #1). Every look plays every core anim frame by
+ * frame at game scale 1, drawn flat with its wings folded (a preen's spread wing over the hip is not the back, nor a
+ * tail). The BACK is the silhouette's top in the hip's column (the back row and the dorsal crest count), or the
+ * standing back's where the pose lowers it; the TAIL is the topmost ink behind the haunch, 2 px past the hip ball's
+ * back edge. Asleep is skipped (the body lies on the straw and the fluke stands clear of the laid-out tail: the asleep
+ * cue, 3.6). The worst frame per look and anim goes on window.__dragonCare.tails for tools/smoke.ts, which fails a
+ * tip-shaped tail (a tipBox: the fluke) over TAIL_CEIL; fire, whose flame owns the zone, and a plain taper are listed
+ * but never gated.
+ */
+function tailsScene(P: GalleryParams): Scene {
+  const W = 320, H = 200, GX = 170, GY = 150;
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const g = off.getContext('2d', { willReadFrequently: true })!;
+  const rows: { id: string; anim: string; over: number; frame: number; gated: boolean; high: boolean }[] = [];
+  const els = P.els || ELEMENT_IDS, stages = P.stages || STAGES, anims = P.anims || TAIL_ANIMS;
+  const pt = { x: 0, y: 0 };
+  for (const el of els) for (const st of stages) for (const a of anims) {
+    const p = makePet(el, st, P.seed, a, GX, GY, { desync: false, blink: false });
+    if (p.player.name !== a) continue;
+    const rig = p.rig, one = ONE_SHOTS.includes(a);
+    const len = one ? Math.max(1, p.player.length) + 16 : Math.max(96, 2 * p.player.length);
+    // the back's top in the hip's column and the tail's top behind the haunch (x under the hip's back edge - 2 px),
+    // drawn flat with the wings folded
+    const backOf = (pose: PartialDragonPose): number => {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, W, H);
+      drawDragon(g, rig, { ...pose, wing: { fold: 0, flap: 0 } }, petOpts(p, { still: true, shadow: false, top: null, silhouette: true }));
+      rootToScreen(rig, rig.j.hip.x, rig.j.hip.y, pt);
+      const col = g.getImageData(Math.round(pt.x), 0, 1, H).data;
+      for (let y = 0; y < H; y++) if (col[y * 4 + 3] >= 128) return y;
+      return H;
+    };
+    const tailOf = (): number => {
+      const tx = Math.max(1, Math.round(pt.x - rig.dims.hipR - 2)), img = g.getImageData(0, 0, tx, H).data;
+      for (let y = 0; y < H; y++) for (let x = 0; x < tx; x++) if (img[(y * tx + x) * 4 + 3] >= 128) return y;
+      return H;
+    };
+    // (a back LOWERED -- sat to beg, bowed, lying down or getting up -- is measured against the standing one: the
+    // fluke on the straw behind a sitting dragon is low, not over its back)
+    const stand = backOf(DP({}));
+    let worst = -Infinity, at = 0;
+    for (let f = 0; f < len; f++) {
+      const pose = p.player.pose, back = Math.min(stand, backOf(pose)), over = back - tailOf();
+      // (asleep the body lies on the floor and the fluke stands clear of the tail laid out along it, the asleep cue:
+      // 3.6, 5.1 #1's asleep sheet; the ceiling is for a standing back)
+      if (pose.sleep < 0.5 && over > worst) { worst = over; at = f; }
+      stepPet(p);
+    }
+    const gated = !!rig.sp.tipBox && el !== 'fire';
+    rows.push({ id: `${el}-${st}`, anim: a, over: worst, frame: at, gated, high: gated && worst > TAIL_CEIL });
+  }
+  if (window.__dragonCare) window.__dragonCare.tails = rows;
+  const bad = rows.filter((r) => r.high);
+  const lines = rows.map((r) => `${r.id} ${r.anim}: ${r.over} PX AT F${r.frame}${r.high ? '  OVER' : r.gated ? '  (GATED)' : ''}`);
+  return {
+    w: 480, h: Math.max(120, 24 + lines.length * 9), pets: [],
+    draw(ctx) {
+      ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
+      label(ctx, `TAIL CEILING: ${rows.length} LOOK x ANIM RUNS, ${bad.length} TIP SHAPES OVER ${TAIL_CEIL} PX ABOVE THE BACK`, this.w / 2, 4, LABEL, 1);
+      lines.forEach((t, i) => label(ctx, t.toUpperCase(), this.w / 2, 16 + i * 9, t.endsWith('OVER') ? '#8a1c1c' : LABEL, 1));
+    },
+  };
+}
+
+// ---------- the neutral-area recorder (3.1: neutral area <= 40 %) ----------
+
+/** The most of a look's silhouette that may be neutral (3.1, a hard rule): HSV saturation under NEUTRAL_S. */
+export const NEUTRAL_MAX = 0.4, NEUTRAL_S = 0.25;
+
+/**
+ * view=neutral: the share of each look's pixels that are NEUTRAL (3.1: "neutral area <= 40 %"; 5.5's recorder). Every
+ * look at game scale 1, standing at rest at mood 0 (the lineup's pose), drawn alone on a transparent canvas: of the
+ * pixels it covers (alpha >= 50 %) the share whose colour has HSV S < 0.25, the ink and the anti-aliased edge included
+ * (the ink `#1a1018` is S 0.38: not neutral), the ground shadow and the top pass left out. The rows go on
+ * window.__dragonCare.neutral for tools/smoke.ts, which fails any over NEUTRAL_MAX. (Cast review v2's first count, on the
+ * 1x lineup over the straw with its edges blended into it, put the elder dusk near 50 %: the one the recorder was
+ * wanted for, 3.8's open risk.)
+ */
+function neutralScene(P: GalleryParams): Scene {
+  const W = 200, H = 140;
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const g = off.getContext('2d', { willReadFrequently: true })!;
+  const rows: { id: string; share: number; over: boolean }[] = [];
+  const els = P.els || ELEMENT_IDS, stages = P.stages || STAGES;
+  for (const el of els) for (const st of stages) {
+    const p = makePet(el, st, P.seed, 'rest', 110, 110, { desync: false, blink: false });
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, W, H);
+    drawDragon(g, p.rig, p.player.pose, petOpts(p, { still: true, shadow: false, top: null }));
+    const d = g.getImageData(0, 0, W, H).data;
+    let n = 0, grey = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 128) continue;
+      n++;
+      const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+      if (mx === 0 || (mx - mn) / mx < NEUTRAL_S) grey++;
+    }
+    const share = n ? grey / n : 0;
+    rows.push({ id: `${el}-${st}`, share: Math.round(share * 1000) / 1000, over: share > NEUTRAL_MAX });
+  }
+  if (window.__dragonCare) window.__dragonCare.neutral = rows;
+  const bad = rows.filter((r) => r.over);
+  const lines = rows.map((r) => `${r.id}: ${Math.round(r.share * 100)} % NEUTRAL${r.over ? '  OVER' : ''}`);
+  return {
+    w: 480, h: Math.max(120, 24 + lines.length * 9), pets: [],
+    draw(ctx) {
+      ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
+      label(ctx, `NEUTRAL AREA: ${rows.length} LOOKS, ${bad.length} OVER ${Math.round(NEUTRAL_MAX * 100)} % (HSV S < ${NEUTRAL_S})`, this.w / 2, 4, LABEL, 1);
+      lines.forEach((t, i) => label(ctx, t, this.w / 2, 16 + i * 9, t.endsWith('OVER') ? '#8a1c1c' : LABEL, 1));
+    },
+  };
+}
+
 // ---------- the elders' worn wings (2.9) ----------
 
 /**
@@ -770,8 +901,10 @@ function wingsScene(P: GalleryParams): Scene {
     p.anim = 'rest';
     pets.push(p);
   }));
+  // (the last column's cue may reach past its cell: dusk's elder lantern and moth, ElementSpec.reach)
+  const pad = Math.max(0, ...ELEMENT_IDS.map((el) => ELEMENTS[el].reach?.elder ?? 0));
   const off = document.createElement('canvas');
-  off.width = cw * n; off.height = ch * rows.length;
+  off.width = cw * n + pad; off.height = ch * rows.length;
   return {
     w: off.width * k, h: off.height * k, pets,
     draw(ctx) {
@@ -886,6 +1019,8 @@ function makeScene(P: GalleryParams): Scene {
     case 'faces': return facesScene(P);
     case 'floor': return floorScene(P);
     case 'roots': return rootsScene(P);
+    case 'tails': return tailsScene(P);
+    case 'neutral': return neutralScene(P);
     case 'wings': return wingsScene(P);
     default: return lineupScene(P);
   }

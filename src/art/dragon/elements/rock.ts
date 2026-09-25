@@ -100,6 +100,8 @@ const CRYSTALS: Readonly<Record<Stage, readonly Crystal[]>> = {
 };
 /** How many of a stage's crystals (its last) are PERMANENT, not grown by the bond: the elder's one more (3.4). */
 const PERMANENT: Readonly<Record<Stage, number>> = { baby: 0, young: 0, adult: 0, elder: 1 };
+/** Where the permanent crystal stands ASLEEP (u, along the dome): low on the rear rim, 6 px behind the rear one. */
+const ASLEEP_U = -0.1;
 /** A crystal's pixels, compiled once: x (from its centre column), y (0 = the sunk row, up is -), class (1..8: '#fabcABC'). */
 const CRYSTAL_PX: Readonly<Record<Stage, readonly Int8Array[]>> = (() => {
   const cls = '#fabcABC';
@@ -623,7 +625,10 @@ function drawCrystals(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: Drago
       const gx = x + GX, gy = y + GY;
       if (gx >= 1 && gx < 15 && gy >= 1 && gy < 15) GRID[gy * 16 + gx] = px[k + 2];
     }
-    const bx = Math.round(x0 + span * cr.u);
+    // (asleep, the elder's permanent fourth seats low on the dome's rear rim, behind the rear one: at its 0.43 beside the
+    // big one, the banked four stood as a crown of 3 to 4 teeth on the sleeping pyramid at / 3, spike's asleep saw;
+    // now the apex shows 2 points: cast review v2)
+    const bx = Math.round(x0 + span * (info.asleep && i >= list.length - PERMANENT[st] ? ASLEEP_U : cr.u));
     // stand it on the dome's top line at its centre (y = 0 in face space)
     localToRootPt(J.body.x, J.body.y, J.bodyAng, bx, domeTopY(bx, n), PT);
     enterFaceFromLocal(ctx, rig, J.body.x, J.body.y, J.bodyAng, PT.x, PT.y);

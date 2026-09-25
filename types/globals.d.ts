@@ -20,6 +20,13 @@ interface Window {
      * rule: roots sunk into the body).
      */
     roots?: { id: string; anim: string; depth: number; frame: number; leg: string; floats: boolean }[];
+    /**
+     * view=tails (src/gallery.ts): per look and core anim, the most its tail's inked top rises over the back's at the
+     * hip, px, and where; `gated` = a tip shape (the fluke) held to the audit's ceiling, `high` = over it (3.0).
+     */
+    tails?: { id: string; anim: string; over: number; frame: number; gated: boolean; high: boolean }[];
+    /** view=neutral (src/gallery.ts): per look, the share of its pixels that are neutral (HSV S < 0.25); `over` > 40 % (3.1). */
+    neutral?: { id: string; share: number; over: boolean }[];
   };
 }
 

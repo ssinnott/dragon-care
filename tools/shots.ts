@@ -64,7 +64,8 @@ for (const el of ELEMENT_IDS) {
     // (the elder's at x 1.3 and 0.8x: 4.2)
     pairs.push(`shots/fidget_${el}_elder.png=view=strip&el=${el}&stage=elder&anim=fidget&n=8&t=0`);
   }
-  // every elder's airing (4.2): the one spread at idle, the hole seen at home (rock, with no hole to air, reminisces)
+  // every elder's airing (4.2): the one spread at idle, the hole seen at home (rock's is its sunning, lightning's its
+  // storm-watch)
   if (idleVariants('elder', ELEMENTS[el].stages.elder.wing).includes('airing')) pairs.push(`shots/airing_${el}_elder.png=view=strip&el=${el}&stage=elder&anim=airing&n=8&t=0`);
 }
 // the element anims past the shared table (fire's bath, rock's upset tuck, slinkwing's lonely call), young and adult

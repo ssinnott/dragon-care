@@ -226,6 +226,13 @@ export interface ElementStageParams {
    */
   tailStiff?: number;
   /**
+   * 0..1, how much of the pose's tail swing ABOVE the rest line this look takes (tail.lift + tail.sway, and a
+   * per-segment tail.curl, where they lift): the rest of the swing, the droop, is taken whole, so a wag swings down
+   * and back. Water's 0 (3.0: its fluke is the tail end's crescent, low and level; the happy's lift, the wags' upswing,
+   * the pet's and the breath's lift carried it to head height, fire's "U" at / 3: cast review v2). Omitted = 1.
+   */
+  tailRise?: number;
+  /**
    * A box round the tail-tip feature in tail-tip space [x0, y0, x1, y1] (y down), ink and every mood's droop
    * included (water's fluke). The rig keeps all four corners on or above the floor whatever the tail's angle, lifting
    * the tail's end (1.1, 5.1 #14): a level tail's lowest point is a lobe tip, a drooping one's is the fluke's far

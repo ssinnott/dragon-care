@@ -131,6 +131,18 @@ export interface BegTuning {
   tilt: number;
 }
 
+/** The elder's airing (4.2: it sits back on its haunches and spreads its wings full). */
+export interface AiringTuning {
+  /**
+   * The tail's lift through the sit, x its pitch B (+ droops): 0.5, lowered half the sit's pitch past riding it, so it
+   * lies back along the floor behind the haunches. Fire -1: lying on the floor its flame sat at floor level, water's
+   * zone, and the sat-back elder with a wing V behind the head and a knob at the end of a floor-long tail was water's
+   * airing at / 3 (cast review v2); lifted by the sit's pitch its tail keeps its up-curled rest line in the world, and
+   * the flame stands 19 px over the rump behind the haunch (3.0: fire's zone above the tail tip).
+   */
+  tailLift: number;
+}
+
 /** Everything the shared set lets an element tune. */
 export interface AnimTuning {
   walk: WalkTuning;
@@ -138,6 +150,7 @@ export interface AnimTuning {
   breath: BreathTuning;
   eat: EatTuning;
   beg: BegTuning;
+  airing: AiringTuning;
 }
 
 /** What an element's tuning hook returns: any subset, per group. */
@@ -150,6 +163,7 @@ const BASE: Readonly<Record<Stage, AnimTuning>> = {
     breath: { jaw: 20, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
     eat: { tailDroop: 22 },
     beg: { mood: -0.5, tilt: 14 },
+    airing: { tailLift: 0.5 },
   },
   young: {
     walk: { cycle: 40, speed: 0.5, lift: 2, head: 0, sway: 0, wave: 0 },
@@ -157,6 +171,7 @@ const BASE: Readonly<Record<Stage, AnimTuning>> = {
     breath: { jaw: 22, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
     eat: { tailDroop: 0 },
     beg: { mood: -0.5, tilt: 12 },
+    airing: { tailLift: 0.5 },
   },
   adult: {
     walk: { cycle: 48, speed: 0.45, lift: 3, head: 0, sway: 0, wave: 0 },
@@ -164,6 +179,7 @@ const BASE: Readonly<Record<Stage, AnimTuning>> = {
     breath: { jaw: 30, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
     eat: { tailDroop: 0 },
     beg: { mood: -0.5, tilt: 12 },
+    airing: { tailLift: 0.5 },
   },
   // the elder (4.2's Elder column): a 64 f walk at 0.34 px/f (the adult's 13 px stride, so the leg-spacing results
   // carry over) with a 2 px paw lift; a 52 f lie-down in two stages and a 216 f sleeping breath, a "z" every 150 f;
@@ -174,6 +190,7 @@ const BASE: Readonly<Record<Stage, AnimTuning>> = {
     breath: { jaw: 28, fizzleFace: 'dazed', fizzleChin: 0, puff: 1, flop: 0, pupil: false },
     eat: { tailDroop: 0 },
     beg: { mood: -0.5, tilt: 10 },
+    airing: { tailLift: 0.5 },
   },
 };
 
@@ -187,5 +204,6 @@ export function animTuning(stage: Stage, spec?: ElementSpec | null): AnimTuning 
     breath: { ...b.breath, ...(p && p.breath) },
     eat: { ...b.eat, ...(p && p.eat) },
     beg: { ...b.beg, ...(p && p.beg) },
+    airing: { ...b.airing, ...(p && p.airing) },
   };
 }

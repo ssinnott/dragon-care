@@ -1046,18 +1046,23 @@ export const WATER: ElementSpec = {
   palette: PAL,
   modifiers: { bodyLength: 1.1, bodyDepth: 0.9, legLength: 0.8, legR: 1.0, neckLength: 1.3, neckAngle: 0, tailLength: 1.15, tailR: 1.0, snout: 1.0 },
   stages: {
+    // tailRise 0 at every stage (3.0, 3.6: the tail end, low and level): the tail takes the shared anims' droop whole
+    // and none of their lift -- the happy's and pet's lift, every wag's upswing, the bite's and the wake's chest-down
+    // pitch, the chain's whip at a contact -- so a wag swings down and back. Riding them, the fluke walked, preened, ate
+    // and woke at head height, 11 to 26 px over the back, fire's "U" at / 3 (cast review v2); now <= 2 px on every
+    // standing frame of every core anim (gallery view=tails, in the smoke run)
     baby: {
       // tipBox: round the fluke at its flare and its droop, ink included (tipBox()): the rig lifts the tail's end so
       // it never hangs through the floor, asleep, begging with the tail down or plopped on its rump (1.1, 5.1 #14)
-      tailRest: TAIL_REST.water.baby, tailR: [3.5, 1.5], tipBox: tipBox('baby'), horns: null, markings: [spot(-0.1), tailSpot(0.5)],
+      tailRest: TAIL_REST.water.baby, tailR: [3.5, 1.5], tipBox: tipBox('baby'), tailRise: 0, horns: null, markings: [spot(-0.1), tailSpot(0.5)],
       wing: wingParams({ style: 'fin', plus: true, scallop: -2 }), dorsal: null,
     },
     young: {
-      tailRest: TAIL_REST.water.young, tipBox: tipBox('young'), horns: null, markings: [spot(-0.1), tailSpot(0.18), tailSpot(0.52, -2)],
+      tailRest: TAIL_REST.water.young, tipBox: tipBox('young'), tailRise: 0, horns: null, markings: [spot(-0.1), tailSpot(0.18), tailSpot(0.52, -2)],
       wing: wingParams({ style: 'fin', plus: true, scallop: -2 }), dorsal: null,
     },
     adult: {
-      tailRest: TAIL_REST.water.adult, tipBox: tipBox('adult'), horns: null,
+      tailRest: TAIL_REST.water.adult, tipBox: tipBox('adult'), tailRise: 0, horns: null,
       markings: [spot(-0.1), spot(0.3), spot(0.7), tailSpot(0.2), tailSpot(0.45, -2)],
       wing: wingParams({ style: 'fin', plus: true, scallop: -3 }), dorsal: null,
     },
@@ -1068,7 +1073,7 @@ export const WATER: ElementSpec = {
     // spread, opens 8 px of the room there; panel 2, like 3, lay over the back and opened none, the elder core review,
     // round 2). Its cue grown and its elder-only extra, the 18 x 9 fluke with its pearls: FLUKE (tipBox follows it)
     elder: {
-      tailRest: TAIL_REST.water.elder, tipBox: tipBox('elder'), horns: null, neckLen: 0.92, neckAngle: 4,
+      tailRest: TAIL_REST.water.elder, tipBox: tipBox('elder'), tailRise: 0, horns: null, neckLen: 0.92, neckAngle: 4,
       markings: [spot(-0.1), spot(0.3), spot(0.7), tailSpot(0.2), tailSpot(0.45, -2)],
       wing: wingParams({
         style: 'fin', plus: true, scallop: -3,

@@ -340,8 +340,9 @@ const QV = { x: 0, y: 0 };
 /**
  * Frames a fired quill flies before it pops, and how long its sparkle shows. The elder's fly 1.1 x as far at the same
  * speed (4.2: "the adult stream at 1.1x reach", slow and wise), and its LAST sparkle holds 1 f longer (POP + 1), so it
- * ends exactly as its breath's finale window opens (cue 32) and becomes the FINALE RING (sapRing): at POP the ring
- * opened at cue 31, a frame early (the v2 review, round 2).
+ * ends at cue 32 and becomes the FINALE RING (sapRing): at POP the ring opened at cue 31, a frame early (the v2
+ * review, round 2). (Cue 32 was the seam's documented window; the anim's is cue 38 to 50, anims.ts ELDER_FINALE, so
+ * this ring opens 6 f early, out of the sparkle in the air: the bible's Element pass v2 known gaps.)
  */
 const FLY = 20, FLY_ELDER = 22, POP = 6;
 const rad = (d: number): number => d * Math.PI / 180;
@@ -426,12 +427,12 @@ function drawVolley(ctx: CanvasRenderingContext2D, rig: DragonRig, c: number, n:
   ctx.restore();
 }
 /**
- * The elder breath's FINALE (4.2, required: the anim's window, cue 32 to 44 with fx 0): the last quill's sparkle
- * becomes ONE SAP RING, `age` frames after that sparkle ends (cue 32), which widens (r 3 -> 7) and drifts up 6 px over
- * RING f: 2 px of `glow` between 1 px `scale` edges, the sap streak's floor-safe colours, stamped in whole pixels
- * about its rounded centre, so it never shimmers (5.1 #12). It fades by NARROWING (5.1 #14) over its last 4 f: the
- * glow 1 px, then a 1 px `scale` circle alone, then gone at cue 44 (at full width to its last frame, it vanished in
- * one frame at its largest: the v2 review, round 2). ROOT space.
+ * The elder breath's FINALE (4.2, required; opening at cue 32, 6 f before the anim's window, ELDER_FINALE): the
+ * last quill's sparkle becomes ONE SAP RING, `age` frames after that sparkle ends (cue 32), which widens (r 3 -> 7)
+ * and drifts up 6 px over RING f: 2 px of `glow` between 1 px `scale` edges, the sap streak's floor-safe colours,
+ * stamped in whole pixels about its rounded centre, so it never shimmers (5.1 #12). It fades by NARROWING (5.1 #14)
+ * over its last 4 f: the glow 1 px, then a 1 px `scale` circle alone, then gone at cue 44 (at full width to its last
+ * frame, it vanished in one frame at its largest: the v2 review, round 2). ROOT space.
  */
 const RING = 13;
 function sapRing(ctx: CanvasRenderingContext2D, rig: DragonRig, age: number, n: number, pal: DragonPalette): void {
@@ -627,10 +628,9 @@ function sneezeBreath(): DragonAnim {
 
 /**
  * The elder-only extra (3.3): two SAP-BUDS, "the old bramble fruits". Permanent: drawn at every mood, awake and
- * asleep, and through the volley (the quills leave, the buds stay). Each is a 3 x 3 bud in `glow.sh`, flat and inked
- * in a 4-neighbour ring (its corners open, so it is round, not a box), in whole pixels (face space, so the 3 px bud
- * never anti-aliases as the body pitches), with a 2 x 2 `glow` glint toward the light at mood >= SAP_GLINT (a
- * `glow.hi` glint on a `glow` bud was 5 % apart, invisible: the v2 review). Each NESTLES at the root of a notch, its
+ * asleep, and through the volley (the quills leave, the buds stay). Each is a round 4 x 4 bud (bud: lit `glow` over
+ * its `glow.sh` calyx, banked at mood <= SAP_DIM and asleep), flat and inked in a 4-neighbour ring, in whole pixels (face space,
+ * so the bud never anti-aliases as the body pitches). Each NESTLES at the root of a notch, its
  * ring against the quills' roots (the palette check's "a sap-bud beside a quill's root", 58 %): a notch is narrower
  * than a bud until ~6 px up, and a bud raised toward where it opens sat on a quill's bone in mid-air, off the back,
  * and filled the notch at /3.
@@ -647,16 +647,16 @@ function sneezeBreath(): DragonAnim {
  *     floor. Seated 1.5 px out, it stood as tall as the drooping quills at mood -1 and filled their notch at /3.
  * Drawn at bodyOver, after the body, so the whole bud shows on the contour.
  */
-const SAP = { x: 0, y: 0 }, SAP_GLINT = 0.5;
+const SAP = { x: 0, y: 0 }, SAP_DIM = -0.3;
 const sapBuds: ElementDraw = (ctx, rig, pose, info) => {
   if (info.stage !== 'elder') return;
-  const comb = COMB.elder, d = rig.dims, J = rig.j, glint = info.mood >= SAP_GLINT;
+  const comb = COMB.elder, d = rig.dims, J = rig.j, lit = info.mood > SAP_DIM && !info.asleep;
   const x0 = rig.hipB.x - d.hipR * 0.35, x1 = rig.chestB.x + d.chestR * 0.05;
   // on the back: behind the rump quill's tail-side root corner, on the dorsal line (a tail curled forward leaves no
   // dorsal line there: then on the rump's own top, at the hip ball's back edge)
   const bx = backX(rig, comb, 0, x0, x1) - comb.back[0][2] / 2 - SAP_BACK[0];
   const by = dorsalLineY(rig, bx) || backLineY(rig, Math.max(bx, rig.hipB.x - d.hipR * 0.9));
-  bud(ctx, rig, bx, by + SAP_BACK[1], glint, info.pal);
+  bud(ctx, rig, bx, by + SAP_BACK[1], lit, info.pal);
   // on the tail, between its first two quills, on the tail's top; like a quill, only where that side faces up
   const tn = J.tailN, f = (comb.tail[0][0] + comb.tail[1][0]) / 2 * tn + SAP_TAIL[0] / d.tail.len;
   const kk = Math.min(tn - 1, Math.floor(f)), u = f - kk;
@@ -665,21 +665,27 @@ const sapBuds: ElementDraw = (ctx, rig, pose, info) => {
   const nx = -dy, ny = dx, a = info.ang * Math.PI / 180;
   if (-(nx * Math.sin(a) + ny * Math.cos(a)) < 0.6) return;
   const r = J.tailR[kk] + (J.tailR[kk + 1] - J.tailR[kk]) * u + SAP_TAIL[1];
-  bud(ctx, rig, J.tailBX[kk] + (J.tailBX[kk + 1] - J.tailBX[kk]) * u + nx * r, J.tailBY[kk] + (J.tailBY[kk + 1] - J.tailBY[kk]) * u + ny * r, glint, info.pal);
+  bud(ctx, rig, J.tailBX[kk] + (J.tailBX[kk + 1] - J.tailBX[kk]) * u + nx * r, J.tailBY[kk] + (J.tailBY[kk + 1] - J.tailBY[kk]) * u + ny * r, lit, info.pal);
 };
 /**
  * The buds' seats: on the back [px behind the rump quill's tail-side root corner, y from the dorsal line], on the
  * tail [px toward the tip from the midpoint of its first two quills, px out from the tail's top].
  */
 const SAP_BACK: readonly number[] = [3, 0], SAP_TAIL: readonly number[] = [1.5, -0.5];
-/** One sap-bud centred on body point (bx, by). BODY space in, left as it was. */
-function bud(ctx: CanvasRenderingContext2D, rig: DragonRig, bx: number, by: number, glint: boolean, pal: Readonly<DragonPalette>): void {
-  const J = rig.j;
+/**
+ * One sap-bud centred on body point (bx, by). BODY space in, left as it was. A ROUND bud, 4 x 4 with its corners cut,
+ * in its 4-neighbour ink ring: lit `glow` over a 2 px `glow.sh` base row, its calyx, so it reads as a bud on its stem
+ * (56 % apart); banked at mood <= -0.3 and asleep (`lit` false), all `glow.sh`, as rock's crystals dim. (The first build's 3 x 3
+ * in `glow.sh` with a 2 x 2 `glow` glint at mood >= 0.5 read as square green rivets or LEDs: cast review v2; a
+ * `glow.hi` glint on the lit bud would be 5 % apart, invisible.)
+ */
+function bud(ctx: CanvasRenderingContext2D, rig: DragonRig, bx: number, by: number, lit: boolean, pal: Readonly<DragonPalette>): void {
+  const J = rig.j, sh = rig.col(tones(rig, pal.glow).sh);
   localToRootPt(J.body.x, J.body.y, J.bodyAng, bx, by, SAP);
   enterFaceFromLocal(ctx, rig, J.body.x, J.body.y, J.bodyAng, SAP.x, SAP.y);
-  ctx.fillStyle = rig.col(rig.outline); ctx.fillRect(-2, -1, 5, 3); ctx.fillRect(-1, -2, 3, 5);
-  ctx.fillStyle = rig.col(tones(rig, pal.glow).sh); ctx.fillRect(-1, -1, 3, 3);
-  if (glint) { ctx.fillStyle = rig.col(pal.glow); ctx.fillRect(-1, -1, 2, 2); }
+  ctx.fillStyle = rig.col(rig.outline); ctx.fillRect(-1, -3, 2, 6); ctx.fillRect(-2, -2, 4, 4); ctx.fillRect(-3, -1, 6, 2);
+  ctx.fillStyle = lit ? rig.col(pal.glow) : sh; ctx.fillRect(-1, -2, 2, 3); ctx.fillRect(-2, -1, 4, 2);
+  ctx.fillStyle = sh; ctx.fillRect(-1, 1, 2, 1);
   ctx.restore();
 }
 
@@ -766,11 +772,12 @@ export const SPIKE: ElementSpec = {
       // stand (the 37 deg gate) and the comb runs nape -> tail, leaning SLEEP_LEAN back (backRow): a low saw on a bar
       // twice as long as it is tall. Curled into a quill ball (pitched +10, the tail under the body, the quills
       // world-upright 4 px apart) it was a round mound with points, rock's dome at /3 (5.1 #1, the cast review).
-      // The baby's bun RAISES its tail a little above level behind the rump instead, so its tail nub stands over the
-      // rump nub: lying flat, its nubs vanished at /3 and the asleep baby spike was baby rock's mound. Its wing nub
+      // The baby's bun holds its tail out LEVEL behind the rump instead, so its tail nub stands clear of the rump nub:
+      // lying flat, its nubs vanished at /3 and the asleep baby spike was baby rock's mound; raised 20 deg, its tail
+      // nub made a knob at the end of an up-curled tail, fire's asleep bun at /3 (cast review v2). Its wing nub
       // rises to 71 deg like every other bun's (nubFold 2.15 from spike's 200 deg rest; the shared 3.3 swung it on
       // to 2 deg, flat forward over the face, where it met the shut-eye bar in one dark band, a sleep mask)
-      sleep: st === 'baby' ? { bodyRot: 6, tailLift: -20, tailCurl: 4, nubFold: 2.15 } : { bodyRot: 0, tailLift: 30, tailCurl: -8 },
+      sleep: st === 'baby' ? { bodyRot: 6, tailLift: 0, tailCurl: 4, nubFold: 2.15 } : { bodyRot: 0, tailLift: 30, tailCurl: -8 },
     }),
   },
 };

@@ -582,7 +582,8 @@ function annulus(ctx: CanvasRenderingContext2D, rig: DragonRig, x: number, y: nu
  * as a puff (r 2, 2 f), opens into a ring and widens as it drifts out and up, slowing, curling up as the jet's end
  * does: a band of fire's smoke 2 px thick (the catchlight's shadow tone, opaque) between two 1 px `horn` lines, its
  * floor-safe colours (5.4), round a hole of the room (R 4, 5, 6 at 2 / 5 / 10 f; the hole 2, 4 and 6 px across).
- * From 16 f it goes as a smoke ring does, spreading flat until its hole is a slit (7 x 4), and is gone at 18 f (5.1
+ * Round, its inner rim is an ember edge of `glow` (fire's own ring beside dusk's grey one). From 16 f it goes as a smoke
+ * ring does, cooling to its horn line, spreading flat until its hole is a slit (7 x 4), and is gone at 18 f (5.1
  * #14: smoke fades by shrinking, never by alpha). (Broken into four wisps on the ring, it read as four bubbles, a
  * die's face; ended as a flat 5 x 2 wisp in its ink, it read as a pill.)
  */
@@ -597,6 +598,9 @@ function smokeRing(ctx: CanvasRenderingContext2D, rig: DragonRig, info: DragonIn
   const rx = a < 16 ? R : 7, ry = a < 16 ? R : 4, hx = rx - 2, hy = ry - 2, ix = hx - 1, iy = hy - 1;
   annulus(ctx, rig, x, y, rx + 1, ry + 1, ix, iy, ink);
   annulus(ctx, rig, x, y, rx, ry, hx, hy, smoke);
+  // its inner rim an EMBER EDGE, 1 px of `glow` round the hole while it is round (the fire in the smoke; a plain grey
+  // ring ahead of the face was dusk's finale too: cast review v2), gone as it spreads flat and cools
+  if (a < 16) annulus(ctx, rig, x, y, hx, hy, ix, iy, info.pal.glow);
 }
 
 /**
@@ -951,6 +955,10 @@ export const FIRE: ElementSpec = {
       // the baby holds its breath before the hiccup: puffed up round, 1.10 wide, until the puff pops out; and its
       // comma keeps riding the eating bow (no tail droop, tuning.eat): the flame above the tail tip is fire's zone
       ...(st === 'baby' ? { breath: { puff: 1.1 }, eat: { tailDroop: 0 } } : {}),
+      // the elder's airing keeps the torch up: its tail lifted by the sit's pitch, its rest line in the world, so the
+      // flame stands behind the haunch and not on the floor, water's zone (3.0; cast review v2: at / 3 it was water's
+      // airing, a knob at the end of a floor-long tail)
+      ...(st === 'elder' ? { airing: { tailLift: -1 } } : {}),
     }),
   },
 };

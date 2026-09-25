@@ -60,9 +60,12 @@ for (const { out, query } of shots) {
   const errors: string[] = [];
   page.on('pageerror', (e: Error) => errors.push('pageerror: ' + e.message));
   page.on('console', (m: any) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+  // (the audits run while the page loads -- every look's every anim, frame by frame -- so they get smoke.ts's long
+  // timeout: with dusk's anims and the tuck-in the floor audit outgrew the 30 s default)
+  const audit = /(^|&)view=(floor|roots|tails)(&|$)/.test(query);
   try {
-    await page.goto(`http://localhost:${port}/index.html${query ? '?' + query : ''}`, { waitUntil: 'load' });
-    await page.waitForFunction(() => (window as any).__dragonCare?.ready === true, null, { timeout: 15000 });
+    await page.goto(`http://localhost:${port}/index.html${query ? '?' + query : ''}`, { waitUntil: 'load', timeout: audit ? 240000 : 30000 });
+    await page.waitForFunction(() => (window as any).__dragonCare?.ready === true, null, { timeout: audit ? 240000 : 15000 });
     const pageErrors: string[] = await page.evaluate(() => (window as any).__dragonCare?.errors ?? []);
     errors.push(...pageErrors);
     const dataUrl: string = await page.evaluate((k: number) => {

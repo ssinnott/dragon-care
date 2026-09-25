@@ -53,8 +53,8 @@
 import { hexToRgb, farPalette } from '../src/lib/art/palettes.ts';
 import { toneOf, RAMP } from '../src/lib/art/shading.ts';
 import {
-  DRAGON_ELEMENTS, DRAGON_SHARED, DRAGON_FAR, DRAGON_SLOTS, DRAGON_SHADOW, AGE_STAGES, AGE_SILVER, blushOf, moodTones,
-  dragonTones, agedPalette, ageK, muzzleOf, beardOf, fanFrostOf, smokeBandOf,
+  DRAGON_ELEMENTS, DRAGON_SHARED, DRAGON_FAR, DRAGON_SLOTS, DRAGON_SHADOW, AGE_STAGES, AGE_SILVER, ageSilver, blushOf, moodTones,
+  dragonTones, agedPalette, ageK, muzzleOf, tuftOf, beardOf, fanFrostOf, smokeBandOf,
 } from '../src/art/dragon/palettes.ts';
 import type { DragonElement, DragonPalette, DragonSlot, AgeStage } from '../src/art/dragon/palettes.ts';
 
@@ -232,11 +232,11 @@ function head(title: string): void { out.push('', title); }
 type Tone = 'hi' | 'sh' | 'deep';
 /**
  * What a pair names: `scale`, `scale.sh`, `ink` (the outline), `blush`, a mood tone (`banked`, `dimSpot`), dusk's
- * `smokeBand` (the slate step of its tail tip's fade), or an elder face colour (`muzzle`: the grey muzzle and brow
- * tuft; `beard`: the beard; `frost`: slinkwing's frosted fan tips). Tones come from dragonTones, so `scale.hi` is the
+ * `smokeBand` (the slate step of its tail tip's fade), or an elder face colour (`muzzle`: the grey muzzle; `tuft`:
+ * the brow tuft, the muzzle's grey but on water and rock; `beard`: the beard; `frost`: slinkwing's frosted fan tips). Tones come from dragonTones, so `scale.hi` is the
  * silvered highlight of an adult or elder.
  */
-type Ref = DragonSlot | `${DragonSlot}.${Tone}` | 'ink' | 'blush' | 'banked' | 'dimSpot' | 'muzzle' | 'beard' | 'frost' | 'smokeBand';
+type Ref = DragonSlot | `${DragonSlot}.${Tone}` | 'ink' | 'blush' | 'banked' | 'dimSpot' | 'muzzle' | 'tuft' | 'beard' | 'frost' | 'smokeBand';
 const PAL = (e: DragonElement, st: AgeStage): Readonly<DragonPalette> => agedPalette(e, st);
 const S = DRAGON_SHARED;
 function colour(e: DragonElement, st: AgeStage, ref: Ref): string {
@@ -244,6 +244,7 @@ function colour(e: DragonElement, st: AgeStage, ref: Ref): string {
   if (ref === 'blush') return blushOf(e);
   if (ref === 'banked' || ref === 'dimSpot') return moodTones(PAL(e, st))[ref];
   if (ref === 'muzzle') return muzzleOf(PAL(e, st), e);
+  if (ref === 'tuft') return tuftOf(PAL(e, st), e);
   if (ref === 'beard') return beardOf(PAL(e, st), e);
   if (ref === 'frost') return fanFrostOf(PAL(e, st), e);
   if (ref === 'smokeBand') return smokeBandOf(PAL(e, st));
@@ -304,7 +305,8 @@ const EXTRA_PAIRS: Readonly<Record<DragonElement, readonly Pair[]>> = {
 };
 /** Pairs only the ELDER has (bible 2.5, the elder face; section 3's elder-only extras). */
 const ELDER_PAIRS: readonly Pair[] = [
-  { a: 'muzzle', b: 'scale', why: 'the grey muzzle on the snout and the brow tuft on the head' },
+  { a: 'muzzle', b: 'scale', why: 'the grey muzzle on the snout' },
+  { a: 'tuft', b: 'scale', why: 'the brow tuft on the head (the muzzle\'s grey, or water\'s and rock\'s own pale grey)' },
   { a: 'muzzle', b: 'scale.sh', why: 'the muzzle meets the head\'s shadow band at the snout\'s front-bottom' },
   { a: 'muzzle', b: 'dark', why: 'the nostril sits on the muzzle' },
   { a: 'muzzle', b: 'ink', why: 'ink face marks (the mouth line, a closed eye\'s bar) sit on the muzzle' },
@@ -321,7 +323,7 @@ const ELDER_EXTRA: Readonly<Partial<Record<DragonElement, readonly Pair[]>>> = {
   spike: [
     { a: 'glow.sh', b: 'scale', why: 'the sap-buds (the elder-only extra) on the back between quills' },
     { a: 'glow.sh', b: 'horn', why: 'a sap-bud beside a quill\'s root' },
-    { a: 'glow', b: 'glow.sh', why: 'the bud\'s glint at mood >= 0.5' },
+    { a: 'glow', b: 'glow.sh', why: 'the lit bud over its calyx (its base row)' },
   ],
   rock: [{ a: 'muzzle', b: 'horn', why: 'the nose horn rises from the pale stone muzzle' }],
   slinkwing: [
@@ -606,7 +608,7 @@ for (const e of DRAGON_ELEMENTS) {
 }
 
 // (k) -----------------------------------------------------------------------------------------------------
-head(`(k) VISIBLE GREYING  (each greying step young -> adult and adult -> elder moves the scale or its silvered highlight band (AGE_SILVER ${STAGES.map((st) => AGE_SILVER[st]).join('/')}) by >= ${GREY_STEP} Oklab dE; dE scale / hi per step)`);
+head(`(k) VISIBLE GREYING  (each greying step young -> adult and adult -> elder moves the scale or its silvered highlight band (AGE_SILVER ${STAGES.map((st) => AGE_SILVER[st]).join('/')}; lightning's and slinkwing's elders ${ageSilver('lightning', 'elder')}) by >= ${GREY_STEP} Oklab dE; dE scale / hi per step)`);
 for (const e of DRAGON_ELEMENTS) {
   const cells: string[] = [];
   let allOk = true;

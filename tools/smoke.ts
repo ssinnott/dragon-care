@@ -13,7 +13,10 @@
 // draws, ground shadow aside, is >= 40 % covered more than 1 px under y = 0 (1.1, 5.1 #14): the idle variants (the
 // elders' back stretch, reminisce and airing), every look's fidget at every stage and the element anims (dusk's
 // tuck-in among them) included. The leg-root audit (view=roots) fails any walk, idle or rest frame where a far leg's
-// sunk root lies outside the body (1.2). Both run over all 28 looks.
+// sunk root lies outside the body (1.2). The tail-ceiling audit (view=tails) fails any standing frame of a core anim
+// where a tail that ends in a shape (water's fluke) rises more than 3 px over the back at the hip (3.0: fire's zone),
+// and the neutral-area recorder (view=neutral) any look more than 40 % neutral at rest (3.1). All four run over all
+// 28 looks.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -40,7 +43,7 @@ async function launch(chromium: any): Promise<any> {
  * One view. `allScales`: every element's body colour must be on the canvas, at each of `stages` (default all four:
  * the lineup's rows) -- a one-stage view (cast, mood) names its stage.
  */
-interface Case { query: string; minColours: number; allScales: boolean; stages?: readonly AgeStage[]; timeout?: number; floor?: boolean; roots?: boolean }
+interface Case { query: string; minColours: number; allScales: boolean; stages?: readonly AgeStage[]; timeout?: number; floor?: boolean; roots?: boolean; tails?: boolean; neutral?: boolean }
 const CASES: Case[] = [
   { query: 'view=lineup&t=0', minColours: 150, allScales: true },
   { query: 'view=lineup&t=45&mood=-1', minColours: 150, allScales: true },
@@ -95,6 +98,12 @@ const CASES: Case[] = [
   // frame; each far leg's sunk root must lie inside the rest of the silhouette drawn over it on every frame (a walk
   // that slid the far shoulder half a stride forward once hung the far front leg in front of the chest)
   { query: 'view=roots&t=0', minColours: 2, allScales: false, timeout: 120000, roots: true },
+  // the tail-ceiling audit (3.0, fire's zone above the tail tip): every look's core anims frame by frame; a tail that
+  // ends in a shape (water's fluke) may never rise more than 3 px over the back at the hip (cast review v2: it walked,
+  // preened, ate and woke with its fluke at head height, fire's "U" at / 3)
+  { query: 'view=tails&t=0', minColours: 2, allScales: false, timeout: 120000, tails: true },
+  // the neutral-area recorder (3.1, a hard rule): no look's pixels more than 40 % neutral (HSV S < 0.25) at rest
+  { query: 'view=neutral&t=0', minColours: 2, allScales: false, neutral: true },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -128,6 +137,16 @@ for (const c of CASES) {
       const rows: { id: string; anim: string; depth: number; frame: number; leg: string; floats: boolean }[] = await page.evaluate(() => (window as any).__dragonCare?.roots ?? []);
       if (!rows.length) errors.push('the leg-root audit reported nothing');
       for (const r of rows) if (r.floats) errors.push(`${r.id} ${r.anim}: the ${r.leg} root is only ${r.depth} px inside the body at f${r.frame}`);
+    }
+    if (c.tails) {
+      const rows: { id: string; anim: string; over: number; frame: number; gated: boolean; high: boolean }[] = await page.evaluate(() => (window as any).__dragonCare?.tails ?? []);
+      if (!rows.some((r) => r.gated)) errors.push('the tail-ceiling audit gated nothing');
+      for (const r of rows) if (r.high) errors.push(`${r.id} ${r.anim}: the tail rises ${r.over} px over the back at f${r.frame}`);
+    }
+    if (c.neutral) {
+      const rows: { id: string; share: number; over: boolean }[] = await page.evaluate(() => (window as any).__dragonCare?.neutral ?? []);
+      if (rows.length !== 28) errors.push(`the neutral-area recorder measured ${rows.length} looks, not 28`);
+      for (const r of rows) if (r.over) errors.push(`${r.id} is ${Math.round(r.share * 100)} % neutral (the ceiling is 40 %)`);
     }
     const colours: number[] = await page.evaluate(() => {
       const cv = document.getElementById('stage') as HTMLCanvasElement;

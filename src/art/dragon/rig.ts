@@ -35,7 +35,7 @@ import type { PartRig, Point } from '../../lib/art/rigParts.ts';
 import { pathTaperedCapsule } from '../../lib/art/shapes.ts';
 import { getChain, stepChain, resetChain } from '../../lib/art/secondary.ts';
 import type { Chain, ChainRig } from '../../lib/art/secondary.ts';
-import { DRAGON_FAR, DRAGON_SHARED, DRAGON_SLOTS, dragonTones, moodTones, muzzleOf, beardOf, fanFrostOf } from './palettes.ts';
+import { DRAGON_FAR, DRAGON_SHARED, DRAGON_SLOTS, dragonTones, moodTones, muzzleOf, tuftOf, beardOf, fanFrostOf } from './palettes.ts';
 import type { DragonElement, DragonPalette } from './palettes.ts';
 import { TAIL_CHAIN, grown } from './stages.ts';
 import type { LegDims, Stage } from './stages.ts';
@@ -175,10 +175,11 @@ export interface DragonRig extends PartRig, ChainRig {
   /** The stage's mood tones (palettes.ts moodTones of `pal`): the banked glow, water's dim spot. */
   moodT: Readonly<{ banked: string; dimSpot: string }>;
   /**
-   * The elder face greys (2.5, palettes.ts muzzleOf / beardOf, of `pal`): the muzzle and brow tuft, the beard; and
-   * slinkwing's frosted fan tips (fanFrostOf). Derived for every stage, drawn on the elder.
+   * The elder face greys (2.5, palettes.ts muzzleOf / tuftOf / beardOf, of `pal`): the muzzle, the brow tuft (the
+   * muzzle's grey but on the pale-muzzled water and rock), the beard; and slinkwing's frosted fan tips (fanFrostOf).
+   * Derived for every stage, drawn on the elder.
    */
-  greys: Readonly<{ muzzle: string; beard: string; fanFrost: string }>;
+  greys: Readonly<{ muzzle: string; tuft: string; beard: string; fanFrost: string }>;
   /**
    * How much deeper the elder's beard hangs below its BEARD_UV shape on this head, px (parts.ts fitBeard, at build): so
    * a skull that hangs lower than the jaw (rock's boxy snout, dusk's short one) leaves 3 x 3 px of tuft in view. 0
@@ -284,7 +285,7 @@ export function buildDragon(build: DragonBuild): DragonRig {
     bellyY: Math.round((-d.chestLift + d.chestR) - d.bellyFrac * d.chestR * 2),
     sagRy: d.sag ? d.sag.ry : 0,
     moodT: moodTones(pal),
-    greys: { muzzle: muzzleOf(pal, build.element), beard: beardOf(pal, build.element), fanFrost: fanFrostOf(pal, build.element) },
+    greys: { muzzle: muzzleOf(pal, build.element), tuft: tuftOf(pal, build.element), beard: beardOf(pal, build.element), fanFrost: fanFrostOf(pal, build.element) },
     beardDv: 0,
     legRest: f32(8), legReachX: f32(4), legBend: new Int8Array(4),
     markBX: f32(build.sp.markings.length).fill(NaN), markBY: f32(build.sp.markings.length).fill(NaN),
@@ -644,9 +645,17 @@ export function computeDragonJoints(rig: DragonRig, pose: DragonPose): DragonJoi
   toRoot(rig, bx, by, J.rump);
   let acc = 0, tau = 0;
   const loose = 1 - clamp(Math.max(pose.tail.stiff, sp.tailStiff || 0), 0, 1);
+  // (a look that keeps its tail low takes only `tailRise` of any swing that would lift it ABOVE its rest line, on the
+  // body or in the world -- the pose's lift and sway, and the chest-down pitch that raises a tail riding it -- and all
+  // of the droop, whichever is lower: water's fluke, 3.0, which the happy's lift, the wags' upswing, the bite's bow and
+  // the wake's play-bow carried to head height, fire's "U" at / 3: cast review v2. At rise 1 both are the pose's swing)
+  const rise = sp.tailRise ?? 1, pitch = J.bodyAng + pose.root.rot, sw = pose.tail.lift + pose.tail.sway, sww = sw - pitch;
+  const up = Math.max(sw < 0 ? sw * rise : sw, (sww < 0 ? sww * rise : sww) + pitch);
+  const curl = pose.tail.curl < 0 ? pose.tail.curl * rise : pose.tail.curl;
   for (let k = 0; k < tn; k++) {
     acc += held[k] * loose;
-    tau = rest.first + pose.tail.lift + pose.tail.sway + k * (rest.bend + pose.tail.curl) - acc;
+    // (the chain's follow-through too: its lift over the rest line at `rise`, its droop whole)
+    tau = rest.first + up + k * (rest.bend + curl) - (acc > 0 ? acc * rise : acc);
     J.tailA[k] = tau - J.bodyAng;
     const a = rad(tau);
     bx += -Math.cos(a) * T.len; by += Math.sin(a) * T.len;
@@ -1696,7 +1705,7 @@ function drawHeadGroup(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonP
   if (faceBlushes(face)) drawBlush(ctx, rig);
   drawEye(ctx, rig, blink === 2 ? DFACE.closed : blink === 1 ? DFACE.sleepy : face, P.pupil >= 0.5);
   // (the elder's brow is its grey tuft, at every face: faces.ts drawBrow)
-  drawBrow(ctx, rig, face, elder ? rig.greys.muzzle : tones(rig, pal.scale).deep);
+  drawBrow(ctx, rig, face, elder ? rig.greys.tuft : tones(rig, pal.scale).deep);
   // nostril near the snout tip, top side, and >= 2 px clear of the eye's ring ALONG THE SNOUT (cranium space),
   // whatever the head's pitch: the baby's button snout leaves ~5 px between ring and tip, and at 1 px the nostril
   // read as a smudge on the eye; clamped in face-space x instead, a head pitched down into the bowl pushed it off

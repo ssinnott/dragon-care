@@ -1201,7 +1201,7 @@ const AIR_SIT_MAX = 30;
  * beside its head and water's fluke over it, and slapped it onto the floor 6 f later: snappy, D21 and 4.1's "no
  * tremor-like jerks", and in fire's zone (3.0). The elder core review, round 2.)
  */
-export function airingAnim(stage: Stage, dims: DragonDims | null, wp: Readonly<WingParams> | null): DragonAnim {
+export function airingAnim(stage: Stage, dims: DragonDims | null, wp: Readonly<WingParams> | null, at: Readonly<AnimTuning['airing']> = animTuning(stage).airing): DragonAnim {
   // (a 'custom' wing -- lightning's bolts -- takes no sit and no lean here; lightning's elder overrides this variant)
   const fit = dims && wp && wp.style !== 'custom' ? airingFit(dims, wp) : { B: 0, F: 0, dy: 0, wing: 1, hole: false };
   const full = fit.wing, B = fit.B;
@@ -1218,10 +1218,11 @@ export function airingAnim(stage: Stage, dims: DragonDims | null, wp: Readonly<W
     'wing.flap': [[0, 0], [20, 0], [32, fit.F], [72, fit.F], [88, 0]],
     // the TAIL goes down with the rump: the chain faded to AIR_TAIL_STIFF through the sit and the stand (its kick from
     // the dropping rump and the turning pitch, which it would read as the tail left behind, stays small) and the tail
-    // lowered half the sit's pitch past riding it, so it lies back along the floor behind the haunches; its one sweep
-    // runs along the floor
+    // lowered half the sit's pitch past riding it (tuning.airing), so it lies back along the floor behind the haunches;
+    // its one sweep runs along the floor. (Fire's keeps its up-curled rest line in the world: its flame stands behind
+    // the haunch, fire's zone, 3.0)
     'tail.stiff': [[0, 0], [8, AIR_TAIL_STIFF], [96, AIR_TAIL_STIFF], [106, 0]],
-    'tail.lift': [[0, 0], [24, B * 0.5], [82, B * 0.5], [106, 0]],
+    'tail.lift': [[0, 0], [24, B * at.tailLift], [82, B * at.tailLift], [106, 0]],
     'tail.sway': [[0, 0], [34, 0], [44, 8], [62, -8], [72, 0]],
     face: [[0, N], [34, H], [70, N]],
     mood: [[0, 0], [32, 1], [72, 1], [88, 0]],
@@ -1269,7 +1270,7 @@ export function baseAnims(stage: Stage, tune: AnimTuning = animTuning(stage), di
     lookAround: lookAroundAnim(stage),
     yawn: yawnAnim(stage),
     ...(stage === 'baby' ? { topple: toppleAnim(stage), plopSit: plopSitAnim(stage) }
-      : elder ? { backStretch: backStretchAnim(stage), reminisce: reminisceAnim(stage), airing: airingAnim(stage, dims, wing) }
+      : elder ? { backStretch: backStretchAnim(stage), reminisce: reminisceAnim(stage), airing: airingAnim(stage, dims, wing, tune.airing) }
       : { scratch: scratchAnim(stage, dims) }),
   };
 }

@@ -12,7 +12,7 @@
 // ridge (the skull's contour, parts.ts), the grey MUZZLE (drawMuzzle: pigment, clipped to the skull, under the eye,
 // nostril and mouth marks), the level grey brow TUFT at every face (drawBrow), the inked beard (parts.ts drawBeard)
 // and fangs worn to 2 x 2. Its greys are rig.greys (palettes.ts muzzleOf / beardOf, set per element by luminance).
-import { DRAGON_SHARED, blushOf } from './palettes.ts';
+import { DRAGON_SHARED, TUFT_LUM, blushOf } from './palettes.ts';
 import { DFACE } from './pose.ts';
 import type { DragonRig } from './rig.ts';
 import { inSkull, skullBands } from './parts.ts';
@@ -246,10 +246,12 @@ export function drawBrow(ctx: CanvasRenderingContext2D, rig: DragonRig, face: nu
   let len = hd.browLen;
   // (upside down, the brow would lie under the screen-upright "^" and read as a mouth line)
   if (rig.tf.ss < 0) return;
-  // THE ELDER'S TUFT (2.5): the same bar, as pigment in the muzzle grey (`deep` is rig.greys.muzzle), at EVERY face --
-  // neutral, and shut (closed, dazed: relaxed, level) as well, since it is hair on the hide, not an expression mark.
-  // 7 px from 1 px behind the ring, its top edge LEVEL: a bar lower at the back is the `sad` tilt and put a worried
-  // brow on every neutral elder (the v2 review). Its length and colour carry the age, never its tilt.
+  // THE ELDER'S TUFT (2.5): the same bar, as pigment in the tuft grey (`deep` is rig.greys.tuft: the muzzle's, or a
+  // pale grey of its own on water and rock), at EVERY face -- neutral, and shut (closed, dazed: relaxed, level) as
+  // well, since it is hair on the hide, not an expression mark. 7 px from 1 px behind the ring, its top edge LEVEL: a
+  // bar lower at the back is the `sad` tilt and put a worried brow on every neutral elder (the v2 review). Its length
+  // and colour carry the age, never its tilt. On a pale-muzzled elder (palettes.ts TUFT_LUM) it is 5 px with rounded
+  // ends, its two top corners dropped: 7 x 2 in the frost's near-white it read as a strip of tape (cast review v2).
   if (!elder && (face === DFACE.dazed || face === DFACE.closed)) return;
   // no bar at neutral on the other stages (2.5 amendment): on young and adult the brow-ridge bump in the skull contour
   // already carries the stage, and a flat dark bar over a resting eye read as a visor; the bar is for expressions
@@ -258,6 +260,8 @@ export function drawBrow(ctx: CanvasRenderingContext2D, rig: DragonRig, face: nu
     if (face === DFACE.happy || face === DFACE.sleepy) return;
     len = 5;
   }
+  const short = elder && TUFT_LUM[rig.element] != null;
+  if (short) len = 5;
   const grow = face === DFACE.hungry || face === DFACE.surprised || face === DFACE.scared ? 1 : 0;
   // the eye's VISIBLE top: the "^" arc's top when happy; a lid's ink edge on a lidded eye (the lid is skin, so the
   // ring's top row under it does not show: measured from the ring, a sleepy brow floated 3 px over the lid)
@@ -301,8 +305,12 @@ export function drawBrow(ctx: CanvasRenderingContext2D, rig: DragonRig, face: nu
     const x = x0 + i, y = browRow(dyB, dyF, len, i);
     if (!elder || rig.override) { rect(ctx, x, y, 1, 2); continue; }
     // the tuft is pigment: a pixel in the skull's highlight cap, or 4-adjacent to it, is dropped (a silvered cap and
-    // a pale tuft need not clear each other: 2.5), so the tuft never smears the silver crown
-    for (let k = 0; k < 2; k++) if (!nearHiCap(rig, x, y + k)) rect(ctx, x, y + k, 1, 1);
+    // a pale tuft need not clear each other: 2.5), so the tuft never smears the silver crown; the short tuft's end
+    // columns keep their bottom pixel only (the top corners dropped: rounded, and level, no tilt either way)
+    for (let k = 0; k < 2; k++) {
+      if (short && k === 0 && (i === 0 || i === len - 1)) continue;
+      if (!nearHiCap(rig, x, y + k)) rect(ctx, x, y + k, 1, 1);
+    }
   }
 }
 

@@ -883,20 +883,30 @@ export function drawJaw(ctx: CanvasRenderingContext2D, rig: DragonRig, jawDeg: n
 }
 
 /**
- * The elder's BEARD (1.2, 2.5) in the jaw's own axis frame: u along the jaw from its hinge, v down from its axis. A
- * small rounded tuft SET BACK under the chin, its root along the jaw's underside from u = tip - 8 to tip - 3 (so it
- * never lengthens the chin's point), 5 px wide and 3 px deep below the jaw (its lower points deeper where the skull
- * hangs below the jaw: rig.beardDv, fitBeard), its bottom round, its lowest point swept
- * back >= 3 px toward the throat: a teardrop pointing back along the throat, never down (EL's pointed goatee under
- * the jaw tip read as a tusk or a drip, and open it grew out of the chin stripe into one long pointed chin).
- * BEARD_UV: [front root, round front, lowest point, back point, back root], (u from the tip, v below the underside).
+ * The elder's BEARD (1.2, 2.5) in the jaw's own axis frame: u along the jaw from its tip (- = back toward the
+ * throat), v down from its underside. A tuft of chin HAIR that grows out of the chin: its root along the jaw's
+ * underside from u = tip - 2.4 to tip - 8.2 (so it never lengthens the chin's point), its front rounding down to a
+ * front lobe 3.2 px deep, then ONE 1 px step up to a shallower back lobe that runs on back along the throat to a round
+ * tip 9.4 px behind the chin: two rounded lobes, swept back, never a point hanging down (EL's pointed goatee under the
+ * jaw tip read as a tusk or a drip; the first build's one inked trapezoid under the jaw, its top edge inked against
+ * the chin, read as a pebble in the mouth, a slack lip or a drip at 1x: cast review v2). The lower points (v >= 1) hang
+ * rig.beardDv px deeper where the skull hangs below the jaw (fitBeard); the root stays on the jaw.
+ * BEARD_UV: the start on the jaw's ink line, then four quadratic segments as (control, end) pairs -- the round front
+ * to the front lobe's bottom, up to the step, along the back lobe, round its tip -- and the end on the jaw's ink line.
  */
-const BEARD_UV: readonly number[] = [-3, -0.6, -3.2, 2.6, -6.2, 3, -9.2, 1.4, -8, -0.6];
-/**
- * The beard's (u from the jaw tip, v below its underside) of BEARD_UV point `i` (0..4) on this rig: the three LOWER
- * points (the round front, the lowest, the back point) hang rig.beardDv px deeper (fitBeard), the root stays on the jaw.
- */
-function beardV(rig: DragonRig, i: number): number { return BEARD_UV[i * 2 + 1] + (i >= 1 && i <= 3 ? rig.beardDv : 0); }
+const BEARD_UV: readonly number[] = [
+  -2.0, 0.6,
+  -3.0, 2.2, -4.1, 3.6,
+  -5.6, 4.0, -5.8, 2.6,
+  -7.6, 2.9, -7.4, 1.4,
+  -7.2, 0.6, -6.4, 0.6,
+];
+/** Points in BEARD_UV (the start, then a control and an end per segment). */
+const BEARD_N = BEARD_UV.length / 2;
+/** How far into the jaw, below its underside's ink line, the tuft's unlined root runs (v): it covers the jaw's ink. */
+const BEARD_ROOT = -0.6;
+/** Point `i`'s v on this rig: a lower point (v >= 1) hangs rig.beardDv px deeper (fitBeard). */
+function beardV(rig: DragonRig, i: number): number { const v = BEARD_UV[i * 2 + 1]; return v >= 1 ? v + rig.beardDv : v; }
 /** Map the beard's (u from the jaw tip, v below its underside) into cranium space at jaw opening `jawDeg`, into `out`. */
 function beardPt(rig: DragonRig, jawDeg: number, u: number, v: number, out: Point): Point {
   const j = rig.dims.head.jaw, tx = j.tx - j.hx, ty = j.ty - j.hy, L = Math.hypot(tx, ty) || 1;
@@ -908,29 +918,41 @@ function beardPt(rig: DragonRig, jawDeg: number, u: number, v: number, out: Poin
   return out;
 }
 const BP: Point = { x: 0, y: 0 }, BQ: Point = { x: 0, y: 0 };
+/** Trace the tuft's OUTER contour (the start on the jaw's ink line to the end on it) onto the current path. */
+function traceBeard(ctx: CanvasRenderingContext2D, rig: DragonRig, jawDeg: number, move: boolean): void {
+  const B = BEARD_UV;
+  beardPt(rig, jawDeg, B[0], beardV(rig, 0), BP);
+  if (move) ctx.moveTo(BP.x, BP.y); else ctx.lineTo(BP.x, BP.y);
+  for (let i = 1; i < BEARD_N; i += 2) {
+    beardPt(rig, jawDeg, B[i * 2], beardV(rig, i), BP); beardPt(rig, jawDeg, B[i * 2 + 2], beardV(rig, i + 1), BQ);
+    ctx.quadraticCurveTo(BP.x, BP.y, BQ.x, BQ.y);
+  }
+}
 
 /**
- * Cranium space: the elder's beard, drawn right after the jaw (1.4 step 12.2) so it moves with the jaw: its own
- * object with its own 1 px ink (hair, like a quill), flat in `hex` (rig.greys.beard: palettes.ts beardOf, >= 25 %
- * from the belly, its shadow tone, the closed jaw's sliver and the straw floor). Its root lies a little inside the
- * jaw's underside, so the jaw's ink under it is covered and the tuft grows from the chin, not beside it.
+ * Cranium space: the elder's beard, drawn right after the jaw (1.4 step 12.2) so it moves with the jaw, flat in `hex`
+ * (rig.greys.beard: palettes.ts beardOf, >= 25 % from the belly, its shadow tone, the closed jaw's sliver and the
+ * straw floor). Hair GROWN from the chin, as the lamp's stalk grows from dusk's skull: inked on its OUTER contour only
+ * (1 px, round joins), no line along its root, which runs a little inside the jaw's underside and covers the jaw's ink
+ * there, so the chin's fill runs straight into the tuft's.
  */
 export function drawBeard(ctx: CanvasRenderingContext2D, rig: DragonRig, jawDeg: number, hex: string): void {
-  const B = BEARD_UV;
+  const B = BEARD_UV, n = BEARD_N - 1;
   ctx.beginPath();
-  beardPt(rig, jawDeg, B[0], beardV(rig, 0), BP); ctx.moveTo(BP.x, BP.y);
-  // the round front and bottom, then the sweep back and up to the point, and back along the jaw to the root
-  beardPt(rig, jawDeg, B[2], beardV(rig, 1), BP); beardPt(rig, jawDeg, B[4], beardV(rig, 2), BQ); ctx.quadraticCurveTo(BP.x, BP.y, BQ.x, BQ.y);
-  beardPt(rig, jawDeg, B[6], beardV(rig, 3), BP); ctx.lineTo(BP.x, BP.y);
-  beardPt(rig, jawDeg, B[8], beardV(rig, 4), BP); ctx.lineTo(BP.x, BP.y);
+  traceBeard(ctx, rig, jawDeg, true);
+  outlinePath(ctx, rig);
+  // the fill: the same contour, closed along the root inside the jaw
+  ctx.beginPath();
+  beardPt(rig, jawDeg, B[0], BEARD_ROOT, BP); ctx.moveTo(BP.x, BP.y);
+  traceBeard(ctx, rig, jawDeg, false);
+  beardPt(rig, jawDeg, B[n * 2], BEARD_ROOT, BP); ctx.lineTo(BP.x, BP.y);
   ctx.closePath();
-  flat(ctx, rig, hex);
+  flat(ctx, rig, hex, false);
 }
 
 /** Cranium space, into `out`: the beard's lowest point at jaw opening `jawDeg` (rig.ts headSink's floor guard). */
 export function beardLow(rig: DragonRig, jawDeg: number, out: Point): Point {
-  // the round bottom's lowest point, and the back point, whichever the head's pitch puts lower is the floor's; the
-  // cranium-space lowest (+y) serves: the guard maps both through the head angle, so take the bottom
+  // the front lobe's bottom, the deepest: the guard maps it through the head angle
   return beardPt(rig, jawDeg, BEARD_UV[4], beardV(rig, 2) + 0.5, out);
 }
 
@@ -943,19 +965,23 @@ export function beardLow(rig: DragonRig, jawDeg: number, out: Point): Point {
  * same tuft under its chin whatever the snout. Allocates: call it once per rig.
  */
 export function fitBeard(rig: DragonRig): number {
-  const keep = rig.beardDv, poly: number[] = [];
+  const keep = rig.beardDv, poly: number[] = [], B = BEARD_UV;
   for (let dv = 0; dv <= 4; dv += 0.25) {
     rig.beardDv = dv;
     poly.length = 0;
-    const B = BEARD_UV;
-    beardPt(rig, 0, B[0], beardV(rig, 0), BP); const x0 = BP.x, y0 = BP.y;
-    beardPt(rig, 0, B[2], beardV(rig, 1), BP); beardPt(rig, 0, B[4], beardV(rig, 2), BQ);
-    for (let i = 0; i <= 12; i++) {
-      const t = i / 12, u = 1 - t;
-      poly.push(u * u * x0 + 2 * u * t * BP.x + t * t * BQ.x, u * u * y0 + 2 * u * t * BP.y + t * t * BQ.y);
+    // the fill's polygon: the root inside the jaw, then each quadratic segment sampled
+    beardPt(rig, 0, B[0], BEARD_ROOT, BP); poly.push(BP.x, BP.y);
+    beardPt(rig, 0, B[0], beardV(rig, 0), BP); let x0 = BP.x, y0 = BP.y;
+    poly.push(x0, y0);
+    for (let i = 1; i < BEARD_N; i += 2) {
+      beardPt(rig, 0, B[i * 2], beardV(rig, i), BP); beardPt(rig, 0, B[i * 2 + 2], beardV(rig, i + 1), BQ);
+      for (let k = 1; k <= 8; k++) {
+        const t = k / 8, u = 1 - t;
+        poly.push(u * u * x0 + 2 * u * t * BP.x + t * t * BQ.x, u * u * y0 + 2 * u * t * BP.y + t * t * BQ.y);
+      }
+      x0 = BQ.x; y0 = BQ.y;
     }
-    beardPt(rig, 0, B[6], beardV(rig, 3), BP); poly.push(BP.x, BP.y);
-    beardPt(rig, 0, B[8], beardV(rig, 4), BP); poly.push(BP.x, BP.y);
+    beardPt(rig, 0, B[(BEARD_N - 1) * 2], BEARD_ROOT, BP); poly.push(BP.x, BP.y);
     let minx = 1e9, maxx = -1e9;
     for (let i = 0; i < poly.length; i += 2) { minx = Math.min(minx, poly[i]); maxx = Math.max(maxx, poly[i]); }
     // the widest run of columns (0.25 px apart) each showing >= 3.4 px of fill under the skull's 1 px of ink
