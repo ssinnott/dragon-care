@@ -1245,6 +1245,18 @@ export function idleVariants(stage: Stage, wing: Readonly<WingParams> | null = n
   if (stage === 'elder') return wing && !wing.hole && wing.style !== 'custom' ? ELDER_POOL_NO_HOLE : ELDER_POOL;
   return ['lookAround', 'yawn', 'scratch', 'fidget'];
 }
+/**
+ * The idle variants that spread the wings (the elder's airing): the owner's `crowded` mark keeps the player from
+ * starting one beside another dragon (DragonAnimPlayer.setVariants, 5.4: CROWD_GAP).
+ */
+export const SPREAD_VARIANTS: readonly string[] = ['airing'];
+/**
+ * The wary gap (5.4: extents along the floor and depth apart, game px) under which a pet counts as crowded: a spread
+ * reaches about 20 px back and up from the shoulders, so under 24 px a neighbour lies within it (the lightning elder's
+ * storm-watch and the slinkwing elder's sit-back spread, 18 px apart, merged into one two-headed dragon: cast review
+ * v2 round 2).
+ */
+export const CROWD_GAP = 24;
 const ELDER_POOL: readonly string[] = ['lookAround', 'yawn', 'backStretch', 'reminisce', 'airing', 'airing', 'fidget'];
 const ELDER_POOL_NO_HOLE: readonly string[] = ['lookAround', 'yawn', 'backStretch', 'reminisce', 'airing', 'fidget'];
 

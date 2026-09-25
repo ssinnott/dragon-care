@@ -19,19 +19,21 @@
 //   view=floor | view=roots    the floor audit (nothing sinks through y = 0) and the leg-root audit (no far leg floats
 //                              free of the body); els= / stages= / anims= narrow them
 //   view=tails                 the tail-ceiling audit (a fluke never rises over 3 px above the back: 3.0), narrowed the same
+//   view=pour                  the pour-column audit (no breath effect joins the mouth to the floor: 3.8), narrowed the same
 //   view=neutral               the neutral-area recorder (each look's share of HSV S < 0.25 pixels, <= 40 %: 3.1)
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
 //   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
-//   charge (0..1); a static pose overlay: face, jaw, wing, flap, sleep, tuck, fx, gulp, flare, bristle,
-//   body=<rot>,<y>, head, pupil; wear=0 draws the elders without their tears and hole (2.9's with / without measure)
+//   charge (0..1), post (grey | cvd: any view post-processed, the habitat's check in grey and CVD); a static pose
+//   overlay: face, jaw, wing, flap, sleep, tuck, fx, gulp, flare, bristle, body=<rot>,<y>, head, pupil; wear=0 draws
+//   the elders without their tears and hole (2.9's with / without measure)
 import { drawText } from './lib/engine/text.ts';
 import { dragonBuild } from './art/dragon/build.ts';
 import { buildDragon, drawDragon, stepDragon, solveDragon, rootToScreen } from './art/dragon/rig.ts';
 import { legRadii } from './art/dragon/parts.ts';
 import type { DragonRig, DrawDragonOpts } from './art/dragon/rig.ts';
 import { DragonAnimPlayer, blinkFor } from './art/dragon/anim.ts';
-import { dragonAnims, ANIM_NAMES, ONE_SHOTS, VARIANT_NAMES, ELEMENT_ANIM_NAMES, ELEMENT_ANIM_FALLBACK, idleVariants, variantEvery } from './art/dragon/anims.ts';
+import { dragonAnims, ANIM_NAMES, ONE_SHOTS, VARIANT_NAMES, ELEMENT_ANIM_NAMES, ELEMENT_ANIM_FALLBACK, idleVariants, variantEvery, SPREAD_VARIANTS, CROWD_GAP } from './art/dragon/anims.ts';
 import { ELEMENTS, ELEMENT_IDS } from './art/dragon/elements/index.ts';
 import { STAGES } from './art/dragon/stages.ts';
 import { DP, DFACE, ACT } from './art/dragon/pose.ts';
@@ -45,7 +47,7 @@ export const STRAW = '#e0d6b8';
 const INK = '#1a1018';
 const LABEL = '#3a2a30';
 
-export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'neutral', 'wings'] as const;
+export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings'] as const;
 export type View = typeof VIEWS[number];
 
 export interface GalleryParams {
@@ -81,6 +83,8 @@ export interface GalleryParams {
   stages: Stage[] | null;
   /** wear=0: the elders draw without their tears and hole (2.9), for measuring what the wear opens against the same frame. */
   wear: boolean;
+  /** post=grey | cvd: any view post-processed as view=grey / cvd do the lineup (the habitat's grey and CVD check: 5.4). */
+  post: 'grey' | 'cvd' | null;
 }
 
 export function parseParams(search: string): GalleryParams {
@@ -111,6 +115,7 @@ export function parseParams(search: string): GalleryParams {
     els: q.get('els') ? (q.get('els') || '').split(',').filter((e) => (ELEMENT_IDS as readonly string[]).includes(e)) as DragonElement[] : null,
     stages: q.get('stages') ? (q.get('stages') || '').split(',').filter((s) => (STAGES as readonly string[]).includes(s)) as Stage[] : null,
     wear: q.get('wear') !== '0',
+    post: q.get('post') === 'grey' || q.get('post') === 'cvd' ? q.get('post') as 'grey' | 'cvd' : null,
   };
 }
 
@@ -170,7 +175,8 @@ export function makePet(el: DragonElement, stage: Stage, seed: number, anim: str
   // an idle pet cuts to a look-around, a yawn, a scratch or its element's fidget every 6-10 s (the elder to its back
   // stretch, reminisce or airing too, every 8-12 s; rock's elder, with no hole to air, airs its own way: its sunning),
   // seeded: 4.2
-  if (anim === 'idle') { const [a, b] = variantEvery(stage); player.setVariants('idle', idleVariants(stage, build.sp.wing), a, b); }
+  // (the airing is skipped while the pet is crowded: stepWary marks it, 5.4)
+  if (anim === 'idle') { const [a, b] = variantEvery(stage); player.setVariants('idle', idleVariants(stage, build.sp.wing), a, b, SPREAD_VARIANTS); }
   if (STATIC_POSE) player.setStaticPose(STATIC_POSE);
   return {
     rig, player, x, y, facing: opts.facing ?? 1, scale: opts.scale ?? 1, mood: opts.mood ?? 0,
@@ -209,7 +215,8 @@ const WARY_ON = 30, WARY_OFF = 36;
  * Step every pet's wary state once per tick, before the pets step (a scene's owner does this; the game's pet
  * renderer will too): the gap to the nearest OTHER pet in game px -- between the two sprites' extents along the
  * floor (tail tip to snout, whichever way each faces) and their depth apart -- latched with hysteresis and eased
- * over about 8 f, so a dragon walking past does not flicker the lean.
+ * over about 8 f, so a dragon walking past does not flicker the lean. The same gap marks the pet `crowded` under
+ * CROWD_GAP, so its idle schedule starts no spread-wing variant (5.4).
  */
 function stepWary(pets: readonly Pet[]): void {
   for (const p of pets) {
@@ -222,6 +229,8 @@ function stepWary(pets: readonly Pet[]): void {
     }
     if (g < WARY_ON) p.waryOn = true; else if (g > WARY_OFF) p.waryOn = false;
     p.wary += ((p.waryOn ? 1 : 0) - p.wary) / 8;
+    // the same gap keeps a spread-wing variant from starting beside a neighbour (5.4: the crowd rule)
+    p.player.crowded = g < CROWD_GAP;
   }
 }
 /** A pet's screen x extent, tail tip to snout, at its facing (from the build's dims, the rest pose). */
@@ -355,13 +364,16 @@ function stagesScene(P: GalleryParams): Scene {
   // baby, young, adult, elder left to right, spaced by their real extents (tail back, snout front) at this scale
   const pets = STAGES.map((st) => makePet(P.el, st, P.seed, P.anim, 0, 400, { scale: sc, mood: P.mood }));
   // (the head's side takes the cue's reach past the snout too: dusk's lantern, and the elder's moth ahead of it, were
-  // cut at the canvas edge)
+  // cut at the canvas edge; and each side a margin for what the straight tail and the head don't measure -- water's
+  // fluke past the tail's last segment, fire's flame, the lamp's swing and the moth's open wings -- with at least 8 px
+  // of straw between two stages (cast review v2: the elder dusk's lantern was cut at the right edge, and water's baby
+  // fluke sat 3 px off the left one)
   const reach = ELEMENTS[P.el].reach;
   const ext = pets.map((p, i) => {
-    const d = p.rig.dims, tail = d.hipR + d.gap / 2 + d.tail.n * d.tail.len + 6, head = d.gap / 2 + d.chestR + d.headLen + 4 + (reach?.[STAGES[i]] ?? 0);
+    const d = p.rig.dims, tail = d.hipR + d.gap / 2 + d.tail.n * d.tail.len + 10, head = d.gap / 2 + d.chestR + d.headLen + 8 + (reach?.[STAGES[i]] ?? 0);
     return [tail * sc, head * sc];
   });
-  const total = ext.reduce((a, e) => a + e[0] + e[1], 0), gap = Math.max(8, (960 - total) / (STAGES.length + 1));
+  const total = ext.reduce((a, e) => a + e[0] + e[1], 0), gap = Math.max(8 * sc, (960 - total) / (STAGES.length + 1));
   let x = gap;
   pets.forEach((p, i) => { p.x = Math.round(x + ext[i][0]); x += ext[i][0] + ext[i][1] + gap; });
   return {
@@ -383,7 +395,8 @@ function zoomScene(P: GalleryParams): Scene {
   const k = Math.max(1, Math.round(P.scale || 6));
   const p = makePet(P.el, P.stage, P.seed, P.anim, 0, 0, { mood: P.mood, facing: P.facing });
   const d = p.rig.dims;
-  const back = Math.ceil(d.hipR + d.gap / 2 + d.tail.n * d.tail.len + 16), front = Math.ceil(d.gap / 2 + d.chestR + d.headLen + 16);
+  // (the front takes the cue's reach past the snout too: the elder dusk's lantern sat on the right edge)
+  const back = Math.ceil(d.hipR + d.gap / 2 + d.tail.n * d.tail.len + 16), front = Math.ceil(d.gap / 2 + d.chestR + d.headLen + 16 + (ELEMENTS[P.el].reach?.[P.stage] ?? 0));
   const w = back + front, h = Math.ceil(d.bodyY + d.head.cranR * 2 + (d.neck.hidden ? 14 : d.neck.len * 2 + 14) + 36);
   // 16 rows below the ground, and the ground row marked in both margins, so anything sinking through the floor
   // shows (1.1, 5.1 #14)
@@ -574,24 +587,28 @@ function stripScene(P: GalleryParams): Scene {
  * water with its baby overlapping in front of it (parent over baby, one element) -- plus a young rock, an adult dusk
  * (its coral lamp ahead of the face, E12's neighbour of fire's glow; its Nightfall on the floor in the mix), and five
  * ELDERS: spike's, roaming with a baby spike (an elder shares the habitat with babies: 5.8's cross-stage gates), fire's,
- * and the dark trio's at the back -- lightning's just behind slinkwing's, the greyed spire behind the greyed fans, with
- * dusk's facing them, spaced by its lamp's reach (ElementSpec.reach) so its lantern hangs in the air between them, not
- * on a neighbour (cast review v2: the check had only two elders, none of the dark three, and no airing). Those pairs
- * and the trio hold their places (`fixed`), the others roam. (The first cast had no young or adult lightning, no adult
- * slinkwing, no young or baby water or rock, and no overlap that stayed put; the v1 cast had no dusk.)
+ * and the dark trio's at the back -- lightning's behind slinkwing's, the greyed spire behind the greyed fans, its head
+ * clear of the fans by >= 4 px, with dusk's facing them, spaced by its lamp's reach (ElementSpec.reach) so its lantern
+ * hangs in the air between them, not on a neighbour (cast review v2: the check had only two elders, none of the dark
+ * three, and no airing; round 2: 18 px apart and airing together, lightning's and slinkwing's elders merged into one
+ * two-headed dragon). The adult dusk stands clear of the water pair by its reach and Nightfall's bank (round 2: its mist
+ * stood by the water's head and read as its spout). Those pairs and the trio hold their places (`fixed`), the others
+ * roam. (The first cast had no young or adult lightning, no adult slinkwing, no young or baby water or rock, and no
+ * overlap that stayed put; the v1 cast had no dusk.)
  */
 function habitatScene(P: GalleryParams): Scene {
   const cast: [DragonElement, Stage, number, number, number, boolean][] = [
-    ['lightning', 'elder', 318, 124, 1, true], ['slinkwing', 'elder', 336, 134, 1, true],
+    ['lightning', 'elder', 286, 110, 1, true], ['slinkwing', 'elder', 336, 120, 1, true],
     ['spike', 'elder', 470, 170, -1, false], ['lightning', 'adult', 196, 176, 1, true], ['slinkwing', 'adult', 214, 186, 1, true],
-    ['dusk', 'adult', 552, 218, -1, false],
-    ['rock', 'young', 110, 262, 1, false], ['fire', 'elder', 340, 236, 1, false], ['water', 'adult', 520, 290, -1, true],
-    ['water', 'baby', 506, 306, -1, true], ['spike', 'baby', 90, 336, 1, false],
+    ['dusk', 'adult', 552, 212, -1, false],
+    ['rock', 'young', 110, 262, 1, false], ['fire', 'elder', 340, 236, 1, false], ['water', 'adult', 520, 298, -1, true],
+    ['water', 'baby', 506, 314, -1, true], ['spike', 'baby', 90, 336, 1, false],
   ];
   cast.splice(2, 0, ['dusk', 'elder', 0, cast[1][3] + 4, -1, true]);
-  // anim=mix: every act at once (the top pass carries the "z", the dazed stars and the embers; eat brings a bowl), the
-  // elders' airing among them (lightning's storm-watch, slinkwing's sit-back spread) and dusk's lamp-bat
-  const MIX = ['airing', 'airing', 'fidget', 'walk', 'happy', 'sleep', 'breath', 'eat', 'breath', 'beg', 'pet', 'walk'];
+  // anim=mix: every act at once (the top pass carries the "z", the dazed stars and the embers; eat brings a bowl), an
+  // elder's airing among them (lightning's storm-watch; slinkwing's elder beside it reminisces, one spread of the pair
+  // at a time as the crowd rule would have it: 5.4) and dusk's lamp-bat
+  const MIX = ['airing', 'reminisce', 'fidget', 'walk', 'happy', 'sleep', 'breath', 'eat', 'breath', 'beg', 'pet', 'walk'];
   const pets = cast.map(([el, st, x, y, f, fixed], i) => {
     const p = makePet(el, st, P.seed + i * 17, P.anim === 'mix' ? MIX[i] : P.anim, x, y, { facing: f, mood: P.mood });
     p.roam = fixed ? null : [-40, 680];
@@ -760,7 +777,9 @@ function rootsScene(P: GalleryParams): Scene {
  * The most a tail that ENDS IN A SHAPE (a look with a `tipBox`: water's fluke) may rise over the back at the hip, px,
  * on any frame of a core anim (3.0: "no other tail rises > 3 px above the back line"). The fluke carried up to head
  * height is fire's "U" at / 3 (cast review v2: the adult walk peaked 23 px over the back on 45 of 96 frames, the
- * happy 26, the pet, eat and wake 16 to 23). A plain taper is reported, not gated: lightning's and slinkwing's thin
+ * happy 26, the pet, eat and wake 16 to 23). A look that caps its tail's rise (`tailRise` under 1: dusk's smoke-tipped
+ * taper, 2.3's "never above the back line") is gated too (cast review v2 round 2: its adult happy swung the pale tip 7
+ * px over the back, into fire's zone). Any other plain taper is reported, not gated: lightning's and slinkwing's thin
  * tails lift 10 to 15 px in the eat, happy and pet with no tip shape to name another element.
  */
 export const TAIL_CEIL = 3;
@@ -774,8 +793,8 @@ const TAIL_ANIMS = ANIM_NAMES;
  * standing back's where the pose lowers it; the TAIL is the topmost ink behind the haunch, 2 px past the hip ball's
  * back edge. Asleep is skipped (the body lies on the straw and the fluke stands clear of the laid-out tail: the asleep
  * cue, 3.6). The worst frame per look and anim goes on window.__dragonCare.tails for tools/smoke.ts, which fails a
- * tip-shaped tail (a tipBox: the fluke) over TAIL_CEIL; fire, whose flame owns the zone, and a plain taper are listed
- * but never gated.
+ * tip-shaped tail (a tipBox: the fluke) or a capped one (tailRise < 1: dusk's) over TAIL_CEIL; fire, whose flame owns
+ * the zone, and any other plain taper are listed but never gated.
  */
 function tailsScene(P: GalleryParams): Scene {
   const W = 320, H = 200, GX = 170, GY = 150;
@@ -817,7 +836,7 @@ function tailsScene(P: GalleryParams): Scene {
       if (pose.sleep < 0.5 && over > worst) { worst = over; at = f; }
       stepPet(p);
     }
-    const gated = !!rig.sp.tipBox && el !== 'fire';
+    const gated = (!!rig.sp.tipBox || (rig.sp.tailRise ?? 1) < 1) && el !== 'fire';
     rows.push({ id: `${el}-${st}`, anim: a, over: worst, frame: at, gated, high: gated && worst > TAIL_CEIL });
   }
   if (window.__dragonCare) window.__dragonCare.tails = rows;
@@ -829,6 +848,81 @@ function tailsScene(P: GalleryParams): Scene {
       ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
       label(ctx, `TAIL CEILING: ${rows.length} LOOK x ANIM RUNS, ${bad.length} TIP SHAPES OVER ${TAIL_CEIL} PX ABOVE THE BACK`, this.w / 2, 4, LABEL, 1);
       lines.forEach((t, i) => label(ctx, t.toUpperCase(), this.w / 2, 16 + i * 9, t.endsWith('OVER') ? '#8a1c1c' : LABEL, 1));
+    },
+  };
+}
+
+// ---------- the pour-column audit (3.8: Nightfall is breathed out, never poured) ----------
+
+/**
+ * view=pour: no breath effect may be ONE connected mark from the mouth down to the floor (3.8, 5.1 #12: a column of
+ * mist from the lip to a puddle reads as the dragon being sick, a rope of beads as a stream: cast review v2, both
+ * rounds). Every look plays its breath from its first frame to 16 f past its last at game scale 1, and each frame is
+ * drawn twice on a clear canvas with no ground shadow and no top pass: as it is, and flat (a silhouette draw, which
+ * draws no breath), so what the first has and the second has not is the dragon's effects off its body. Of those
+ * pixels (alpha >= 50 %, 8-connected) a component that reaches from POUR_LIP px under the mouth or higher down to
+ * the floor row is a pour column. The worst frame per look (the tallest such component, or the component nearest
+ * to it) goes on window.__dragonCare.pour for tools/smoke.ts, which fails any column; the babies' fizzles, which
+ * rise, are played too.
+ */
+export const POUR_LIP = 3;
+function pourScene(P: GalleryParams): Scene {
+  const W = 320, H = 200, GX = 150, GY = 150, MIN_A = 128;
+  const a = document.createElement('canvas'), b = document.createElement('canvas');
+  a.width = b.width = W; a.height = b.height = H;
+  const ga = a.getContext('2d', { willReadFrequently: true })!, gb = b.getContext('2d', { willReadFrequently: true })!;
+  const rows: { id: string; frame: number; top: number; lip: number; column: boolean }[] = [];
+  const els = P.els || ELEMENT_IDS, stages = P.stages || STAGES;
+  const pt = { x: 0, y: 0 }, lab = new Int32Array(W * H), stack = new Int32Array(W * H);
+  for (const el of els) for (const st of stages) {
+    const p = makePet(el, st, P.seed, 'breath', GX, GY, { desync: false, blink: false });
+    if (p.player.name !== 'breath') continue;
+    const len = Math.max(1, p.player.length) + 16;
+    // the worst frame: a column if any, else the effect component whose top came nearest the lip line, among those
+    // that reach the floor (none reaching the floor: top = H)
+    let worst = { frame: 0, top: H, lip: 0, column: false };
+    for (let f = 0; f < len; f++) {
+      const pose = p.player.pose;
+      for (const [g, sil] of [[ga, false], [gb, true]] as const) {
+        g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+        drawDragon(g, p.rig, pose, petOpts(p, { still: true, shadow: false, top: null, silhouette: sil ? '#0000ff' : undefined }));
+      }
+      rootToScreen(p.rig, p.rig.j.mouth.x, p.rig.j.mouth.y, pt);
+      const lip = Math.round(pt.y) + POUR_LIP;
+      const da = ga.getImageData(0, 0, W, H).data, db = gb.getImageData(0, 0, W, H).data;
+      lab.fill(0);
+      let next = 1;
+      for (let i = 0; i < W * H; i++) {
+        if (lab[i] || da[i * 4 + 3] < MIN_A || db[i * 4 + 3] >= MIN_A) continue;
+        // flood one component, keeping its top row and whether it touches the floor row
+        let sp = 0, top = H, floor = false;
+        stack[sp++] = i; lab[i] = next;
+        while (sp) {
+          const j = stack[--sp], x = j % W, y = (j - x) / W;
+          if (y < top) top = y;
+          if (y >= GY - 1) floor = true;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const X = x + dx, Y = y + dy, k = Y * W + X;
+            if (X < 0 || Y < 0 || X >= W || Y >= H || lab[k] || da[k * 4 + 3] < MIN_A || db[k * 4 + 3] >= MIN_A) continue;
+            lab[k] = next; stack[sp++] = k;
+          }
+        }
+        next++;
+        if (floor && top - lip < worst.top - worst.lip) worst = { frame: f, top, lip, column: top <= lip };
+      }
+      stepPet(p);
+    }
+    rows.push({ id: `${el}-${st}`, ...worst });
+  }
+  if (window.__dragonCare) window.__dragonCare.pour = rows;
+  const bad = rows.filter((r) => r.column);
+  const lines = rows.map((r) => `${r.id}: ${r.top >= H ? 'NOTHING ON THE FLOOR' : `TOP ${r.top - r.lip + POUR_LIP} PX UNDER THE MOUTH AT F${r.frame}`}${r.column ? '  COLUMN' : ''}`);
+  return {
+    w: 480, h: Math.max(120, 24 + lines.length * 9), pets: [],
+    draw(ctx) {
+      ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
+      label(ctx, `POUR COLUMN: ${rows.length} BREATHS, ${bad.length} WITH ONE MARK FROM ${POUR_LIP} PX UNDER THE MOUTH TO THE FLOOR`, this.w / 2, 4, LABEL, 1);
+      lines.forEach((t, i) => label(ctx, t.toUpperCase(), this.w / 2, 16 + i * 9, t.endsWith('COLUMN') ? '#8a1c1c' : LABEL, 1));
     },
   };
 }
@@ -1029,6 +1123,7 @@ function makeScene(P: GalleryParams): Scene {
     case 'floor': return floorScene(P);
     case 'roots': return rootsScene(P);
     case 'tails': return tailsScene(P);
+    case 'pour': return pourScene(P);
     case 'neutral': return neutralScene(P);
     case 'wings': return wingsScene(P);
     default: return lineupScene(P);
@@ -1039,9 +1134,10 @@ function render(ctx: CanvasRenderingContext2D, scene: Scene, P: GalleryParams, l
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
   scene.draw(ctx);
-  if (P.view === 'grey' || P.view === 'cvd') {
-    postProcess(ctx, scene.w, scene.h, P.view);
-    label(ctx, P.view === 'grey' ? 'GREYSCALE' : 'SIMULATED DEUTERANOPIA', scene.w / 2, 4, P.view === 'grey' ? '#303030' : LABEL, 1);
+  const post = P.view === 'grey' || P.view === 'cvd' ? P.view : P.post;
+  if (post) {
+    postProcess(ctx, scene.w, scene.h, post);
+    label(ctx, post === 'grey' ? 'GREYSCALE' : 'SIMULATED DEUTERANOPIA', scene.w / 2, 4, post === 'grey' ? '#303030' : LABEL, 1);
   }
   if (live) label(ctx, `${P.view.toUpperCase()}  ANIM ${P.anim.toUpperCase()}   ARROWS/SPACE: VIEW  1-9, 0: ANIM (${ANIM_NAMES.join(' ').toUpperCase()})  E: ELEMENT`, scene.w / 2, scene.h - 10, '#5a4850', 1);
 }

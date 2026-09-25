@@ -106,13 +106,13 @@ function boltPath(ctx: CanvasRenderingContext2D, p: readonly number[], tears: re
 }
 
 /**
- * The bolt's tear slot (2.9's shape, re-aimed for a tooth run): TEAR_MOUTH px wide between its sides, `d` deep, its
- * LOWER side stepped TEAR_STEP px toward the upper halfway down, the sides running into the bolt along the run's
- * normal turned TEAR_TILT deg up. A tooth run is 8-10 px long, and square to it (parts.ts pathTearEdge) the slot's
- * sides aimed down at the next shelf's inner corner: at 4 deep its bottom crossed the shelf, the tooth point below it
- * was cut loose as a separate flag, and the far bolt read as an "E". Turned up and stepped on the lower side, the
- * tooth keeps a neck of about 3 px. From the current point on the edge (x0, y0) -> (x1, y1), appended; TN is the run's
- * normal into the bolt.
+ * The bolt's tear slot (2.9's shape, re-aimed for a tooth run): TEAR_MOUTH px wide at the edge, `d` deep, its LOWER
+ * side stepped TEAR_STEP px toward the upper halfway down and then running in to meet the upper side in a point (a
+ * rip), the sides running into the bolt along the run's normal turned TEAR_TILT deg up. A tooth run is 8-10 px long,
+ * and square to it (parts.ts pathTearEdge) the slot's sides aimed down at the next shelf's inner corner: at 4 deep
+ * its bottom crossed the shelf, the tooth point below it was cut loose as a separate flag, and the far bolt read as
+ * an "E". Turned up and stepped on the lower side, the tooth keeps a neck of about 3 px. From the current point on
+ * the edge (x0, y0) -> (x1, y1), appended; TN is the run's normal into the bolt.
  */
 const TEAR_MOUTH = 6.5, TEAR_STEP = 1.5, TEAR_TILT = 20;
 function boltTear(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, at: number, d: number): void {
@@ -126,8 +126,9 @@ function boltTear(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: num
   let px = -dy, py = dx;
   if ((ax - bx) * px + (ay - by) * py < 0) { px = -px; py = -py; }
   ctx.lineTo(ax, ay);
-  ctx.lineTo(ax + dx * d, ay + dy * d);
-  ctx.lineTo(bx + px * st + dx * d, by + py * st + dy * d);
+  // (its bottom a POINT, a rip, 1 px in from the upper side: with a flat bottom the slot was a clean square chunk, a
+  // bite out of the bolt's back edge, not wear: cast review v2)
+  ctx.lineTo(ax + dx * d - px, ay + dy * d - py);
   ctx.lineTo(bx + px * st + dx * d / 2, by + py * st + dy * d / 2);
   ctx.lineTo(bx + dx * d / 2, by + dy * d / 2);
   ctx.lineTo(bx, by);

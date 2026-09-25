@@ -268,15 +268,20 @@ export interface AgeRule {
  * The two elders whose bodies barely greyed at game scale (cast review v2: adult -> elder 0.018 and 0.028 Oklab dE on
  * the scale, the elder Zap the adult's vivid blue with a grey muzzle), lightning and slinkwing, silver their highlight
  * band further as elders (0.8, not 0.6) and grey their bellies at 1.5 there: neither slot carries their identity (the
- * bolts and the fans do), so the silver back and the greyer belly show the age.
+ * bolts and the fans do), so the silver back and the greyer belly show the age. Their elder scales grey a step more
+ * too (cast review v2 round 2: still the adult's colour at game scale, an adult in a grey mask): lightning's 0.65 (its
+ * closest dusk pair, the elder Zap against the baby Wick, 0.095 Oklab dE and 30 % in value: B2), slinkwing's 1.2
+ * (0.54: S 0.35, its B1 hue pass with dusk kept). Rock's elder, the least greyed of the cast after that (its scale
+ * 0.25 is held by gate f's protan rock / water pair), silvers its highlight band at 0.8 as well and greys its dome at
+ * 1.3 (cast review v2 round 2): the sand stays, the crown and the carapace go stone grey.
  */
 export const AGE_RULES: Readonly<Partial<Record<DragonElement, Readonly<AgeRule>>>> = Object.freeze({
   fire: { weight: { scale: 0.3, belly: 0.6, membrane: 0.6 }, drift: { scale: -0.6 }, from: { scale: 'elder' } },
   spike: { weight: { scale: 0.9, belly: 0.6, membrane: 0.6 }, drift: { scale: 0.2 }, from: { scale: 'elder' } },
-  rock: { weight: { scale: 0.25, belly: 1.5, membrane: 0.5, marking: 1 }, shadow: { belly: 0.5 } },
-  lightning: { weight: { scale: 0.5, membrane: 0.5 }, elder: { belly: 1.5 }, silver: { baby: 0, young: 0, adult: 0.3, elder: 0.8 } },
+  rock: { weight: { scale: 0.25, belly: 1.5, membrane: 0.5, marking: 1 }, elder: { marking: 1.3 }, shadow: { belly: 0.5 }, silver: { baby: 0, young: 0, adult: 0.3, elder: 0.8 } },
+  lightning: { weight: { scale: 0.5, membrane: 0.5 }, elder: { scale: 0.65, belly: 1.5 }, silver: { baby: 0, young: 0, adult: 0.3, elder: 0.8 } },
   water: { weight: { scale: 0.8, membrane: 0.6 } },
-  slinkwing: { weight: { membrane: 0.5 }, elder: { belly: 1.5 }, silver: { baby: 0, young: 0, adult: 0.3, elder: 0.8 } },
+  slinkwing: { weight: { membrane: 0.5 }, elder: { scale: 1.2, belly: 1.5 }, silver: { baby: 0, young: 0, adult: 0.3, elder: 0.8 } },
   dusk: { curve: { baby: 0, young: 0.12, adult: 0.3, elder: 0.65 }, weight: { belly: 0.5, membrane: 0, marking: 0 }, elder: { belly: 0.25 } },
 });
 
@@ -384,27 +389,35 @@ export function dragonTones(e: DragonElement, slot: DragonSlot, ramp: Readonly<R
 //                  nose horn);
 //   beard        : >= 25 % from the belly, the belly's shadow tone, the scale's shadow tone (the closed jaw's sliver),
 //                  the ink and the straw floor (a sleeping elder's chin and beard rest on it).
-// No single grey clears both lists on rock (its muzzle window is light, >= 0.65, its beard window mid, 0.37 to 0.50),
-// so rock's beard is a mid stone grey under a pale stone muzzle; on every other element they are one grey, water's
-// the near-white frost (its mid sea-slate beard under the white snout read as a pebble in the mouth, and the swept-back
-// tuft with its own ink cannot read as the buck tooth the first beard's white trapezoid did: cast review v2).
+// On every element the beard is the muzzle's grey, water's a pale sea frost (its mid sea-slate beard under the white
+// snout read as a pebble in the mouth; the near-white frost made a stark white snout and, hanging under it, a white
+// tusk: cast review v2) and rock's its white (no single grey clears both lists there: its muzzle window is light,
+// >= 0.65, its beard window mid, 0.37 to 0.50; the mid stone beard under the white snout and chin read as a stone or
+// a leaf stuck under the jaw: cast review v2 round 2). The muzzle grey also wraps the jaw's front, the elder's grey
+// chin (parts.ts drawJaw), so the beard grows out of it. No one grey clears water's beard list (its belly and the
+// straw sit 0.48 and 0.67), and rock's white sits 5 % from its cream throat stripe and 22 % from the straw, so their
+// beards, inked on the outer contour, are exempt from the floor gate, rock's from the stripe too (tools/palette-check.ts,
+// bible 5.6 E14, E15).
 // ---------------------------------------------------------------------------------------------------------------
 
 /**
  * Relative luminance of the elder muzzle and brow tuft, per element (dusk's is its smoke marking: MUZZLE_SLOT). Rock's
  * is a white old dog's muzzle, 0.86 (#efefed): at 0.72 the muzzle and tuft were a pale smudge on its tan face beside
- * the silvered crown, 33 % from the scale (now 44 %; the element pass v2 review).
+ * the silvered crown, 33 % from the scale (now 44 %; the element pass v2 review). Water's is a pale frost, 0.65 (47 %
+ * from its scale, 26 % from its belly): at 0.92, near white, it was the stark white patch the eye went to first
+ * (cast review v2).
  */
 export const MUZZLE_LUM: Readonly<Partial<Record<DragonElement, number>>> = Object.freeze({
-  fire: 0.48, spike: 0.265, rock: 0.86, lightning: 0.315, water: 0.92, slinkwing: 0.285,
+  fire: 0.48, spike: 0.265, rock: 0.86, lightning: 0.315, water: 0.65, slinkwing: 0.285,
 });
 /**
- * Relative luminance of the elder beard, where it differs from the muzzle's: rock's mid stone grey (its muzzle window
- * is pale, its beard window mid). (Water's was a mid sea-slate, 0.32, since its frost as the first beard's trapezoid
- * under the chin read as a buck tooth; under the white snout the slate tuft read as a pebble in the mouth, and as the
- * swept-back tuft grown from the chin its beard is the frost again, belly 47 %, floor 27 %: cast review v2.)
+ * Relative luminance of the elder beard, where it differs from the muzzle's: none now. (Water's was a mid sea-slate,
+ * 0.32, since its frost as the first beard's trapezoid under the chin read as a buck tooth; under the white snout the
+ * slate tuft read as a pebble in the mouth, and as the swept-back tuft grown from the grey chin its beard is the
+ * muzzle's pale frost: cast review v2. Rock's was a mid stone grey, 0.43, its beard window's, a separate grey lump
+ * under its white chin; it is the white now, an old dog's chin tuft: cast review v2 round 2, 5.6 E15.)
  */
-export const BEARD_LUM: Readonly<Partial<Record<DragonElement, number>>> = Object.freeze({ rock: 0.43 });
+export const BEARD_LUM: Readonly<Partial<Record<DragonElement, number>>> = Object.freeze({});
 /**
  * Relative luminance of the elder's BROW TUFT where it is not the muzzle grey: the pale-muzzled elders, whose tuft in
  * the muzzle's near-white was the brightest mark on the face, a strip of tape across the brow that pulled the eye
@@ -429,7 +442,7 @@ export function tuftOf(p: Readonly<DragonPalette>, e: DragonElement): string {
   const L = TUFT_LUM[e];
   return L == null ? muzzleOf(p, e) : atLum(ageShade(p.belly, 0.85), L);
 }
-/** The elder's beard (bible 1.2, 2.5): the muzzle grey, or BEARD_LUM's where no one grey clears both (rock). */
+/** The elder's beard (bible 1.2, 2.5): the muzzle grey, or BEARD_LUM's where an element sets one (none now). */
 export function beardOf(p: Readonly<DragonPalette>, e: DragonElement): string {
   const L = BEARD_LUM[e];
   return L == null ? muzzleOf(p, e) : atLum(ageShade(p.belly, 0.85), L);

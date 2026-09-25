@@ -431,16 +431,17 @@ function drawVolley(ctx: CanvasRenderingContext2D, rig: DragonRig, c: number, n:
  * last quill's sparkle becomes ONE SAP RING, `age` frames after that sparkle ends (cue 32), which widens (r 3 -> 7)
  * and drifts up 6 px over RING f: 2 px of `glow` between 1 px `scale` edges, the sap streak's floor-safe colours,
  * stamped in whole pixels about its rounded centre, so it never shimmers (5.1 #12). It fades by NARROWING (5.1 #14)
- * over its last 4 f: the glow 1 px, then a 1 px `scale` circle alone, then gone at cue 44 (at full width to its last
- * frame, it vanished in one frame at its largest: the v2 review, round 2). ROOT space.
+ * over its last 2 f, the glow 1 px between its edges, and is gone at cue 42 (at full width to its last frame, it
+ * vanished in one frame at its largest: the v2 review, round 2; narrowed on to a 1 px `scale` circle alone for its
+ * last 2 f, under the 2 px mark floor, it ended as a thin dark outline: cast review v2 round 2). ROOT space.
  */
 const RING = 13;
 function sapRing(ctx: CanvasRenderingContext2D, rig: DragonRig, age: number, n: number, pal: DragonPalette): void {
-  if (age < 0 || age >= RING - 1) return;
+  if (age < 0 || age >= RING - 3) return;
   volleyAt(rig, n - 1, n, FLY_ELDER);
   // the glow band's and the whole ring's half-widths: 1 / 2 (glow 2 px, an edge 1 px each side), then 0.5 / 1.5 for
-  // 2 f, then 0 / 0.5 for 2 f (the elder breath's cue steps 2 f at a time: one frame each, the thin stage was skipped)
-  const k = RING - 1 - age, gw = k > 4 ? 1 : k > 2 ? 0.5 : 0, ew = k > 4 ? 2 : k > 2 ? 1.5 : 0.5;
+  // its last 2 f (the elder breath's cue steps 2 f at a time: one frame each, a thinner stage was skipped)
+  const k = RING - 1 - age, gw = k > 4 ? 1 : 0.5, ew = k > 4 ? 2 : 1.5;
   const r = 3 + 4 * age / (RING - 1), R = Math.ceil(r + 2);
   enterFaceFromLocal(ctx, rig, 0, 0, 0, Math.round(QV.x), Math.round(QV.y - age * 0.5));
   for (let y = -R; y < R; y++) for (let x = -R; x < R; x++) {

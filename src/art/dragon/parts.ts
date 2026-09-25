@@ -879,27 +879,43 @@ export function drawJaw(ctx: CanvasRenderingContext2D, rig: DragonRig, jawDeg: n
     ctx.fillStyle = pal.belly; ctx.fillRect(-j.r0 - 2, 0, Math.hypot(tx, ty) + j.r0 + 4, j.r0 + 2);
     ctx.restore();
   }
+  // the ELDER's grey CHIN (2.5): the muzzle wraps round the mouth onto the jaw's front CHIN px, pigment clipped to the
+  // jaw (open or shut), so the beard grows out of a grey chin (cast review v2: under a chin in the scale's colour the
+  // grey tuft was a separate thing hanging from the mouth, a pebble, a slack lip or a drip)
+  if (rig.stage === 'elder' && !rig.override) {
+    ctx.save(); ctx.clip();
+    ctx.rotate(Math.atan2(ty, tx));
+    const L = Math.hypot(tx, ty);
+    ctx.fillStyle = rig.col(rig.greys.muzzle); ctx.fillRect(L - CHIN, -j.r1 - 3, CHIN + j.r1 + 3, 2 * j.r1 + 6);
+    ctx.restore();
+  }
   ctx.restore();
 }
+/** How far back from the jaw's tip the elder's grey chin runs, px (the beard's root lies inside it: BEARD_UV). */
+const CHIN = 7;
 
 /**
  * The elder's BEARD (1.2, 2.5) in the jaw's own axis frame: u along the jaw from its tip (- = back toward the
- * throat), v down from its underside. A tuft of chin HAIR that grows out of the chin: its root along the jaw's
- * underside from u = tip - 2.4 to tip - 8.2 (so it never lengthens the chin's point), its front rounding down to a
- * front lobe 3.2 px deep, then ONE 1 px step up to a shallower back lobe that runs on back along the throat to a round
- * tip 9.4 px behind the chin: two rounded lobes, swept back, never a point hanging down (EL's pointed goatee under the
- * jaw tip read as a tusk or a drip; the first build's one inked trapezoid under the jaw, its top edge inked against
- * the chin, read as a pebble in the mouth, a slack lip or a drip at 1x: cast review v2). The lower points (v >= 1) hang
- * rig.beardDv px deeper where the skull hangs below the jaw (fitBeard); the root stays on the jaw.
- * BEARD_UV: the start on the jaw's ink line, then four quadratic segments as (control, end) pairs -- the round front
- * to the front lobe's bottom, up to the step, along the back lobe, round its tip -- and the end on the jaw's ink line.
+ * throat), v down from its underside. A tuft of chin HAIR that grows out of the grey chin (drawJaw's CHIN): its root
+ * along the jaw's underside from u = tip - 1.4 to tip - 6.6 (so it never lengthens the chin's point), SWEPT BACK along
+ * the throat: its front edge slants from the chin down and back to a front lobe 3.3 px deep, then ONE 1 px step DOWN
+ * to a deeper back lobe (4.4) that trails on back to a round tip 9 px behind the chin, past its own root, and its
+ * back edge slants up and forward to the throat: two rounded lobes leaning back, deepest behind, never a point
+ * hanging down (EL's pointed goatee under the jaw tip read as a tusk or a drip; the first build's one inked trapezoid,
+ * its top edge inked against the chin, and then a two-lobed tuft deepest at the front, both under a chin in the scale's
+ * colour, read as a pebble in the mouth, a slack lip or a grey lump hanging from the jaw at 1x: cast review v2). The
+ * lower points (v >= 1) hang rig.beardDv px deeper where the skull hangs below the jaw (fitBeard); the root stays on
+ * the jaw. BEARD_UV: the start on the jaw's ink line, then five quadratic segments as (control, end) pairs -- the
+ * slanting front to the front lobe's bottom, along it to the step, down the step into the back lobe, round its
+ * trailing tip, up the back edge -- and the end on the jaw's ink line.
  */
 const BEARD_UV: readonly number[] = [
-  -2.0, 0.6,
-  -3.0, 2.2, -4.1, 3.6,
-  -5.6, 4.0, -5.8, 2.6,
-  -7.6, 2.9, -7.4, 1.4,
-  -7.2, 0.6, -6.4, 0.6,
+  -1.4, 0.6,
+  -2.4, 2.6, -4.2, 3.3,
+  -5.4, 3.7, -6.0, 3.6,
+  -6.4, 4.4, -7.6, 4.4,
+  -9.2, 4.2, -8.4, 2.2,
+  -7.6, 0.6, -6.6, 0.6,
 ];
 /** Points in BEARD_UV (the start, then a control and an end per segment). */
 const BEARD_N = BEARD_UV.length / 2;
@@ -952,8 +968,8 @@ export function drawBeard(ctx: CanvasRenderingContext2D, rig: DragonRig, jawDeg:
 
 /** Cranium space, into `out`: the beard's lowest point at jaw opening `jawDeg` (rig.ts headSink's floor guard). */
 export function beardLow(rig: DragonRig, jawDeg: number, out: Point): Point {
-  // the front lobe's bottom, the deepest: the guard maps it through the head angle
-  return beardPt(rig, jawDeg, BEARD_UV[4], beardV(rig, 2) + 0.5, out);
+  // the back lobe's bottom, the deepest: the guard maps it through the head angle
+  return beardPt(rig, jawDeg, BEARD_UV[12], beardV(rig, 6) + 0.5, out);
 }
 
 /**

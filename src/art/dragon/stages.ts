@@ -70,6 +70,8 @@ export interface HeadDims {
   /** Jaw opening range, degrees: max, and the minimum any open frame lifts to (1.2). */
   jawMax: number;
   jawMin: number;
+  /** A parted opening under the minimum, no tongue or fangs (ElementStageParams.jawPart: dusk's blow); none if unset. */
+  jawPart?: number;
   /** Eye: outer size including the ink ring, centre in cranium space. */
   eye: { w: number; h: number; x: number; y: number };
   /**

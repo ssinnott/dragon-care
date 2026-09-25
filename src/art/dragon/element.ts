@@ -262,6 +262,13 @@ export interface ElementStageParams {
   /** The jaw's maximum opening, deg, replacing the stage table's and the modifier's (slinkwing's elder 36). */
   jawMax?: number;
   /**
+   * A PARTED opening, deg, under the stage minimum (1.2: an open jaw is otherwise 0 or at least the minimum): a pose
+   * jaw from half of it up to it holds it, and the mouth is only parted, the wedge showing with no tongue and no
+   * fangs. Dusk's 9 (Nightfall's blow: at 16 with the fangs and the tongue over the mist it read as a laugh, or being
+   * sick: cast review v2 round 2). Omitted = none (every other look: its bite, chew and lick keep the minimum).
+   */
+  jawPart?: number;
+  /**
    * The belly band's fraction of the chest depth, replacing the stage table's (38 %, babies 45 %, the elder's 42 %):
    * rock's elder keeps its adult's 38 %, since its pale cream band over the elder's paunch read as a nappy between
    * the legs (the elder core review).

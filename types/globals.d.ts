@@ -25,6 +25,11 @@ interface Window {
      * hip, px, and where; `gated` = a tip shape (the fluke) held to the audit's ceiling, `high` = over it (3.0).
      */
     tails?: { id: string; anim: string; over: number; frame: number; gated: boolean; high: boolean }[];
+    /**
+     * view=pour (src/gallery.ts): per look, its breath's effect component that reaches the floor with the highest top
+     * (screen row) against the lip line (the mouth's row + POUR_LIP), and where; `column` = it reaches the lip line (3.8).
+     */
+    pour?: { id: string; frame: number; top: number; lip: number; column: boolean }[];
     /** view=neutral (src/gallery.ts): per look, the share of its pixels that are neutral (HSV S < 0.25); `over` > 40 % (3.1). */
     neutral?: { id: string; share: number; over: boolean }[];
   };

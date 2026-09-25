@@ -32,6 +32,10 @@ const pairs: string[] = [
   'shots/cvd.png=view=cvd&t=0',
   'shots/habitat.png=view=habitat&t=45',
   'shots/habitat_mix.png=view=habitat&anim=mix&t=60',
+  // the crowd in the mix at a later frame, and in greyscale and deuteranopia (5.4: the overlaps separate in all three)
+  'shots/habitat_mix200.png=view=habitat&anim=mix&t=200',
+  'shots/habitat_mix200_grey.png=view=habitat&anim=mix&t=200&post=grey',
+  'shots/habitat_mix200_cvd.png=view=habitat&anim=mix&t=200&post=cvd',
   'shots/lineup_walk.png=view=lineup&anim=walk&t=10',
   'shots/lineup_sleep.png=view=lineup&anim=sleep&t=10',
   ...ELEMENT_IDS.map((el) => `shots/stages_${el}.png=view=stages&el=${el}&t=0`),
@@ -72,9 +76,9 @@ for (const el of ELEMENT_IDS) {
 for (const [el, anim] of [['fire', 'bath'], ['rock', 'upset'], ['slinkwing', 'call']] as const) {
   for (const stage of ['adult', 'young']) pairs.push(`shots/element_${el}_${stage}_${anim}.png=view=strip&el=${el}&stage=${stage}&anim=${anim}&n=8&t=0`);
 }
-// the floor audit (5.1 #14: every look, every anim; failing runs show their worst frame), the leg-root audit (1.2)
-// and the face sheets
-pairs.push('shots/floor.png=view=floor&t=0', 'shots/roots.png=view=roots&t=0');
+// the floor audit (5.1 #14: every look, every anim; failing runs show their worst frame), the leg-root audit (1.2),
+// the tail-ceiling and pour-column audits (3.0, 3.8) and the face sheets
+pairs.push('shots/floor.png=view=floor&t=0', 'shots/roots.png=view=roots&t=0', 'shots/tails.png=view=tails&t=0', 'shots/pour.png=view=pour&t=0');
 for (const st of STAGES) pairs.push(`shots/faces_${st}.png=view=faces&stage=${st}&t=0`);
 // the breath stream of every element (adult sustain) and the six baby fizzles
 for (const el of ELEMENT_IDS) {
@@ -82,6 +86,9 @@ for (const el of ELEMENT_IDS) {
   pairs.push(`shots/breath_${el}_elder.png=view=strip&el=${el}&stage=elder&anim=breath&n=6&from=24&span=48&t=0`);
   pairs.push(`shots/breath_${el}_baby.png=view=strip&el=${el}&stage=baby&anim=breath&n=6&t=0&scale=3`);
 }
+// Nightfall whole (3.8): the puffs, the band under the lamp, the settle and the bank, adult and elder (its ring)
+pairs.push('shots/breath_dusk_adult_whole.png=view=strip&el=dusk&stage=adult&anim=breath&n=12&from=18&span=96&t=0');
+pairs.push('shots/breath_dusk_elder_whole.png=view=strip&el=dusk&stage=elder&anim=breath&n=12&from=22&span=92&t=0');
 
 const r = spawnSync(process.execPath, [path.join(ROOT, 'tools', 'shot.ts'), ...pairs, '--scale', scale], { cwd: ROOT, stdio: 'inherit' });
 process.exit(r.status ?? 1);

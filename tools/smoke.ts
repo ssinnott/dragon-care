@@ -14,9 +14,10 @@
 // elders' back stretch, reminisce and airing), every look's fidget at every stage and the element anims (dusk's
 // tuck-in among them) included. The leg-root audit (view=roots) fails any walk, idle or rest frame where a far leg's
 // sunk root lies outside the body (1.2). The tail-ceiling audit (view=tails) fails any standing frame of a core anim
-// where a tail that ends in a shape (water's fluke) rises more than 3 px over the back at the hip (3.0: fire's zone),
-// and the neutral-area recorder (view=neutral) any look more than 40 % neutral at rest (3.1). All four run over all
-// 28 looks.
+// where a tail that ends in a shape (water's fluke) or caps its rise (dusk's) rises more than 3 px over the back at
+// the hip (3.0: fire's zone), the pour-column audit (view=pour) any breath frame with one effect mark from 3 px under
+// the mouth down to the floor (3.8: Nightfall is breathed out, never poured), and the neutral-area recorder
+// (view=neutral) any look more than 40 % neutral at rest (3.1). All five run over all 28 looks.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -43,7 +44,7 @@ async function launch(chromium: any): Promise<any> {
  * One view. `allScales`: every element's body colour must be on the canvas, at each of `stages` (default all four:
  * the lineup's rows) -- a one-stage view (cast, mood) names its stage.
  */
-interface Case { query: string; minColours: number; allScales: boolean; stages?: readonly AgeStage[]; timeout?: number; floor?: boolean; roots?: boolean; tails?: boolean; neutral?: boolean }
+interface Case { query: string; minColours: number; allScales: boolean; stages?: readonly AgeStage[]; timeout?: number; floor?: boolean; roots?: boolean; tails?: boolean; pour?: boolean; neutral?: boolean }
 const CASES: Case[] = [
   { query: 'view=lineup&t=0', minColours: 150, allScales: true },
   { query: 'view=lineup&t=45&mood=-1', minColours: 150, allScales: true },
@@ -102,6 +103,7 @@ const CASES: Case[] = [
   // ends in a shape (water's fluke) may never rise more than 3 px over the back at the hip (cast review v2: it walked,
   // preened, ate and woke with its fluke at head height, fire's "U" at / 3)
   { query: 'view=tails&t=0', minColours: 2, allScales: false, timeout: 120000, tails: true },
+  { query: 'view=pour&t=0', minColours: 2, allScales: false, timeout: 120000, pour: true },
   // the neutral-area recorder (3.1, a hard rule): no look's pixels more than 40 % neutral (HSV S < 0.25) at rest
   { query: 'view=neutral&t=0', minColours: 2, allScales: false, neutral: true },
 ];
@@ -142,6 +144,11 @@ for (const c of CASES) {
       const rows: { id: string; anim: string; over: number; frame: number; gated: boolean; high: boolean }[] = await page.evaluate(() => (window as any).__dragonCare?.tails ?? []);
       if (!rows.some((r) => r.gated)) errors.push('the tail-ceiling audit gated nothing');
       for (const r of rows) if (r.high) errors.push(`${r.id} ${r.anim}: the tail rises ${r.over} px over the back at f${r.frame}`);
+    }
+    if (c.pour) {
+      const rows: { id: string; frame: number; column: boolean }[] = await page.evaluate(() => (window as any).__dragonCare?.pour ?? []);
+      if (rows.length !== 28) errors.push(`the pour-column audit played ${rows.length} breaths, not 28`);
+      for (const r of rows) if (r.column) errors.push(`${r.id} breath: one mark runs from the mouth to the floor at f${r.frame}`);
     }
     if (c.neutral) {
       const rows: { id: string; share: number; over: boolean }[] = await page.evaluate(() => (window as any).__dragonCare?.neutral ?? []);

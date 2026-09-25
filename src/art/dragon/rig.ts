@@ -610,9 +610,10 @@ export function computeDragonJoints(rig: DragonRig, pose: DragonPose): DragonJoi
   const hc = Math.cos(rad(J.headAng)), hs = Math.sin(rad(J.headAng));
   const ex = J.neckX[nn], ey = J.neckY[nn];
   J.cran.x = S(ex + H.fromNeck[0] * hc - fy * H.fromNeck[1] * hs); J.cran.y = S(ey + H.fromNeck[0] * hs + fy * H.fromNeck[1] * hc);
-  // An open jaw is 0 or >= the stage minimum (1.2): below that the wedge shows neither mouth nor tongue.
-  const jw = pose.jaw;
-  J.jaw = jw < H.jawMin * 0.5 ? 0 : clamp(jw, H.jawMin, H.jawMax);
+  // An open jaw is 0 or >= the stage minimum (1.2): below that the wedge shows neither mouth nor tongue. A look with
+  // a parted opening (jawPart: dusk's blow) holds it from half of it up to it, and draws it without tongue or fangs
+  const jw = pose.jaw, jp = H.jawPart ?? 0;
+  J.jaw = jp && jw >= jp * 0.5 && jw <= jp ? jp : jw < H.jawMin * 0.5 ? 0 : clamp(jw, H.jawMin, H.jawMax);
   // the floor: a head lowered to it (the sleeping chin, a bow, a nod) RESTS on it. neckFit aims the jaw's hinge at
   // the floor, but a head pitched snout-down puts the jaw tip lower, and a lie-down passes through it on the way:
   // the head and the neck's end lift by whole device pixels until no part of the skull or jaw is under the floor
@@ -1723,11 +1724,12 @@ function drawHeadGroup(ctx: CanvasRenderingContext2D, rig: DragonRig, P: DragonP
       p = cranToRoot(rig, sn.x1 + sn.r1 * 0.72, sn.y1 + sn.r1 * 0.2);
       drawEggTooth(ctx, rig, Math.round((p.x - ex) * hf) - 1, Math.round(p.y - ey) - 1);
     }
-  } else if (J.jaw > 0) {
+  } else if (J.jaw >= H.jawMin) {
     p = cranToRoot(rig, sn.x1 - 2, sn.y1 + sn.r1 * 0.9);
     drawFangs(ctx, rig, Math.round((p.x - ex) * hf) - 1, Math.round(p.y - ey));
   }
-  if (J.jaw > 0) {
+  // (a parted jaw, under the minimum, shows neither: ElementStageParams.jawPart)
+  if (J.jaw >= H.jawMin) {
     // the 2 x 2 tongue lies on the open jaw's top edge where the mouth is widest (its bottom row on the jaw's ink,
     // the mouth colour above it), whole pixels in face space: drawn under the jaw, the jaw covered it
     jawTopAt(rig, J.jaw, 0.85, TG);

@@ -10,8 +10,8 @@
 //     lantern carry's swing, the happy flare, the lamplight search, the lamp-bat, the wake's relight);
 //   - the SMOKE TAIL TIP (tailTip: the stepped flat fade navy -> slate band -> smoke) and the NOSE FROST
 //     (headMarkings): the grey creeping in from the edges, stage by stage;
-//   - the BREATH (breath): Nightfall, a mist that rolls along the floor, its elder's finale ring, and the baby's
-//     fizzle (it blows out its own nightlight);
+//   - the BREATH (breath): Nightfall, puffs of mist blown out into a band under the lamp that settles into a bank on
+//     the floor, its elder's finale ring, and the baby's fizzle (it blows out its own nightlight);
 //   - the TOP PASS (ambient): motes (the happy flourish, the breath's, an idle one), the adult's visiting moth and
 //     the fizzle's curl of smoke;
 //   - the ANIMS: the lantern carry, the breathing lamp in the idle, the lamplight search, the tell and `hush` of its
@@ -25,7 +25,7 @@ import type { ElementSpec, ElementDraw, DragonInfo } from '../element.ts';
 import { mouthToRoot } from '../features.ts';
 import { ACT, DFACE, makeDragonPose, lerpDragonPose, dfaceIndex } from '../pose.ts';
 import type { DragonPose, PartialDragonPose } from '../pose.ts';
-import { bake, walkAnim, begAnim, breathAnim, wakeAnim, sleepAnim, baseAnims, lag } from '../anims.ts';
+import { bake, walkAnim, begAnim, breathAnim, wakeAnim, sleepAnim, happyAnim, baseAnims, lag } from '../anims.ts';
 import type { Key } from '../anims.ts';
 import type { DragonAnim, DragonFrame } from '../anim.ts';
 import { animTuning } from '../tuning.ts';
@@ -343,7 +343,8 @@ function lampFrame(rig: DragonRig, pose: DragonPose, info: DragonInfo): void {
   if (S.bud && !LF.turn) { LF.x3 += swing; LF.x2 += swing * 0.5; LF.swing = 0; } else LF.swing = swing;
   LF.bx = LF.x3 + M.bx + LAMP[st].bw / 2 + (LF.turn ? 0 : Math.round(LF.swing));
   LF.by = LF.y3 + M.bodyY + LAMP[st].bh / 2; LF.foot = LF.y3 + M.bottom - 1; LF.floor = floorAt(pose, LF.bx);
-  LF.flick = st === 'elder' && !info.asleep && ((info.tick + Math.floor(hash01(93, info.seed) * MOTH_EVERY)) % MOTH_EVERY < MOTH_FLICK || (act === ACT.fidget && c / FIDGET_TIMING[st].dur >= 47 && c / FIDGET_TIMING[st].dur < 55));
+  // (and once as the pet begins, a tap's answer, so the player finds it: cast review v2 round 2)
+  LF.flick = st === 'elder' && !info.asleep && ((info.tick + Math.floor(hash01(93, info.seed) * MOTH_EVERY)) % MOTH_EVERY < MOTH_FLICK || (act === ACT.fidget && c / FIDGET_TIMING[st].dur >= 47 && c / FIDGET_TIMING[st].dur < 55) || (act === ACT.pet && c >= 2 && c < 2 + MOTH_FLICK));
 }
 
 /**
@@ -558,15 +559,22 @@ function craniumToRoot(ctx: CanvasRenderingContext2D, rig: DragonRig): void {
 }
 
 /**
- * The moth glyphs (3.8): open, a 5 x 3 bow-tie (its notched top and bottom make it a moth, not a star); closed in
+ * The moth glyphs (3.8): open, its wings raised in a V (10001 / 11011 / 01110: two tips up, a 3 px notch of background
+ * between them, the 4-neighbour ink ring filling the middle as its body), the wingbeat's top against the closed delta
+ * (the first 5 x 3 bow-tie, 11011 / 11111 / 11011, closed its notches with ink and read as an "H", glasses or just a
+ * grey shape near the adult's lamp; wings and a body seen from above read as a broken heart: cast review v2); closed in
  * flight (the visiting moth's), a 3 x 4 delta, the folded wings: a flat top, the point down and back (the first
  * draft's wedge, point up at the back, read in its ink ring as a teardrop or a nozzle: the v2 element review); AT
  * REST on the glass (the elder's resident moth), head up, its wings folded into a tent: a 1 px head over two 3 px rows
- * and the two wing tips apart at the bottom. Rows as bit masks, the high bit on the left (the back).
+ * and the two wing tips apart at the bottom, an ink BODY down its middle column under the head (MOTH_BODY), so it is
+ * two folded wings round a body, not a grey "A" or a tent on the glass (cast review v2 round 2). Rows as bit masks,
+ * the high bit on the left (the back).
  */
-const MOTH_OPEN: readonly number[] = [0b11011, 0b11111, 0b11011];
+const MOTH_OPEN: readonly number[] = [0b10001, 0b11011, 0b01110];
 const MOTH_SHUT: readonly number[] = [0b111, 0b111, 0b110, 0b100];
 const MOTH_REST: readonly number[] = [0b010, 0b111, 0b111, 0b101];
+/** The resting moth's body: its middle column, rows 1 to 3, in ink. */
+const MOTH_BODY = 1;
 /** The resident moth's flick: open this many frames every MOTH_EVERY (12 in 36: at 8 in 60 it was hardly seen). */
 const MOTH_FLICK = 12, MOTH_EVERY = 36;
 /** Is cell (x, y) of a moth glyph on? */
@@ -577,9 +585,9 @@ function mothOn(rows: readonly number[], w: number, x: number, y: number): boole
  * Draw a moth glyph (`rows`, `w` wide) with its top-left at lamp (x0, y0), in whole pixels: `fill` (the moth grey
  * `membrane`) in a 4-neighbour ink ring, whose cells that would land on the lamp it sits on (M, shifted `sh` px with
  * its swing) are left out: on the glass it is grey on the lamp's light, and only where it reaches past the lantern does
- * it take ink.
+ * it take ink. `body` >= 0: that column, from row 1 down, is the moth's ink body.
  */
-function mothGlyph(ctx: CanvasRenderingContext2D, rig: DragonRig, rows: readonly number[], w: number, x0: number, y0: number, fill: string, M: LampMask, sh: number): void {
+function mothGlyph(ctx: CanvasRenderingContext2D, rig: DragonRig, rows: readonly number[], w: number, x0: number, y0: number, fill: string, M: LampMask, sh: number, body = -1): void {
   const h = rows.length;
   ctx.fillStyle = rig.col(rig.outline);
   for (let y = -1; y <= h; y++) for (let x = -1; x <= w; x++) {
@@ -590,6 +598,7 @@ function mothGlyph(ctx: CanvasRenderingContext2D, rig: DragonRig, rows: readonly
   }
   ctx.fillStyle = rig.col(fill);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (mothOn(rows, w, x, y)) ctx.fillRect(x0 + x, y0 + y, 1, 1);
+  if (body >= 0) { ctx.fillStyle = rig.col(rig.outline); ctx.fillRect(x0 + body, y0 + 1, 1, h - 1); }
 }
 
 /**
@@ -606,7 +615,7 @@ function drawMothOnGlass(ctx: CanvasRenderingContext2D, rig: DragonRig, info: Dr
   enterFace(ctx, rig, LF.x3, LF.y3);
   if (!small) ctx.rotate(-swingAngle(s, M));
   if (LF.flick) mothGlyph(ctx, rig, MOTH_OPEN, 5, x0 - 1, y0, info.pal.membrane, M, dx);
-  else mothGlyph(ctx, rig, MOTH_REST, 3, x0, y0, info.pal.membrane, M, dx);
+  else mothGlyph(ctx, rig, MOTH_REST, 3, x0, y0, info.pal.membrane, M, dx, MOTH_BODY);
   ctx.restore();
 }
 
@@ -819,9 +828,9 @@ const MOTH_IN = 16, MOTH_ROUND = 72, MOTH_OUT = 20, MOTH_LIFE = MOTH_IN + MOTH_R
  *     each, a quarter of a turn apart: orbitPt), then wink out beside it (the "comes home" of its breath; the first
  *     draft's rising fan copied fire's embers);
  *   - the BREATH's motes (3.8 Nightfall, breathTop): 4 (young 2) rise 12 px out of the bank's front over 24 f, 6 f
- *     apart from the stage's `moteAt` (cue 26; the elder's 44, after its finale ring), swaying together 1 px every
- *     4 f and blinking (8 f on, 2 off); the adult's last one turns back at age 8, flies home in 6 f and goes once
- *     round the lamp on the orbit (24 f) before it winks out beside it;
+ *     apart from the stage's `moteAt` (cue 48 as the band lands, young 34; the elder's 57, after its finale ring),
+ *     swaying together 1 px every 4 f and blinking (8 f on, 2 off); the adult's last one turns back at age 8, flies
+ *     home in 6 f and goes once round the lamp on the orbit (24 f) before it winks out beside it;
  *   - the FIZZLE's curl of smoke (the baby's breath): 2 puffs off its blown-out bud's front shoulder, rising 8 px over
  *     20 f, r 2 -> 3, then shrinking out, `marking` in ink rings, every ring before any fill;
  *   - the IDLE MOTE (awake, the lamp lit, mood >= 0): one mote now and then (every 300 +- 100 f) slips out of the lamp,
@@ -889,109 +898,104 @@ function pushMoth(rig: DragonRig, info: DragonInfo, age: number): void {
 // ---------- the breath: Nightfall ----------
 
 /**
- * The mist per stage (3.8, re-timed by the v2 element review and cast review v2): `n` lobes born every 3 f from cue 2,
- * each born `lead` px out along the snout from the mouth (its ring 2 px or more clear of the lip: never a column joined
- * to the mouth), GLIDING on forward along the snout for `glide` frames as it sinks a little (GLIDE_V), then falling
- * over `fall` frames onto the floor `land` px ahead of the chest's front, 14 to 16 px ahead of the mouth: small in the air
- * (r0 -> rFall, 2 -> 2.5), so the bank takes the volume. Every other one (the odd lobes) is the pour's alone, sinking
- * into the bank as it lands; the even ones ARE the bank (the adult's and elder's 5, the young's 3: 3.8's count), each
- * spreading to its own size (`sizes`: a lumpy top, a cloud) as it rolls along the floor to its place (`rolls`, px from
- * where it landed): the first out forward, the next back toward the paws, and so on, closer in each time, so the bank
- * spreads both ways from the pour as a mist landing does. (Rolled only forward, the lobes bunched into one smooth pill,
- * and the growing bank and the pour made a boot. Born at the mouth at r 2.5 and grown to 5 as they fell straight down
- * 5 px ahead of it, the lobes were one lumpy column from the open lower lip to a pile on the floor: with the jaw at 26
- * deg, the tongue out and the eyes shut, the dragon was being sick, D21's "never sick" on the elder: cast review v2.)
- * It lies there whole until it shrinks away lobe by lobe, the rearmost first, the front lobe gone at cue `end` (the
- * anim's last frame: nightfallAnim). Its motes, and whether the last one comes home to the lamp.
+ * The mist per stage (3.8, re-timed by the v2 element review and both rounds of cast review v2): Nightfall is BREATHED
+ * OUT, LAID OUT, THEN LET SETTLE. It leaves in `puffs` of 3 lobes (a lobe a frame from each puff's cue), each lobe
+ * born `lead` px out along the snout (its ring >= 2 px clear of the parted lip) and blown LEVEL to its place in one
+ * BAND of mist hanging at snout height under the lamp (`fly` frames, eased out: fast off the mouth, slowing as it
+ * arrives), the first puff furthest out (`far` px ahead of the sustain's mouth, the band's front lobe) and each later
+ * one nearer (`near`, under the lantern), so no puff passes through another and the background shows between them
+ * in the air: breaths of fog, never a pour. Then the whole band SETTLES AS ONE SHEET: from `settle` every lobe sinks
+ * at the same rate over `sink` frames (eased in and out), the front lobes up to SETTLE_LAG f first, swelling to its
+ * bank size (`sizes`, front to back: a lumpy top) and flattening as it comes down, so the sheet lands as one long,
+ * low bank under and ahead of the lamp, its far edge about 22 px ahead of the mouth. (Cast review v2 round 2: blown
+ * along an arc that sank as it slowed, the lobes made one beaded rope from just ahead of the open mouth to a puddle
+ * 28 to 34 px out, and the last ones stood up on it as a stalk -- a periscope, a worm, and with the mouth open on the
+ * fangs and the tongue the dragon was being sick or laughing; landed that far out, in the habitat the puddle was the
+ * adult water's. Round 1's: falling straight down 5 px ahead of the lip at 26 deg, one column from the mouth to a
+ * pile.) No mist component ever spans from the lip down to the floor: the band is in the air until it is all down.
+ * The bank lies whole until it shrinks away lobe by lobe, the rearmost first, the front lobe gone at cue `end` (the
+ * anim's last frame: nightfallAnim). The band hangs from the SUSTAIN's mouth (`mx` px ahead of the chest's front, `by`
+ * px over the floor), not the frame's, so the head's 1 px jitter never shakes it. The elder's finale `ring` opens off
+ * the bank's front lobe once the last lobe is down. Its motes, and whether the last one comes home to the lamp.
  */
 interface MistSpec {
-  n: number; r0: number; rFall: number; lead: number; glide: number; land: number; rolls: readonly number[];
-  sizes: readonly number[]; fall: number; end: number; motes: number; moteAt: number; home: boolean;
+  puffs: readonly number[]; r0: number; rBand: number; lead: number; fly: number; mx: number; by: number;
+  near: number; far: number; settle: number; sink: number; sizes: readonly number[]; ring: number; end: number;
+  motes: number; moteAt: number; home: boolean;
 }
 const MIST: Readonly<Record<Stage, MistSpec>> = {
-  baby: { n: 0, r0: 2, rFall: 2, lead: 0, glide: 0, land: 0, rolls: [0], sizes: [3], fall: 1, end: 0, motes: 0, moteAt: 0, home: false },
+  baby: {
+    puffs: [], r0: 2, rBand: 2, lead: 0, fly: 1, mx: 0, by: 0, near: 0, far: 0, settle: 0, sink: 1, sizes: [3], ring: 0,
+    end: 0, motes: 0, moteAt: 0, home: false,
+  },
   young: {
-    n: 5, r0: 2, rFall: 2.5, lead: 9, glide: 6, land: 21, rolls: [7, -5, 1], sizes: [5, 4, 4.5], fall: 12, end: 60,
-    motes: 2, moteAt: 26, home: false,
+    puffs: [2, 8], r0: 1.5, rBand: 2.5, lead: 5, fly: 7, mx: 7.5, by: 23, near: 6, far: 12, settle: 19, sink: 14,
+    sizes: [3, 4.5, 3, 3.5, 4.5, 2.5], ring: 0, end: 64, motes: 2, moteAt: 34, home: false,
   },
   adult: {
-    n: 9, r0: 2, rFall: 2.5, lead: 9, glide: 7, land: 27, rolls: [10, -8, 5.5, -3.5, 1], sizes: [5, 4.5, 6, 5.5, 4],
-    fall: 14, end: 82, motes: 4, moteAt: 26, home: true,
+    puffs: [2, 8, 14], r0: 1.5, rBand: 3, lead: 5, fly: 8, mx: 13, by: 32, near: 7, far: 16, settle: 27, sink: 20,
+    sizes: [3, 5, 3.5, 4, 6, 3.5, 3.5, 5, 2.5], ring: 0, end: 104, motes: 4, moteAt: 48, home: true,
   },
-  // the elder's slow, wise breath: the adult's stream at 1.1x reach over its longer sustain, then the finale ring
-  // (its front lobe, rising off the bank) and only then its motes; none comes home (3.8: the adult's; the elder's
-  // lamp has its moth)
+  // the elder's slow, wise breath: the adult's three puffs, the sheet settling a little quicker so it is down before
+  // its finale ring opens off the bank (cue 45, in the recover's grace: 4.2), and only then its motes; none comes
+  // home (3.8: the adult's; the elder's lamp has its moth)
   elder: {
-    n: 9, r0: 2, rFall: 2.5, lead: 9, glide: 8, land: 31, rolls: [9, -8, 5, -3.5, 0.5], sizes: [5, 4.5, 6, 5.5, 4],
-    fall: 14, end: 86, motes: 4, moteAt: 44, home: false,
+    puffs: [2, 8, 14], r0: 1.5, rBand: 3, lead: 5, fly: 8, mx: 17, by: 29, near: 7, far: 16, settle: 26, sink: 16,
+    sizes: [3, 5, 3.5, 4, 6, 3.5, 3.5, 5, 2.5], ring: 45, end: 100, motes: 4, moteAt: 57, home: false,
   },
 };
 /**
- * The breath's motes rise out of the bank's front, ahead of the pour, from the stage's `moteAt`, 6 f apart, each this
- * far ahead of where the pour lands, px (the adult's; the others' in proportion to their bank): two in the air 6 f
- * apart are 6 px apart across, 12 f apart 6 px apart up (the first build's, 3 px apart, chained into one scribble: the
- * v2 element review).
+ * The breath's motes rise out of the bank's front from the stage's `moteAt`, 6 f apart, each this far ahead of the
+ * bank's front lobe less 4 px, x 0.6: two in the air 6 f apart are 3.6 px apart across, 12 f apart 6 px apart up
+ * (the first build's, 3 px apart, chained into one scribble: the v2 element review).
  */
 const MOTE_X: readonly number[] = [9, 15, 10, 16];
 /** Frames a bank lobe shrinks over at its end (3 steps: 5.1 #14, never alpha), and between one lobe's end and the next's. */
-const MIST_FADE = 9, MIST_STEP = 2.5;
-/**
- * A lobe's glide along the snout, px/f, before it falls. Born `lead` 9 px out (its ring 2.0 to 2.2 px of background off
- * the lip at every stage's jaw: measured on the rig), it falls from 12 to 13 px ahead of the mouth and lands 14 to 16.
- */
-const GLIDE_V = 0.5;
-const LB = { x: 0, y: 0, r: 0, ry: 0, air: false };
+const MIST_FADE = 9, MIST_STEP = 1.5;
+/** Frames each puff of the band starts to settle after the one ahead of it (the front sinks first). */
+const SETTLE_LAG = 1;
+/** px between a puff's lobes in the band, the first born furthest out: each puff one lump of the cloud. */
+const PUFF_STEP = 1.5;
+const LB = { x: 0, y: 0, r: 0, ry: 0 };
+
+/** Ease-in-out on u clamped to 0..1 (the sheet's settle: it starts softly and lands softly). */
+function inOut(u: number): number { const v = u < 0 ? 0 : u > 1 ? 1 : u; return v * v * (3 - 2 * v); }
 
 /**
- * Where mist lobe k is at cue c, ROOT space, into LB (centre, radius, and its height ry; LB.r 0 = not there). Born at
- * cue 2 + 3k `lead` px out along the snout from the mouth at r `r0`, it GLIDES on along the snout for `glide` frames
- * (easing from 1 px/f, sinking a pixel or two), then POURS to the floor over `fall` frames, out and down in an arc
- * (forward on an ease-out, down on a steady fall that gathers a little speed, 0.7 v + 0.3 v^2: lobes 3 f apart
- * overlap into one ribbon of mist, where the first build's quadratic fall, 5 f apart, spread them into a string of
- * drips), each a pixel to one side or the other of the last so its edges billow; round and small (rFall) as it falls.
- * An odd lobe then sinks into the bank (shrinking out over 4 f); an even one grows to its bank size, FLATTENS (ry
- * 0.9 r -> 0.6 r over 4 f, a low bank) and ROLLS forward along the floor, easing from 1 px/f to its place in the bank.
- * It rests on the floor, its ring's lowest row on the floor line; over its last 9 f it shrinks away in 3 steps, the
- * rear lobe first.
+ * Where mist lobe k (0 = the first born, the band's front) is at cue c, ROOT space, into LB (centre, radius and its
+ * height ry; LB.r 0 = not there): born at its puff's cue + (k mod 3) `lead` px out along the snout from the mouth
+ * (mouthAng) at r `r0`; blown level to its place in the band over `fly` f (an ease-out), swelling to rBand, a
+ * pixel above or below its neighbours so the band's top billows; held there until its turn to settle; sunk to the
+ * floor with the sheet (inOut over `sink`), swelling to its bank size and flattening (ry 0.9 r -> 0.6 r); then
+ * lying on the floor, its ring's lowest row on the floor line, until it shrinks away over its last MIST_FADE f in 3
+ * steps, the rearmost first.
  */
 function lobeAt(rig: DragonRig, pose: DragonPose, st: Stage, k: number, c: number): void {
-  const Mi = MIST[st], J = rig.j, d = rig.dims, age = c - 2 - 3 * k, bank = k % 2 === 0, j = k >> 1;
-  // (a bank lobe ends MIST_STEP frames before each one that lies ahead of it: the rearmost first)
-  let ahead = 0;
-  if (bank) for (let i = 0; i < Mi.rolls.length; i++) if (Mi.rolls[i] > Mi.rolls[j]) ahead++;
-  const air = Mi.glide + Mi.fall, dieAt = bank ? Mi.end - 1 - MIST_STEP * ahead : 2 + 3 * k + air + 4;
+  const Mi = MIST[st], J = rig.j, n = Mi.puffs.length * 3, born = Mi.puffs[Math.floor(k / 3)] + (k % 3), age = c - born;
+  // (the rearmost, the last born, shrinks first; the front lobe is gone at `end`)
+  const dieAt = Mi.end - 1 - MIST_STEP * k;
   LB.r = 0;
   if (age < 0 || c >= dieAt) return;
-  const xL = d.gap / 2 + d.chestR + Mi.land, rk = bank ? Mi.sizes[j] : Mi.rFall;
-  LB.air = age < air;
-  // (small in the air; a bank lobe spreads to its own size over its first 8 f down, the pour's sinks into it)
-  let r = age < air ? Mi.r0 + (Mi.rFall - Mi.r0) * age / air
-    : bank ? Mi.rFall + (rk - Mi.rFall) * Math.min(1, (age - air) / 8) : Mi.rFall;
-  const fade = c - (dieAt - (bank ? MIST_FADE : 4));
-  if (fade >= 0) r = Math.max(1, bank ? r * (fade < 3 ? 0.75 : fade < 6 ? 0.5 : 0.3) : r * (fade < 2 ? 0.7 : 0.4));
-  // the glide's end: `lead` + GLIDE_V px/f along the snout (mouthAng, never more than 10 deg below level), easing out
-  const ma = J.mouthAng * D2R, gl = Mi.lead + GLIDE_V * Mi.glide;
-  if (age < Mi.glide) {
-    const u = age / Mi.glide, g = Mi.lead + GLIDE_V * Mi.glide * (1 - 0.5 * (1 - u) * (1 - u) - 0.5 * (1 - u));
-    LB.x = J.mouth.x + Math.cos(ma) * g; LB.y = J.mouth.y + Math.sin(ma) * g + 1.5 * u * u;
-    LB.r = r; LB.ry = r * 0.9;
-    return;
+  const P = Mi.puffs.length, p = Math.floor(k / 3), chest = rig.dims.gap / 2 + rig.dims.chestR;
+  const sx = chest + Mi.mx + Mi.far - (Mi.far - Mi.near) * (P > 1 ? p / (P - 1) : 0) + PUFF_STEP * (1 - (k % 3)), rk = Mi.sizes[k];
+  // the band's height: the sustain mouth's less its drop under the lamp, and never nearer the lamp's foot ink than
+  // 2 px of air (LF: nearHead set it this frame)
+  const yB = Math.max(floorAt(pose, sx) - Mi.by, LF.foot + 4 + Mi.rBand) + ((k % 3) - 1) * 0.7;
+  const s0 = Math.max(Mi.settle + SETTLE_LAG * p, born + Mi.fly), w = inOut((c - s0) / Mi.sink);
+  let x: number, y: number, r: number, ry: number;
+  if (age < Mi.fly) {
+    // blown out level: fast off the mouth, slowing into its place
+    const v = age / Mi.fly, u = 1 - (1 - v) * (1 - v) * (1 - v), ma = J.mouthAng * D2R;
+    const x0 = J.mouth.x + Math.cos(ma) * Mi.lead, y0 = J.mouth.y + Math.sin(ma) * Mi.lead;
+    x = x0 + (sx - x0) * u; y = y0 + (yB - y0) * u; r = Mi.r0 + (Mi.rBand - Mi.r0) * u; ry = r * 0.9;
+  } else {
+    // in the band, then settling with the sheet, then lying in the bank
+    x = sx; r = Mi.rBand + (rk - Mi.rBand) * w; ry = r * (0.9 - 0.25 * w);
+    y = yB + (floorAt(pose, x) - ry - 1 - yB) * w;
   }
-  if (age < air) {
-    // (out along the snout on an ease-out and down, billowing a pixel and a half to either side mid-fall)
-    const v = (age - Mi.glide) / Mi.fall, mx = J.mouth.x + Math.cos(ma) * gl, my = J.mouth.y + Math.sin(ma) * gl + 1.5, ry = r * 0.9;
-    const rest = floorAt(pose, xL) - ry - 1, side = (k % 2 ? 1.5 : -1) * Math.sin(Math.PI * v);
-    LB.x = mx + (xL - mx) * (1 - (1 - v) * (1 - v)) + side;
-    LB.y = my + (rest - my) * (0.7 * v + 0.3 * v * v);
-    LB.r = r; LB.ry = ry;
-    return;
-  }
-  const D = bank ? Mi.rolls[j] : 0, T = Math.max(1, 2 * Math.abs(D));
-  const u = Math.min(1, (age - air) / T);
-  LB.x = xL + D * (1 - (1 - u) * (1 - u));
-  LB.ry = r * (0.9 - 0.3 * Math.min(1, (age - air) / 4));
-  LB.y = floorAt(pose, LB.x) - LB.ry - 1;
-  LB.r = r;
+  const fade = c - (dieAt - MIST_FADE);
+  if (fade >= 0) { const f = fade < 3 ? 0.75 : fade < 6 ? 0.5 : 0.3; r = Math.max(1, r * f); ry = Math.max(1, ry * f); y = floorAt(pose, x) - ry - 1; }
+  LB.x = x; LB.y = y; LB.r = r; LB.ry = ry;
 }
 
 /** A lobe's ellipse filled flat (its ring is the same ellipse 1 px larger each way, drawn first). */
@@ -1002,17 +1006,17 @@ function lobe(ctx: CanvasRenderingContext2D, rig: DragonRig, x: number, y: numbe
 
 /**
  * The signature: NIGHTFALL (3.8), the only breath that goes DOWN and lies on the floor. Mouth space in; the mist is
- * drawn in root space. A lobe is born every 3 f from cue 2 (9 of them, young 5), and they pour from the mouth in one
- * billowing column onto the floor under the chin, where every other one sinks into the bank and the rest spread out
- * both ways along it into one long, low bank reaching 34 px ahead of the chest (young 25), which lies there whole
- * through the recover (16 f or more) and then shrinks away lobe by lobe, the rearmost first (MIST, lobeAt). Opaque `membrane` lobes, each in a 1 px `scale` ring, EVERY RING BEFORE ANY FILL so column and bank
- * read as one cloud (fire's smoke technique). (The first build's 5 lobes, 5 f apart, fell in a string of separate
- * ringed discs, drool or bubbles, and piled into one lump under the lamp that read as a stone: the v2 element
- * review.) The elder's FINALE (cue 32 to 44, 6 f before the anim's window, anims.ts ELDER_FINALE: the seam's old text):
- * the bank's front lobe lifts off the floor as one ring of mist that
- * widens and drifts up and forward, away from the face, 2 px of `membrane` between 1 px `scale` edges. The baby's
- * FIZZLE: one huff of 2 small lobes rises from its mouth into its own bud (cue 0 to 6), which goes out (lampFrame);
- * the smoke is the top pass's (breathTop).
+ * drawn in root space. Three puffs of mist (young two) are blown out level from the parted mouth into one band
+ * hanging at snout height under the lamp, which then settles as one sheet into a long, low bank on the floor under
+ * and ahead of the lamp (MIST, lobeAt), lies there whole through the recover and shrinks away lobe by lobe, the
+ * rearmost first. Opaque `membrane` lobes, each in a 1 px `scale` ring, EVERY RING BEFORE ANY FILL so each puff, the
+ * band and the bank read as one cloud (fire's smoke technique). (The first build's 5 lobes, 5 f apart, fell in a
+ * string of separate ringed discs, drool or bubbles, and piled into one lump under the lamp that read as a stone:
+ * the v2 element review.) The elder's FINALE, once the sheet is down (cue `ring` to + 12, 6 f into the recover's
+ * grace after the anim's window, anims.ts ELDER_FINALE): the bank's front lobe lifts off the floor as one ring of
+ * mist that widens and drifts up and forward, away from the face, 2 px of `membrane` between 1 px `scale` edges.
+ * The baby's FIZZLE: one huff of 2 small lobes rises from its mouth into its own bud (cue 0 to 6), which goes out
+ * (lampFrame); the smoke is the top pass's (breathTop).
  */
 const breath: ElementDraw = (ctx, rig, pose, info) => {
   if (pose.act !== ACT.breath || rig.override) return;
@@ -1020,29 +1024,23 @@ const breath: ElementDraw = (ctx, rig, pose, info) => {
   ctx.save();
   mouthToRoot(ctx, rig, info.ang);
   if (st === 'baby') { huff(ctx, rig, info, c); ctx.restore(); return; }
-  const Mi = MIST[st], elder = st === 'elder';
+  const Mi = MIST[st], ring = Mi.ring > 0 && c >= Mi.ring;
   for (let pass = 0; pass < 2; pass++) {
-    // (between two lobes in the air, one more at their midpoint, a size smaller: the pour is one wavy ribbon of mist,
-    // never a string of beads)
-    let px = 0, py = 0, pr = 0, pAir = false;
-    for (let k = Mi.n - 1; k >= 0; k--) {
-      // (the elder's front lobe becomes the finale's ring at cue 32)
-      if (elder && k === 0 && c >= 32) continue;
+    for (let k = Mi.puffs.length * 3 - 1; k >= 0; k--) {
+      // (the elder's front lobe becomes the finale's ring)
+      if (ring && k === 0) continue;
       lobeAt(rig, pose, st, k, c);
-      if (LB.r <= 0) { pAir = false; continue; }
-      const hex = pass ? info.pal.membrane : info.pal.scale, e = pass ? 0 : 1;
-      lobe(ctx, rig, LB.x, LB.y, LB.r + e, LB.ry + e, hex);
-      if (pAir && LB.air) {
-        const rm = Math.min(pr, LB.r) * 0.8;
-        lobe(ctx, rig, (px + LB.x) / 2, (py + LB.y) / 2, rm + e, rm * 0.9 + e, hex);
-      }
-      px = LB.x; py = LB.y; pr = LB.r; pAir = LB.air;
+      if (LB.r <= 0) continue;
+      const e = pass ? 0 : 1;
+      lobe(ctx, rig, LB.x, LB.y, LB.r + e, LB.ry + e, pass ? info.pal.membrane : info.pal.scale);
     }
   }
-  if (elder && c >= 32 && c < 44) {
-    lobeAt(rig, pose, st, 0, 31);
-    const u = (c - 32) / 12, R = Math.round(4 + 5 * u), x = Math.round(LB.x + 6 * u);
-    const y = Math.round(floorAt(pose, x) - R - 2 - 6 * u);
+  if (ring && c < Mi.ring + 12) {
+    lobeAt(rig, pose, st, 0, Mi.ring - 1);
+    // (lifting off at once, then drifting up more slowly: sat on the bank's end for its first frames it read as a
+    // tyre on a puddle, cast review v2 round 2)
+    const u = (c - Mi.ring) / 12, R = Math.round(4 + 5 * u), x = Math.round(LB.x + 6 * u);
+    const y = Math.round(floorAt(pose, x) - R - 3 - 8 * Math.sqrt(u));
     ringOf(ctx, rig, x, y, R + 1, R - 3, info.pal.scale);
     ringOf(ctx, rig, x, y, R, R - 2, info.pal.membrane);
   }
@@ -1094,12 +1092,12 @@ function breathTop(rig: DragonRig, pose: DragonPose, info: DragonInfo): void {
     }
     return;
   }
-  const d = rig.dims, xL = d.gap / 2 + d.chestR + Mi.land;
+  const d = rig.dims, xF = d.gap / 2 + d.chestR + Mi.mx + Mi.far;
   for (let i = 0; i < Mi.motes; i++) {
     const age = c - Mi.moteAt - 6 * i;
     const home = Mi.home && i === Mi.motes - 1;
     if (age < 0 || age >= (home ? 38 : 24)) continue;
-    const x0 = xL + MOTE_X[i] * (Mi.rolls[0] + Mi.sizes[0]) / 15, y0 = floorAt(pose, x0) - 10;
+    const x0 = xF - 4 + MOTE_X[i] * 0.6, y0 = floorAt(pose, x0) - 10;
     if (home && age >= 8) {
       // it comes home: 6 f to the lamp, once round it on the orbit (24 f), and out beside it
       const ex = x0 - 1, ey = y0 - 4;
@@ -1217,6 +1215,19 @@ function tuckinAnim(stage: Stage, dims: DragonDims | null): DragonAnim {
 }
 
 /**
+ * HAPPY, young and older (4.2's preen and the young's hop): the shared one with the tail held at `tail.stiff` 0.6 or
+ * more through it, so the long, full tail sways as one piece, the chain's lag never whipping it: gentle and dreamy
+ * (3.8). (Cast review v2 round 2: the adult's swung from the floor to 25 deg up in 4 f as the chest puffed, and its
+ * smoke tip kinked up at the end; TAIL_RISE takes most of the lift out, this the snap.)
+ */
+function preenAnim(stage: Stage): DragonAnim {
+  return eachFrame(happyAnim(stage), (_t, p) => {
+    const tl = (p.tail ??= {});
+    tl.stiff = Math.max(0.6, tl.stiff ?? 0);
+  });
+}
+
+/**
  * WAKE (4.3): the shared wake (the lamp switched on as the eyes first open and refilled by the nap: lampFrame), with the
  * long tail kept low: the chain faded to 0.3 through it. Let go as the play-bow's pitch lifted off it, dusk's tail (x 1.2,
  * the cast's fullest but water's) swung up past 45 deg over the rump, into fire's zone above the tail tip (3.0).
@@ -1230,12 +1241,14 @@ function relightAnim(stage: Stage, dims: DragonDims | null): DragonAnim {
 
 /**
  * BREATH (3.8 Nightfall), young and older: the shared breath with its tell and its event. The TELL: the lamp turns up
- * in two steps (lampFrame) and it smiles, `happy` from the wind-up's last 4 f through the pour to the recover's own
+ * in two steps (lampFrame) and it smiles, `happy` from the wind-up's last 4 f through the blow to the recover's own
  * (a soft blow, content: the eyes shut for the wind-up and the jaw at 26 deg over a column falling to the floor read
- * as being sick, D21, cast review v2; the jaw now opens only to its stage minimum, tuning.breath); `event: 'hush'` at
- * the snap (cue 0), meant to calm the neighbours (5.4: nothing consumes it yet). The anim runs on after the shared
- * recover, holding its last pose, to the mist's `end` (cue 60 / 82 / 86: the bank lies whole through the recover and
- * then shrinks away, and the adult's last mote comes home to the lamp: breathTop); 75 / 101 / 109 f in all.
+ * as being sick, D21, cast review v2); the jaw only PARTED, BLOW_JAW, all through (the shared elder breath's 16 for
+ * its finale clamped too: at 16 the fangs and the tongue over the mist read as a laugh, cast review v2 round 2);
+ * `event: 'hush'` at the snap (cue 0), meant to calm the neighbours (5.4: nothing consumes it yet). The anim runs on
+ * after the shared recover, holding its last pose, to the mist's `end` (cue 64 / 104 / 100: the band settles, the bank
+ * lies whole through the recover and then shrinks away, and the adult's last mote comes home to the lamp:
+ * breathTop); 79 / 123 / 123 f in all.
  */
 function nightfallAnim(stage: Stage): DragonAnim {
   const a = breathAnim(stage, animTuning(stage, DUSK));
@@ -1243,6 +1256,9 @@ function nightfallAnim(stage: Stage): DragonAnim {
     const c = p.cue ?? 0;
     if (c >= -4 && (c < 0 || (p.fx ?? 0) > 0.05)) p.face = DFACE.happy;
     if (c === 0) f.event = 'hush';
+    // (the blow's parted jaw throughout: the shared elder breath opens to 16 for its finale, a bite of fangs over
+    // the ring)
+    if ((p.jaw ?? 0) > BLOW_JAW) p.jaw = BLOW_JAW;
   });
   return extendOneShot(a, MIST[stage].end - (a.frames[a.frames.length - 1].pose?.cue ?? 0));
 }
@@ -1393,6 +1409,19 @@ const BAT_SIT: Readonly<Record<Stage, Readonly<{ body: number; neck: number; hea
   elder: { body: -22, neck: -70, head: 100, up: 145, low: -40 },
 };
 
+/**
+ * The share of a swing over its rest line the tail takes (ElementStageParams.tailRise), every stage: the plain tail
+ * and its pale smoke tip droop and sway, never above the back line (2.3; the adult happy swung the tip 7 px over the
+ * back, to head height in fire's zone, and the sleep 6: cast review v2 round 2). Water's is 0; dusk's sways a little.
+ */
+const TAIL_RISE = 0.3;
+/**
+ * Nightfall's blow (3.8): the jaw PARTED, deg, under the stage minimum (ElementStageParams.jawPart): the mouth wedge
+ * shows with no tongue and no fangs, a soft "ooh" (at the minimum, 16 / 20, the fangs and the tongue showed over the
+ * mist and it read as a laugh, or being sick: cast review v2 round 2).
+ */
+const BLOW_JAW = 9;
+
 export const DUSK: ElementSpec = {
   id: 'dusk',
   name: 'Wick',
@@ -1408,21 +1437,23 @@ export const DUSK: ElementSpec = {
     bodyLength: 1.0, bodyDepth: 1.2, legLength: 0.85, legR: 0.76, neckLength: 1.0, neckAngle: 6, tailLength: 1.2,
     tailR: 1.0, snout: 0.8,
   },
+  // (every stage: the tail takes TAIL_RISE of a swing over its rest line, and the young and older part the jaw for
+  // Nightfall's blow, BLOW_JAW)
   stages: {
     // the first marking is the smoke tail tip (tailTip: the shared kinds have no stepped `tip`), the second the nose
     // frost (headMarkings), so no shared marking is listed: the baby carries its tip alone (D15)
     baby: {
       // (its tail x 0.9, in line with Ripple's: at the modifier's full 1.2 the baby was the cast's longest, 58 px, a
       // low salamander more than a pot-bellied ball, 2.6's short, stiff baby tail: cast review v2)
-      tailRest: TAIL_REST.dusk.baby, tailLen: 0.9, horns: null, markings: [],
+      tailRest: TAIL_REST.dusk.baby, tailLen: 0.9, tailRise: TAIL_RISE, horns: null, markings: [],
       wing: wingParams({ style: 'bat' }), dorsal: null,
     },
     young: {
-      tailRest: TAIL_REST.dusk.young, horns: null, markings: [],
+      tailRest: TAIL_REST.dusk.young, tailRise: TAIL_RISE, jawPart: BLOW_JAW, horns: null, markings: [],
       wing: wingParams({ style: 'bat', scallop: -1 }), dorsal: null,
     },
     adult: {
-      tailRest: TAIL_REST.dusk.adult, horns: null, markings: [],
+      tailRest: TAIL_REST.dusk.adult, tailRise: TAIL_RISE, jawPart: BLOW_JAW, horns: null, markings: [],
       wing: wingParams({ style: 'bat', scallop: -1.5 }), dorsal: null,
     },
     // the elder (3.8's Elder column): the elder's posture with dusk's +6 deg on top (2.3: net 58 / 28), the storm
@@ -1431,7 +1462,7 @@ export const DUSK: ElementSpec = {
     // the resident moth (nearHead), the moth wing worn as fire's is (2.9: tears in panels 1 and 2, the notched hole
     // from full spread, re-measured for the airing)
     elder: {
-      tailRest: TAIL_REST.dusk.elder, horns: null, markings: [],
+      tailRest: TAIL_REST.dusk.elder, tailRise: TAIL_RISE, jawPart: BLOW_JAW, horns: null, markings: [],
       wing: wingParams({
         style: 'bat', scallop: -1.5,
         tears: [{ panel: 1, at: 0.35, depth: 5 }, { panel: 2, at: 0.6, depth: 5 }],
@@ -1452,16 +1483,17 @@ export const DUSK: ElementSpec = {
     fidget: (st) => batAnim(st),
     overrides: (st, dims) => ({
       idle: breathingIdle(st), walk: carryAnim(st, dims), beg: searchAnim(st), wake: relightAnim(st, dims),
+      ...(st === 'baby' ? {} : { happy: preenAnim(st) }),
       breath: st === 'baby' ? babyBreath() : nightfallAnim(st), tuckin: tuckinAnim(st, dims),
     }),
     tuning: (st) => ({
       // the lantern carry (4.3): 0.4 px/f (young 0.45, baby 0.28), paw lift 2.5 / 2 / 1.5; the elder at its own 0.34
       // and 2 px (4.2's elder column)
       walk: st === 'elder' ? {} : { speed: st === 'adult' ? 0.4 : st === 'young' ? 0.45 : 0.28, lift: st === 'adult' ? 2.5 : st === 'young' ? 2 : 1.5 },
-      // Nightfall's snap: the jaw at its stage minimum, 16 (young 20), a soft blow, never a gape (26 with the tongue
-      // out over the pour read as being sick: cast review v2); the baby's fizzle ends sheepish, puffed up round before
-      // it (babyBreath)
-      breath: st === 'baby' ? { fizzleFace: 'sheepish', puff: 1.1 } : { jaw: st === 'young' ? 20 : 16 },
+      // Nightfall's snap: the jaw only parted, BLOW_JAW, a soft blow, never a gape (26 with the tongue out over the
+      // pour read as being sick, and 16 with the fangs as a laugh: cast review v2); the baby's fizzle ends sheepish,
+      // puffed up round before it (babyBreath)
+      breath: st === 'baby' ? { fizzleFace: 'sheepish', puff: 1.1 } : { jaw: BLOW_JAW },
     }),
   },
 };

@@ -101,6 +101,7 @@ export function dragonBuild(o: DragonBuildOpts): DragonBuild {
     snout: { ...sn, x1, r1 },
     jaw: { ...H.jaw, tx: H.jaw.tx + (x1 - sn.x1), r0: H.jaw.r0 * jd, r1: H.jaw.r1 * jd },
     jawMax: base0.jawMax != null ? base0.jawMax : M.jawMax != null ? M.jawMax : H.jawMax,
+    jawPart: base0.jawPart,
   };
 
   // ---- 2.8 seeded variant (inside the 2.7 invariants) ----

@@ -13,7 +13,9 @@
 //
 // - VARIANTS. While a "home" loop plays (idle), every 6-10 s (seeded, so a frozen frame is reproducible) the player
 //   cuts to one of the home's variants -- a look-around, a yawn, a scratch, the element's fidget -- with a blend, and
-//   blends back to the home loop when it ends (setVariants; 4.2 "Variants every 6 to 10 s").
+//   blends back to the home loop when it ends (setVariants; 4.2 "Variants every 6 to 10 s"). A variant that spreads
+//   the wings (the elder's airing) is skipped while the owner marks the pet `crowded` (5.4: spread wings are events,
+//   never a wall of membranes; two elders airing side by side merged into one two-headed dragon: cast review v2).
 //
 // And three small additions to the frame format's semantics, all opt-in:
 // - `loopFrom`: a loop with an INTRO (sleep: the lie-down plays once, then the breathing loops). A desynced start
@@ -140,9 +142,16 @@ export class DragonAnimPlayer {
   private blinkAt = -1e9;
   private blinkTwice = false;
   private staticPose: PartialDragonPose | null = null;
+  /**
+   * Set by the scene's owner once per tick: another dragon lies within this one's spread reach (the wary gap under
+   * CROWD_GAP, 5.4), so the variant schedule does not START a spread-wing variant (setVariants' `spread`); one already
+   * playing plays out.
+   */
+  crowded = false;
   /** The idle-variant schedule (setVariants): the home loop, its variants, the interval range, the next cut. */
   private home: string | null = null;
   private variants: readonly string[] = [];
+  private spread: readonly string[] = [];
   private varMin = 360;
   private varMax = 600;
   private nextVariant = Infinity;
@@ -206,11 +215,27 @@ export class DragonAnimPlayer {
   /**
    * Schedule idle variants: while `home` (a loop) plays, every `min`-`max` frames (seeded) cut to one of `names`
    * (one-shots in the table; a name may repeat to weight it) with an 8 f blend, and blend back to `home` when it ends.
-   * Names missing from the table are skipped. An empty list switches the schedule off.
+   * Names missing from the table are skipped. An empty list switches the schedule off. `spread` names the variants
+   * that spread the wings (anims.ts SPREAD_VARIANTS): a cut while `crowded` picks among the others.
    */
-  setVariants(home: string, names: readonly string[], min = 360, max = 600): void {
+  setVariants(home: string, names: readonly string[], min = 360, max = 600, spread: readonly string[] = []): void {
     this.home = home; this.variants = names.filter((n) => this.has(n)); this.varMin = min; this.varMax = Math.max(min, max);
+    this.spread = spread;
     this.nextVariant = this.variants.length ? this.clock + this.varMin + Math.floor(this.varRng.next() * (this.varMax - this.varMin + 1)) : Infinity;
+  }
+
+  /**
+   * The variant a cut plays, from one draw `u` in [0, 1): any of the list, or while `crowded` any but the spread
+   * ones (null when the list has nothing else: the cut waits for the next interval).
+   */
+  private pickVariant(u: number): string | null {
+    const V = this.variants;
+    if (!this.crowded || !this.spread.length) return V[Math.floor(u * V.length)];
+    let n = 0;
+    for (let i = 0; i < V.length; i++) if (!this.spread.includes(V[i])) n++;
+    let k = Math.floor(u * n);
+    for (let i = 0; i < V.length; i++) if (!this.spread.includes(V[i]) && k-- === 0) return V[i];
+    return null;
   }
 
   /** Is the current anim one of the home loop's variants (it returns to the home loop when it ends)? */
@@ -222,7 +247,9 @@ export class DragonAnimPlayer {
     this.clock++;
     if (this.home && this.def) {
       if (this.name === this.home && this.clock >= this.nextVariant) {
-        this.play(this.variants[Math.floor(this.varRng.next() * this.variants.length)], { restart: true, blend: 8 });
+        const v = this.pickVariant(this.varRng.next());
+        if (v) this.play(v, { restart: true, blend: 8 });
+        else this.nextVariant = this.clock + this.varMin + Math.floor(this.varRng.next() * (this.varMax - this.varMin + 1));
       } else if (this.done && this.inVariant) {
         this.play(this.home, { restart: true, blend: 10 });
         this.nextVariant = this.clock + this.varMin + Math.floor(this.varRng.next() * (this.varMax - this.varMin + 1));

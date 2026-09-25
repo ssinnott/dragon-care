@@ -20,7 +20,8 @@
 //                   near-black is noise, not colour. Pairs include the cel tones a pigment edge crosses: a marking
 //                   runs through the body's shadow and highlight bands, and the belly line runs through the shadow.
 //                   The elder adds its face: the grey muzzle and brow tuft, and the beard (its own inked hair tuft),
-//                   against what they touch (bible 2.5), and its elder-only extras (section 3).
+//                   against what they touch (bible 2.5; rock's white beard exempt from the throat stripe, inked:
+//                   5.6 E15), and its elder-only extras (section 3).
 //   (b) elements  : the seven SCALE colours (the body, about half of every sprite) are pairwise distinguishable at
 //                   every pair of stages. See RULE_B below for the rule and why; a pair that passes on value alone
 //                   (B2) must also clear the dark-pair floor (OKL_MIN, or OKDE_MIN of Oklab dE).
@@ -39,8 +40,9 @@
 //   (h) mood states: every pair of colours a mood swaps between passes the ladder, so the change can be seen.
 //   (i) floor     : every scale, every belly, the outer colour of every effect that lands on the floor, every marking
 //                   that runs along the silhouette's edge (dusk's smoke tail tip and its band), dusk's lamp resting
-//                   on the floor asleep, and the elder's beard (a sleeping elder's chin rests on it) keep >= 25 %
-//                   luminance from the reference habitat floor. Hue cannot help: the floor's S is < 0.20.
+//                   on the floor asleep, and the elder's beard (a sleeping elder's chin rests on it; water's and
+//                   rock's are exempt, inked: bible 5.6 E14, E15) keep >= 25 % luminance from the reference habitat
+//                   floor. Hue cannot help: the floor's S is < 0.20.
 //   (j) identity  : greying never takes a body's hue away: every scale keeps HSV S >= 0.30 at every stage, so gate
 //                   (b)'s B1 and the neutral ceiling (<= 40 % neutral area) keep holding for elders.
 //   (k) visible greying: each greying step (young -> adult, adult -> elder) moves the scale or its highlight band
@@ -253,7 +255,8 @@ function colour(e: DragonElement, st: AgeStage, ref: Ref): string {
 }
 
 // ---------- adjacency: which colours touch on the sprite ----------
-interface Pair { a: Ref; b: Ref; why: string; }
+/** `except`: an element whose pair is not gated, and why (the bible's 5.6 exemption ledger: E15, rock's white beard). */
+interface Pair { a: Ref; b: Ref; why: string; except?: Readonly<Partial<Record<DragonElement, string>>>; }
 /** The pairs every dragon has, from the part construction in the bible (section 1). */
 const CORE_PAIRS: readonly Pair[] = [
   { a: 'scale', b: 'belly', why: 'belly band inside the body silhouette, no ink' },
@@ -303,6 +306,8 @@ const EXTRA_PAIRS: Readonly<Record<DragonElement, readonly Pair[]>> = {
     { a: 'smokeBand', b: 'marking', why: 'the slate band meets the smoke tip' },
   ],
 };
+/** E15: rock's beard is its muzzle white, an old dog's white chin tuft, held off the cream stripe and the straw by its ink. */
+const ROCK_BEARD = 'the muzzle white, inked on its outer contour: 5.6 E15';
 /** Pairs only the ELDER has (bible 2.5, the elder face; section 3's elder-only extras). */
 const ELDER_PAIRS: readonly Pair[] = [
   { a: 'muzzle', b: 'scale', why: 'the grey muzzle on the snout' },
@@ -310,8 +315,8 @@ const ELDER_PAIRS: readonly Pair[] = [
   { a: 'muzzle', b: 'scale.sh', why: 'the muzzle meets the head\'s shadow band at the snout\'s front-bottom' },
   { a: 'muzzle', b: 'dark', why: 'the nostril sits on the muzzle' },
   { a: 'muzzle', b: 'ink', why: 'ink face marks (the mouth line, a closed eye\'s bar) sit on the muzzle' },
-  { a: 'beard', b: 'belly', why: 'the beard sweeps back along the throat stripe (inked, but gated like a horn)' },
-  { a: 'beard', b: 'belly.sh', why: 'the beard over the throat stripe\'s shadow tone' },
+  { a: 'beard', b: 'belly', why: 'the beard sweeps back along the throat stripe (inked, but gated like a horn)', except: { rock: ROCK_BEARD } },
+  { a: 'beard', b: 'belly.sh', why: 'the beard over the throat stripe\'s shadow tone', except: { rock: ROCK_BEARD } },
   { a: 'beard', b: 'scale.sh', why: 'the beard\'s root under the closed jaw\'s shadow sliver' },
   { a: 'beard', b: 'ink', why: 'the beard\'s own outline' },
 ];
@@ -355,8 +360,14 @@ const MOOD_PAIRS: Readonly<Partial<Record<DragonElement, readonly Pair[]>>> = {
  * marking that runs along the silhouette's edge (dusk's smoke tail tip and band: a tail lies on the floor), dusk's
  * lamp resting on the floor asleep (its dark face), and (`only` elder) the beard a sleeping elder rests its chin on.
  */
-interface FloorItem { what: string; ref: Ref; only?: AgeStage; }
-const FLOOR_ALL: readonly FloorItem[] = [{ what: 'beard', ref: 'beard', only: 'elder' }];
+interface FloorItem { what: string; ref: Ref; only?: AgeStage; except?: Readonly<Partial<Record<DragonElement, string>>>; }
+/**
+ * (`except`: an element whose item is not gated, and why: the bible's 5.6 exemption ledger. E14: water's elder beard is its
+ * pale frost muzzle's grey, 0.65, grown from the grey chin: its belly and the floor are 0.48 and 0.67, so one grey
+ * clears the belly only at >= 0.64 and the floor only at <= 0.50 or >= 0.89, and the frost at 0.92 made the stark
+ * white snout and a white tusk under it (cast review v2). On the straw it rests inside its own 1 px ink ring.)
+ */
+const FLOOR_ALL: readonly FloorItem[] = [{ what: 'beard', ref: 'beard', only: 'elder', except: { water: 'inked on its outer contour: 5.6 E14', rock: ROCK_BEARD } }];
 const FLOOR_FX: Readonly<Record<DragonElement, readonly FloorItem[]>> = {
   fire: [{ what: 'breath puff outer ring', ref: 'scale' }],
   spike: [{ what: 'sap streak / sparkle edge', ref: 'scale' }],
@@ -410,7 +421,11 @@ for (const e of DRAGON_ELEMENTS) {
     const [a0, b0] = get('baby'), [a3, b3] = get('elder');
     out.push(`${allOk ? '  ok  ' : '  FAIL'} ${name.padEnd(19)} lum ${perStage(lums, oks, n100).padEnd(15)} hue ${'-'.padEnd(15)} ${'lum'.padEnd(12)} ${a0} ${b0}${a3 !== a0 || b3 !== b0 ? ` -> ${a3} ${b3}` : ''}`);
   }
-  for (const pr of [...ELDER_PAIRS, ...(ELDER_EXTRA[e] ?? [])]) pairLine(e, pr.a, pr.b, 'elder');
+  for (const pr of [...ELDER_PAIRS, ...(ELDER_EXTRA[e] ?? [])]) {
+    const ex = pr.except?.[e];
+    if (ex) out.push(`  ex   ${(pr.a + '/' + pr.b).padEnd(19)} exempt (${ex})`);
+    else pairLine(e, pr.a, pr.b, 'elder');
+  }
 }
 out.push(' shared');
 for (const [name, a, b] of [['mouth/tongue', S.mouth, S.tongue], ['mouth/fang', S.mouth, S.catchlight]] as const) {
@@ -584,6 +599,8 @@ for (const e of DRAGON_ELEMENTS) {
   let allOk = true;
   const items: FloorItem[] = [{ what: 'scale', ref: 'scale' }, { what: 'belly', ref: 'belly' }, ...FLOOR_FX[e], ...FLOOR_ALL];
   for (const it of items) {
+    const ex = it.except?.[e];
+    if (ex) { cells.push(`${it.what} exempt (${ex})`); continue; }
     const ds: (number | null)[] = [], oks: (boolean | null)[] = [];
     for (const st of STAGES) {
       if (it.only && st !== it.only) { ds.push(null); oks.push(null); continue; }
@@ -608,7 +625,7 @@ for (const e of DRAGON_ELEMENTS) {
 }
 
 // (k) -----------------------------------------------------------------------------------------------------
-head(`(k) VISIBLE GREYING  (each greying step young -> adult and adult -> elder moves the scale or its silvered highlight band (AGE_SILVER ${STAGES.map((st) => AGE_SILVER[st]).join('/')}; lightning's and slinkwing's elders ${ageSilver('lightning', 'elder')}) by >= ${GREY_STEP} Oklab dE; dE scale / hi per step)`);
+head(`(k) VISIBLE GREYING  (each greying step young -> adult and adult -> elder moves the scale or its silvered highlight band (AGE_SILVER ${STAGES.map((st) => AGE_SILVER[st]).join('/')}; rock's, lightning's and slinkwing's elders ${ageSilver('lightning', 'elder')}) by >= ${GREY_STEP} Oklab dE; dE scale / hi per step)`);
 for (const e of DRAGON_ELEMENTS) {
   const cells: string[] = [];
   let allOk = true;
