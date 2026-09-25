@@ -1,0 +1,24 @@
+{
+  // Type checking only, exactly as in game-engine's tsconfig.json (see the long note there): tsc never
+  // emits, esbuild does -- tools/server.ts per request for the dev loop, tools/build.ts for the single-file
+  // dist/index.html -- and Node 22 runs tools/*.ts by stripping types natively. That is also why the
+  // import specifiers name the real '.ts' file on disk.
+  //
+  // src/lib/ is the vendored engine (git subtree, see game-engine's docs/VENDORING.md). It is checked
+  // here under the same strict settings it is written for, and it is never edited in place: fix it in
+  // game-engine and `git subtree pull`.
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2022", "dom"],
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts", "tools/**/*.ts", "types/**/*.d.ts"]
+}
