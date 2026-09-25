@@ -51,15 +51,17 @@ export const KEEPER_SHARED = Object.freeze({
  */
 export const KEEPER_PALETTES: Readonly<Record<KeeperId, Readonly<KeeperPalette>>> = Object.freeze({
   // Bea, the cook (an elder): silver hair in a bun, a terracotta blouse under a cream apron, plum skirt, brown shoes.
-  // Her skin is a warm mid-brown, so her silver hair clears it by value (58 %) and her hands clear the clay bowl.
+  // Her skin is a warm mid-brown, so her silver hair clears it by value (58 %) and her hands clear the clay bowl. Her
+  // blush is a raspberry rose: a coral one sat 8 % and 25 deg from her skin, and vanished.
   bea: Object.freeze({
     skin: '#c68a5e', hair: '#dcdfe4', primary: '#b04e3a', secondary: '#5e4262', accent: '#e8c46a',
-    metal: '#c8c4bc', dark: '#6a4636', glow: '#e86a6a', apron: '#f2e7c9',
+    metal: '#c8c4bc', dark: '#6a4636', glow: '#e8508a', apron: '#f2e7c9',
   }),
   // Tomas, the groomer: a weathered-straw hat with an oxblood band, a dark beard, a denim work shirt with the sleeves
-  // rolled, brown trousers and boots, a wooden grooming brush.
+  // rolled, brown trousers and boots, a wooden grooming brush. (The denim a shade darker than a chambray: at the
+  // value of Iris's mauve cardigan the two tops merged under deuteranopia.)
   tomas: Object.freeze({
-    skin: '#f0c29c', hair: '#4a3326', primary: '#5a80b8', secondary: '#6e4f37', accent: '#6e2e2a',
+    skin: '#f0c29c', hair: '#4a3326', primary: '#3d5f94', secondary: '#6e4f37', accent: '#6e2e2a',
     metal: '#c8c4bc', dark: '#5c3e30', glow: '#f08a8a', hat: '#b98a3a', tool: '#9a6a3c',
   }),
   // Iris, the night keeper: a periwinkle nightcap with a cream pom-pom, a mauve cardigan over a cream nightshirt, slate

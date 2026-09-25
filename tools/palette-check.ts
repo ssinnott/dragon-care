@@ -59,6 +59,12 @@ import {
   dragonTones, agedPalette, ageK, muzzleOf, tuftOf, beardOf, fanFrostOf, smokeBandOf,
 } from '../src/art/dragon/palettes.ts';
 import type { DragonElement, DragonPalette, DragonSlot, AgeStage } from '../src/art/dragon/palettes.ts';
+import { makeTones } from '../src/lib/art/shading.ts';
+import { KEEPER_PALETTES, KEEPER_SHARED, KEEPER_SKIN_SHADOW, KEEPER_FAR } from '../src/art/keeper/palettes.ts';
+import type { KeeperPalette } from '../src/art/keeper/palettes.ts';
+import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
+import type { KeeperId } from '../src/art/keeper/cast.ts';
+import { BOWL } from '../src/art/props.ts';
 
 // ---------- thresholds ----------
 /** House ladder: adjacent parts separate by this relative luminance difference... */
@@ -654,8 +660,94 @@ for (let i = 0; i < DRAGON_ELEMENTS.length; i++) {
 }
 if (!glowClose) out.push('   none');
 
+// ---------- the keepers (docs/KEEPERS.md 3) ----------
+// The keepers' palettes (src/art/keeper/palettes.ts) under the same maths, counted apart from the dragons' gates:
+//   (Ka) adjacency : every pair of colours that touch on a keeper passes the house ladder (the pairs below, with where
+//                    they touch), the bowl in Bea's hands and Tomas's brush in his among them;
+//   (Kd) ramps     : makeTones keeps shadow != base != highlight for every slot; the hand-set skin shadow
+//                    (KEEPER_SKIN_SHADOW) sits >= 25 % luminance under its skin;
+//   (Kc) far side  : the far arm and leg (farPalette at KEEPER_FAR) keep >= 25 % luminance from the near side;
+//   (Ke) ink floor : and >= 25 % luminance AND >= OKL_MIN Oklab L from the outline;
+//   (Ki) floor     : the shoes and the trousers or skirt keep >= 25 % luminance from the straw floor;
+//   (Kf) told apart: the four keepers' tops pass RULE_B pairwise, as they are and under simulated deuteranopia and
+//                    protanopia (a player tells the keepers apart across the yard by the top first).
+let kGates = 0, kFailures = 0;
+const kFailed: string[] = [];
+function kcount(label: string, ok: boolean): boolean {
+  kGates++;
+  if (!ok) { kFailures++; kFailed.push(label); }
+  return ok;
+}
+type KSlot = keyof KeeperPalette | 'white' | 'bowl';
+const kcol = (id: KeeperId, slot: KSlot): string | undefined =>
+  slot === 'white' ? KEEPER_SHARED.white : slot === 'bowl' ? BOWL : (KEEPER_PALETTES[id] as Record<string, string | undefined>)[slot];
+/** The pairs that touch on a keeper, and where. A pair a keeper lacks a slot for is skipped (only Bea wears an apron). */
+interface KPair { a: KSlot; b: KSlot; where: string; only?: readonly KeeperId[] }
+const kp = (a: KSlot, b: KSlot, where: string, only?: readonly KeeperId[]): KPair => ({ a, b, where, only });
+const K_PAIRS: readonly KPair[] = [
+  kp('skin', 'hair', 'hairline, brows on the face'), kp('skin', 'primary', 'the neck on the collar, a forearm over the top'),
+  kp('hair', 'primary', 'the hair at the nape on the collar'), kp('primary', 'secondary', 'the top on the trousers at the waist'),
+  kp('secondary', 'dark', 'the trousers on the shoes'), kp('skin', 'white', 'the eye whites on the face'), kp('glow', 'skin', 'the blush on the cheek'),
+  kp('apron', 'primary', 'the apron bib on the blouse'), kp('apron', 'secondary', 'the apron skirt on the skirt'), kp('apron', 'skin', 'the hands on the apron'),
+  kp('hat', 'hair', 'the hat on the hair'), kp('hat', 'skin', 'the brim over the brow'), kp('accent', 'hat', 'the band on the straw hat', ['tomas']),
+  kp('trim', 'hat', 'the pom-pom and the cuff on the nightcap', ['iris']), kp('accent', 'primary', 'the nightshirt under the cardigan', ['iris']),
+  kp('trim', 'primary', 'the straps on the tee', ['pip']),
+  kp('tool', 'skin', 'the hand on the brush'), kp('tool', 'primary', 'the brush held over the shirt'),
+  kp('bowl', 'skin', 'the hands on the bowl', ['bea']), kp('bowl', 'primary', 'the bowl held over the blouse', ['bea']), kp('bowl', 'apron', 'the bowl held over the apron', ['bea']),
+];
+
+head(`KEEPERS (src/art/keeper/palettes.ts: the house ladder, >= ${LUM_MIN * 100}% luminance or >= ${HUE_MIN}deg hue; far side at ${KEEPER_FAR.shade} / ${KEEPER_FAR.desat})`);
+for (const id of KEEPER_IDS) {
+  const P = KEEPER_PALETTES[id];
+  out.push(` ${id}`);
+  // (Ka)
+  for (const { a, b, where, only } of K_PAIRS) {
+    if (only && !only.includes(id)) continue;
+    const ca = kcol(id, a), cb = kcol(id, b);
+    if (!ca || !cb) continue;
+    const m = ladder(ca, cb);
+    kcount(`(Ka) ${id} ${a}/${b}`, m.pass);
+    out.push(`${m.pass ? '  ok  ' : '  FAIL'} (Ka) ${(a + '/' + b).padEnd(18)} lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by.padEnd(8)} ${ca} ${cb}  (${where})`);
+  }
+  // (Kd)
+  for (const [slot, hex] of Object.entries(P) as [string, string][]) {
+    const t = makeTones(hex), ok = t.sh !== t.base && t.hi !== t.base && t.sh !== t.hi;
+    if (!kcount(`(Kd) ${id} ${slot} ramp`, ok)) out.push(`  FAIL (Kd) ${slot} ramp collapses: ${t.sh} ${t.base} ${t.hi}`);
+  }
+  const skSh = KEEPER_SKIN_SHADOW[id], dSh = relDiff(skSh, P.skin);
+  kcount(`(Kd) ${id} skin shadow`, dSh >= LUM_MIN);
+  out.push(`${dSh >= LUM_MIN ? '  ok  ' : '  FAIL'} (Kd) skin shadow      ${pct(dSh)} under the skin  ${skSh} on ${P.skin}  (every other slot's ramp: shadow, base and highlight all distinct)`);
+  // (Kc) (Ke)
+  const far = farPalette(P, KEEPER_FAR.shade, KEEPER_FAR.desat) as Record<string, string>;
+  for (const slot of ['skin', 'primary', 'secondary', 'dark'] as const) {
+    const f = far[slot], near = P[slot], dn = relDiff(f, near), di = relDiff(f, S.outline), dk = okDiff(f, S.outline);
+    const okC = kcount(`(Kc) ${id} far ${slot}`, dn >= LUM_MIN), okE = kcount(`(Ke) ${id} far ${slot} / ink`, di >= LUM_MIN && dk >= OKL_MIN);
+    out.push(`${okC && okE ? '  ok  ' : '  FAIL'} (Kc/Ke) far ${slot.padEnd(10)} ${f}  vs near ${pct(dn)}  vs ink ${pct(di)} ${okf(dk)}`);
+  }
+  // (Ki)
+  for (const slot of ['dark', 'secondary'] as const) {
+    const d = relDiff(P[slot], FLOOR_REF), ok = kcount(`(Ki) ${id} ${slot} / floor`, d >= LUM_MIN);
+    out.push(`${ok ? '  ok  ' : '  FAIL'} (Ki) ${(slot === 'dark' ? 'shoes' : 'trousers') + ' / floor'}${' '.repeat(slot === 'dark' ? 5 : 2)} ${pct(d)}  ${P[slot]} on ${FLOOR_REF}`);
+  }
+}
+// (Kf)
+out.push(' the four tops (RULE_B: as seen, deutan, protan)');
+for (let i = 0; i < KEEPER_IDS.length; i++) {
+  for (let j = i + 1; j < KEEPER_IDS.length; j++) {
+    const a = KEEPER_IDS[i], b = KEEPER_IDS[j], cells: string[] = [];
+    let allOk = true;
+    for (const [k, f] of [['as seen', (h: string) => h], ['deutan', (h: string) => simulate(h, 'deutan')], ['protan', (h: string) => simulate(h, 'protan')]] as const) {
+      const m = ruleB(f(KEEPER_PALETTES[a].primary), f(KEEPER_PALETTES[b].primary));
+      if (!kcount(`(Kf) ${a}/${b} tops ${k}`, m.pass)) allOk = false;
+      cells.push(`${k} ${m.pass ? m.by : 'FAIL'}`);
+    }
+    out.push(`${allOk ? '  ok  ' : '  FAIL'} (Kf) ${(a + '/' + b).padEnd(12)} ${cells.join('  ')}  ${KEEPER_PALETTES[a].primary} ${KEEPER_PALETTES[b].primary}`);
+  }
+}
+
 // ---------- verdict ----------
 out.push('');
 out.push(failures ? `RESULT: FAIL  ${failures} of ${gates} gates failed: ${failed.join('; ')}` : `RESULT: PASS  ${gates} of ${gates} gates passed`);
+out.push(kFailures ? `KEEPERS: FAIL  ${kFailures} of ${kGates} gates failed: ${kFailed.join('; ')}` : `KEEPERS: PASS  ${kGates} of ${kGates} gates passed`);
 console.log(out.join('\n'));
-if (failures) process.exitCode = 1;
+if (failures || kFailures) process.exitCode = 1;

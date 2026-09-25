@@ -18,6 +18,8 @@ import { resetChain } from '../lib/art/secondary.ts';
 export interface DragonAgent {
   el: DragonElement;
   stage: Stage;
+  /** The look's seed (its build: the same element, stage and seed is the same dragon, down to its proportions). */
+  seed: number;
   rig: DragonRig;
   player: DragonAnimPlayer;
   /** Screen position of the ground point under the body centre, facing and draw scale. */
@@ -56,7 +58,7 @@ export function makeDragon(el: DragonElement, stage: Stage, seed: number, anim: 
   const [a, b] = variantEvery(stage);
   player.setVariants('idle', idleVariants(stage, build.sp.wing), a, b, SPREAD_VARIANTS);
   const d: DragonAgent = {
-    el, stage, rig, player, x, y, facing: o.facing ?? 1, scale: o.scale ?? 1, mood: o.mood ?? 0,
+    el, stage, seed, rig, player, x, y, facing: o.facing ?? 1, scale: o.scale ?? 1, mood: o.mood ?? 0,
     spot: bowlFor(rig, anims.eat ? anims.eat.frames : []), bowl: null, phase: build.phase, speed: build.speed, turning: -1,
   };
   playDragon(d, anim);
@@ -75,6 +77,23 @@ export function playDragon(d: DragonAgent, anim: string, o: DragonPlayOpts = {})
 
 function drawOpts(d: DragonAgent, extra: Partial<DrawDragonOpts> = {}): DrawDragonOpts {
   return { x: d.x, y: d.y, facing: d.facing, scale: d.scale, mood: d.mood, ...extra };
+}
+
+/**
+ * Hold a dragon to its plain idle while a keeper works with it, or give it back its idle variants (the look-around,
+ * the yawn, the scratch, its element's fidget: bible 4.2). A variant turns or tips the head, and the care acts plan
+ * where a keeper stands from the dragon's idle and pet poses (acts.ts planSide): a look-around put its eye under a
+ * keeper's arm. A variant already playing is cut back to idle.
+ */
+export function quiet(d: DragonAgent, on: boolean): void {
+  if (on) {
+    const cut = d.player.inVariant;
+    d.player.setVariants('idle', []);
+    if (cut) playDragon(d, 'idle', { blend: 10 });
+    return;
+  }
+  const [a, b] = variantEvery(d.stage);
+  d.player.setVariants('idle', idleVariants(d.stage, d.rig.sp.wing), a, b, SPREAD_VARIANTS);
 }
 
 /** Start a paper turn (the dragon faces the other way TURN_HALF frames from now). */
@@ -167,6 +186,18 @@ export function backTop(d: DragonAgent, u: number, outside: number, out: { x: nu
   }
   const x = J.chest.x + (J.hip.x - J.chest.x) * t, y = J.chest.y - dm.chestR + (J.hip.y - dm.hipR - J.chest.y + dm.chestR) * t;
   return rootToScreen(d.rig, x, y - outside, out);
+}
+
+/**
+ * The floor a dragon takes up, on screen: from the middle of its tail to its snout along the floor (whichever way it
+ * faces; from the build's dims at rest) and a band round its floor line. A keeper whose walk would cross it goes round
+ * behind (acts.ts).
+ */
+export function bodySpan(d: DragonAgent): { x0: number; x1: number; y0: number; y1: number } {
+  const m = d.rig.dims, s = d.scale * d.rig.scale;
+  const back = (m.hipR + m.gap / 2 + (m.tail.n * m.tail.len) / 2) * s, front = (m.gap / 2 + m.chestR + m.headLen) * s;
+  const [x0, x1] = d.facing < 0 ? [d.x - front, d.x + back] : [d.x - back, d.x + front];
+  return { x0, x1, y0: d.y - 12 * s, y1: d.y + 8 * s };
 }
 
 /** The snout's tip on screen after the last step (cranium space: the snout taper's end), for keeping clear of it. */

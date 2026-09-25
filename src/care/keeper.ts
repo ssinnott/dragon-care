@@ -28,6 +28,8 @@ export interface KeeperAgent {
    */
   reach: HandT | null;
   reachW: number;
+  /** Walking on the spot: the anim's root motion does not carry it along the floor (acts.ts walkTo, into the scene). */
+  pinX: boolean;
 }
 
 /** Make a keeper standing at (x, y) and playing `anim` (its whole anim table built for its proportions and tempo). */
@@ -35,7 +37,7 @@ export function makeKeeper(id: KeeperId, anim: string, x: number, y: number, o: 
   const rig = buildKeeper(id), player = new KeeperPlayer(keeperAnims(rig.spec), o.seed ?? 1);
   player.blinks = o.blinks !== false;
   player.play(anim, { restart: true });
-  const k: KeeperAgent = { id, rig, player, x, y, facing: o.facing ?? 1, scale: o.scale ?? 1, reach: null, reachW: 0 };
+  const k: KeeperAgent = { id, rig, player, x, y, facing: o.facing ?? 1, scale: o.scale ?? 1, reach: null, reachW: 0, pinX: false };
   settle(k);
   return k;
 }
@@ -91,7 +93,7 @@ function settle(k: KeeperAgent): void {
 export function stepKeeperAgent(k: KeeperAgent): void {
   k.player.tick();
   const mv = k.player.move;
-  if (mv) k.x += k.facing * mv * k.scale;
+  if (mv && !k.pinX) k.x += k.facing * mv * k.scale;
   settle(k);
 }
 

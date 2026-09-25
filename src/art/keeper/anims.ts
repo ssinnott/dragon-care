@@ -359,8 +359,9 @@ function shhKP(sp: Readonly<KeeperSpec>, p: Proportions, t: number, k: number): 
 }
 
 /**
- * CHEER (one-shot, 48 f x tempo): the arms up and a little hop (the child's bigger, two of them); the elder claps
- * instead, three claps in front of her chest, never a jump (bible D21). `happy` throughout.
+ * CHEER (one-shot, 48 f x tempo): the arms up (the far one straight up, the near one a fist pumped up in front of the
+ * face) and a little hop (the child's bigger, two of them); the elder claps instead, three claps in front of her chest,
+ * never a jump (bible D21). `happy` throughout.
  */
 function cheerKP(sp: Readonly<KeeperSpec>, p: Proportions, t: number, k: number): KPose {
   const kp = idleKP(sp, p, t, 150 * k), hy = hipYOf(p);
@@ -376,7 +377,9 @@ function cheerKP(sp: Readonly<KeeperSpec>, p: Proportions, t: number, k: number)
   // a crouch is the root dropping over planted feet (hop > 0); a hop the root rising with the feet lifted as far
   // (hop < 0), so the legs keep their shape in the air
   kp.rootY = hop; kp.footN = { x: 1, lift: Math.max(0, -hop), tilt: 0 }; kp.footF = { x: -1, lift: Math.max(0, -hop), tilt: 0 };
-  kp.armN = [30 + 130 * up, 20 - 10 * up]; kp.armF = [20 + 130 * up, 20 - 10 * up];
+  // the far arm straight up behind the head; the near one a fist pumped up in FRONT of the face, the elbow out at the
+  // shoulder's height (the near shoulder sits forward: raised straight up, the near arm covered the face)
+  kp.armN = [30 + 90 * up, 20 + 25 * up]; kp.armF = [20 + 140 * up, 20 - 10 * up];
   kp.head = -6 * up;
   return kp;
 }
