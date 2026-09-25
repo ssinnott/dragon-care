@@ -4,7 +4,8 @@
 // the anim's start); with `t` the page draws exactly that frame and then sets window.__dragonCare.ready. Without `t`
 // it runs live (keyboard: arrows / space cycle views, number keys pick anims) and sets ready after the first frame.
 //
-//   view=lineup (default)      28 dragons: seven element columns (bible order) x baby / young / adult / elder rows
+//   (no view=, or an unknown one)   the game: view=base, below -- this is the page a plain index.html load runs
+//   view=lineup                28 dragons: seven element columns (bible order) x baby / young / adult / elder rows
 //   view=silhouette            all 28 flat #1a1018 + the /3 area-coverage reduction at 3 sub-pixel phases (5.1 #1);
 //                              &set=all stacks idle, lowest mood and asleep on one sheet
 //   view=stages&el=<id>        one element's four stages side by side at scale 3
@@ -114,7 +115,7 @@ export interface GalleryParams {
 export function parseParams(search: string): GalleryParams {
   const q = new URLSearchParams(search);
   const num = (k: string, d: number) => { const v = q.get(k); return v != null && v !== '' && isFinite(Number(v)) ? Number(v) : d; };
-  const view = (VIEWS as readonly string[]).includes(q.get('view') || '') ? q.get('view') as View : 'lineup';
+  const view = (VIEWS as readonly string[]).includes(q.get('view') || '') ? q.get('view') as View : 'base';
   const el = (ELEMENT_IDS as readonly string[]).includes(q.get('el') || '') ? q.get('el') as DragonElement : 'fire';
   const stage = (STAGES as readonly string[]).includes(q.get('stage') || '') ? q.get('stage') as Stage : 'adult';
   return {

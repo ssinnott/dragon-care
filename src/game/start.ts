@@ -1,9 +1,10 @@
 // The base a new game starts from, and the one view=base and tools/sim-check.ts run: the greybox mockups' rooms
-// (docs/base/), twelve dragons -- every element and every stage among them -- and five keepers.
+// (docs/base/), twelve dragons -- every element and every stage among them -- and the four named keepers.
 import type { RoomPlace, RoomKind } from './layout.ts';
 import type { NeedKind } from './needs.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { Stage } from '../art/dragon/stages.ts';
+import type { KeeperId } from '../art/keeper/cast.ts';
 
 export const START_ROOMS: readonly RoomPlace[] = [
   { kind: 'kitchen', part: 'barn', floor: 0, mod: 0, width: 2 },
@@ -46,12 +47,16 @@ export const START_DRAGONS: readonly DragonPlace[] = [
   { name: 'ECHO', element: 'slinkwing', stage: 'adult', seed: 266, room: 'roost', at: 0.35, facing: 1 },
 ];
 
-/** A keeper: their look (people.ts), the need they're best at (4.4) and the room they wait in (its post). */
-export interface KeeperPlace { name: string; look: string; specialty: NeedKind | null; station: RoomKind }
+/**
+ * A keeper: which of the four named cast (docs/KEEPERS.md 2) they are, the need they're best at (4.4) and the room
+ * they wait in (its post). Bea, Tomas, Iris and Pip -- the base's one job each, same as the yard's -- with Pip, the
+ * apprentice who "pets the babies and cheers the others on", standing in for play; nobody specialises in a bath (no
+ * named keeper has one), so the nearest free keeper takes it (sim.ts's assign: a specialist is a preference, not a rule).
+ */
+export interface KeeperPlace { name: string; look: KeeperId; specialty: NeedKind | null; station: RoomKind }
 export const START_KEEPERS: readonly KeeperPlace[] = [
-  { name: 'MARTA', look: 'cook', specialty: 'food', station: 'kitchen' },
-  { name: 'TAM', look: 'groom', specialty: 'love', station: 'groom' },
-  { name: 'ROSA', look: 'handler', specialty: 'play', station: 'romp' },
-  { name: 'BEN', look: 'hand', specialty: null, station: 'mess' },
-  { name: 'ODA', look: 'hand2', specialty: 'bath', station: 'library' },
+  { name: 'BEA', look: 'bea', specialty: 'food', station: 'kitchen' },
+  { name: 'TOMAS', look: 'tomas', specialty: 'love', station: 'groom' },
+  { name: 'IRIS', look: 'iris', specialty: 'sleep', station: 'dorm' },
+  { name: 'PIP', look: 'pip', specialty: 'play', station: 'romp' },
 ];

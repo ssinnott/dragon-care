@@ -10,6 +10,7 @@ import type { Room, RoomPlace, Leg, Spot } from './layout.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { Stage } from '../art/dragon/stages.ts';
+import type { KeeperId } from '../art/keeper/cast.ts';
 
 // ---------- tuning (4.9: first numbers, not law) ----------
 
@@ -56,7 +57,7 @@ export type Phase = 'idle' | 'fetch' | 'pickup' | 'go' | 'work' | 'home';
 export interface Keeper {
   id: number;
   name: string;
-  look: string;
+  look: KeeperId;
   specialty: NeedKind | null;
   station: Room;
   stationX: number;

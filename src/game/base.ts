@@ -6,7 +6,6 @@ import { drawDragon, rootToScreen } from '../art/dragon/rig.ts';
 import { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
 import { ELEMENT_ANIM_FALLBACK } from '../art/dragon/anims.ts';
 import { drawText } from '../lib/engine/text.ts';
-import type { Rig } from '../lib/art/rig.ts';
 import { makePet, petOpts, stepPet, stepWary, extentX, bowlFor, drawBowl } from './pet.ts';
 import type { Pet } from './pet.ts';
 import { CareSim } from './sim.ts';
@@ -16,7 +15,8 @@ import { WORLD_W, WORLD_H, HOIST_CX, feetY } from './layout.ts';
 import { SOON, tierOf, chargeOf } from './needs.ts';
 import type { NeedKind } from './needs.ts';
 import { drawBuilding, drawPlates, drawHoistCar } from './building.ts';
-import { keeperRig, drawKeeper } from './people.ts';
+import { makeKeeperAgent, stepKeeperVisual, drawKeeperVisual } from './people.ts';
+import type { KeeperAgent } from '../care/keeper.ts';
 import { drawBubble, drawChip, hit } from './icons.ts';
 import type { Rect } from './icons.ts';
 
@@ -43,7 +43,7 @@ export class BaseView {
   camY = START_CAM.y;
   /** Where the camera is easing to after a job chip was tapped (null: it stays put). */
   private camTo: { x: number; y: number } | null = null;
-  private readonly rigs: Rig[];
+  private readonly keeperAgents: KeeperAgent[];
   private readonly building: HTMLCanvasElement;
   private readonly plates: HTMLCanvasElement;
   private readonly top = new TopPass(160);
@@ -64,7 +64,7 @@ export class BaseView {
     for (const d of this.sim.dragons) this.pets.push(makePet(d.element, d.stage, d.seed, 'idle', d.x, this.feet(d), { facing: d.facing, mood: d.mood }));
     this.waking = this.pets.map(() => false);
     this.bowls = this.pets.map(() => null);
-    this.rigs = this.sim.keepers.map((k) => keeperRig(k.look));
+    this.keeperAgents = this.sim.keepers.map((k) => makeKeeperAgent(k.look));
     this.building = drawBuilding(this.sim.rooms);
     this.plates = drawPlates(this.sim.rooms);
   }
@@ -79,7 +79,10 @@ export class BaseView {
     this.sim.dragons.forEach((d, i) => this.sync(d, i));
     stepWary(this.pets);
     for (const p of this.pets) stepPet(p);
-    for (const k of this.sim.keepers) if (k.climbing && Math.abs(k.x - HOIST_CX) < 1) this.carY = k.y;
+    this.sim.keepers.forEach((k, i) => {
+      if (k.climbing && Math.abs(k.x - HOIST_CX) < 1) this.carY = k.y;
+      stepKeeperVisual(this.keeperAgents[i], k, k.climbing ? k.y : k.y - 3);
+    });
     if (this.camTo) {
       this.setCam(this.camX + (this.camTo.x - this.camX) / 6, this.camY + (this.camTo.y - this.camY) / 6);
       if (Math.abs(this.camTo.x - this.camX) < 0.5 && Math.abs(this.camTo.y - this.camY) < 0.5) { this.setCam(this.camTo.x, this.camTo.y); this.camTo = null; }
@@ -144,7 +147,7 @@ export class BaseView {
         const p = c.pet;
         drawDragon(ctx, p.rig, p.player.pose, petOpts(p, { still: true, top: this.top, budget: this.budget, slot: slot++ }));
         if (p.bowl) drawBowl(ctx, p);
-      } else if (c.keeper != null) drawKeeper(ctx, this.rigs[c.keeper], this.sim.keepers[c.keeper], c.y, this.frame);
+      } else if (c.keeper != null) drawKeeperVisual(ctx, this.keeperAgents[c.keeper], this.sim.keepers[c.keeper]);
     }
     this.top.flush(ctx);
     // the bubbles: each awake dragon's most pressing job that no one is at work on yet
