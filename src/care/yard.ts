@@ -4,7 +4,7 @@
 // neediest dragon its job covers, and the care act (acts.ts) plays out:
 //   Bea, the cook          feeds a hungry dragon (she brings the bowl from her kitchen);
 //   Tomas, the groomer     grooms a lonely young or grown dragon;
-//   Pip, the apprentice    pets a lonely baby;
+//   Pip, the apprentice    pets a lonely baby, and cheers from his bench when a dragon is fed or groomed;
 //   Iris, the night keeper tucks in a sleepy dragon; it sleeps until rested, then wakes.
 // A fed dragon, which trotted off from its bowl, walks home; the keeper takes the bowl back and every keeper walks back
 // to its station. Everything is stepped at 60 Hz from seeded state, so a frozen `t` is always the same frame.
@@ -68,6 +68,8 @@ export interface YardDragon {
   by: YardKeeper | null;
   /** A need already shown (its yawn, its call): shown once until it is met. */
   shown: Partial<Record<NeedName, boolean>>;
+  /** Its happy has been cheered (by the apprentice, from the bench). */
+  cheered: boolean;
 }
 
 export interface YardKeeper {
@@ -127,7 +129,7 @@ export class Yard {
       const d = makeDragon(c.el, c.stage, seed + i * 17, 'idle', c.x, c.y, { facing: c.facing });
       const jitter = () => 1 + (r() - 0.5) * 0.3, f = FILL_S[c.stage];
       const rate: Needs = { hunger: jitter() / (f.hunger * 60), lonely: jitter() / (f.lonely * 60), sleepy: jitter() / (f.sleepy * 60) };
-      return { d, name: ELEMENTS[c.el].name, needs: { ...c.needs }, rate, home: { x: c.x, facing: c.facing }, state: 'free' as DragonState, by: null, shown: {} };
+      return { d, name: ELEMENTS[c.el].name, needs: { ...c.needs }, rate, home: { x: c.x, facing: c.facing }, state: 'free' as DragonState, by: null, shown: {}, cheered: false };
     });
     this.keepers = (Object.keys(STATIONS) as KeeperId[]).map((id, i) => {
       const s = STATIONS[id];
@@ -163,7 +165,8 @@ export class Yard {
   private direct(): void {
     for (const id of ASK) {
       const yk = this.keepers.find((k) => k.k.id === id)!;
-      if (yk.act) continue;
+      // (busy, or mid-cheer: the apprentice finishes his cheer before he goes)
+      if (yk.act || yk.k.player.name === 'cheer') continue;
       const j = yk.job;
       let best: YardDragon | null = null;
       for (const y of this.dragons) {
@@ -201,6 +204,15 @@ export class Yard {
       stepKeeperAgent(k);
       if ((s.x - x0) * (s.x - k.x) < 0) k.x = s.x;
       return;
+    }
+    // the apprentice, waiting at the bench, cheers the others on: once for each happy that thanks a keeper
+    if (k.id === 'pip') {
+      for (const y of this.dragons) {
+        const happy = y.state === 'care' && y.d.player.name === 'happy';
+        if (happy && !y.cheered && k.player.name === 'idle') { y.cheered = true; k.player.play('cheer', { restart: true, blend: 6 }); }
+        else if (!happy) y.cheered = false;
+      }
+      if (k.player.done && k.player.name === 'cheer') k.player.play('idle', { restart: true, blend: 10 });
     }
     stepKeeperAgent(k);
   }
