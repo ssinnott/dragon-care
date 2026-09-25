@@ -18,6 +18,10 @@
 // the hip (3.0: fire's zone), the pour-column audit (view=pour) any breath frame with one effect mark from 3 px under
 // the mouth down to the floor (3.8: Nightfall is breathed out, never poured), and the neutral-area recorder
 // (view=neutral) any look more than 40 % neutral at rest (3.1). All five run over all 28 looks.
+// The keepers (docs/KEEPERS.md): the keeper views must show every keeper (its top colour on the canvas), and the two care
+// audits -- every care act on all 28 looks (view=careaudit), every act the yard plays (view=yardaudit) -- fail a keeper
+// at work covering the dragon's eye (K7), a stroking hand more than REACH_MISS px off its mark, or an act that never
+// ends.
 // The base (view=base, docs/BASE_DESIGN.md): frozen, a minute in, the care simulation must have got jobs done; live,
 // a drag must pan the camera and a tap on the first job chip must Rush that job.
 import fs from 'node:fs';
@@ -25,6 +29,9 @@ import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
 import { AGE_STAGES, DRAGON_ELEMENTS, agedPalette } from '../src/art/dragon/palettes.ts';
 import type { AgeStage } from '../src/art/dragon/palettes.ts';
+import { KEEPER_PALETTES } from '../src/art/keeper/palettes.ts';
+import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
+import { REACH_MISS } from '../src/care/limits.ts';
 
 const require = createRequire(import.meta.url);
 function loadPlaywright(): any {
@@ -46,11 +53,18 @@ async function launch(chromium: any): Promise<any> {
  * One view. `allScales`: every element's body colour must be on the canvas, at each of `stages` (default all four:
  * the lineup's rows) -- a one-stage view (cast, mood) names its stage.
  */
-interface Case { query: string; minColours: number; allScales: boolean; stages?: readonly AgeStage[]; timeout?: number; floor?: boolean; roots?: boolean; tails?: boolean; pour?: boolean; neutral?: boolean;
+interface Case {
+  query: string; minColours: number; allScales: boolean; stages?: readonly AgeStage[]; timeout?: number; floor?: boolean; roots?: boolean;
+  tails?: boolean; pour?: boolean; neutral?: boolean;
+  /** Every keeper's top colour must be on the canvas (the keepers were drawn). */
+  keepers?: boolean;
+  /** A care audit's rows (window.__dragonCare.care): at least this many acts, none with the eye covered, the hand off, or stuck. */
+  care?: number;
   /** view=base: the care simulation must have done jobs by the frozen frame. */
   base?: boolean;
   /** A live page to drive (pointer input); returns what went wrong. */
-  act?: (page: any) => Promise<string[]> }
+  act?: (page: any) => Promise<string[]>;
+}
 
 /** view=base, live: a drag pans the camera the other way, and a tap on the first job chip Rushes that job. */
 async function baseInput(page: any): Promise<string[]> {
@@ -135,6 +149,18 @@ const CASES: Case[] = [
   { query: 'view=pour&t=0', minColours: 2, allScales: false, timeout: 120000, pour: true },
   // the neutral-area recorder (3.1, a hard rule): no look's pixels more than 40 % neutral (HSV S < 0.25) at rest
   { query: 'view=neutral&t=0', minColours: 2, allScales: false, neutral: true },
+  // the keepers (docs/KEEPERS.md): the cast, a walk and a kneel strip, the care vignettes and the yard
+  { query: 'view=keepers&t=0', minColours: 40, allScales: false, keepers: true },
+  { query: 'view=keepers&anim=walk&t=12', minColours: 40, allScales: false, keepers: true },
+  { query: 'view=keepers&k=iris&anim=kneel&n=6&t=0', minColours: 20, allScales: false },
+  { query: 'view=care&t=300', minColours: 60, allScales: false },
+  { query: 'view=yard&t=600', minColours: 80, allScales: false, keepers: true },
+  // the care audits (K7): every care act on all 28 looks, and the yard for 2.5 minutes (every keeper against every
+  // dragon's eye, walking or at work); no keeper covers an eye, a stroking hand lands within REACH_MISS, every act ends
+  { query: 'view=careaudit&t=0', minColours: 2, allScales: false, timeout: 300000, care: 112 },
+  // (and mirrored, the dragons facing left, on two elements: every plan, walk and pose the other way round)
+  { query: 'view=careaudit&facing=-1&els=fire,dusk&t=0', minColours: 2, allScales: false, timeout: 300000, care: 32 },
+  { query: 'view=yardaudit&t=0', minColours: 2, allScales: false, timeout: 300000, care: 14 },
   // the base: its first seconds, a minute of care (jobs got done), and live input (a drag pans, a chip tap Rushes)
   { query: 'view=base&t=600', minColours: 150, allScales: false },
   { query: 'view=base&t=3600', minColours: 150, allScales: false, base: true },
@@ -188,6 +214,15 @@ for (const c of CASES) {
       if (rows.length !== 28) errors.push(`the neutral-area recorder measured ${rows.length} looks, not 28`);
       for (const r of rows) if (r.over) errors.push(`${r.id} is ${Math.round(r.share * 100)} % neutral (the ceiling is 40 %)`);
     }
+    if (c.care) {
+      const rows: { act: string; id: string; covered: number; frame: number; phase: string; miss: number; done: boolean }[] = await page.evaluate(() => (window as any).__dragonCare?.care ?? []);
+      if (rows.length < c.care) errors.push(`the care audit ran ${rows.length} acts, not ${c.care}`);
+      for (const r of rows) {
+        if (r.covered > 0) errors.push(`${r.act} ${r.id}: the keeper covers ${r.covered} px of the eye at f${r.frame} (${r.phase})`);
+        if (r.miss > REACH_MISS) errors.push(`${r.act} ${r.id}: the hand lands ${r.miss} px off its mark`);
+        if (!r.done) errors.push(`${r.act} ${r.id}: the act never ends`);
+      }
+    }
     if (c.base) {
       const b: { tick: number; done: number } | undefined = await page.evaluate(() => (window as any).__dragonCare?.base);
       if (!b) errors.push('the base reported nothing');
@@ -203,6 +238,10 @@ for (const c of CASES) {
     });
     const set = new Set(colours);
     if (colours.length < c.minColours) errors.push(`only ${colours.length} distinct colours (want >= ${c.minColours}): were dragons drawn?`);
+    if (c.keepers) {
+      const missing = KEEPER_IDS.filter((id) => !set.has(hexToInt(KEEPER_PALETTES[id].primary)));
+      if (missing.length) errors.push(`no top colour for: ${missing.join(', ')} (were the keepers drawn?)`);
+    }
     if (c.allScales) {
       const want = c.stages ?? AGE_STAGES;
       const missing = SCALES.filter((s) => want.includes(s.st) && !set.has(s.rgb)).map((s) => `${s.el} ${s.st}`);
@@ -219,5 +258,5 @@ for (const c of CASES) {
 
 await browser.close();
 server.close();
-console.log(bad ? `SMOKE: ${bad} of ${CASES.length} views failed` : `SMOKE: all ${CASES.length} views drew dragons, no page errors`);
+console.log(bad ? `SMOKE: ${bad} of ${CASES.length} views failed` : `SMOKE: all ${CASES.length} views drew dragons (and keepers), no page errors`);
 process.exit(bad ? 1 : 0);

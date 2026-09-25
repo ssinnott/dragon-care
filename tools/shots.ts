@@ -10,13 +10,15 @@
 // cue) -- plus the baby's walk stumble, the idle variants (the elder's back stretch, reminisce and airing among them),
 // every element's fidget and its own anims (bath, upset, call), the elders' worn wings (view=wings: full spread, the
 // airing, the preen), the floor audit and the face sheets. A walk strip is the 8 keys of one cycle over scrolling
-// ground ticks (a planted paw must hold still against them). Every shot is frozen-time, so the set is deterministic.
+// ground ticks (a planted paw must hold still against them). The keepers too (docs/KEEPERS.md): the cast in every anim,
+// strips of the care acts, the yard, and the care audits. Every shot is frozen-time, so the set is deterministic.
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ANIM_NAMES, idleVariants } from '../src/art/dragon/anims.ts';
 import { STAGES } from '../src/art/dragon/stages.ts';
 import { ELEMENTS, ELEMENT_IDS } from '../src/art/dragon/elements/index.ts';
+import { KEEPER_ANIM_NAMES, KEEPER_ONE_SHOTS } from '../src/art/keeper/anims.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -92,6 +94,17 @@ for (const el of ELEMENT_IDS) {
 // Nightfall whole (3.8): the puffs, the band under the lamp, the settle and the bank, adult and elder (its ring)
 pairs.push('shots/breath_dusk_adult_whole.png=view=strip&el=dusk&stage=adult&anim=breath&n=12&from=18&span=96&t=0');
 pairs.push('shots/breath_dusk_elder_whole.png=view=strip&el=dusk&stage=elder&anim=breath&n=12&from=22&span=92&t=0');
+
+// the keepers (docs/KEEPERS.md): the cast in every anim (the one-shots mid-play), the care acts -- each on a baby and a
+// grown dragon, as 12-frame strips -- the yard at three moments, and the two care audits
+for (const anim of KEEPER_ANIM_NAMES) pairs.push(`shots/keepers_${anim}.png=view=keepers&anim=${anim}&t=${KEEPER_ONE_SHOTS.includes(anim) ? 20 : 0}&scale=1`);
+pairs.push('shots/care.png=view=care&t=300&scale=1');
+for (const [act, k, el, st] of [
+  ['feed', 'bea', 'fire', 'baby'], ['feed', 'bea', 'water', 'adult'], ['pet', 'tomas', 'spike', 'adult'], ['pet', 'tomas', 'rock', 'baby'],
+  ['pet', 'pip', 'slinkwing', 'baby'], ['pet', 'bea', 'fire', 'adult'], ['tuck', 'iris', 'dusk', 'adult'], ['tuck', 'iris', 'lightning', 'baby'],
+] as const) pairs.push(`shots/care_${act}_${k}_${el}_${st}.png=view=care&act=${act}&k=${k}&el=${el}&stage=${st}&n=12&span=1100&t=0&scale=1`);
+for (const t of [300, 900, 1800]) pairs.push(`shots/yard_t${t}.png=view=yard&t=${t}`);
+pairs.push('shots/careaudit.png=view=careaudit&t=0', 'shots/yardaudit.png=view=yardaudit&t=0');
 
 const r = spawnSync(process.execPath, [path.join(ROOT, 'tools', 'shot.ts'), ...pairs, '--scale', scale], { cwd: ROOT, stdio: 'inherit' });
 process.exit(r.status ?? 1);

@@ -2,20 +2,19 @@
 // every tick (the wary latch and the crowd rule: docs/ART_BIBLE.md 5.4) and every frame (y-sorted, with the eat bowl).
 // Shared by the gallery (src/gallery.ts), which shows the art pipeline every look, and the base (src/game/base.ts),
 // which drives its pets from the care simulation. Moved out of the gallery unchanged; what was the gallery's query
-// state (its static pose overlay, the elders' wear, every pet's bond and charge) is now per pet or per call.
+// state (its static pose overlay, the elders' wear, every pet's bond and charge) is now per pet or per call. The eat
+// bowl is the one the keepers carry in and set down too (src/art/props.ts).
 import { dragonBuild } from '../art/dragon/build.ts';
-import { buildDragon, drawDragon, stepDragon, solveDragon } from '../art/dragon/rig.ts';
+import { buildDragon, drawDragon, stepDragon } from '../art/dragon/rig.ts';
 import type { DragonRig, DrawDragonOpts } from '../art/dragon/rig.ts';
 import { DragonAnimPlayer, blinkFor } from '../art/dragon/anim.ts';
 import { dragonAnims, ONE_SHOTS, ELEMENT_ANIM_FALLBACK, idleVariants, variantEvery, SPREAD_VARIANTS, CROWD_GAP } from '../art/dragon/anims.ts';
 import { ELEMENTS } from '../art/dragon/elements/index.ts';
-import { ACT } from '../art/dragon/pose.ts';
 import type { PartialDragonPose } from '../art/dragon/pose.ts';
+import { bowlFor, drawBowl as drawBowlAt } from '../art/props.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
-
-const INK = '#1a1018';
 
 export interface Pet {
   rig: DragonRig;
@@ -82,20 +81,8 @@ export function makePet(el: DragonElement, stage: Stage, seed: number, anim: str
   };
 }
 
-/**
- * Where the eat bowl stands (4.2: "the bowl is drawn after the dragon"): under the snout at the chomp (the frame
- * whose act clock is 0), its rim 2 px above the mouth line, so the snout tip dips in behind the rim.
- */
-export function bowlFor(rig: DragonRig, frames: readonly { pose?: PartialDragonPose | null }[]): { x: number; h: number; w: number } {
-  const f = frames.find((fr) => fr.pose && fr.pose.act === ACT.eat && Math.abs(fr.pose.cue ?? 1) < 0.5);
-  // (solved with the jaw shut: an open jaw moves the mouth anchor down into the opening)
-  const J = solveDragon(rig, f && f.pose ? { ...f.pose, jaw: 0 } : {}, { x: 0, y: 0 });
-  const w = rig.stage === 'adult' || rig.stage === 'elder' ? 17 : rig.stage === 'young' ? 15 : 11;
-  // the bowl is drawn AFTER the dragon, so its top (the food heaped 2 px over the rim) stays >= 2 px under the eye's
-  // largest box: at the rim the baby's eye sat on it (hard rule: nothing covers the eye)
-  const eyeBottom = J.eye.y + rig.info.eye.h / 2;
-  return { x: Math.round(J.mouth.x - 1), h: Math.max(4, Math.min(Math.round(-J.mouth.y) + 1, Math.floor(-(eyeBottom + 2) - 2))), w };
-}
+/** Where the eat bowl stands (src/art/props.ts bowlFor: under the snout at the chomp). */
+export { bowlFor };
 
 /** A pet's draw options: where it stands, its mood, wariness, bond and charge, then `extra` (a scene's own). */
 export function petOpts(p: Pet, extra: Partial<DrawDragonOpts> = {}): DrawDragonOpts {
@@ -134,7 +121,7 @@ export function extentX(p: Pet): [number, number] {
 }
 
 /** Frames a finished one-shot is held before the gallery replays it (a live view keeps showing the anim). */
-const REPLAY = 40;
+export const REPLAY = 40;
 
 /** Advance a pet one 60 Hz step (anim + rig). */
 export function stepPet(p: Pet): void {
@@ -183,25 +170,11 @@ export function drawPets(ctx: CanvasRenderingContext2D, pets: readonly Pet[], fx
   fx.top.flush(ctx);
 }
 
-const BOWL = '#8c4a3a', BOWL_SH = '#6a3428', FOOD_TOP = '#b87a3a';
 /**
- * A simple food bowl in front of an eating pet (drawn AFTER it, 4.2), whole game pixels at the pet's scale: an inked
- * clay bowl, widest at the rim and rounding in toward its foot, with a low mound of food over the rim. Its rim sits
- * a couple of px over the snout at the chomp, so the snout dips in behind it.
+ * The food bowl in front of an eating pet (drawn AFTER it, 4.2), at the pet's scale: props.ts drawBowl, the one bowl
+ * the keepers carry in and set down too (src/care/acts.ts).
  */
 export function drawBowl(ctx: CanvasRenderingContext2D, p: Pet): void {
-  const b = p.bowl!, sc = p.scale * p.rig.scale, w = b.w, h = b.h;
-  const cx = Math.round(p.x + p.facing * b.x * sc), gy = Math.round(p.y);
-  const px = (x: number, y: number, ww: number, hh: number, c: string) => {
-    ctx.fillStyle = c; ctx.fillRect(Math.round(cx + x * sc), Math.round(gy + y * sc), Math.max(1, Math.round(ww * sc)), Math.max(1, Math.round(hh * sc)));
-  };
-  const half = w >> 1;
-  // row r (0 = the rim, h - 1 = the foot) is inset by a curve that rounds in toward the foot
-  const inset = (r: number) => Math.round(3 * Math.pow(r / Math.max(1, h - 1), 2.2));
-  for (let r = 0; r < h; r++) px(-half - 1 + inset(r), -h + r, w + 2 - 2 * inset(r), 1, INK);
-  px(-half + inset(h - 1), 0, w - 2 * inset(h - 1), 1, INK);
-  px(-half - 1, -h - 1, w + 2, 1, INK);
-  for (let r = 0; r < h; r++) px(-half + inset(r), -h + r, w - 2 * inset(r), 1, r === 0 ? BOWL_SH : r > h * 0.6 ? BOWL_SH : BOWL);
-  // the food: a low mound over the rim
-  px(-half + 2, -h - 2, w - 4, 1, INK); px(-half + 1, -h - 1, w - 2, 1, FOOD_TOP);
+  const b = p.bowl!, sc = p.scale * p.rig.scale;
+  drawBowlAt(ctx, Math.round(p.x + p.facing * b.x * sc), Math.round(p.y), b.w, b.h, sc);
 }

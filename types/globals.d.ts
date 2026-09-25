@@ -33,6 +33,11 @@ interface Window {
     /** view=neutral (src/gallery.ts): per look, the share of its pixels that are neutral (HSV S < 0.25); `over` > 40 % (3.1). */
     neutral?: { id: string; share: number; over: boolean }[];
     /**
+     * view=careaudit (src/gallery.ts): per care act and look, the most pixels of the dragon's eye box the keeper covers
+     * (K7: never any), where, how far a stroking hand lands from its mark, and whether the act finished.
+     */
+    care?: { act: string; id: string; covered: number; frame: number; phase: string; miss: number; done: boolean; frames: number }[];
+    /**
      * view=base (src/game/base.ts), as of the last frame drawn: the care simulation's step, the camera, the open jobs,
      * the jobs done and the Rushes so far, and the job strip's chips (canvas px) for tapping.
      */
