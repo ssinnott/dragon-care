@@ -10,7 +10,7 @@ dragons in them are the real rigs, the people the engine's humanoid rig; everyth
 `docs/base/`). The references were Fallout Shelter (the cutaway, rooms that merge), Two Point Museum (expeditions,
 rooms that earn their keep) and World of Warcraft's mission table (pick a team, counter the challenges, see the odds).
 
-**Status.** Designed. Being built in slices; the first is needs and jobs (section 8).
+**Status.** Designed, and being built in slices. The first, needs and jobs, runs as `view=base` in the gallery (section 8).
 
 ![The whole base, one screen of it outlined](base/barn_cutaway.png)
 
@@ -90,7 +90,7 @@ lively); moving a dragon to another room is the player's call, later by dragging
 | Room | Need (the element it suits) | Supplies | What living well there gives back |
 |---|---|---|---|
 | Hearth Kitchen | food (fire) | the bowl | warms the rooms beside it (fire is "a pet heater", 3.2) |
-| Grooming Parlour | love (spike: touch) | the brush | an adult spike's shed quills, a crafting material (3.3) |
+| Grooming Parlour | love (spike: touch) | | an adult spike's shed quills, a crafting material (3.3) |
 | Sun Loft (top floor only) | love (rock: bond) | | rock's crystals grow with its bond (3.4); the elder's sunning |
 | Romp Room | play (lightning) | the ball | the play wheel turns the mill (feed); play drains lightning's static (3.5) |
 | Bathhouse | bath (water) | the bucket | fire won't go in (3.2); water floats belly-up (an anim to build) |
@@ -247,12 +247,28 @@ a mission are not keeping, which is the price of sending a team (5.6).
 
 ## 8. Build order
 
-1. **Needs and jobs** (the first slice, this branch):
-   - the pet code moved out of `src/gallery.ts` into `src/game/`;
-   - the needs, the barn's layout and paths, and the job and keeper simulation, as plain data and functions with no
-     drawing in them, checked headless by `tools/sim-check.ts`;
-   - a live `view=base` in the gallery: the greybox barn, the real dragons driven by the simulation, the keepers,
-     bubbles, the job strip, panning and Rush.
+1. **Needs and jobs.** Built. Run `npm run dev` and open `index.html?view=base`: drag to look around, and tap a bubble,
+   a job chip or a dragon to Rush it.
+
+   ![The built slice, 30 s in: keepers on their way, the handler fetching a ball, the job strip](base/base_live.png)
+
+   | File | What it is |
+   |---|---|
+   | `src/game/pet.ts` | the pet code, moved out of `src/gallery.ts` unchanged (the gallery renders pixel for pixel as before) |
+   | `src/game/needs.ts` | the five needs, the drains, the tiers, mood and lightning's charge |
+   | `src/game/layout.ts` | the grid, the rooms, the floor spans, the ladders and the hoist, and routes between any two spots |
+   | `src/game/start.ts` | the starting base: the mockups' rooms, twelve dragons and five keepers |
+   | `src/game/sim.ts` | the care simulation: the queue, the keepers' trips and jobs, and Rush; no drawing, seeded, deterministic |
+   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building, the keepers on the engine rig, the bubbles and chips |
+   | `src/game/base.ts` | the live view: the simulation driving the dragons' anims, the camera, the HUD and the input |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route, 30 minutes of play with its invariants, determinism, Rush |
+
+   Measured by `npm run sim` on the starting base: over 30 minutes of play, 274 jobs opened and 272 were done. A
+   keeper started on a job 14 s after it opened on average (47 s at most), and no need ever emptied. Not in this
+   slice:
+   - dragons stay where they stand (the idle and its variants keep them lively);
+   - the base is the fixed starting one, and nothing is saved;
+   - there is no building yet, and no missions.
 2. **Rooms you build:** place, merge and upgrade rooms; move dragons between them; save and load.
 3. **Missions:** the table, then the scene.
 4. **The rest of the world:** people's own lives (bunks, the mess hall), eggs and hatching, day and night, the
