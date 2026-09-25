@@ -31,6 +31,9 @@ the yard plays in two and a half minutes, walks included). `npm run shots` rende
 yard also brings the game side of one care hook: **dusk's `tuckin` is played on a tuck-in** (the bible's status noted
 that nothing did). **Not built:** a player-facing game loop (the yard runs itself: nothing lets a player send a
 keeper), props for the keepers' stations, keepers in the habitat view, and night: Iris tucks in whoever is sleepy.
+Nor are these keepers in **the base** (`view=base`, `docs/BASE_DESIGN.md`), which has its own on the plain engine
+rig with a procedural walk: its care simulation could drive these keepers' walks and care acts, but that is not
+wired up.
 A plan (6.3) is made the first time a keeper does a job for a look, in the tick the job starts (tens of ms; a game
 would make them while it loads).
 

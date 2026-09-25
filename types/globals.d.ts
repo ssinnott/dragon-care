@@ -37,6 +37,12 @@ interface Window {
      * (K7: never any), where, how far a stroking hand lands from its mark, and whether the act finished.
      */
     care?: { act: string; id: string; covered: number; frame: number; phase: string; miss: number; done: boolean; frames: number }[];
+    /**
+     * view=base (src/game/base.ts), as of the last frame drawn: the care simulation's step, the camera, the open jobs,
+     * the jobs done and the Rushes so far, and the job strip's chips (canvas px) for tapping.
+     */
+    base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
+      chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[] };
   };
 }
 

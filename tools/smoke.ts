@@ -22,6 +22,8 @@
 // audits -- every care act on all 28 looks (view=careaudit), every act the yard plays (view=yardaudit) -- fail a keeper
 // at work covering the dragon's eye (K7), a stroking hand more than REACH_MISS px off its mark, or an act that never
 // ends.
+// The base (view=base, docs/BASE_DESIGN.md): frozen, a minute in, the care simulation must have got jobs done; live,
+// a drag must pan the camera and a tap on the first job chip must Rush that job.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -58,6 +60,33 @@ interface Case {
   keepers?: boolean;
   /** A care audit's rows (window.__dragonCare.care): at least this many acts, none with the eye covered, the hand off, or stuck. */
   care?: number;
+  /** view=base: the care simulation must have done jobs by the frozen frame. */
+  base?: boolean;
+  /** A live page to drive (pointer input); returns what went wrong. */
+  act?: (page: any) => Promise<string[]>;
+}
+
+/** view=base, live: a drag pans the camera the other way, and a tap on the first job chip Rushes that job. */
+async function baseInput(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = () => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.chips?.length ?? 0) > 0, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox();
+  const k = box.width / 640;
+  const a = await st();
+  await page.mouse.move(box.x + 700, box.y + 400);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 400, box.y + 300, { steps: 8 });
+  await page.mouse.up();
+  const b = await st();
+  if (!(b.camX > a.camX + 100)) out.push(`a drag to the left did not pan the camera right (x ${a.camX} -> ${b.camX})`);
+  const c = b.chips[0];
+  if (!c) return [...out, 'the job strip was empty'];
+  await page.mouse.click(box.x + (c.x + c.w / 2) * k, box.y + (c.y + c.h / 2) * k);
+  await page.waitForTimeout(300);
+  const d = await st();
+  if (d.rushes !== b.rushes + 1) out.push(`tapping ${c.dragon}'s ${c.need} chip Rushed ${d.rushes - b.rushes} jobs, not 1`);
+  return out;
 }
 const CASES: Case[] = [
   { query: 'view=lineup&t=0', minColours: 150, allScales: true },
@@ -132,6 +161,10 @@ const CASES: Case[] = [
   // (and mirrored, the dragons facing left, on two elements: every plan, walk and pose the other way round)
   { query: 'view=careaudit&facing=-1&els=fire,dusk&t=0', minColours: 2, allScales: false, timeout: 300000, care: 32 },
   { query: 'view=yardaudit&t=0', minColours: 2, allScales: false, timeout: 300000, care: 14 },
+  // the base: its first seconds, a minute of care (jobs got done), and live input (a drag pans, a chip tap Rushes)
+  { query: 'view=base&t=600', minColours: 150, allScales: false },
+  { query: 'view=base&t=3600', minColours: 150, allScales: false, base: true },
+  { query: 'view=base', minColours: 150, allScales: false, act: baseInput },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -190,6 +223,12 @@ for (const c of CASES) {
         if (!r.done) errors.push(`${r.act} ${r.id}: the act never ends`);
       }
     }
+    if (c.base) {
+      const b: { tick: number; done: number } | undefined = await page.evaluate(() => (window as any).__dragonCare?.base);
+      if (!b) errors.push('the base reported nothing');
+      else if (b.done < 1) errors.push(`the keepers finished no job in ${b.tick} steps`);
+    }
+    if (c.act) errors.push(...await c.act(page));
     const colours: number[] = await page.evaluate(() => {
       const cv = document.getElementById('stage') as HTMLCanvasElement;
       const d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;

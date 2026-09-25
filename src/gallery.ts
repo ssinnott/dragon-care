@@ -25,6 +25,9 @@
 //   view=tails                 the tail-ceiling audit (a fluke never rises over 3 px above the back: 3.0), narrowed the same
 //   view=pour                  the pour-column audit (no breath effect joins the mouth to the floor: 3.8), narrowed the same
 //   view=neutral               the neutral-area recorder (each look's share of HSV S < 0.25 pixels, <= 40 %: 3.1)
+//   view=base                  the base (src/game/base.ts; docs/BASE_DESIGN.md): the barn and towers at 640 x 360 with the
+//                              care simulation running -- need bubbles, keepers, the job strip; live, drag to look around
+//                              and tap a bubble, a job or a dragon to Rush it; seed= seeds the world
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
 //   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
@@ -32,20 +35,20 @@
 //   overlay: face, jaw, wing, flap, sleep, tuck, fx, gulp, flare, bristle, body=<rot>,<y>, head, pupil; wear=0 draws
 //   the elders without their tears and hole (2.9's with / without measure)
 import { drawText } from './lib/engine/text.ts';
-import { dragonBuild } from './art/dragon/build.ts';
-import { buildDragon, drawDragon, stepDragon, rootToScreen } from './art/dragon/rig.ts';
+import { drawDragon, rootToScreen } from './art/dragon/rig.ts';
 import { legRadii } from './art/dragon/parts.ts';
-import type { DragonRig, DrawDragonOpts } from './art/dragon/rig.ts';
-import { DragonAnimPlayer, blinkFor } from './art/dragon/anim.ts';
-import { dragonAnims, ANIM_NAMES, ONE_SHOTS, VARIANT_NAMES, ELEMENT_ANIM_NAMES, ELEMENT_ANIM_FALLBACK, idleVariants, variantEvery, SPREAD_VARIANTS, CROWD_GAP } from './art/dragon/anims.ts';
+import type { DrawDragonOpts } from './art/dragon/rig.ts';
+import { ANIM_NAMES, ONE_SHOTS, VARIANT_NAMES, ELEMENT_ANIM_NAMES } from './art/dragon/anims.ts';
 import { ELEMENTS, ELEMENT_IDS } from './art/dragon/elements/index.ts';
 import { STAGES } from './art/dragon/stages.ts';
 import { DP, DFACE } from './art/dragon/pose.ts';
 import type { DFaceName, PartialDragonPose } from './art/dragon/pose.ts';
 import type { Stage } from './art/dragon/stages.ts';
 import type { DragonElement } from './art/dragon/palettes.ts';
+import { makePet as makeGamePet, petOpts as gamePetOpts, stepPet, stepWary, extentX, seekPet, animIntro, drawPets as drawGamePets, REPLAY } from './game/pet.ts';
+import type { Pet, MakePetOpts } from './game/pet.ts';
+import { BaseView } from './game/base.ts';
 import { TopPass, AmbientBudget } from './art/dragon/fx.ts';
-import { bowlFor, drawBowl as drawBowlAt } from './art/props.ts';
 import { KEEPERS, KEEPER_IDS } from './art/keeper/cast.ts';
 import type { KeeperId } from './art/keeper/cast.ts';
 import { KEEPER_ANIM_NAMES, KEEPER_ONE_SHOTS } from './art/keeper/anims.ts';
@@ -64,7 +67,7 @@ import { REACH_MISS, ACT_MAX, YARD_ACT_MAX } from './care/limits.ts';
 export const STRAW = '#e0d6b8';
 const LABEL = '#3a2a30';
 
-export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings', 'keepers', 'care', 'careaudit', 'yard', 'yardaudit'] as const;
+export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings', 'keepers', 'care', 'careaudit', 'yard', 'yardaudit', 'base'] as const;
 export type View = typeof VIEWS[number];
 
 export interface GalleryParams {
@@ -156,134 +159,29 @@ function poseParams(q: URLSearchParams): PartialDragonPose | null {
     body: q.has('body') ? [body[0] || 0, body[1] || 0] : undefined });
 }
 
-// ---------- pets: a rig + a player + where it stands ----------
-
-export interface Pet {
-  rig: DragonRig;
-  player: DragonAnimPlayer;
-  x: number;
-  y: number;
-  facing: number;
-  scale: number;
-  mood: number;
-  label: string;
-  /** The anim the gallery asked for (a one-shot replays after a pause, so a live view keeps showing it). */
-  anim: string;
-  /** Frames the finished one-shot has been held. */
-  hold: number;
-  /** World distance walked, px along facing (the sum of the frames' `move`): the strip's ground ticks scroll by it. */
-  wx: number;
-  /** The eat bowl, root-space x of its centre and its height, px (null = no bowl). */
-  bowl: { x: number; h: number; w: number } | null;
-  /** Roaming: the pet really moves by its frames' `move` along facing, wrapping inside [x0, x1] (the habitat). */
-  roam: readonly [number, number] | null;
-  /** How wary the pet is of the nearest other dragon, 0..1 eased, and its latch (stepWary; DrawDragonOpts.wary). */
-  wary: number;
-  waryOn: boolean;
-}
-
-export function makePet(el: DragonElement, stage: Stage, seed: number, anim: string, x: number, y: number,
-  opts: { scale?: number; facing?: number; mood?: number; desync?: boolean; blink?: boolean } = {}): Pet {
-  const build = dragonBuild({ element: el, stage, seed });
-  const rig = buildDragon(build);
-  // (wear=0: the same elder without its tears and hole, the other half of 2.9's with / without measure; the renderers'
-  // info.sp too, or an element that reads its wear there -- a custom wing's tear -- ignored it)
-  if (!WEAR) { rig.sp = { ...rig.sp, wing: { ...rig.sp.wing, tears: undefined, hole: undefined } }; rig.info.sp = rig.sp; }
-  const anims = dragonAnims(stage, build.spec, build.dims);
-  const player = new DragonAnimPlayer(anims, seed, blinkFor(stage));
-  player.blink = opts.blink !== false;
-  const desync = opts.desync !== false;
-  // (an element anim the look has not got plays its fallback: dusk's tuck-in is every other look's sleep)
-  player.play(anim, { restart: true, phase: desync ? build.phase : 0, speed: desync ? build.speed : 1, fallback: ELEMENT_ANIM_FALLBACK[anim] });
-  // an idle pet cuts to a look-around, a yawn, a scratch or its element's fidget every 6-10 s (the elder to its back
-  // stretch, reminisce or airing too, every 8-12 s; rock's elder, with no hole to air, airs its own way: its sunning),
-  // seeded: 4.2
-  // (the airing is skipped while the pet is crowded: stepWary marks it, 5.4)
-  if (anim === 'idle') { const [a, b] = variantEvery(stage); player.setVariants('idle', idleVariants(stage, build.sp.wing), a, b, SPREAD_VARIANTS); }
-  if (STATIC_POSE) player.setStaticPose(STATIC_POSE);
-  return {
-    rig, player, x, y, facing: opts.facing ?? 1, scale: opts.scale ?? 1, mood: opts.mood ?? 0,
-    label: `${ELEMENTS[el].name} ${stage}`, anim, hold: 0, wx: 0, roam: null, wary: 0, waryOn: false,
-    bowl: anim === 'eat' && !STATIC_POSE ? bowlFor(rig, anims.eat ? anims.eat.frames : []) : null,
-  };
-}
+// ---------- pets (src/game/pet.ts), with the query applied ----------
 
 /** The query's static pose overlay, applied to every pet a scene makes (set by startGallery). */
 let STATIC_POSE: PartialDragonPose | null = null;
 /** The query's flash / tint, bond and charge, applied at draw time. */
 let FLASH = false, TINT: string | null = null, BOND = 1, CHARGE = 0, WEAR = true;
 
+/** A pet with the query applied: its static pose overlay, the elders' wear, and every pet's bond and charge. */
+function makePet(el: DragonElement, stage: Stage, seed: number, anim: string, x: number, y: number, opts: MakePetOpts = {}): Pet {
+  const p = makeGamePet(el, stage, seed, anim, x, y, { staticPose: STATIC_POSE, wear: WEAR, ...opts });
+  p.bond = BOND; p.charge = CHARGE;
+  return p;
+}
+/** A pet's draw options with the query's flash and tint checks (the offscreen passes). */
 function petOpts(p: Pet, extra: Partial<DrawDragonOpts> = {}): DrawDragonOpts {
-  return { x: p.x, y: p.y, facing: p.facing, scale: p.scale, mood: p.mood, flash: FLASH, tint: TINT, tintAlpha: 0.35, wary: p.wary, bond: BOND, charge: CHARGE, ...extra };
+  return gamePetOpts(p, { flash: FLASH, tint: TINT, tintAlpha: 0.35, ...extra });
 }
 
-/** The wary latch (4.3, spike's wary lean): on under this many game px to the nearest other dragon, off over WARY_OFF. */
-const WARY_ON = 30, WARY_OFF = 36;
-/**
- * Step every pet's wary state once per tick, before the pets step (a scene's owner does this; the game's pet
- * renderer will too): the gap to the nearest OTHER pet in game px -- between the two sprites' extents along the
- * floor (tail tip to snout, whichever way each faces) and their depth apart -- latched with hysteresis and eased
- * over about 8 f, so a dragon walking past does not flicker the lean. The same gap marks the pet `crowded` under
- * CROWD_GAP, so its idle schedule starts no spread-wing variant (5.4).
- */
-function stepWary(pets: readonly Pet[]): void {
-  for (const p of pets) {
-    const [a0, a1] = extentX(p);
-    let g = Infinity;
-    for (const q of pets) {
-      if (q === p) continue;
-      const [b0, b1] = extentX(q), dx = Math.max(0, b0 - a1, a0 - b1), dy = Math.abs(q.y - p.y);
-      g = Math.min(g, Math.hypot(dx, dy) / (p.scale || 1));
-    }
-    if (g < WARY_ON) p.waryOn = true; else if (g > WARY_OFF) p.waryOn = false;
-    p.wary += ((p.waryOn ? 1 : 0) - p.wary) / 8;
-    // the same gap keeps a spread-wing variant from starting beside a neighbour (5.4: the crowd rule)
-    p.player.crowded = g < CROWD_GAP;
-  }
-}
-/** A pet's screen x extent, tail tip to snout, at its facing (from the build's dims, the rest pose). */
-function extentX(p: Pet): [number, number] {
-  const d = p.rig.dims, s = p.scale * p.rig.scale;
-  const back = (d.hipR + d.gap / 2 + d.tail.n * d.tail.len) * s, front = (d.gap / 2 + d.chestR + d.headLen) * s;
-  return p.facing < 0 ? [p.x - front, p.x + back] : [p.x - back, p.x + front];
-}
-
-/** One scene tick: the scene-wide state (the wary latch, where the scene has one), then every pet, then its own step. */
+/** One scene tick: a scene that runs its own world steps it (the base); otherwise the wary latch, then every pet. */
 function stepScene(scene: Scene): void {
+  if (scene.step) { scene.step(); return; }
   if (scene.wary) stepWary(scene.pets);
   for (const p of scene.pets) stepPet(p);
-  if (scene.step) scene.step();
-}
-
-/** Frames a finished one-shot is held before the gallery replays it (a live view keeps showing the anim). */
-const REPLAY = 40;
-
-/** Advance a pet one 60 Hz step (anim + rig). */
-export function stepPet(p: Pet): void {
-  if (p.player.done && p.player.name === p.anim && ONE_SHOTS.includes(p.anim) && ++p.hold >= REPLAY) {
-    p.hold = 0; p.player.play(p.anim, { restart: true, blend: 8 });
-  }
-  p.player.tick();
-  const mv = p.player.move;
-  p.wx += mv;
-  if (p.roam && mv) {
-    // a roaming pet walks for real: the whole sprite moves, so its planted paws stand still on the floor
-    const [x0, x1] = p.roam, span = x1 - x0;
-    p.x = x0 + ((((p.x + p.facing * mv * p.scale) - x0) % span) + span) % span;
-  }
-  stepDragon(p.rig, p.player.pose, petOpts(p));
-}
-
-/** Freeze a pet at frame t: replay t steps from its start, so the frame is deterministic. */
-function seekPet(p: Pet, t: number): void { for (let i = 0; i < t; i++) stepPet(p); }
-
-/** Frames of an anim's intro (the frames before its loopFrom): the lie-down of sleep. */
-function animIntro(p: Pet, name: string): number {
-  const a = p.player.anims[name];
-  if (!a || !a.loopFrom) return 0;
-  let n = 0;
-  for (let i = 0; i < a.loopFrom; i++) n += a.frames[i].dur || 1;
-  return n;
 }
 
 // ---------- the scene ----------
@@ -294,8 +192,14 @@ interface Scene {
   pets: Pet[];
   /** The pets share a floor and react to each other (the habitat): stepScene runs the wary latch. */
   wary?: boolean;
-  /** Whatever else the scene steps once per tick, after its pets (the keepers). */
+  /**
+   * A scene with a world of its own (the base, the keepers' views: their dragons and keepers are agents, not pets)
+   * steps it here, instead of the gallery stepping its pets.
+   */
   step?(): void;
+  /** A live scene that takes input (the base) hooks the canvas here, and lets go of it in detach; frozen shots never call either. */
+  attach?(canvas: HTMLCanvasElement): void;
+  detach?(): void;
   /** Draw the whole view (pets already stepped). */
   draw(ctx: CanvasRenderingContext2D): void;
 }
@@ -305,24 +209,7 @@ const budget = new AmbientBudget();
 let frame = 0;
 
 function drawPets(ctx: CanvasRenderingContext2D, pets: Pet[], extra: Partial<DrawDragonOpts> = {}): void {
-  // y-sort by the feet (5.4)
-  const order = pets.slice().sort((a, b) => a.y - b.y);
-  budget.begin(order.length, frame);
-  for (let i = 0; i < order.length; i++) {
-    const p = order[i];
-    drawDragon(ctx, p.rig, p.player.pose, petOpts(p, { still: true, top, budget, slot: i, ...extra }));
-    if (p.bowl && !extra.silhouette) drawBowl(ctx, p);
-  }
-  top.flush(ctx);
-}
-
-/**
- * The food bowl in front of an eating pet (drawn AFTER it, 4.2), at the pet's scale: props.ts drawBowl, the one bowl
- * the keepers carry in and set down too (src/care/acts.ts).
- */
-function drawBowl(ctx: CanvasRenderingContext2D, p: Pet): void {
-  const b = p.bowl!, sc = p.scale * p.rig.scale;
-  drawBowlAt(ctx, Math.round(p.x + p.facing * b.x * sc), Math.round(p.y), b.w, b.h, sc);
+  drawGamePets(ctx, pets, { top, budget, frame }, { flash: FLASH, tint: TINT, tintAlpha: 0.35, ...extra });
 }
 
 function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color = LABEL, size = 1): void {
@@ -1422,6 +1309,7 @@ function makeScene(P: GalleryParams): Scene {
     case 'careaudit': return careAuditScene(P);
     case 'yard': return yardScene(P);
     case 'yardaudit': return yardAuditScene(P);
+    case 'base': return new BaseView(P.seed);
     default: return lineupScene(P);
   }
 }
@@ -1435,7 +1323,7 @@ function render(ctx: CanvasRenderingContext2D, scene: Scene, P: GalleryParams, l
     postProcess(ctx, scene.w, scene.h, post);
     label(ctx, post === 'grey' ? 'GREYSCALE' : 'SIMULATED DEUTERANOPIA', scene.w / 2, 4, post === 'grey' ? '#303030' : LABEL, 1);
   }
-  if (live) label(ctx, `${P.view.toUpperCase()}  ANIM ${P.anim.toUpperCase()}   ARROWS/SPACE: VIEW  1-9, 0: ANIM (${ANIM_NAMES.join(' ').toUpperCase()})  E: ELEMENT`, scene.w / 2, scene.h - 10, '#5a4850', 1);
+  if (live && P.view !== 'base') label(ctx, `${P.view.toUpperCase()}  ANIM ${P.anim.toUpperCase()}   ARROWS/SPACE: VIEW  1-9, 0: ANIM (${ANIM_NAMES.join(' ').toUpperCase()})  E: ELEMENT`, scene.w / 2, scene.h - 10, '#5a4850', 1);
 }
 
 /** Start the gallery on a canvas; resolves once the requested frame is drawn. */
@@ -1456,7 +1344,8 @@ export function startGallery(canvas: HTMLCanvasElement, search: string, onReady:
     return;
   }
   let first = true;
-  const rebuild = () => { scene = makeScene(P); size(); };
+  scene.attach?.(canvas);
+  const rebuild = () => { scene.detach?.(); scene = makeScene(P); size(); scene.attach?.(canvas); };
   window.addEventListener('keydown', (e) => {
     const vi = VIEWS.indexOf(P.view);
     if (e.key === 'ArrowRight' || e.key === ' ') { P = { ...P, view: VIEWS[(vi + 1) % VIEWS.length] }; rebuild(); }
