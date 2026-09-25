@@ -11,14 +11,14 @@
 //         and tiptoes away.
 // STAGING (K7). A feed is FRONT on (the bowl goes in front of the dragon); a pet, a groom and a tuck-in are from the
 // SIDE, the way a person pets a pony: the keeper at the dragon's shoulder, a step nearer the camera, facing the way it
-// faces, reaching forward, kneeling on both knees for a small or a lying dragon. WHERE the hand goes and where the
-// keeper stands are PLANNED before it walks over (planSide): the back of the crown if it can, else the top of the neck,
-// else the back (a baby's: its rump); a spot a stroke's length from it. Each is checked by dry runs of the keeper's own
-// poses, drawn off screen, against the dragon's eye as the dragon will be posed at every point of the act (keeper.ts
-// dryRun): the keeper's body, arms, hat and brush never cover the eye, and the hand reaches its mark. The eyes are
-// big and a keeper's fist is 9 or 10 px, so on a baby, or a head laid on the floor, the head is out: no fixed spacing
-// or mark does for every look. Gallery view=careaudit runs every act on every look and fails any frame where these do
-// not hold.
+// faces, reaching forward, kneeling on both knees for a small or a lying dragon. WHERE the hand goes, whether it opens
+// flat, and where the keeper stands are PLANNED before it walks over (planSide): the back of the crown if it can, else
+// the top of the neck, else the back (a baby's: its back or its rump); a spot a stroke's length from it. Each is
+// checked by dry runs of the keeper's own poses, drawn off screen, against the dragon's eye as the dragon will be
+// posed at every point of the act (keeper.ts dryRun): the keeper's body, arms, hat and brush never cover the eye, and
+// the hand reaches its mark. The eyes are big and a keeper's hand is 8 to 10 px, so on a baby, or a head laid on the
+// floor, the head is out: no fixed spacing or mark does for every look. Gallery view=careaudit runs every act on every
+// look and fails any frame where these do not hold.
 import { clamp } from '../lib/engine/math.ts';
 import { setDownAnim, petStroke, propsOf } from '../art/keeper/anims.ts';
 import type { HandT } from '../art/keeper/anims.ts';
@@ -49,8 +49,9 @@ export interface CareAct {
   low: boolean;
   /** Tomas grooms: the brush on the dragon's neck (a baby's: the back of its head). */
   groom: boolean;
-  /** Where the stroking hand goes (planSide's choice). */
+  /** Where the stroking hand goes, and whether it opens flat or stays a fist (planSide's choices: KeeperAgent.palm). */
   mark: Mark;
+  palm: boolean;
   /** Feed: ground px from the kneeling keeper to the bowl's centre; the bowl's screen x; where the dragon eats from. */
   bowlAt: number;
   bowlX: number;
@@ -91,7 +92,7 @@ const STROKE = 26, STROKE_TUCK = 40;
 const SETTLE = 8;
 /**
  * The stroke's arc over the head, cranium degrees (0 toward the snout, -90 the crown): the back of the crown on a young
- * or grown head, the back of the head on a baby's, whose crown is right over its big eye.
+ * or grown head (a baby's, the back of its head, is only an act's mark before its plan: marksFor never strokes it).
  */
 const ARC: Readonly<Record<string, readonly [number, number]>> = { baby: [-150, -176], young: [-112, -150], adult: [-112, -150], elder: [-112, -150] };
 /** Feed: how far the dragon walks up to its bowl at least, px, by stage (the keeper sets it down that far out). */
@@ -134,22 +135,24 @@ export interface Mark { on: 'crown' | 'neck' | 'back'; from: number; to: number 
 
 /**
  * The marks a keeper tries, in order (planSide takes the first it can reach with the eye clear throughout). A PET:
- * the back of the crown (a baby's: the back of its head), then the same arc slid back 10 deg at a time (a baby's big
- * eye comes up to its crown, and the fist lay over it); the top of the neck behind the head, then lower down it; the
- * withers and the back last (a child beside a grown dragon pats its neck or its back, as a child pats a pony). A
- * GROOM (Tomas's brush, 11 px wide under his fist): the top of the neck, then the back. A TUCK-IN strokes the back of
- * a dragon lying down: on a head laid on the floor the eye is most of the head's side, and no stroke of it kept off.
+ * the back of the crown, then the same arc slid back 10 deg at a time; the top of the neck behind the head, then lower
+ * down it; the withers and the back last (a child beside a grown dragon pats its neck or its back, as a child pats a
+ * pony). A baby is patted on its back or its rump: its big eye comes up to its crown, and no arc of its head, slid back
+ * 40 deg, kept a hand off it on any look (they were tried first, and made the baby's plan the slowest). A GROOM
+ * (Tomas's brush, 11 px wide under his hand): the top of the neck, then the back. A TUCK-IN strokes the back of a
+ * dragon lying down: on a head laid on the floor the eye is most of the head's side, and no stroke of it kept off.
  */
 function marksFor(a: Pick<CareAct, 'd' | 'groom' | 'kind'>): readonly Mark[] {
   const st = a.d.stage, [c0, c1] = ARC[st], crown: Mark[] = [];
-  for (let back = 0; back <= (st === 'baby' ? 40 : 30); back += 10) crown.push({ on: 'crown', from: c0 - back, to: c1 - back });
+  for (let back = 0; back <= 30; back += 10) crown.push({ on: 'crown', from: c0 - back, to: c1 - back });
   const neck = (from: number, to: number): Mark => ({ on: 'neck', from, to });
   const back = (from: number, to: number): Mark => ({ on: 'back', from, to });
   // (a baby's short back hides under its head: its hand goes on the rump, round the hip ball)
   const backs = st === 'baby' ? [back(0.8, 1.3), back(1.1, 1.6), back(1.4, 1.9)] : [back(0.05, 0.4), back(0.3, 0.65), back(0.6, 1)];
   if (a.kind === 'tuck') return backs;
-  if (a.groom) return st === 'baby' ? backs : [neck(0.15, 0.6), neck(0.3, 0.75), neck(0.45, 0.9), ...backs];
-  return st === 'baby' ? [...crown, ...backs] : [...crown, neck(0.1, 0.45), neck(0.3, 0.65), neck(0.45, 0.85), ...backs];
+  if (st === 'baby') return backs;
+  if (a.groom) return [neck(0.15, 0.6), neck(0.3, 0.75), neck(0.45, 0.9), ...backs];
+  return [...crown, neck(0.1, 0.45), neck(0.3, 0.65), neck(0.45, 0.85), ...backs];
 }
 
 /**
@@ -183,6 +186,22 @@ function careTarget(a: Pick<CareAct, 'd' | 'k' | 'groom' | 'mark'>, u: number, o
   return out;
 }
 
+const P1 = { x: 0, y: 0 }, P2 = { x: 0, y: 0 };
+/**
+ * The open palm's angle at `u` along the mark, in the keeper's ground space (deg: 0 down, 90 forward; the keeper faces
+ * the way the dragon does): along the mark toward the snout, the fingers forward, as a hand lies on a pony's neck. A
+ * groom's is left along the forearm (undefined), on the back of the brush drawn level under it (parts.ts
+ * drawHeldBrush): laid level too, its fingers came over a baby's eye from the rump.
+ */
+function palmAngle(a: Pick<CareAct, 'd' | 'k' | 'groom' | 'mark'>, u: number): number | undefined {
+  if (a.groom) return undefined;
+  careTarget(a, u - 0.08, P1); careTarget(a, u + 0.08, P2);
+  return (Math.atan2((P1.x - P2.x) * a.d.facing, P1.y - P2.y) * 180) / Math.PI;
+}
+
+/** The share of its reach a keeper's arm is out at the spot a plan starts looking from. */
+const IDEAL_REACH = 0.85;
+
 /** A hand within this of its mark is on it, px (the audit allows REACH_MISS; the joints snap to whole pixels). */
 const REACH_OK = 1.5;
 /** A stroke's every mark lies this far inside the straight arm's reach, px (the poses between the samples wander). */
@@ -194,7 +213,7 @@ const REACH_SLACK = 1.5;
 const EYE_MARGIN = 2;
 
 /** The dragon in one pose the plan checks against: its eye (grown EYE_MARGIN) and the stroke's two ends, on screen. */
-interface DSample { eye: Box; t0: { x: number; y: number }; t1: { x: number; y: number } }
+interface DSample { eye: Box; t0: HandT; t1: HandT }
 /**
  * One check at a spot: frame `frame` of the keeper's anim `anim` against the dragon posed as `s`, the near hand
  * reaching for the stroke's ends (`reach`: blended in by `w`, as a hand eases on and off) or not reaching (null).
@@ -213,17 +232,18 @@ function kFrames(k: KeeperAgent, anim: string, at: readonly number[]): number[] 
  * PLAN the side staging (K7): where the keeper stands, whether it kneels and which mark it strokes, so that its hand
  * reaches the mark on every sampled pose of the dragon and nothing of it covers the dragon's eye at any point of the
  * act. Every phase the keeper spends at the spot is checked by a dry run against the dragon as it will be then
- * (`plan`: which of the dragon's poses go with which of the keeper's). For each mark (marksFor), kneeling or standing
- * (the posture the mark's height suggests first), spots run 1 px apart outward from where the first mark sits at 0.7
- * of the arm's reach. A spot must first REACH: every end of the stroke on every sampled pose within the straight arm
- * less REACH_SLACK of the shoulder (the poses between the samples wander), and the hand's joint within REACH_OK of it
- * as a tick places it (keeper.ts dryRun, snapped to the pixel grid); then its dry runs must keep the eye clear. The
- * first such spot wins. None (no look in the audit needs it): the eye-clear spot whose stroke overreaches least.
+ * (`plan`: which of the dragon's poses go with which of the keeper's). With the hand flat (KeeperAgent.palm), then, if
+ * no mark will do, a fist: for each mark (marksFor), kneeling or standing (the posture the mark's height suggests
+ * first), spots run 1 px apart outward from where the first mark sits at IDEAL_REACH of the arm's reach. A spot must
+ * first REACH: every end of the stroke on every sampled pose within the straight arm less REACH_SLACK of the shoulder
+ * (the poses between the samples wander), and the hand's joint within REACH_OK of it as a tick places it (keeper.ts
+ * dryRun, snapped to the pixel grid); then its dry runs must keep the eye clear. The first such spot wins. None (no
+ * look in the audit needs it): the eye-clear spot whose stroke overreaches least.
  */
 function planSide(a: CareAct, plan: (low: boolean, sample: (anim: string, frame: number) => DSample) => { work: Check[]; around: Check[] }, lying: boolean): void {
   const { k, d } = a, p = propsOf(k.rig.spec), face = d.facing, standY = d.y + STAND_DEPTH * d.scale, sc = k.scale;
   a.face = face; a.standY = standY; a.staging = 'side';
-  const ground = (t: { x: number; y: number }, x: number): HandT => ({ x: ((t.x - x) * face) / sc, y: (t.y - standY) / sc });
+  const ground = (t: HandT, x: number): HandT => ({ x: ((t.x - x) * face) / sc, y: (t.y - standY) / sc, a: t.a });
   const reach = (armReach(p) - REACH_SLACK) * sc;
   // the dragon in each pose a check asks for, solved once: its eye and every mark's two ends
   const marks = marksFor(a), poses = new Map<string, DSample[]>();
@@ -233,17 +253,19 @@ function planSide(a: CareAct, plan: (low: boolean, sample: (anim: string, frame:
     if (!v) {
       v = pointIn(d, anim, frame, () => {
         const eye = grow(eyeBox(d), EYE_MARGIN);
-        return marks.map((m) => { a.mark = m; return { eye, t0: { ...careTarget(a, 0, PT) }, t1: { ...careTarget(a, 1, PT) } }; });
+        return marks.map((m) => { a.mark = m; return { eye, t0: { ...careTarget(a, 0, PT), a: palmAngle(a, 0) }, t1: { ...careTarget(a, 1, PT), a: palmAngle(a, 1) } }; });
       });
       poses.set(key, v);
     }
     return v;
   };
   // (two passes: the first takes only spots that reach; the second, if no mark had one, the spot that overreaches
-  // least with the eye clear)
+  // least with the eye clear. The hand flat first, then a fist: on some looks the flat hand's fingers come over the
+  // eye from every mark. Per mark, the fist doubled a plan's time, most marks failing either way)
   for (const pass of [0, 1]) {
-    let fallback: { x: number; low: boolean; mark: Mark; over: number } | null = null;
-    for (let mi = 0; mi < marks.length; mi++) {
+    let fallback: { x: number; low: boolean; mark: Mark; over: number; palm: boolean } | null = null;
+    for (const palm of [true, false]) for (let mi = 0; mi < marks.length; mi++) {
+      k.palm = palm;
       const mark = marks[mi], sample = (anim: string, frame: number): DSample => posed(anim, frame)[mi];
       a.mark = mark;
       const firstWork = plan(false, sample).work;
@@ -256,7 +278,9 @@ function planSide(a: CareAct, plan: (low: boolean, sample: (anim: string, frame:
         // the near shoulder of each working frame (ground space, scaled), and the spots in order from the ideal one out
         const sh = work.map((c) => { shoulderAt(k, c.anim, c.frame, SH); return { x: SH.x * sc, y: SH.y * sc }; });
         const t0 = work[0].s.t0, vy = t0.y - (standY + sh[0].y);
-        const ideal = Math.round(t0.x - face * (sh[0].x + Math.sqrt(Math.max(0, (reach * 0.7) ** 2 - vy * vy))));
+        // (the arm most of the way out: at 0.7 of its reach the forearm folded back against the keeper's own chest, and
+        // a stroke read as a hug)
+        const ideal = Math.round(t0.x - face * (sh[0].x + Math.sqrt(Math.max(0, (reach * IDEAL_REACH) ** 2 - vy * vy))));
         const cands: number[] = [ideal];
         for (let dx = 1; dx <= 40; dx++) cands.push(ideal - face * dx, ideal + face * dx);
         // the checks, one draw each (a reaching one per end of the stroke); the one that last failed goes first,
@@ -269,7 +293,7 @@ function planSide(a: CareAct, plan: (low: boolean, sample: (anim: string, frame:
           let over = -Infinity;
           work.forEach((c, i) => { for (const t of [c.s.t0, c.s.t1]) over = Math.max(over, Math.hypot(t.x - (x + face * sh[i].x), t.y - (standY + sh[i].y)) - reach); });
           if (pass === 0 ? over > 0 : fallback && over >= fallback.over) continue;
-          // the fist alone first, from its joints (cheap: most spots that fail, fail there), then every check drawn
+          // the hand alone first, from its joints (cheap: most spots that fail, fail there), then every check drawn
           let clear = true;
           for (let j = 0; j < quick.length && clear; j++) {
             const i = j === 0 ? qkiller : j <= qkiller ? j - 1 : j, { c, t } = quick[i];
@@ -280,17 +304,17 @@ function planSide(a: CareAct, plan: (low: boolean, sample: (anim: string, frame:
             if (dryRun(k, c.anim, c.frame, x, standY, face, t && ground(t, x), c.s.eye, c.reach ?? 1).cover > 0) { clear = false; killer = i; }
           }
           if (!clear) continue;
-          if (pass === 1) { fallback = { x, low, mark, over }; continue; }
+          if (pass === 1) { fallback = { x, low, mark, over, palm }; continue; }
           // (the hand's joint as a tick places it, snapped to the pixel grid)
           let miss = 0;
           for (const c of work) for (const t of [c.s.t0, c.s.t1]) miss = Math.max(miss, dryRun(k, c.anim, c.frame, x, standY, face, ground(t, x), null).miss);
-          if (miss <= REACH_OK) { a.standX = x; a.low = low; a.mark = mark; return; }
+          if (miss <= REACH_OK) { a.standX = x; a.low = low; a.mark = mark; a.palm = palm; return; }
         }
       }
     }
-    if (fallback) { a.standX = fallback.x; a.low = fallback.low; a.mark = fallback.mark; return; }
+    if (fallback) { a.standX = fallback.x; a.low = fallback.low; a.mark = fallback.mark; a.palm = fallback.palm; return; }
   }
-  a.standX = Math.round(d.x - face * 20); a.low = lying; a.mark = marksFor(a)[0];
+  a.standX = Math.round(d.x - face * 20); a.low = lying; a.mark = marksFor(a)[0]; a.palm = true;
 }
 
 /**
@@ -298,7 +322,7 @@ function planSide(a: CareAct, plan: (low: boolean, sample: (anim: string, frame:
  * stand relative to the dragon, kneeling or not, and the mark (a pet's, a groom's, a tuck-in's), or the bowl's gap (a
  * feed's). A plan is a few dozen ms of dry runs; the yard (yard.ts) makes the same few again and again.
  */
-const PLANS = new Map<string, { dx: number; low: boolean; mark: Mark; gap: number }>();
+const PLANS = new Map<string, { dx: number; low: boolean; mark: Mark; palm: boolean; gap: number }>();
 function planKey(a: CareAct): string {
   const { k, d } = a;
   return `${a.kind}:${k.id}:${d.el}:${d.stage}:${d.seed}:${d.facing}:${d.scale}:${k.scale}`;
@@ -314,16 +338,16 @@ function act(kind: ActKind, k: KeeperAgent, d: DragonAgent, exitX: number, exitY
     world: o.world ?? (() => own), walk: null,
     floor: o.floor ?? { x0: Math.min(k.x, d.x, exitX) - 80, y0: Math.min(k.y, d.y, exitY) - 40, x1: Math.max(k.x, d.x, exitX) + 80, y1: Math.max(k.y, d.y, exitY) + 30 },
     kind, k, d, phase: 'go', t: 0, standX: k.x, standY: k.y, face: 1, staging: 'side', low: false, groom: false,
-    mark: { on: 'crown', from: ARC[d.stage][0], to: ARC[d.stage][1] }, bowlAt: 0, bowlX: 0, eatX: d.x, backX: k.x, trot: FEED_TROT, count: 0, lieEnd: 0, exitX, exitY, done: false, ownsDragon: true, met: false, strokeT: 0,
+    mark: { on: 'crown', from: ARC[d.stage][0], to: ARC[d.stage][1] }, palm: true, bowlAt: 0, bowlX: 0, eatX: d.x, backX: k.x, trot: FEED_TROT, count: 0, lieEnd: 0, exitX, exitY, done: false, ownsDragon: true, met: false, strokeT: 0,
   };
 }
 
 /**
  * Start a feed: the keeper picks up a full bowl the size of the dragon's (props.ts bowlFor) and sets off. Where the
  * bowl goes is solved first: the stage's gap out from the begging dragon's eating spot, widened 2 px at a time until
- * a dry run of the set-down (every third frame, with the bowl in the hands up to its release) covers none of the
- * begging dragon's eye (K7): a kneeling grown-up keeper is as big as a baby dragon, and a fixed gap put the bowl, the
- * arms or the keeper's head over a baby's face.
+ * a dry run of the set-down (every frame, with the bowl in the hands up to its release) covers none of the begging
+ * dragon's eye anywhere in its beg (K7): a kneeling grown-up keeper is as big as a baby dragon, and a fixed gap put
+ * the bowl, the arms or the keeper's head over a baby's face.
  */
 export function beginFeed(k: KeeperAgent, d: DragonAgent, exitX: number, exitY = k.y, scene: ActScene = {}): CareAct {
   const sp = k.rig.spec, p = propsOf(sp), f = d.facing, a = act('feed', k, d, exitX, exitY, scene);
@@ -338,18 +362,25 @@ export function beginFeed(k: KeeperAgent, d: DragonAgent, exitX: number, exitY =
   let gap = known ? known.gap : FEED_GAP[d.stage] * d.scale;
   if (!known) {
     const release = set.frames.findIndex((fr) => fr.event === 'release');
-    const box = grow(pointIn(d, 'beg', 0, () => eyeBox(d)), 2), held = k.rig.bowl;
+    // (the eye over the whole beg, every frame: dusk's swings its head 15 px down and up, and the box of its first
+    // frame let a kneeling keeper's chin into the eye)
+    const beg = d.player.anims.beg?.frames ?? [], box = grow(pointIn(d, 'beg', 0, () => eyeBox(d)), 2), held = k.rig.bowl;
+    for (let i = 1; i < beg.length; i++) {
+      const e = pointIn(d, 'beg', i, () => eyeBox(d));
+      box.x0 = Math.min(box.x0, e.x0 - 2); box.y0 = Math.min(box.y0, e.y0 - 2); box.x1 = Math.max(box.x1, e.x1 + 2); box.y1 = Math.max(box.y1, e.y1 + 2);
+    }
     for (let tries = 0; tries < 30; tries++, gap += 2) {
       const standX = bowlScreenX(d) + f * (gap + a.bowlAt * k.scale);
       let hit = false;
-      for (let i = 0; i < set.frames.length && !hit; i += 3) {
+      // (every frame: the head dips in and out of the eye over three, at every third it slipped 2 px in between)
+      for (let i = 0; i < set.frames.length && !hit; i++) {
         k.rig.bowl = i <= release ? held : null;
         hit = coverage(k, 'setDown', i, standX, a.standY, a.face, null, box) > 0;
       }
       if (!hit) break;
     }
     k.rig.bowl = held;
-    PLANS.set(key, { dx: 0, low: true, mark: a.mark, gap });
+    PLANS.set(key, { dx: 0, low: true, mark: a.mark, palm: true, gap });
   }
   a.eatX = d.x + f * gap;
   a.bowlX = bowlScreenX(d) + f * gap;
@@ -376,11 +407,12 @@ function planOnce(a: CareAct, lying: boolean, plan: Parameters<typeof planSide>[
   const key = planKey(a), known = PLANS.get(key);
   if (known) {
     a.face = a.d.facing; a.standY = a.d.y + STAND_DEPTH * a.d.scale; a.staging = 'side';
-    a.standX = Math.round(a.d.x) + known.dx; a.low = known.low; a.mark = known.mark;
+    a.standX = Math.round(a.d.x) + known.dx; a.low = known.low; a.mark = known.mark; a.k.palm = a.palm = known.palm;
     return;
   }
   planSide(a, plan, lying);
-  PLANS.set(key, { dx: a.standX - Math.round(a.d.x), low: a.low, mark: a.mark, gap: 0 });
+  a.k.palm = a.palm;
+  PLANS.set(key, { dx: a.standX - Math.round(a.d.x), low: a.low, mark: a.mark, palm: a.palm, gap: 0 });
 }
 
 /** The frames of an anim `every` frames apart in time, from its first to its last. */
@@ -526,10 +558,11 @@ const STROKE_FROM = SETTLE + 12;
  * the target never jumps as the phase changes.
  */
 function strokeTarget(a: CareAct, period: number): HandT {
-  const t = Math.max(0, a.strokeT - STROKE_FROM);
-  careTarget(a, petStroke(t, period, 1).x, PT);
+  const t = Math.max(0, a.strokeT - STROKE_FROM), u = petStroke(t, period, 1).x;
+  careTarget(a, u, PT);
   const g = toGround(a.k, PT.x, PT.y);
   if (t > 0 && t % period >= period * 0.6) g.y -= 1;
+  g.a = palmAngle(a, u);
   return g;
 }
 

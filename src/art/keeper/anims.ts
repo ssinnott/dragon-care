@@ -24,13 +24,18 @@ import { DEFAULT_PROPORTIONS } from '../../lib/art/rig.ts';
 import type { Proportions } from '../../lib/art/rig.ts';
 import { solveLeg, solveArm, shoulderOf, ankleYOf, hipYOf, armReach } from './ik.ts';
 import type { LimbAngles } from './ik.ts';
-import { KFACE, BOWL_AHEAD, BOWL_UNDER } from './parts.ts';
+import { KFACE, BOWL_AHEAD, BOWL_UNDER, FINGER } from './parts.ts';
 import type { KeeperSpec } from './cast.ts';
 
 /** A foot on the floor, ground space: x from its hip's rest spot (+ forward), px lifted off the floor, tilt (+ toe up). */
 export interface FootT { x: number; lift: number; tilt: number }
 /** A hand target in ground space: from the keeper's floor point, facing +x, y up negative. */
-export interface HandT { x: number; y: number }
+export interface HandT {
+  x: number;
+  y: number;
+  /** An open palm's angle, deg in ground space (0 down, 90 forward): laid along a mark (care/keeper.ts reachArm). */
+  a?: number;
+}
 
 /** One authored instant of a keeper anim. Angles in degrees; every field optional (the rest pose fills it). */
 export interface KPose {
@@ -105,11 +110,11 @@ export function resolveKPose(p: Proportions, kp: KPose): PartialPose {
 }
 
 /**
- * The arms at rest: the near arm hanging a little forward, the far arm back (the engine's DEFAULT_POSE convention, +20
- * / -20), so the far hand shows behind the seat instead of hanging against the thighs, where its darker far skin read
- * as a stain on the trousers.
+ * The arms at rest: the near arm hanging a little forward, the far arm a little forward too, so the far hand hangs
+ * hidden behind the hips (the sliver rule: show a part or hide it). Hanging against the thighs its darker far skin
+ * read as a stain on the trousers; held back behind the seat, as a bag on a belt.
  */
-const ARM_REST_N = [10, 12] as const, ARM_REST_F = [-18, 10] as const;
+const ARM_REST_N = [10, 12] as const, ARM_REST_F = [10, 10] as const;
 
 // ---------- keys and baking ----------
 
@@ -174,11 +179,6 @@ function mouthSpot(p: Proportions): HandT {
   return { x: Math.round(p.headR * 0.95 + 2), y: Math.round(headY + p.headR * 0.5) };
 }
 
-/** The mouth spot with the torso leaned `lean` deg forward about the hips and the body lowered `rootY` (ground space). */
-function mouthAt(p: Proportions, lean: number, rootY: number): HandT {
-  const m = mouthSpot(p), hy = hipYOf(p), h = hy - m.y, a = lean * D;
-  return { x: m.x * Math.cos(a) + h * Math.sin(a), y: hy - h * Math.cos(a) + m.x * Math.sin(a) + rootY };
-}
 
 /**
  * The KNEEL at depth e (0 standing .. 1 kneeling), the care pose (docs/KEEPERS.md K7): the near knee on the floor
@@ -235,8 +235,8 @@ interface WalkOpts {
  * under the body at exactly the walk speed (planted: it holds still on the floor), rolls from heel to flat to toe; a
  * swing foot leaves with its toe down, arcs forward 3 px up (the child 2.5, the tiptoe 4) and meets the floor toe-up.
  * The body dips where the stance leg must reach (the double support) and rides highest over the planted foot, 1 px
- * of that the knees' own give; the arms swing against the legs (or hold the bowl, or, on tiptoe, a finger stays at
- * the lips); the head counters the bob.
+ * of that the knees' own give; the arms swing against the legs (or hold the bowl, or, on tiptoe, balance low); the head
+ * counters the bob.
  */
 function walkKP(sp: Readonly<KeeperSpec>, p: Proportions, t: number, o: WalkOpts): KPose {
   const L = walkLen(sp) * (o.tiptoe ? 1.4 : 1), S = sp.stride * (o.tiptoe ? 0.6 : 1), st = 0.6, A = (st * S) / 2;
@@ -260,15 +260,16 @@ function walkKP(sp: Readonly<KeeperSpec>, p: Proportions, t: number, o: WalkOpts
     rootY, footN: fN, footF: fF, torso: sp.age === 'child' ? 4 : 3, head: -rootY * 0.8,
     armN: [-swing * (fN.x / A), 14 + 6 * Math.max(0, -fN.x / A)],
     armF: [-swing * (fF.x / A), 14 + 6 * Math.max(0, -fF.x / A)],
-    face: o.tiptoe ? KFACE.shh : KFACE.smile,
+    face: o.tiptoe ? KFACE.hush : KFACE.smile,
   };
   if (o.carry) {
     const c = carrySpot(p);
     kp.reachN = { x: c.x, y: c.y + rootY * 0.5 }; kp.grip = 1;
   }
-  // the tiptoe: a finger still to the lips (the shh it follows), the far arm out behind for balance (both arms held
-  // out in front, it read as a sleepwalker)
-  if (o.tiptoe) { kp.torso = 6; kp.reachN = mouthAt(p, 6, rootY); kp.armF = [-24, 30]; }
+  // the tiptoe: the arms low and a little out for balance, the near one forward and the far one back (both held out
+  // in front, it read as a sleepwalker; a finger kept at the lips hid the face for the whole walk: the shh before it
+  // says it)
+  if (o.tiptoe) { kp.torso = 6; kp.armN = [18, 34]; kp.armF = [-16, 30]; }
   return kp;
 }
 
@@ -286,8 +287,8 @@ function idleKP(sp: Readonly<KeeperSpec>, p: Proportions, t: number, L: number):
   };
   const hy = hipYOf(p);
   if (sp.id === 'bea') { kp.reachN = { x: p.torsoW / 2 + 1, y: hy - 1 + breath }; kp.reachF = { x: p.torsoW / 2, y: hy - 2 + breath }; }
-  else if (sp.id === 'pip') { kp.rootY = 0.6 + 0.6 * Math.sin(u * Math.PI * 4); kp.armN = [8, 12]; kp.armF = [-18, 10]; }
-  else { kp.armN = [8 - breath, 14]; kp.armF = [-18, 10]; }
+  else if (sp.id === 'pip') { kp.rootY = 0.6 + 0.6 * Math.sin(u * Math.PI * 4); kp.armN = [8, 12]; kp.armF = [...ARM_REST_F]; }
+  else { kp.armN = [8 - breath, 14]; kp.armF = [...ARM_REST_F]; }
   return kp;
 }
 
@@ -348,9 +349,13 @@ export function petStroke(t: number, period: number, amp: number): HandT {
   return { x: amp * e, y: u >= 0.6 ? -1 : 0 };
 }
 
-/** The SHH (one-shot, 56 f x tempo): the near hand up to the lips, held, eyes shut and a pursed mouth, and down again. */
+/**
+ * The SHH (one-shot, 56 f x tempo): the near hand up under the chin with one finger raised to the lips, held, eyes shut
+ * and a pursed mouth, and down again.
+ */
 function shhKP(sp: Readonly<KeeperSpec>, p: Proportions, t: number, k: number): KPose {
-  const kp = idleKP(sp, p, t, 150 * k), m = mouthSpot(p), rest = { x: 4, y: hipYOf(p) + 4 };
+  // (the fist below the chin, its raised finger at the lips: parts.ts drawKeeperHand, on the `shh` face)
+  const kp = idleKP(sp, p, t, 150 * k), lips = mouthSpot(p), m = { x: lips.x + 1, y: lips.y + Math.round(p.handR * 1.6) + FINGER - 1 }, rest = { x: 4, y: hipYOf(p) + 4 };
   const e = key(stretch([[0, 0], [12, 1, 'out'], [44, 1], [56, 0]], k), t);
   kp.reachN = { x: rest.x + (m.x - rest.x) * e, y: rest.y + (m.y - rest.y) * e };
   kp.torso = 3 * e; kp.head = 4 * e;
@@ -377,19 +382,32 @@ function cheerKP(sp: Readonly<KeeperSpec>, p: Proportions, t: number, k: number)
   // a crouch is the root dropping over planted feet (hop > 0); a hop the root rising with the feet lifted as far
   // (hop < 0), so the legs keep their shape in the air
   kp.rootY = hop; kp.footN = { x: 1, lift: Math.max(0, -hop), tilt: 0 }; kp.footF = { x: -1, lift: Math.max(0, -hop), tilt: 0 };
-  // the far arm straight up behind the head; the near one a fist pumped up in FRONT of the face, the elbow out at the
-  // shoulder's height (the near shoulder sits forward: raised straight up, the near arm covered the face)
-  kp.armN = [30 + 90 * up, 20 + 25 * up]; kp.armF = [20 + 140 * up, 20 - 10 * up];
+  // one fist pumped up and FORWARD, clear of the face (the near shoulder sits forward: raised straight up the near arm
+  // covered the face, and a far arm raised behind the head put a knob on a hat), the far arm at rest
+  kp.reachN = raised(p, kp, up, sp.age === 'child' ? 45 : 35); kp.armF = [...ARM_REST_F];
   kp.head = -6 * up;
   return kp;
 }
 
-/** WAVE (one-shot, 60 f x tempo): the near arm up, the hand waving three times from the wrist, `smile`. */
+/**
+ * Where a hand raised `deg` from straight up, forward, sits (ground space) at `up` (0 at rest .. 1 raised): the arm
+ * nearly straight from the shoulder, eased from the rest spot beside the hip. Forward of the face at any `deg` of 35 or
+ * more (a child's short arms want 45: at 35 its fist came to its mouth).
+ */
+function raised(p: Proportions, kp: KPose, up: number, deg: number): HandT {
+  const sh = { x: 0, y: 0 }, L = armReach(p) * 0.94, a = deg * D;
+  shoulderOf(p, true, kp.torso ?? 0, kp.torsoX ?? 0, kp.torsoY ?? 0, sh);
+  const rx = kp.rootX ?? 0, ry = kp.rootY ?? 0, hi = { x: sh.x + rx + Math.sin(a) * L, y: sh.y + ry - Math.cos(a) * L };
+  const lo = { x: p.torsoW / 2 + 2, y: hipYOf(p) + ry + 2 };
+  return { x: lo.x + (hi.x - lo.x) * up, y: lo.y + (hi.y - lo.y) * up };
+}
+
+/** WAVE (one-shot, 60 f x tempo): the near hand raised forward of the face, waving three times from the wrist, `smile`. */
 function waveKP(sp: Readonly<KeeperSpec>, p: Proportions, t: number, k: number): KPose {
   const kp = idleKP(sp, p, t, 150 * k);
   const up = key(stretch([[0, 0], [10, 1, 'out'], [50, 1], [60, 0]], k), t);
-  kp.reachN = undefined;
-  kp.armN = [40 + 110 * up, 20 + 10 * up];
+  // (the hand raised forward, clear of the face: raised straight up, the near arm covered it)
+  kp.reachN = raised(p, kp, up, sp.age === 'child' ? 45 : 40);
   kp.handN = up * 25 * Math.sin((t / k) * Math.PI * 2 / 14);
   kp.face = KFACE.happy;
   return kp;
@@ -428,7 +446,8 @@ export function setDownAnim(sp: Readonly<KeeperSpec>, bx: number, h: number, pic
     kp.reachN = { x: rest.x + (floorHand.x - rest.x) * r, y: rest.y + (floorHand.y - rest.y) * r };
     kp.torso = 6 * clamp(e, 0, 1) + (lean - 6) * key([[0, 0], [T.down * 0.6, 0.2], [T.reach, 1], [T.let, 1], [T.back, 0]], t);
     kp.grip = holding ? 1 : 0;
-    if (!holding) kp.armF = [4, 30];
+    // (its hands off the bowl, the far one rests on the far thigh: keyed by angle it swung up to a baby's snout)
+    if (!holding) kp.reachF = { x: 3, y: hipYOf(p) + (kp.rootY ?? 0) + 3 };
     kp.head = 8 * r;
     kp.face = r > 0.5 ? KFACE.aww : KFACE.smile;
     return kp;

@@ -33,6 +33,8 @@ export interface KeeperRig extends Rig {
   blink: number;
   /** The bowl in the hands, or null. Its weapon slot entry is TOOL_BOWL while it is held (acts.ts). */
   bowl: HeldBowl | null;
+  /** The near hand is open and flat (stroking a dragon: parts.ts drawKeeperHand); set each step by the care agent. */
+  open: boolean;
 }
 
 /** Build a keeper. Allocates: once per keeper. */
@@ -46,7 +48,7 @@ export function buildKeeper(id: KeeperId, scale = 1): KeeperRig {
     face: { big: false },
   };
   const k = buildRig(build) as KeeperRig;
-  k.spec = spec; k.kpal = pal; k.blink = 0; k.bowl = null;
+  k.spec = spec; k.kpal = pal; k.blink = 0; k.bowl = null; k.open = false;
   // the skin's tone ramp, seeded with its warm hand-set shadow (palettes.ts KEEPER_SKIN_SHADOW): every part drawn in
   // skin (the face, the neck, a forearm, the hands) reads it from the rig's tone cache
   k.tones.set(pal.skin, { ...makeTones(pal.skin, k.ramp), sh: KEEPER_SKIN_SHADOW[id] });

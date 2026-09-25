@@ -37,7 +37,8 @@
 keeper and an apprentice) drawn on the engine's humanoid rig in this house style, the care acts they perform with a
 dragon (feed, pet or groom, tuck-in) using the dragons' own anims, and a yard where the dragons' needs rise and a
 director sends the keeper whose job it is. They have their own document, `docs/KEEPERS.md`, and their own checks (a
-KEEPERS section in the palette check; the care audits in the smoke run: no keeper at work ever covers a dragon's eye).
+KEEPERS section in the palette check; the care audits in the smoke run: no keeper, at work or walking, ever covers a
+dragon's eye).
 The yard is the first game-side consumer of a care hook above: a tuck-in plays dusk's `tuckin`. Nothing in this bible
 changed for them.
 

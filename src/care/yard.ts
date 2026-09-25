@@ -311,6 +311,7 @@ export class Yard {
         const verb = yk.act.kind === 'feed' ? 'FEEDS' : yk.act.kind === 'tuck' ? 'TUCKS IN' : yk.k.rig.spec.tool === 'brush' ? 'GROOMS' : 'PETS';
         return yk.act.ownsDragon ? `${name} ${verb} ${yk.with.name.toUpperCase()}` : `${name} HEADS BACK`;
       }
+      if (yk.k.player.name === 'cheer') return `${name} CHEERS`;
       return yk.k.x === yk.station.x && yk.k.y === yk.station.y ? `${name} WAITS` : `${name} HEADS BACK`;
     });
   }

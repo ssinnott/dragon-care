@@ -30,6 +30,8 @@ export interface KeeperPalette extends Palette {
   trim?: string;
   /** The tool a keeper carries (the brush's wooden back; the bowl keeps its own clay colours: props.ts). */
   tool?: string;
+  /** The brush's bristles, a dark row under its back. */
+  bristle?: string;
 }
 
 /** Shared keeper colours, the dragons' shared ones where the two meet (DRAGON_SHARED: the ink, the eye whites). */
@@ -62,12 +64,13 @@ export const KEEPER_PALETTES: Readonly<Record<KeeperId, Readonly<KeeperPalette>>
   // value of Iris's mauve cardigan the two tops merged under deuteranopia.)
   tomas: Object.freeze({
     skin: '#f0c29c', hair: '#4a3326', primary: '#3d5f94', secondary: '#6e4f37', accent: '#6e2e2a',
-    metal: '#c8c4bc', dark: '#5c3e30', glow: '#f08a8a', hat: '#b98a3a', tool: '#9a6a3c',
+    metal: '#c8c4bc', dark: '#5c3e30', glow: '#f08a8a', hat: '#b98a3a', tool: '#9a6a3c', bristle: '#3e2c24',
   }),
-  // Iris, the night keeper: a periwinkle nightcap with a cream pom-pom, a mauve cardigan over a cream nightshirt, slate
-  // trousers and rose slippers (the slippers are the one light shoe: 40 % from the straw).
+  // Iris, the night keeper: a periwinkle nightcap with a cream pom-pom, a mauve cardigan over a cream nightshirt, wine
+  // pyjama trousers and rose slippers (the slippers are the one light shoe: 40 % from the straw). The trousers were
+  // slate, and kneeling at Wick's side for its tuck-in her legs merged into its Prussian blue: gate (Kg), 36 %.
   iris: Object.freeze({
-    skin: '#7a4e34', hair: '#2b2231', primary: '#b3637d', secondary: '#3f4c6a', accent: '#f4ecd8',
+    skin: '#7a4e34', hair: '#2b2231', primary: '#b3637d', secondary: '#603444', accent: '#f4ecd8',
     metal: '#c8c4bc', dark: '#d89aa0', glow: '#d9607a', hat: '#6a86cc', trim: '#f4ecd8',
   }),
   // Pip, the apprentice (a child): ginger tufts, a leaf-green tee, denim overalls, red sneakers.

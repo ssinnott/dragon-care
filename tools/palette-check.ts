@@ -670,7 +670,9 @@ if (!glowClose) out.push('   none');
 //   (Ke) ink floor : and >= 25 % luminance AND >= OKL_MIN Oklab L from the outline;
 //   (Ki) floor     : the shoes and the trousers or skirt keep >= 25 % luminance from the straw floor;
 //   (Kf) told apart: the four keepers' tops pass RULE_B pairwise, as they are and under simulated deuteranopia and
-//                    protanopia (a player tells the keepers apart across the yard by the top first).
+//                    protanopia (a player tells the keepers apart across the yard by the top first);
+//   (Kg) at work   : the night keeper's trousers and cardigan pass the ladder against dusk's scale at every stage
+//                    (kneeling at its side for its own tuck-in, her legs lie over its body: slate, they merged).
 let kGates = 0, kFailures = 0;
 const kFailed: string[] = [];
 function kcount(label: string, ok: boolean): boolean {
@@ -694,6 +696,7 @@ const K_PAIRS: readonly KPair[] = [
   kp('trim', 'hat', 'the pom-pom and the cuff on the nightcap', ['iris']), kp('trim', 'primary', 'the nightshirt between the cardigan\'s edges', ['iris']),
   kp('trim', 'primary', 'the straps on the tee', ['pip']), kp('accent', 'trim', 'the buckle on the strap', ['pip']),
   kp('tool', 'skin', 'the hand on the brush'), kp('tool', 'primary', 'the brush held over the shirt'),
+  kp('bristle', 'tool', 'the bristles under the brush\'s back', ['tomas']),
   kp('bowl', 'skin', 'the hands on the bowl', ['bea']), kp('bowl', 'primary', 'the bowl held over the blouse', ['bea']), kp('bowl', 'apron', 'the bowl held over the apron', ['bea']),
 ];
 
@@ -745,6 +748,18 @@ for (let i = 0; i < KEEPER_IDS.length; i++) {
     }
     out.push(`${allOk ? '  ok  ' : '  FAIL'} (Kf) ${(a + '/' + b).padEnd(12)} ${cells.join('  ')}  ${KEEPER_PALETTES[a].primary} ${KEEPER_PALETTES[b].primary}`);
   }
+}
+// (Kg)
+out.push(' at work: the night keeper on the dragon of the tuck-in (dusk\'s scale, each stage greyed)');
+for (const slot of ['secondary', 'primary'] as const) {
+  const c = KEEPER_PALETTES.iris[slot], cells: string[] = [];
+  let allOk = true;
+  for (const st of STAGES) {
+    const m = ladder(c, PAL('dusk', st).scale);
+    if (!kcount(`(Kg) iris ${slot} / dusk ${st} scale`, m.pass)) allOk = false;
+    cells.push(`${st} ${m.pass ? m.by : 'FAIL'} ${pct(m.lum)}`);
+  }
+  out.push(`${allOk ? '  ok  ' : '  FAIL'} (Kg) iris ${(slot === 'secondary' ? 'trousers' : 'cardigan').padEnd(9)} ${c} on dusk: ${cells.join('  ')}`);
 }
 
 // ---------- verdict ----------

@@ -50,6 +50,7 @@ import { KEEPERS, KEEPER_IDS } from './art/keeper/cast.ts';
 import type { KeeperId } from './art/keeper/cast.ts';
 import { KEEPER_ANIM_NAMES, KEEPER_ONE_SHOTS } from './art/keeper/anims.ts';
 import { makeKeeper, stepKeeperAgent, drawKeeperAgent } from './care/keeper.ts';
+import { TOOL_BOWL } from './art/keeper/parts.ts';
 import { keeperJoint } from './art/keeper/rig.ts';
 import type { KeeperAgent } from './care/keeper.ts';
 import { makeDragon, drawDragonAgent, stepDragonAgent, eyeBox } from './care/dragon.ts';
@@ -634,17 +635,20 @@ function stepKeeperShown(k: KeeperAgent, anim: string, hold: { n: number }): voi
  * view=keepers: the four keepers side by side at game scale 1, blown up `scale` times (default 3), each labelled with
  * name and job, playing `anim` (any keeper anim: idle, walk, carry, hold, watch, kneel, kneelIdle, rise, pet, petLow,
  * shh, tiptoe, cheer, wave). A walking keeper walks in place: its root motion is taken off again each tick, and ground
- * ticks under it scroll by the distance walked, so a planted foot must hold still against them (no skating).
+ * ticks under it scroll by the distance walked, so a planted foot must hold still against them (no skating). A
+ * carry or a hold has a young dragon's full bowl in the hands (the hands of an empty one held air).
  * &k=<keeper>: that keeper's anim as a strip of n frames instead (from= / span= as view=strip).
  */
 function keepersScene(P: GalleryParams): Scene {
   const k = Math.max(1, Math.round(P.scale || 3)), anim = KEEPER_ANIM_NAMES.includes(P.anim) ? P.anim : 'idle';
   const walking = ['walk', 'carry', 'tiptoe'].includes(anim);
   const cw = P.k ? 58 : 80, ch = 112, gy = ch - 22;
+  const spot = anim === 'carry' || anim === 'hold' ? makeDragon('fire', 'young', P.seed, 'idle', 0, 0).spot : null;
   type Cell = { a: KeeperAgent; x0: number; wx: number; hold: { n: number }; label: string };
   const cells: Cell[] = [];
   const add = (id: KeeperId, x0: number, seek: number, label: string) => {
     const a = makeKeeper(id, anim, x0, gy, { facing: P.facing, seed: P.seed + cells.length, blinks: !P.k });
+    if (spot) { a.rig.bowl = { w: spot.w, h: spot.h, full: true }; a.rig.weapon = TOOL_BOWL; }
     const c: Cell = { a, x0, wx: 0, hold: { n: 0 }, label };
     for (let i = 0; i < seek; i++) stepCell(c);
     cells.push(c);
@@ -749,7 +753,10 @@ function careScene(P: GalleryParams): Scene {
       g.fillStyle = P.bg || STRAW; g.fillRect(0, 0, off.width, off.height);
       for (const s of scenes) {
         g.fillStyle = '#cfc4a4'; g.fillRect(s.x, s.y, W, 1); g.fillRect(s.x, s.y, 1, H);
+        // (each cell's cast clipped to its cell: a keeper walking off, or a long tail, drew into the next one)
+        g.save(); g.beginPath(); g.rect(s.x + 1, s.y + 1, W - 1, H - 1); g.clip();
         drawCareCast(g, [s.v.d], [s.v.kp]);
+        g.restore();
         if (!strip || s === scenes[0]) label(g, s.v.label, s.x + W / 2, s.y + 3, LABEL, 1);
         label(g, `${strip ? `F${s.f} ` : ''}${s.v.act.done ? 'DONE' : s.v.act.phase.toUpperCase()}`, s.x + W / 2, s.y + H - 8, '#6a5a60', 1);
       }

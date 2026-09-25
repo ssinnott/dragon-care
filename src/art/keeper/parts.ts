@@ -16,7 +16,7 @@
 // Everything draws through rig.col(), so the engine's white flash and tint (DrawRigOpts) reach every keeper part.
 import { rad } from '../../lib/engine/math.ts';
 import { celPath, celPoly, celBall, celRect, tones } from '../../lib/art/shading.ts';
-import { drawLimbSegs, brow } from '../../lib/art/rigParts.ts';
+import { drawLimbSegs, brow, drawFist } from '../../lib/art/rigParts.ts';
 import { pathTaperedCapsule } from '../../lib/art/shapes.ts';
 import { setLight } from '../../lib/art/rig.ts';
 import type { Rig, RigAccessory, RigParts, RigWeapon } from '../../lib/art/rig.ts';
@@ -37,9 +37,10 @@ const K = (rig: Rig): KeeperRig => rig as KeeperRig;
  * The keepers' face set, stepped on `pose.face` (an index; the engine's FACE names do not apply to a keeper). Never
  * angry, the dragons' rule (bible D18): this is a cozy game, and the keepers' faces answer the dragons' --
  * `smile` is a keeper at work, `happy` and `aww` a dragon that is happy or asleep, `oh` a surprise (a sneeze, a
- * fizzle), `shh` the finger at the lips after a tuck-in, `closed` a keeper humming or content.
+ * fizzle), `shh` the finger at the lips after a tuck-in, `hush` its face without the finger (the tiptoe away after
+ * it), `closed` a keeper humming or content.
  */
-export const KFACE = Object.freeze({ neutral: 0, smile: 1, happy: 2, closed: 3, oh: 4, aww: 5, shh: 6 });
+export const KFACE = Object.freeze({ neutral: 0, smile: 1, happy: 2, closed: 3, oh: 4, aww: 5, shh: 6, hush: 7 });
 export type KFaceName = keyof typeof KFACE;
 
 /**
@@ -53,7 +54,8 @@ function drawKeeperFace(ctx: CanvasRenderingContext2D, rig: Rig, pose: Pose, inf
   const ey = R(-r * 0.15), ex = R(r * 0.45), fx = R(-r * 0.12);
   const ew = 4, fw = 3, eh = 3, bt = 2;
   const arcs = face === KFACE.happy || face === KFACE.aww;
-  const shut = !arcs && (face === KFACE.closed || face === KFACE.shh || k.blink > 0);
+  const hush = face === KFACE.shh || face === KFACE.hush;
+  const shut = !arcs && (face === KFACE.closed || hush || k.blink > 0);
   const wide = face === KFACE.oh;
   // eyes
   if (arcs) {
@@ -88,7 +90,7 @@ function drawKeeperFace(ctx: CanvasRenderingContext2D, rig: Rig, pose: Pose, inf
   ctx.fillStyle = ink;
   if (face === KFACE.neutral) ctx.fillRect(mx, my, 3, 1);
   else if (wide) ctx.fillRect(mx, my - 1, 2, 3);
-  else if (face === KFACE.shh) ctx.fillRect(mx + 1, my - 1, 2, 2);
+  else if (hush) ctx.fillRect(mx + 1, my - 1, 2, 2);
   else if (face === KFACE.happy) {
     // an open smile: the corners up, a 3 x 2 mouth under the line
     ctx.fillRect(mx - 1, my - 1, 1, 1); ctx.fillRect(mx, my, 3, 1); ctx.fillRect(mx + 3, my - 1, 1, 1);
@@ -117,6 +119,9 @@ function drawKeeperHead(ctx: CanvasRenderingContext2D, rig: Rig, _pose: Pose, in
 
 // ---------- hair ----------
 
+/** Bea's bun on the crown behind the cap (head space, by head radius): centre and radius. */
+const BUN = Object.freeze({ x: -0.8, y: -0.92, r: 0.48 });
+
 /** Append the hair's union path for the keeper's style (head space, r = head radius). */
 function pathHair(ctx: CanvasRenderingContext2D, style: string, r: number): void {
   if (style === 'bun') {
@@ -125,8 +130,10 @@ function pathHair(ctx: CanvasRenderingContext2D, style: string, r: number): void
     ctx.ellipse(0, -r * 0.08, r * 1.07, r * 1.04, 0, -Math.PI * 0.27, -Math.PI * 1.08, true);
     ctx.lineTo(-r * 0.72, r * 0.2); ctx.lineTo(-r * 0.62, -r * 0.3); ctx.lineTo(-r * 0.2, -r * 0.62); ctx.lineTo(r * 0.25, -r * 0.66);
     ctx.closePath();
-    ctx.moveTo(-r * 0.78 + r * 0.44, -r * 0.9);
-    ctx.arc(-r * 0.78, -r * 0.9, r * 0.44, 0, Math.PI * 2);
+    // (wound the way the cap is, anticlockwise: the other way, the two cancelled where they overlap and the skin
+    // showed through a notch between the bun and the cap)
+    ctx.moveTo(r * (BUN.x + BUN.r), r * BUN.y);
+    ctx.arc(r * BUN.x, r * BUN.y, r * BUN.r, 0, Math.PI * 2, true);
     return;
   }
   if (style === 'cropped') {
@@ -166,6 +173,11 @@ function drawKeeperHair(ctx: CanvasRenderingContext2D, rig: Rig, _pose: Pose, in
   ctx.beginPath();
   pathHair(ctx, k.spec.hair, r);
   celPath(ctx, k, info.color, -r * 0.25, -r * 0.55, r * 1.05, 0.4, 0.3);
+  if (k.spec.hair === 'bun' && !k.override) {
+    // the bun's edge where it sits on the cap, in the hair's shadow (without it the bun and the cap were one lump)
+    ctx.strokeStyle = tones(k, info.color).sh; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(r * BUN.x, r * BUN.y, r * BUN.r - 0.75, Math.PI * 0.05, Math.PI * 0.5); ctx.stroke();
+  }
 }
 
 // ---------- the beard ----------
@@ -345,9 +357,9 @@ export const HELD_BOWL: RigAccessory = Object.freeze({ attach: 'handR', layer: '
 export const BRUSH_DROP = 8;
 
 /**
- * Tomas's grooming brush, held by its back in the near fist with its bristles DOWN whatever the forearm does (drawn
- * level, under the fist, which closes over its back): an oval wooden back and a pale bristle band under it. Hanging at
- * his side it is a brush carried by its back; grooming, the bristles lie on the dragon's scales under his hand, so the
+ * Tomas's grooming brush, held by its back with its bristles DOWN whatever the forearm does (drawn level under the
+ * hand: a fist closed over its back at his side, a flat hand on it while he grooms, as a body brush is held): a wooden
+ * back and a dark bristle row under it. Grooming, the bristles lie on the dragon's scales under his hand, so the
  * groom's reach target is BRUSH_DROP over the scales. (Out of the fist along the forearm, a handle and a block read as
  * a knife, and a T-head as a toilet brush poking the dragon.)
  */
@@ -356,7 +368,8 @@ function drawHeldBrush(ctx: CanvasRenderingContext2D, rig: Rig, pose: Pose): voi
   const a = -rig.joints.armN.hand + 90 + pose.weapon.rot;
   ctx.save(); ctx.rotate(rad(-a)); setLight(k, 0);
   celRect(ctx, k, -5, 1, 11, 5, 2, wood, 0.4, 0);
-  celRect(ctx, k, -4, 5, 9, 3, 1, '#e9dcc0', 0.3, 0);
+  // (the bristles a dark row under the wooden back: cream, the brush read as a bar of soap)
+  celRect(ctx, k, -4, 5, 9, 3, 1, pal.bristle ?? pal.dark, 0.3, 0);
   ctx.restore();
 }
 
@@ -367,11 +380,45 @@ function drawHeldBrush(ctx: CanvasRenderingContext2D, rig: Rig, pose: Pose): voi
 export const TOOL_BOWL: RigWeapon = Object.freeze({ attach: 'handR', length: 10, twoHanded: true, grip: 2, draw: noop });
 export const TOOL_BRUSH: RigWeapon = Object.freeze({ attach: 'handR', length: 14, draw: drawHeldBrush });
 
-/** A keeper's part table for buildRig: the engine's defaults kept for the limbs, the hands and the skull. */
+// ---------- the hands ----------
+
+/**
+ * The open hand's block in hand space (+x along the forearm to the fingertips), by hand radius r: longer and flatter
+ * than the fist (rigParts.ts drawFist: -0.6 r to +1.6 r, +-r), the fingers laid out along it, and never under 5 px
+ * across (at 4 its two ink rows and the shadow band left one row of skin: a dark stick on the dragon's head). Written
+ * into one shared box: parts.ts draws it and the planner models it (care/keeper.ts handOver) from the same numbers.
+ */
+export function palmBlock(r: number): Readonly<{ x0: number; y0: number; w: number; h: number; cr: number }> {
+  const h = Math.max(5, R(r * 1.6));
+  PALM.x0 = R(r * -0.5); PALM.w = R(r * 2.5); PALM.h = h; PALM.y0 = -R(h / 2); PALM.cr = 2;
+  return PALM;
+}
+const PALM = { x0: 0, y0: 0, w: 0, h: 0, cr: 0 };
+/** The raised finger of a shh: this many px along the forearm past the fist, 2 px thick. */
+export const FINGER = 4;
+
+/**
+ * A keeper's hand: the engine's fist (rigParts.ts drawFist), except the near hand while it strokes a dragon
+ * (KeeperRig.open), which is open and laid flat along its mark (a closed fist folded against the keeper's own chin
+ * read as a hug, not a stroke; Tomas's lies flat on the back of his brush), and a shh's, which keeps one finger raised
+ * to the lips (on the `shh` face: the whole fist at the lips hid the keeper's face).
+ */
+function drawKeeperHand(ctx: CanvasRenderingContext2D, rig: Rig, pose: Pose, info: Info): void {
+  const k = K(rig), r = info.r;
+  if (!info.far && k.open) {
+    const b = palmBlock(r);
+    celRect(ctx, k, b.x0, b.y0, b.w, b.h, b.cr, info.color, 0.3, 0.25);
+    return;
+  }
+  drawFist(ctx, rig, r, info.color);
+  if (!info.far && pose.face === KFACE.shh) celRect(ctx, k, R(r * 1.6) - 1, -1, FINGER + 1, 2, 1, info.color, 0.3, 0);
+}
+
+/** A keeper's part table for buildRig: the engine's defaults kept for the limbs and the skull. */
 export function keeperParts(sleeves: 'long' | 'short'): RigParts {
   const parts: RigParts = {
     head: drawKeeperHead, face: drawKeeperFace, hair: drawKeeperHair, beard: drawKeeperBeard, hat: drawKeeperHat,
-    torso: drawKeeperTorso, hips: drawKeeperHips, foot: drawKeeperShoe,
+    torso: drawKeeperTorso, hips: drawKeeperHips, foot: drawKeeperShoe, hand: drawKeeperHand,
   };
   if (sleeves === 'long') { parts.armUpper = drawLongSleeve; parts.armLower = noop; }
   return parts;

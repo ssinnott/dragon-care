@@ -2,6 +2,7 @@
 // The gallery's keeper sheets and the care acts both use this; the yard (yard.ts) moves keepers around with it.
 import { solveArm, shoulderOf } from '../art/keeper/ik.ts';
 import type { Walker } from './path.ts';
+import { palmBlock } from '../art/keeper/parts.ts';
 import type { LimbAngles } from '../art/keeper/ik.ts';
 import { buildKeeper, stepKeeper, drawKeeper } from '../art/keeper/rig.ts';
 import { markFull, computeJoints } from '../lib/art/rig.ts';
@@ -31,6 +32,11 @@ export interface KeeperAgent {
   reachW: number;
   /** Walking on the spot: the anim's root motion does not carry it along the floor (acts.ts walkTo, into the scene). */
   pinX: boolean;
+  /**
+   * The near hand opens flat as it strokes (parts.ts drawKeeperHand), or stays a fist: the care plan's choice (acts.ts
+   * planSide), since on some looks the flat hand's fingers come over the eye.
+   */
+  palm: boolean;
 }
 
 /** Make a keeper standing at (x, y) and playing `anim` (its whole anim table built for its proportions and tempo). */
@@ -38,7 +44,7 @@ export function makeKeeper(id: KeeperId, anim: string, x: number, y: number, o: 
   const rig = buildKeeper(id), player = new KeeperPlayer(keeperAnims(rig.spec), o.seed ?? 1);
   player.blinks = o.blinks !== false;
   player.play(anim, { restart: true });
-  const k: KeeperAgent = { id, rig, player, x, y, facing: o.facing ?? 1, scale: o.scale ?? 1, reach: null, reachW: 0, pinX: false };
+  const k: KeeperAgent = { id, rig, player, x, y, facing: o.facing ?? 1, scale: o.scale ?? 1, reach: null, reachW: 0, pinX: false, palm: true };
   settle(k);
   return k;
 }
@@ -50,13 +56,29 @@ const LA: LimbAngles = { upper: 0, lower: 0 };
  * pose's own arm by `w`. At full weight, a small search against the pixel snap: the engine snaps every joint to the
  * pixel grid, which walked the hand up to 2.4 px off its mark, so the arm is solved again for the mark moved back by
  * the error and for half-pixel nudges round that, the joints placed each time (computeJoints), and the solve that
- * lands nearest kept. Used by a tick (settle) and by the planner's dry runs alike.
+ * lands nearest kept. A hand given a palm angle (reach.a) then lays its palm that way, the wrist bent from the forearm
+ * as far as WRIST (along the forearm, the open hand read as a longer arm). Used by a tick (settle) and by the planner's
+ * dry runs alike.
  */
 function reachArm(k: KeeperAgent, pose: FullPose, reach: HandT, w: number): void {
   const p = k.rig.p, t = pose.torso, u0 = pose.armR.upper, l0 = pose.armR.lower;
   solveArm(p, true, t.rot, t.x, t.y, reach.x - pose.root.x, reach.y - pose.root.y, LA);
   pose.armR.upper = u0 + (LA.upper - u0) * w; pose.armR.lower = l0 + (LA.lower - l0) * w;
-  if (w < 1) return;
+  if (w >= 1) snapSearch(k, pose, reach);
+  if (reach.a != null) {
+    // (the forearm's angle as computeJoints makes it: the torso's, the upper arm's and the elbow's)
+    const bend = Math.min(WRIST, Math.max(-WRIST, wrap180(reach.a - (t.rot + pose.armR.upper + pose.armR.lower))));
+    pose.handR.rot += (bend - pose.handR.rot) * Math.min(1, w);
+  }
+}
+/** The furthest a wrist bends from the forearm, deg. */
+const WRIST = 60;
+/** An angle brought into -180 .. 180, deg. */
+const wrap180 = (a: number): number => ((((a + 180) % 360) + 360) % 360) - 180;
+
+/** reachArm's snap search (the arm solved at full weight). */
+function snapSearch(k: KeeperAgent, pose: FullPose, reach: HandT): void {
+  const p = k.rig.p, t = pose.torso;
   let best = handError(k, pose, reach), bu = pose.armR.upper, bl = pose.armR.lower;
   if (best <= 0.5) return;
   const cx = reach.x - ERR.x, cy = reach.y - ERR.y;
@@ -86,8 +108,14 @@ function handError(k: KeeperAgent, pose: FullPose, reach: HandT): number {
 function settle(k: KeeperAgent): void {
   const pose = k.player.pose;
   if (k.reach && k.reachW > 0) reachArm(k, pose, k.reach, Math.min(1, k.reachW));
+  k.rig.open = handOpen(k, k.reach, k.reachW);
   k.rig.blink = k.player.lid;
   stepKeeper(k.rig, pose, { x: k.x, y: k.y, facing: k.facing, scale: k.scale });
+}
+
+/** Is the near hand open (parts.ts drawKeeperHand): a palm (KeeperAgent.palm), stroking, most of the way on its mark? */
+function handOpen(k: KeeperAgent, reach: HandT | null, reachW: number): boolean {
+  return k.palm && !!reach && reachW >= 0.5;
 }
 
 /** Advance one 60 Hz step: the anim, the root motion along facing (a walk carries the keeper), the rig. */
@@ -161,11 +189,11 @@ const DRY: DryRun = { cover: 0, miss: 0 };
  * `miss`: how far the hand's joint lands from the mark, the arm solved as a tick solves it (settle) and the joints
  * placed as the engine places them (computeJoints, snapped to the pixel grid), so it is the miss the care audit
  * measures. `cover`, with a `box`: the keeper drawn alone on a scratch canvas, the pixels it covers (alpha >= 50 %)
- * inside the box; `quick`: only the near fist, from its joints (fistOver), without drawing: a cheap first test (a
- * pixel it finds is drawn; one it misses may still be). The care acts use them to choose where a keeper stands before
- * it walks over: its hand reaches its mark, and its body, its arms and its hat stay off the dragon's eye (K7). The rig
- * is re-solved by the keeper's next step, so nothing of a dry run stays on it. The result is reused: read it before
- * the next call.
+ * inside the box; `quick`: only the near hand, from its joints (handOver), without drawing, and only whether it covers
+ * any (1) or none (0): a cheap first test (a pixel it finds is drawn; one it misses may still be). The care acts use
+ * them to choose where a keeper stands before it walks over: its hand reaches its mark, and its body, its arms and its
+ * hat stay off the dragon's eye (K7). The rig is re-solved by the keeper's next step, so nothing of a dry run stays on
+ * it. The result is reused: read it before the next call.
  */
 export function dryRun(k: KeeperAgent, anim: string, frame: number, x: number, y: number, facing: number, reach: HandT | null, box: Box | null, reachW = 1, quick = false): DryRun {
   const a = k.player.anims[anim], fr = a?.frames[Math.min(Math.max(0, frame), (a?.frames.length ?? 1) - 1)];
@@ -178,7 +206,10 @@ export function dryRun(k: KeeperAgent, anim: string, frame: number, x: number, y
   if (reach) DRY.miss = handError(k, DRY_POSE, reach) * k.scale;
   else if (quick) { k.rig.pxScale = k.scale * k.rig.scale; computeJoints(k.rig, DRY_POSE); }
   if (!box) return DRY;
-  if (quick) { DRY.cover = fistOver(k, x, y, facing, box); return DRY; }
+  // (the hand open as a tick opens it: reaching, most of the way on; put back after)
+  const open0 = k.rig.open;
+  k.rig.open = handOpen(k, reach, reachW);
+  if (quick) { DRY.cover = handOver(k, x, y, facing, box); k.rig.open = open0; return DRY; }
   const w = Math.max(1, box.x1 - box.x0), h = Math.max(1, box.y1 - box.y0);
   if (!dryCanvas) { dryCanvas = document.createElement('canvas'); dryCanvas.width = 400; dryCanvas.height = 300; dryCtx = dryCanvas.getContext('2d', { willReadFrequently: true }); }
   const g = dryCtx!;
@@ -190,33 +221,40 @@ export function dryRun(k: KeeperAgent, anim: string, frame: number, x: number, y
   g.restore();
   const px = g.getImageData(100, 100, w, h).data;
   for (let i = 3; i < px.length; i += 4) if (px[i] >= 128) DRY.cover++;
+  k.rig.open = open0;
   return DRY;
 }
 
 /**
- * The pixels of `box` the near fist covers, from the rig's joints as the last computeJoints left them (the keeper
- * standing at (x, y) facing `facing`): the engine's fist (rigParts.ts drawFist) is a block rounded at 0.8 r, from
- * -0.6 r to +1.6 r along the forearm and -r to +r across it, with the thumb's ball (0.55 r) on one edge, drawn round
- * the hand joint turned to the hand's angle; a pixel whose centre falls inside it or its 1 px ink counts.
+ * Does the near hand cover a pixel of `box` (1) or none (0), from the rig's joints as the last computeJoints left them
+ * (the keeper standing at (x, y) facing `facing`): the engine's fist (rigParts.ts drawFist) is a block rounded at
+ * 0.8 r, from -0.6 r to +1.6 r along the forearm and -r to +r across it, with the thumb's ball (0.55 r) on one edge,
+ * drawn round the hand joint turned to the hand's angle (the open hand, its own block); a pixel whose centre falls
+ * inside it or its 1 px ink counts. A box out of the hand's reach from its joint is none at once (most are).
  */
-function fistOver(k: KeeperAgent, x: number, y: number, facing: number, box: Box): number {
+function handOver(k: KeeperAgent, x: number, y: number, facing: number, box: Box): number {
   const J = k.rig.joints, r = k.rig.p.handR, sc = k.scale * k.rig.scale, snap = k.rig.snap, R = Math.round;
   const rx = snap ? R(DRY_POSE.root.x * sc) / sc : DRY_POSE.root.x, ry = snap ? R(DRY_POSE.root.y * sc) / sc : DRY_POSE.root.y;
   const hx = R(x) + (J.handN.x + rx) * facing * sc, hy = R(y) + (J.handN.y + ry) * sc;
   // (hand space is root space turned by 90 - hand deg: its +x runs (sin, cos) of the hand angle, its -y, the thumb's
   // side, (cos, -sin); the sprite's facing mirrors x)
   const a = (J.armN.hand * Math.PI) / 180, ux = Math.sin(a) * facing, uy = Math.cos(a), wx = Math.cos(a) * facing, wy = -Math.sin(a);
-  // the block (drawFist's rounded x0, w, y0, h and corner), the thumb's ball, in screen px; the ink 1 px round both
-  const x0 = R(-r * 0.6), bw = R(r * 2.2), y0 = R(-r), bh = R(r * 2), cr = R(r * 0.8) * sc;
+  // the block (drawFist's rounded x0, w, y0, h and corner, or the open hand's: parts.ts palmBlock), the fist's thumb
+  // ball, in screen px; the ink 1 px round both
+  const open = k.rig.open, pb = open ? palmBlock(r) : null;
+  const x0 = pb ? pb.x0 : R(-r * 0.6), bw = pb ? pb.w : R(r * 2.2);
+  const y0 = pb ? pb.y0 : R(-r), bh = pb ? pb.h : R(r * 2), cr = (pb ? pb.cr : R(r * 0.8)) * sc;
   const a0 = x0 * sc, a1 = (x0 + bw) * sc, s0 = -(y0 + bh) * sc, s1 = -y0 * sc;
-  const ta = (x0 + R(r * 0.9)) * sc, ts = -y0 * sc, tr = R(r * 0.55) * sc + 1;
-  let n = 0;
+  const ta = (x0 + R(r * 0.9)) * sc, ts = -y0 * sc, tr = open ? -1 : R(r * 0.55) * sc + 1;
+  // (the farthest the hand reaches from its joint, its ink and a pixel's half diagonal)
+  const far = Math.hypot(Math.max(-a0, a1), Math.max(-s0, s1)) + Math.max(0, tr) + 2;
+  if (Math.hypot(Math.max(box.x0 - hx, 0, hx - box.x1), Math.max(box.y0 - hy, 0, hy - box.y1)) > far) return 0;
   for (let py = box.y0; py < box.y1; py++) for (let px = box.x0; px < box.x1; px++) {
     const dx = px + 0.5 - hx, dy = py + 0.5 - hy, al = dx * ux + dy * uy, sd = dx * wx + dy * wy;
     const ca = Math.min(Math.max(al, a0 + cr), a1 - cr), cs = Math.min(Math.max(sd, s0 + cr), s1 - cr);
-    if (Math.hypot(al - ca, sd - cs) <= cr + 1 || Math.hypot(al - ta, sd - ts) <= tr) n++;
+    if (Math.hypot(al - ca, sd - cs) <= cr + 1 || Math.hypot(al - ta, sd - ts) <= tr) return 1;
   }
-  return n;
+  return 0;
 }
 
 /** A dry run's cover alone (dryRun with a box). */
