@@ -14,6 +14,7 @@ import { bowlFor, drawBowl } from '../art/props.ts';
 import type { BowlSpot } from '../art/props.ts';
 import type { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
 import { resetChain } from '../lib/art/secondary.ts';
+import type { Obstacle } from './path.ts';
 
 export interface DragonAgent {
   el: DragonElement;
@@ -41,6 +42,17 @@ export interface DragonAgent {
   speed: number;
   /** Frames into a paper turn (turnDragon), or -1. */
   turning: number;
+  /**
+   * The dragon may turn round and walk off before long (the scene's owner says: the yard's fed dragon, or one walking
+   * home): a keeper's walk keeps off the eye of both its facings (eyeSweep) and its body both ways (obstacleOf).
+   */
+  restless: boolean;
+  /**
+   * The anims the dragon may play before long besides its current one (the scene's owner says: the yard, by what the
+   * dragon is doing): a keeper's walk keeps off the eye through all of them (eyeSweep). A fed dragon's head drops into
+   * its bowl; an idle one's variants tip and turn it.
+   */
+  soon: readonly string[];
 }
 
 /**
@@ -59,7 +71,7 @@ export function makeDragon(el: DragonElement, stage: Stage, seed: number, anim: 
   player.setVariants('idle', idleVariants(stage, build.sp.wing), a, b, SPREAD_VARIANTS);
   const d: DragonAgent = {
     el, stage, seed, rig, player, x, y, facing: o.facing ?? 1, scale: o.scale ?? 1, mood: o.mood ?? 0,
-    spot: bowlFor(rig, anims.eat ? anims.eat.frames : []), bowl: null, phase: build.phase, speed: build.speed, turning: -1,
+    spot: bowlFor(rig, anims.eat ? anims.eat.frames : []), bowl: null, phase: build.phase, speed: build.speed, turning: -1, restless: false, soon: [],
   };
   playDragon(d, anim);
   stepDragon(rig, player.pose, drawOpts(d));
@@ -131,7 +143,7 @@ export function drawBowlOf(ctx: CanvasRenderingContext2D, d: DragonAgent): void 
 /** The screen x of a dragon's bowl centre. */
 export function bowlScreenX(d: DragonAgent): number { return Math.round(d.x + d.facing * d.spot.x * d.scale * d.rig.scale); }
 
-const PT = { x: 0, y: 0 };
+const PT = { x: 0, y: 0 }, PT2 = { x: 0, y: 0 };
 /**
  * A point on the dragon's cranium circle on screen, after its last step: `ang` degrees in cranium space (0 = toward
  * the snout, -90 = the crown), `out` px outside the circle's edge (a hand's centre rests a hand's radius out). The
@@ -198,6 +210,57 @@ export function bodySpan(d: DragonAgent): { x0: number; x1: number; y0: number; 
   const back = (m.hipR + m.gap / 2 + (m.tail.n * m.tail.len) / 2) * s, front = (m.gap / 2 + m.chestR + m.headLen) * s;
   const [x0, x1] = d.facing < 0 ? [d.x - front, d.x + back] : [d.x - back, d.x + front];
   return { x0, x1, y0: d.y - 12 * s, y1: d.y + 8 * s };
+}
+
+/** Where the eye goes over a whole anim, per look, anim, facing and scale: its boxes' union, from (round x, round y). */
+const SWEEPS = new Map<string, { x0: number; y0: number; x1: number; y1: number }>();
+/**
+ * The box a dragon's eye sweeps through over its current anim, on screen (the union of its eye box at every 4th frame,
+ * and as it is now): what a keeper's walk keeps off (path.ts). A snapshot is not enough: dusk's beg (its search by
+ * lamplight) swings its head 15 px down and back up, and a walk planned round the head as it was crossed it as it came.
+ * The anims the owner says it may play soon (DragonAgent.soon) are swept too; a dragon turning, walking or restless
+ * gets both facings' sweeps, and a walking one its walk's reach over the next plan.
+ */
+export function eyeSweep(d: DragonAgent, ahead: number): { x0: number; y0: number; x1: number; y1: number } {
+  const name = d.player.name ?? 'idle', rx = Math.round(d.x), ry = Math.round(d.y);
+  const one = (facing: number, name: string) => {
+    const key = `${d.el}:${d.stage}:${d.seed}:${name}:${facing}:${d.scale}`;
+    let u = SWEEPS.get(key);
+    if (!u) {
+      const f0 = d.facing, frames = d.player.anims[name]?.frames ?? [];
+      d.facing = facing;
+      u = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+      for (let i = 0; i < Math.max(1, frames.length); i += 4) {
+        const e = pointIn(d, name, i, () => eyeBox(d));
+        u.x0 = Math.min(u.x0, e.x0 - rx); u.y0 = Math.min(u.y0, e.y0 - ry); u.x1 = Math.max(u.x1, e.x1 - rx); u.y1 = Math.max(u.y1, e.y1 - ry);
+      }
+      d.facing = f0;
+      solveDragon(d.rig, d.player.pose, drawOpts(d));
+      SWEEPS.set(key, u);
+    }
+    return u;
+  };
+  const moving = d.turning >= 0 || name === 'walk' || d.restless, u = { ...one(d.facing, name) };
+  const add = (v: { x0: number; y0: number; x1: number; y1: number }) => { u.x0 = Math.min(u.x0, v.x0); u.y0 = Math.min(u.y0, v.y0); u.x1 = Math.max(u.x1, v.x1); u.y1 = Math.max(u.y1, v.y1); };
+  for (const a of d.soon) if (d.player.has(a)) add(one(d.facing, a));
+  if (moving) { add(one(-d.facing, name)); for (const a of d.soon) if (d.player.has(a)) add(one(-d.facing, a)); }
+  const e = eyeBox(d);
+  const box = { x0: Math.min(u.x0 + rx, e.x0), y0: Math.min(u.y0 + ry, e.y0), x1: Math.max(u.x1 + rx, e.x1), y1: Math.max(u.y1 + ry, e.y1) };
+  if (name === 'walk') { const m = Math.abs(d.player.move) * d.scale * ahead; if (d.facing > 0) box.x1 += m; else box.x0 -= m; }
+  return box;
+}
+
+/**
+ * A dragon as a keeper's walk sees it (path.ts): its floor line, its length along the floor, and the box its eye sweeps
+ * over its current anim (eyeSweep, `ahead` frames of a walk on), grown `pad`.
+ */
+export function obstacleOf(d: DragonAgent, pad: number, ahead = 0): Obstacle {
+  const b = bodySpan(d), e = eyeSweep(d, ahead);
+  // (a restless dragon's body both ways: it turns in place)
+  const x0 = d.restless ? Math.min(b.x0, 2 * d.x - b.x1) : b.x0, x1 = d.restless ? Math.max(b.x1, 2 * d.x - b.x0) : b.x1;
+  // the top of its back, as it stands (its withers or its rump, whichever is higher)
+  const top = Math.min(backTop(d, 0, 0, PT2).y, backTop(d, 1, 0, PT2).y);
+  return { y: d.y, top, x0, x1, eye: { x0: e.x0 - pad, y0: e.y0 - pad, x1: e.x1 + pad, y1: e.y1 + pad } };
 }
 
 /** The snout's tip on screen after the last step (cranium space: the snout taper's end), for keeping clear of it. */

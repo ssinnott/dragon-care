@@ -29,9 +29,7 @@ import { AGE_STAGES, DRAGON_ELEMENTS, agedPalette } from '../src/art/dragon/pale
 import type { AgeStage } from '../src/art/dragon/palettes.ts';
 import { KEEPER_PALETTES } from '../src/art/keeper/palettes.ts';
 import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
-
-/** How far a stroking hand may land from its mark, px (src/gallery.ts REACH_MISS: the joints snap to whole pixels). */
-const REACH_MISS = 2.5;
+import { REACH_MISS } from '../src/care/limits.ts';
 
 const require = createRequire(import.meta.url);
 function loadPlaywright(): any {
@@ -128,10 +126,12 @@ const CASES: Case[] = [
   { query: 'view=keepers&k=iris&anim=kneel&n=6&t=0', minColours: 20, allScales: false },
   { query: 'view=care&t=300', minColours: 60, allScales: false },
   { query: 'view=yard&t=600', minColours: 80, allScales: false, keepers: true },
-  // the care audits (K7): every care act on all 28 looks, and every act the yard plays in 2.5 minutes; a keeper at work
-  // never covers the dragon's eye, a stroking hand lands within REACH_MISS of its mark, and every act ends
+  // the care audits (K7): every care act on all 28 looks, and the yard for 2.5 minutes (every keeper against every
+  // dragon's eye, walking or at work); no keeper covers an eye, a stroking hand lands within REACH_MISS, every act ends
   { query: 'view=careaudit&t=0', minColours: 2, allScales: false, timeout: 300000, care: 112 },
-  { query: 'view=yardaudit&t=0', minColours: 2, allScales: false, timeout: 300000, care: 10 },
+  // (and mirrored, the dragons facing left, on two elements: every plan, walk and pose the other way round)
+  { query: 'view=careaudit&facing=-1&els=fire,dusk&t=0', minColours: 2, allScales: false, timeout: 300000, care: 32 },
+  { query: 'view=yardaudit&t=0', minColours: 2, allScales: false, timeout: 300000, care: 14 },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);

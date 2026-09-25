@@ -10,6 +10,7 @@
 // to its station. Everything is stepped at 60 Hz from seeded state, so a frozen `t` is always the same frame.
 import { clamp } from '../lib/engine/math.ts';
 import { ELEMENTS } from '../art/dragon/elements/index.ts';
+import { VARIANT_NAMES } from '../art/dragon/anims.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import { KEEPERS } from '../art/keeper/cast.ts';
@@ -20,7 +21,8 @@ import { makeDragon, playDragon, stepDragonAgent, turnDragon } from './dragon.ts
 import type { KeeperAgent } from './keeper.ts';
 import { makeKeeper, stepKeeperAgent } from './keeper.ts';
 import type { ActKind, CareAct } from './acts.ts';
-import { beginFeed, beginPet, beginTuck, stepAct, walkTo } from './acts.ts';
+import { beginFeed, beginPet, beginTuck, stepAct, walkAlong } from './acts.ts';
+import type { Walk } from './acts.ts';
 
 export type NeedName = 'hunger' | 'lonely' | 'sleepy';
 export type Needs = Record<NeedName, number>;
@@ -80,6 +82,8 @@ export interface YardKeeper {
   act: CareAct | null;
   /** The dragon of its act. */
   with: YardDragon | null;
+  /** Its walk back to its station, when it is not in an act. */
+  walk: Walk | null;
 }
 
 /** One dragon of the yard's cast: its look, its home spot and facing, and the needs it starts with. */
@@ -101,16 +105,36 @@ const CAST: readonly CastRow[] = [
 ];
 
 /**
- * The keepers' stations at the sides of the yard, between the rows (so a walk to a dragon is mostly along the floor,
- * where a side-on walk is a walk): Bea's kitchen and Tomas's grooming shed on the left, Iris's lamp and Pip's bench on
- * the right, each facing in.
+ * The keepers' stations along the back of the yard, in the band behind the dragons (a keeper behind a dragon is drawn
+ * under it and covers nothing: path.ts): Bea's kitchen, Tomas's grooming shed, Iris's lamp and Pip's bench, each over
+ * the dragons it mostly works with and facing into the yard.
  */
 const STATIONS: Readonly<Record<KeeperId, { x: number; y: number; facing: number }>> = {
-  bea: { x: 36, y: 266, facing: 1 },
-  tomas: { x: 42, y: 162, facing: 1 },
-  iris: { x: 602, y: 160, facing: -1 },
-  pip: { x: 606, y: 268, facing: -1 },
+  bea: { x: 64, y: 150, facing: 1 },
+  tomas: { x: 246, y: 146, facing: 1 },
+  iris: { x: 432, y: 148, facing: -1 },
+  pip: { x: 586, y: 152, facing: -1 },
 };
+
+/** The floor the keepers walk on: the whole yard but a margin at the sides and the bottom, and the sky over the stations. */
+const FLOOR = { x0: 8, y0: 128, x1: 632, y1: 352 } as const;
+
+/**
+ * The anims a dragon may play before long, by what it is doing (DragonAgent.soon: a keeper's walk keeps off its eye
+ * through all of them): at home idle, its variants, the beg and its needs' tells; being fed, the walk to its bowl, the
+ * bites, the happy; petted, the pet loop and the happy; tucked in, the lie-down; asleep, the wake.
+ */
+function soonFor(y: YardDragon): readonly string[] {
+  const act = y.by?.act?.kind, sleep = y.d.player.has('tuckin') ? 'tuckin' : 'sleep';
+  switch (y.state) {
+    case 'free': return FREE_SOON;
+    case 'care': return act === 'feed' ? ['beg', 'walk', 'eat', 'happy', 'idle'] : act === 'pet' ? ['idle', 'pet', 'happy'] : ['idle', sleep];
+    case 'home': return ['walk', 'idle'];
+    case 'asleep': return [sleep, 'wake'];
+    case 'waking': return ['wake', 'idle'];
+  }
+}
+const FREE_SOON: readonly string[] = ['idle', 'beg', 'call', ...VARIANT_NAMES];
 
 /** A small seeded generator (the yard's own: the same seed, the same yard). */
 function rng(seed: number): () => number {
@@ -122,6 +146,8 @@ export class Yard {
   readonly dragons: YardDragon[];
   readonly keepers: YardKeeper[];
   tick = 0;
+  /** Every dragon in the yard (what a keeper's walk goes round). */
+  readonly world = (): readonly DragonAgent[] => this.dragons.map((y) => y.d);
 
   constructor(seed = 1) {
     const r = rng(seed * 7919 + 13);
@@ -133,13 +159,19 @@ export class Yard {
     });
     this.keepers = (Object.keys(STATIONS) as KeeperId[]).map((id, i) => {
       const s = STATIONS[id];
-      return { k: makeKeeper(id, 'idle', s.x, s.y, { facing: s.facing, seed: seed + 101 + i }), job: JOBS[id], station: { ...s }, act: null, with: null };
+      return { k: makeKeeper(id, 'idle', s.x, s.y, { facing: s.facing, seed: seed + 101 + i }), job: JOBS[id], station: { ...s }, act: null, with: null, walk: null };
     });
   }
 
   /** One 60 Hz step: the needs, the director, the acts, and everyone not in one. */
   step(): void {
     this.tick++;
+    // (a dragon being fed turns and trots off from its bowl, and one walking home turns round at the end: the keepers'
+    // walks keep off both its facings, path.ts)
+    for (const y of this.dragons) {
+      y.d.restless = y.state === 'home' || (y.state === 'care' && y.by?.act?.kind === 'feed');
+      y.d.soon = soonFor(y);
+    }
     for (const y of this.dragons) this.stepNeeds(y);
     this.direct();
     for (const yk of this.keepers) this.stepKeeper(yk);
@@ -174,8 +206,8 @@ export class Yard {
         if (!best || y.needs[j.need] > best.needs[j.need]) best = y;
       }
       if (!best) continue;
-      const k = yk.k, d = best.d, s = yk.station;
-      yk.act = j.act === 'feed' ? beginFeed(k, d, s.x, s.y) : j.act === 'pet' ? beginPet(k, d, s.x, s.y) : beginTuck(k, d, s.x, s.y);
+      const k = yk.k, d = best.d, s = yk.station, scene = { world: this.world, floor: FLOOR };
+      yk.act = j.act === 'feed' ? beginFeed(k, d, s.x, s.y, scene) : j.act === 'pet' ? beginPet(k, d, s.x, s.y, scene) : beginTuck(k, d, s.x, s.y, scene);
       yk.with = best; best.state = 'care'; best.by = yk;
     }
   }
@@ -189,7 +221,10 @@ export class Yard {
     if (a) {
       const wasOwned = a.ownsDragon;
       stepAct(a);
-      // the act lets the dragon go as the keeper walks off: its need is met, and it goes home (or sleeps)
+      // the need is met as it is met (the last bite, the hand let go), so the dragon's mood lifts with its happy (a
+      // tucked-in dragon's sleepiness is the sleep's to run down: 'asleep')
+      if (a.met && yk.with && yk.job.need !== 'sleepy') yk.with.needs[yk.job.need] = 0;
+      // the act lets the dragon go as the keeper walks off: it goes home (or sleeps)
       if (wasOwned && !a.ownsDragon && yk.with) this.release(yk.with, a);
       if (a.done) {
         yk.act = null; yk.with = null;
@@ -199,10 +234,9 @@ export class Yard {
       return;
     }
     if (k.x !== s.x || k.y !== s.y) {
-      const x0 = k.x;
-      if (walkTo(k, s.x, s.y, 'walk')) { k.facing = s.facing; k.player.play('idle', { restart: true, blend: 10 }); }
-      stepKeeperAgent(k);
-      if ((s.x - x0) * (s.x - k.x) < 0) k.x = s.x;
+      const r = walkAlong(k, yk.walk, s.x, s.y, 'walk', this.world(), FLOOR);
+      yk.walk = r.arrived ? null : r.walk;
+      if (r.arrived) { k.facing = s.facing; k.player.play('idle', { restart: true, blend: 10 }); stepKeeperAgent(k); }
       return;
     }
     // the apprentice, waiting at the bench, cheers the others on: once for each happy that thanks a keeper
@@ -217,12 +251,10 @@ export class Yard {
     stepKeeperAgent(k);
   }
 
-  /** The act is over for the dragon: its need met, and on with its day. */
+  /** The act is over for the dragon (its need was met as the act met it): on with its day. */
   private release(y: YardDragon, a: CareAct): void {
     y.by = null; y.shown = {};
-    if (a.kind === 'feed') { y.needs.hunger = 0; y.state = 'home'; }
-    else if (a.kind === 'pet') { y.needs.lonely = 0; y.state = 'home'; }
-    else y.state = 'asleep';
+    y.state = a.kind === 'tuck' ? 'asleep' : 'home';
   }
 
   /** A dragon on its own: idle at home (showing its needs), walking home, asleep, or waking. */

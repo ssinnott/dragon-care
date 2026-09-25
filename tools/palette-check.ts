@@ -690,8 +690,9 @@ const K_PAIRS: readonly KPair[] = [
   kp('secondary', 'dark', 'the trousers on the shoes'), kp('skin', 'white', 'the eye whites on the face'), kp('glow', 'skin', 'the blush on the cheek'),
   kp('apron', 'primary', 'the apron bib on the blouse'), kp('apron', 'secondary', 'the apron skirt on the skirt'), kp('apron', 'skin', 'the hands on the apron'),
   kp('hat', 'hair', 'the hat on the hair'), kp('hat', 'skin', 'the brim over the brow'), kp('accent', 'hat', 'the band on the straw hat', ['tomas']),
-  kp('trim', 'hat', 'the pom-pom and the cuff on the nightcap', ['iris']), kp('accent', 'primary', 'the nightshirt under the cardigan', ['iris']),
-  kp('trim', 'primary', 'the straps on the tee', ['pip']),
+  kp('accent', 'primary', 'the brace on the shirt', ['tomas']),
+  kp('trim', 'hat', 'the pom-pom and the cuff on the nightcap', ['iris']), kp('trim', 'primary', 'the nightshirt between the cardigan\'s edges', ['iris']),
+  kp('trim', 'primary', 'the straps on the tee', ['pip']), kp('accent', 'trim', 'the buckle on the strap', ['pip']),
   kp('tool', 'skin', 'the hand on the brush'), kp('tool', 'primary', 'the brush held over the shirt'),
   kp('bowl', 'skin', 'the hands on the bowl', ['bea']), kp('bowl', 'primary', 'the bowl held over the blouse', ['bea']), kp('bowl', 'apron', 'the bowl held over the apron', ['bea']),
 ];
@@ -704,7 +705,8 @@ for (const id of KEEPER_IDS) {
   for (const { a, b, where, only } of K_PAIRS) {
     if (only && !only.includes(id)) continue;
     const ca = kcol(id, a), cb = kcol(id, b);
-    if (!ca || !cb) continue;
+    // (a pair named for this keeper must have both its colours: a slot taken away fails, it does not drop the check)
+    if (!ca || !cb) { if (only) { kcount(`(Ka) ${id} ${a}/${b} slot missing`, false); out.push(`  FAIL (Ka) ${(a + '/' + b).padEnd(18)} a colour slot is missing  (${where})`); } continue; }
     const m = ladder(ca, cb);
     kcount(`(Ka) ${id} ${a}/${b}`, m.pass);
     out.push(`${m.pass ? '  ok  ' : '  FAIL'} (Ka) ${(a + '/' + b).padEnd(18)} lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by.padEnd(8)} ${ca} ${cb}  (${where})`);

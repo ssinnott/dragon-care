@@ -1,6 +1,7 @@
 // A keeper in a scene (docs/KEEPERS.md 6): the rig, its player and where it stands, stepped once per 60 Hz tick.
 // The gallery's keeper sheets and the care acts both use this; the yard (yard.ts) moves keepers around with it.
 import { solveArm, shoulderOf } from '../art/keeper/ik.ts';
+import type { Walker } from './path.ts';
 import type { LimbAngles } from '../art/keeper/ik.ts';
 import { buildKeeper, stepKeeper, drawKeeper } from '../art/keeper/rig.ts';
 import { markFull, computeJoints } from '../lib/art/rig.ts';
@@ -100,6 +101,43 @@ export function stepKeeperAgent(k: KeeperAgent): void {
 /** Draw a keeper (already stepped this tick). */
 export function drawKeeperAgent(ctx: CanvasRenderingContext2D, k: KeeperAgent, o: Partial<DrawKeeperOpts> = {}): void {
   drawKeeper(ctx, k.rig, k.player.pose, { x: k.x, y: k.y, facing: k.facing, scale: k.scale, ...o });
+}
+
+/** A keeper's drawn extent over its walks, measured once per keeper, walk and bowl (walkerOf). */
+const EXTENTS = new Map<string, { hw: number; h: number }>();
+/** The walks a keeper's extent is measured over. */
+const WALKS = ['walk', 'carry', 'tiptoe'] as const;
+
+/**
+ * A keeper as its walk sees it (path.ts), on screen px: half its width and its height over its feet, as DRAWN over
+ * its walk cycles (every frame of walk, carry and tiptoe, drawn off screen and the covered pixels' box read back: the
+ * arms' swing, the nightcap's cone, a bowl or the brush in hand; once per keeper, and again with a bowl in its hands),
+ * and half its feet's span. An estimate from the proportions let a swinging hand reach 4 px into an eye.
+ */
+export function walkerOf(k: KeeperAgent): Walker {
+  const p = k.rig.p, sc = k.scale * k.rig.scale, key = `${k.id}:${k.rig.bowl ? 'bowl' : '-'}:${sc}`;
+  let e = EXTENTS.get(key);
+  if (!e) {
+    if (!dryCanvas) { dryCanvas = document.createElement('canvas'); dryCanvas.width = 400; dryCanvas.height = 300; dryCtx = dryCanvas.getContext('2d', { willReadFrequently: true }); }
+    const g = dryCtx!, X = 200, Y = 260;
+    let hw = 0, h = 0;
+    for (const anim of WALKS) {
+      const a = k.player.anims[anim];
+      if (!a) continue;
+      // (every 2nd frame: the walks are sampled every frame, and a swing peaks over several)
+      for (let i = 0; i < a.frames.length; i += 2) {
+        copyPose(a.frames[i].pose ?? null, DRY_POSE, true);
+        g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(X - 100, Y - 140, 200, 150);
+        drawKeeper(g, k.rig, DRY_POSE, { x: X, y: Y, facing: 1, scale: k.scale, shadow: false });
+        const px = g.getImageData(X - 100, Y - 140, 200, 150).data;
+        for (let y = 0; y < 150; y++) for (let x = 0; x < 200; x++) if (px[(y * 200 + x) * 4 + 3] >= 128) { hw = Math.max(hw, Math.abs(x - 100 + 0.5)); h = Math.max(h, 140 - y); }
+      }
+    }
+    // (the nightcap's cone swings on its chain: a few px more than the frames it was measured in)
+    e = { hw: hw + 2, h: h + 2 };
+    EXTENTS.set(key, e);
+  }
+  return { hw: e.hw, fw: (p.hipX + p.footL * 0.6) * sc, h: e.h };
 }
 
 /** A screen point in a keeper's ground space (from its floor point, facing +x, y up negative, game px). */

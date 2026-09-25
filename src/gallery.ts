@@ -57,6 +57,7 @@ import type { DragonAgent } from './care/dragon.ts';
 import { beginFeed, beginPet, beginTuck, stepAct, approachSide } from './care/acts.ts';
 import type { ActKind, CareAct } from './care/acts.ts';
 import { Yard } from './care/yard.ts';
+import { REACH_MISS, ACT_MAX, YARD_ACT_MAX } from './care/limits.ts';
 
 /** The reference habitat floor (5.4, gate i). */
 export const STRAW = '#e0d6b8';
@@ -706,13 +707,15 @@ export function drawCareCast(ctx: CanvasRenderingContext2D, dragons: readonly Dr
  */
 /** One care vignette: a dragon at (x0, gy) facing right and a keeper walking in from the right to do `kind`. */
 interface Vignette { act: CareAct; d: DragonAgent; kp: KeeperAgent; label: string }
-function makeVignette(kind: ActKind, el: DragonElement, st: Stage, kid: KeeperId, seed: number, x0: number, gy: number, left: number, right: number): Vignette {
-  const d = makeDragon(el, st, seed, kind === 'feed' ? 'beg' : 'idle', x0, gy, { facing: 1, mood: kind === 'feed' ? -0.3 : 0 });
+function makeVignette(kind: ActKind, el: DragonElement, st: Stage, kid: KeeperId, seed: number, x0: number, gy: number, left: number, right: number, facing = 1): Vignette {
+  const d = makeDragon(el, st, seed, kind === 'feed' ? 'beg' : 'idle', x0, gy, { facing, mood: kind === 'feed' ? -0.3 : 0 });
   // the keeper walks in from the side the act comes from (a feed from in front, the rest from behind: acts.ts
   // approachSide) and leaves that way
   const side = approachSide(kind, d), kx = side > 0 ? right : left;
   const kp = makeKeeper(kid, 'walk', kx, gy, { facing: -side, seed });
-  const act: CareAct = kind === 'feed' ? beginFeed(kp, d, kx) : kind === 'pet' ? beginPet(kp, d, kx) : beginTuck(kp, d, kx);
+  // (the floor its walks may use: its own cell, from a little behind the floor line to just above the cell's edge)
+  const scene = { floor: { x0: left, y0: gy - 30, x1: right, y1: gy + 11 } };
+  const act: CareAct = kind === 'feed' ? beginFeed(kp, d, kx, gy, scene) : kind === 'pet' ? beginPet(kp, d, kx, gy, scene) : beginTuck(kp, d, kx, gy, scene);
   const verb = kind === 'feed' ? 'FEEDS' : kind === 'pet' ? (KEEPERS[kid].tool === 'brush' ? 'GROOMS' : 'PETS') : 'TUCKS IN';
   return { act, d, kp, label: `${KEEPERS[kid].name.toUpperCase()} ${verb} ${ELEMENTS[el].name.toUpperCase()} (${st.toUpperCase()})` };
 }
@@ -758,18 +761,14 @@ function careScene(P: GalleryParams): Scene {
 
 // ---------- the care audit (docs/KEEPERS.md K7: a keeper never covers a dragon's eye) ----------
 
-/** The frames an act may take before the audit calls it stuck. */
-const ACT_MAX = 2400;
-/** The phases of an act where the keeper is walking, not at work (the eye audit leaves them out). */
-const WALKING: readonly string[] = ['go', 'back', 'return', 'leave'];
-/** How far a stroking hand may land from its mark, px (the joints snap to whole pixels). */
-export const REACH_MISS = 2.5;
+
+
 
 /**
  * view=careaudit: every care act on every look (feed by Bea, a groom by Tomas, a pet by Pip, a tuck-in by Iris), run
- * from the keeper's walk-in to its walk-off at game scale 1. Each frame the keeper is at work (not walking: WALKING),
- * it is drawn alone on a clear canvas and the pixels it covers inside the dragon's eye box (its largest box:
- * rig.info.eye) are counted: the hard rule, "nothing covers the eye", holds for a keeper at work too (bible 1.4; K7). It also measures how far a stroking hand lands from its mark
+ * from the keeper's walk-in to its walk-off at game scale 1. Every frame, walking in and out too, the keeper is drawn
+ * alone on a clear canvas and the pixels it covers inside the dragon's eye box (its largest box: rig.info.eye) are
+ * counted: the hard rule, "nothing covers the eye", holds for a keeper too (bible 1.4; K7). It also measures how far a stroking hand lands from its mark
  * (the crown, or the neck under the brush) and whether the act finishes. The rows go on window.__dragonCare.care for
  * tools/smoke.ts, which fails an eye covered, a hand more than REACH_MISS px off, or an act that never ends.
  */
@@ -782,12 +781,11 @@ function careAuditScene(P: GalleryParams): Scene {
   const rows: { act: string; id: string; covered: number; frame: number; phase: string; miss: number; done: boolean; frames: number }[] = [];
   const pt = { x: 0, y: 0 };
   for (const [kind, kid] of runs) for (const el of P.els || ELEMENT_IDS) for (const st of P.stages || STAGES) {
-    const v = makeVignette(kind, el, st, kid, P.seed, 150, GY, 20, 300);
+    const v = makeVignette(kind, el, st, kid, P.seed, 150, GY, 20, 300, P.facing);
     let covered = 0, at = 0, phase = '', miss = 0, f = 0;
     for (; f < ACT_MAX && !v.act.done; f++) {
       stepVignette(v);
-      // (walking in, out, back and round again is the scene's ordinary traffic: a keeper at WORK never covers the eye)
-      if (WALKING.includes(v.act.phase)) continue;
+      // (every phase, the walks in and out among them: a walk goes round the eye, path.ts)
       const b = eyeBox(v.d), x0 = Math.max(0, b.x0), y0 = Math.max(0, b.y0), w = Math.min(W, b.x1) - x0, h = Math.min(H, b.y1) - y0;
       g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
       drawKeeperAgent(g, v.kp, { shadow: false });
@@ -843,10 +841,11 @@ function yardScene(P: GalleryParams): Scene {
 const YARD_AUDIT_T = 9000;
 
 /**
- * view=yardaudit: the yard run for YARD_AUDIT_T frames with the care audit's checks on every act it plays (the acts
- * there start from wherever a keeper is, at whatever the dragon was doing): each frame a keeper is at work (not
- * walking), it is drawn alone and the pixels it covers inside its dragon's eye box counted; a stroking hand's miss;
- * and every act ends within ACT_MAX frames. Rows go on window.__dragonCare.care (tools/smoke.ts fails any bad one).
+ * view=yardaudit: the yard run for YARD_AUDIT_T frames with the care audit's checks on every keeper, all the time:
+ * each frame each keeper is drawn alone and the pixels it covers inside the eye box of EVERY dragon it is level with or
+ * in front of (drawn over: a keeper behind a dragon is drawn under it) are counted, walking or at work, in an act or
+ * between acts (a row per act, and one per keeper for its walks home); a stroking hand's miss; and every act ends
+ * within YARD_ACT_MAX frames. Rows go on window.__dragonCare.care (tools/smoke.ts fails any bad one).
  */
 function yardAuditScene(P: GalleryParams): Scene {
   const W = 640, H = 360, MIN_A = 128;
@@ -855,38 +854,49 @@ function yardAuditScene(P: GalleryParams): Scene {
   const g = off.getContext('2d', { willReadFrequently: true })!;
   const yard = new Yard(P.seed);
   type Row = { act: string; id: string; covered: number; frame: number; phase: string; miss: number; done: boolean; frames: number; start: number };
-  const rows: Row[] = [], open = new Map<CareAct, Row>(), pt = { x: 0, y: 0 };
+  const rows: Row[] = [], open = new Map<CareAct, Row>(), between = new Map<KeeperId, Row>(), pt = { x: 0, y: 0 };
+  for (const yk of yard.keepers) {
+    const r: Row = { act: `walks:${yk.k.id}`, id: 'between acts', covered: 0, frame: 0, phase: '', miss: 0, done: true, frames: 0, start: 0 };
+    between.set(yk.k.id, r); rows.push(r);
+  }
   for (let f = 0; f < YARD_AUDIT_T; f++) {
     yard.step();
     for (const yk of yard.keepers) {
-      const a = yk.act;
-      if (!a || !yk.with) continue;
-      let r = open.get(a);
-      if (!r) {
-        r = { act: `${a.kind}:${yk.k.id}`, id: `${yk.with.d.el}-${yk.with.d.stage}@${f}`, covered: 0, frame: 0, phase: '', miss: 0, done: false, frames: 0, start: f };
-        open.set(a, r); rows.push(r);
+      const a = yk.act, k = yk.k;
+      let r: Row;
+      if (a && yk.with) {
+        let o = open.get(a);
+        if (!o) {
+          o = { act: `${a.kind}:${k.id}`, id: `${yk.with.d.el}-${yk.with.d.stage}@${f}`, covered: 0, frame: 0, phase: '', miss: 0, done: false, frames: 0, start: f };
+          open.set(a, o); rows.push(o);
+        }
+        o.frames = f - o.start; r = o;
+      } else r = between.get(k.id)!;
+      // the eyes this keeper could be drawn over: level with it or behind it, and near enough to matter
+      const eyes = yard.dragons.filter((y) => y.d.y <= k.y).map((y) => ({ y, b: eyeBox(y.d) })).filter(({ b }) => b.x1 > k.x - 60 && b.x0 < k.x + 60 && b.y1 > k.y - 110);
+      if (eyes.length) {
+        g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+        drawKeeperAgent(g, k, { shadow: false });
+        for (const { y, b } of eyes) {
+          const x0 = Math.max(0, b.x0), y0 = Math.max(0, b.y0), w = Math.min(W, b.x1) - x0, h = Math.min(H, b.y1) - y0;
+          if (w <= 0 || h <= 0) continue;
+          const px = g.getImageData(x0, y0, w, h).data;
+          let n = 0;
+          for (let i = 3; i < px.length; i += 4) if (px[i] >= MIN_A) n++;
+          if (n > r.covered) { r.covered = n; r.frame = f; r.phase = `${a ? a.phase : 'walk'} over ${y.name}`; }
+        }
       }
-      r.frames = f - r.start;
-      if (WALKING.includes(a.phase)) continue;
-      const b = eyeBox(yk.with.d), x0 = Math.max(0, b.x0), y0 = Math.max(0, b.y0), w = Math.min(W, b.x1) - x0, h = Math.min(H, b.y1) - y0;
-      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
-      drawKeeperAgent(g, yk.k, { shadow: false });
-      if (w > 0 && h > 0) {
-        const px = g.getImageData(x0, y0, w, h).data;
-        let n = 0;
-        for (let i = 3; i < px.length; i += 4) if (px[i] >= MIN_A) n++;
-        if (n > r.covered) { r.covered = n; r.frame = f; r.phase = a.phase; }
-      }
-      const rc = yk.k.reach;
-      if (rc && a.phase === 'stroke') {
-        keeperJoint(yk.k.rig, 'handN', pt);
-        r.miss = Math.max(r.miss, Math.round(Math.hypot(pt.x - (yk.k.x + yk.k.facing * rc.x * yk.k.scale), pt.y - (yk.k.y + rc.y * yk.k.scale)) * 10) / 10);
+      const rc = k.reach;
+      if (a && rc && a.phase === 'stroke') {
+        keeperJoint(k.rig, 'handN', pt);
+        r.miss = Math.max(r.miss, Math.round(Math.hypot(pt.x - (k.x + k.facing * rc.x * k.scale), pt.y - (k.y + rc.y * k.scale)) * 10) / 10);
       }
     }
-    for (const [a, r] of open) if (a.done) { r.done = true; open.delete(a); }
+    for (const [a, r] of open) if (a.done) { r.done = r.frames <= YARD_ACT_MAX; open.delete(a); }
   }
-  // (an act still running when the run ends is fine if it is young; one older than ACT_MAX is stuck)
-  for (const [, r] of open) r.done = r.frames < ACT_MAX;
+  // (an act still running when the run ends is fine if it is young; one older than YARD_ACT_MAX is stuck, and so is
+  // one that ended but took longer)
+  for (const [, r] of open) r.done = r.frames < YARD_ACT_MAX;
   if (window.__dragonCare) window.__dragonCare.care = rows.map(({ start: _s, ...r }) => r);
   const bad = rows.filter((r) => r.covered > 0 || r.miss > REACH_MISS || !r.done);
   const lines = rows.map((r) => `${r.act} ${r.id}: ${r.covered ? `EYE COVERED ${r.covered} PX AT F${r.frame} (${r.phase})` : 'EYE CLEAR'}  HAND ${r.miss} PX  ${r.done ? `${r.frames} F` : 'STUCK'}${r.covered > 0 || r.miss > REACH_MISS || !r.done ? '  FAIL' : ''}`);
@@ -894,7 +904,7 @@ function yardAuditScene(P: GalleryParams): Scene {
     w: 560, h: Math.max(120, 24 + lines.length * 9), pets: [],
     draw(ctx) {
       ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
-      label(ctx, `YARD AUDIT: ${rows.length} ACTS IN ${YARD_AUDIT_T} F, ${bad.length} FAILING (EYE COVERED, HAND OFF ITS MARK BY MORE THAN ${REACH_MISS} PX, OR STUCK)`, this.w / 2, 4, LABEL, 1);
+      label(ctx, `YARD AUDIT: ${rows.length} ROWS IN ${YARD_AUDIT_T} F, ${bad.length} FAILING (AN EYE COVERED, A HAND OFF ITS MARK BY MORE THAN ${REACH_MISS} PX, OR STUCK)`, this.w / 2, 4, LABEL, 1);
       lines.forEach((t, i) => label(ctx, t.toUpperCase(), this.w / 2, 16 + i * 9, t.endsWith('FAIL') ? '#8a1c1c' : LABEL, 1));
     },
   };

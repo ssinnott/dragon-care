@@ -25,9 +25,11 @@ import type { HandT } from '../art/keeper/anims.ts';
 import { armReach, hipYOf } from '../art/keeper/ik.ts';
 import { TOOL_BOWL, TOOL_BRUSH, BRUSH_DROP } from '../art/keeper/parts.ts';
 import type { KeeperAgent, Box } from './keeper.ts';
-import { stepKeeperAgent, toGround, coverage, dryRun, frameAt, shoulderAt } from './keeper.ts';
+import { stepKeeperAgent, toGround, coverage, dryRun, frameAt, shoulderAt, walkerOf } from './keeper.ts';
+import { findPath, FOOT_BAND, REPLAN } from './path.ts';
+import type { Floor } from './path.ts';
 import type { DragonAgent } from './dragon.ts';
-import { playDragon, stepDragonAgent, turnDragon, quiet, craniumPoint, pointIn, neckTop, backTop, eyeBox, bowlScreenX, bodySpan } from './dragon.ts';
+import { playDragon, stepDragonAgent, turnDragon, quiet, craniumPoint, pointIn, neckTop, backTop, eyeBox, bowlScreenX, obstacleOf } from './dragon.ts';
 
 export type ActKind = 'feed' | 'pet' | 'tuck';
 
@@ -61,14 +63,21 @@ export interface CareAct {
   /** Where the keeper walks off to when it is done (screen x, y). */
   exitX: number;
   exitY: number;
-  /** A point to walk by first (behind the dragon, when the straight way crosses it), or null. */
-  via: { x: number; y: number } | null;
+  /** The dragons a walk goes round (the yard's all; a vignette's its own) and the floor it may use (path.ts). */
+  world: () => readonly DragonAgent[];
+  floor: Floor;
+  /** The walk under way, planned and re-planned (walkAlong), or null. */
+  walk: Walk | null;
   done: boolean;
   /**
    * The act steps its dragon until the keeper walks off (`leave`): from then on the dragon is its owner's again (the
    * yard lets it go home, or sleep; a gallery vignette steps it), while the act walks the keeper away.
    */
   ownsDragon: boolean;
+  /** The dragon's need is met (the last bite, the hand let go, asleep): the scene's owner may reset it now. */
+  met: boolean;
+  /** Frames since the hand set out for its mark (reach, stroke, let: one clock, so the stroke never jumps). */
+  strokeT: number;
 }
 
 /** How many bites a fed dragon eats (each is its one-bite eat anim: bible 4.2). */
@@ -92,6 +101,11 @@ const FEED_BACK = 20;
 const FEED_TROT = 30;
 /** Tuck-in: how far the keeper tiptoes away from the sleeping dragon before it walks, px. */
 const TIPTOE = 40;
+/**
+ * Side staging: how far in front of the dragon's floor line a keeper at work stands, px: just outside its footprint
+ * (path.ts FOOT_BAND), so a little floor shows between the keeper's knees and the dragon (at 5 px Iris knelt on Wick).
+ */
+const STAND_DEPTH = FOOT_BAND + 2;
 
 const PT = { x: 0, y: 0 }, SH = { x: 0, y: 0 };
 
@@ -204,7 +218,7 @@ function kFrames(k: KeeperAgent, anim: string, at: readonly number[]): number[] 
  * first such spot wins. None (no look in the audit needs it): the eye-clear spot whose stroke overreaches least.
  */
 function planSide(a: CareAct, plan: (low: boolean, sample: (anim: string, frame: number) => DSample) => { work: Check[]; around: Check[] }, lying: boolean): void {
-  const { k, d } = a, p = propsOf(k.rig.spec), face = d.facing, standY = d.y + 5, sc = k.scale;
+  const { k, d } = a, p = propsOf(k.rig.spec), face = d.facing, standY = d.y + STAND_DEPTH * d.scale, sc = k.scale;
   a.face = face; a.standY = standY; a.staging = 'side';
   const ground = (t: { x: number; y: number }, x: number): HandT => ({ x: ((t.x - x) * face) / sc, y: (t.y - standY) / sc });
   const reach = (armReach(p) - REACH_SLACK) * sc;
@@ -288,10 +302,16 @@ function planKey(a: CareAct): string {
 }
 
 /** A blank act (the fields every kind fills in). */
-function act(kind: ActKind, k: KeeperAgent, d: DragonAgent, exitX: number, exitY: number): CareAct {
+/** Where an act happens: the dragons a keeper's walks go round, and the floor they may use. */
+export interface ActScene { world?: () => readonly DragonAgent[]; floor?: Floor }
+
+function act(kind: ActKind, k: KeeperAgent, d: DragonAgent, exitX: number, exitY: number, o: ActScene): CareAct {
+  const own = [d] as const;
   return {
+    world: o.world ?? (() => own), walk: null,
+    floor: o.floor ?? { x0: Math.min(k.x, d.x, exitX) - 80, y0: Math.min(k.y, d.y, exitY) - 40, x1: Math.max(k.x, d.x, exitX) + 80, y1: Math.max(k.y, d.y, exitY) + 30 },
     kind, k, d, phase: 'go', t: 0, standX: k.x, standY: k.y, face: 1, staging: 'side', low: false, groom: false,
-    mark: { on: 'crown', from: ARC[d.stage][0], to: ARC[d.stage][1] }, bowlAt: 0, bowlX: 0, eatX: d.x, backX: k.x, count: 0, lieEnd: 0, exitX, exitY, via: null, done: false, ownsDragon: true,
+    mark: { on: 'crown', from: ARC[d.stage][0], to: ARC[d.stage][1] }, bowlAt: 0, bowlX: 0, eatX: d.x, backX: k.x, count: 0, lieEnd: 0, exitX, exitY, done: false, ownsDragon: true, met: false, strokeT: 0,
   };
 }
 
@@ -302,8 +322,8 @@ function act(kind: ActKind, k: KeeperAgent, d: DragonAgent, exitX: number, exitY
  * begging dragon's eye (K7): a kneeling grown-up keeper is as big as a baby dragon, and a fixed gap put the bowl, the
  * arms or the keeper's head over a baby's face.
  */
-export function beginFeed(k: KeeperAgent, d: DragonAgent, exitX: number, exitY = k.y): CareAct {
-  const sp = k.rig.spec, p = propsOf(sp), f = d.facing, a = act('feed', k, d, exitX, exitY);
+export function beginFeed(k: KeeperAgent, d: DragonAgent, exitX: number, exitY = k.y, scene: ActScene = {}): CareAct {
+  const sp = k.rig.spec, p = propsOf(sp), f = d.facing, a = act('feed', k, d, exitX, exitY, scene);
   a.bowlAt = Math.round(p.upperLeg * 0.95);
   a.standY = d.y; a.face = -f; a.low = true; a.staging = 'front';
   k.rig.bowl = { w: d.spot.w, h: d.spot.h, full: true }; k.rig.weapon = TOOL_BOWL;
@@ -334,7 +354,6 @@ export function beginFeed(k: KeeperAgent, d: DragonAgent, exitX: number, exitY =
   a.backX = a.standX + f * FEED_BACK * k.scale;
   // (on the dragon's own floor line, so the bowl the keeper lowers and the bowl that stands there are one bowl; the
   // scene draws a keeper after a dragon on the same line, and the bowl between them)
-  a.via = roundBehind(d, k.x, k.y, a.standX, a.standY);
   k.player.play('carry', { restart: true, blend: 6 });
   return a;
 }
@@ -349,7 +368,7 @@ function holdForCare(d: DragonAgent): void {
 function planOnce(a: CareAct, lying: boolean, plan: Parameters<typeof planSide>[1]): void {
   const key = planKey(a), known = PLANS.get(key);
   if (known) {
-    a.face = a.d.facing; a.standY = a.d.y + 5; a.staging = 'side';
+    a.face = a.d.facing; a.standY = a.d.y + STAND_DEPTH * a.d.scale; a.staging = 'side';
     a.standX = Math.round(a.d.x) + known.dx; a.low = known.low; a.mark = known.mark;
     return;
   }
@@ -375,8 +394,8 @@ const EASE_W = [0.25, 0.5, 0.75] as const;
  * kneeling and rising beside the idle dragon, and resting beside it (kneeling, or standing watching) through the happy
  * that thanks it.
  */
-export function beginPet(k: KeeperAgent, d: DragonAgent, exitX: number, exitY = k.y): CareAct {
-  const a = act('pet', k, d, exitX, exitY), pet = d.player.anims.pet?.frames ?? [], happy = d.player.anims.happy?.frames ?? [];
+export function beginPet(k: KeeperAgent, d: DragonAgent, exitX: number, exitY = k.y, scene: ActScene = {}): CareAct {
+  const a = act('pet', k, d, exitX, exitY, scene), pet = d.player.anims.pet?.frames ?? [], happy = d.player.anims.happy?.frames ?? [];
   a.groom = grooms(k);
   holdForCare(d);
   const petF = everyFrames(pet, Math.max(1, Math.round(pet.reduce((n, f) => n + (f.dur || 1), 0) / 4)));
@@ -396,7 +415,6 @@ export function beginPet(k: KeeperAgent, d: DragonAgent, exitX: number, exitY = 
     if (low) for (const an of ['kneel', 'rise']) for (const f of kFrames(k, an, [0, 0.33, 0.66, 1])) around.push({ anim: an, frame: f, s: idle, reach: null });
     return { work: checks, around };
   });
-  a.via = roundBehind(d, k.x, k.y, a.standX, a.standY);
   k.player.play('walk', { restart: true, blend: 6 });
   return a;
 }
@@ -407,8 +425,8 @@ export function beginPet(k: KeeperAgent, d: DragonAgent, exitX: number, exitY = 
  * dragon lying (the end of its lie-down, and on into its tuck-in or its sleep), and the rise and the shh over it
  * asleep.
  */
-export function beginTuck(k: KeeperAgent, d: DragonAgent, exitX: number, exitY = k.y): CareAct {
-  const a = act('tuck', k, d, exitX, exitY), anim = d.player.has('tuckin') ? 'tuckin' : 'sleep', A = d.player.anims[anim]?.frames ?? [];
+export function beginTuck(k: KeeperAgent, d: DragonAgent, exitX: number, exitY = k.y, scene: ActScene = {}): CareAct {
+  const a = act('tuck', k, d, exitX, exitY, scene), anim = d.player.has('tuckin') ? 'tuckin' : 'sleep', A = d.player.anims[anim]?.frames ?? [];
   a.lieEnd = d.player.anims.sleep?.loopFrom ?? 0;
   const n = A.length, lyingF = [0, 8, 30, 60].map((i) => Math.min(n - 1, a.lieEnd + i));
   holdForCare(d);
@@ -427,14 +445,14 @@ export function beginTuck(k: KeeperAgent, d: DragonAgent, exitX: number, exitY =
     for (const an of ['kneelIdle', 'rise', 'shh']) for (const f of kFrames(k, an, [0, 0.33, 0.66, 1])) for (const s of L) around.push({ anim: an, frame: f, s, reach: null });
     return { work, around };
   });
-  a.via = roundBehind(d, k.x, k.y, a.standX, a.standY);
   k.player.play('walk', { restart: true, blend: 6 });
   return a;
 }
 
 function next(a: CareAct, phase: string): void {
   a.phase = phase; a.t = 0;
-  if (phase === 'leave') { a.ownsDragon = false; a.via = roundBehind(a.d, a.k.x, a.k.y, a.exitX, a.exitY); }
+  // (the dragon is its owner's again, its idle variants back: from here another keeper may take it)
+  if (phase === 'leave') { a.ownsDragon = false; a.met = true; quiet(a.d, false); }
 }
 
 /**
@@ -462,47 +480,49 @@ function clampTo(k: KeeperAgent, x: number, x0: number): void {
   if ((x - x0) * (x - k.x) < 0) k.x = x;
 }
 
-/** How far behind a dragon's floor line a keeper walks round it, px. */
-const ROUND_BEHIND = 26;
+/** A keeper's walk to a spot, planned (path.ts findPath) and re-planned as it goes. */
+export interface Walk { to: { x: number; y: number }; path: { x: number; y: number }[]; t: number }
 
 /**
- * The way round a dragon: if a keeper's straight walk from (sx, sy) to (tx, ty) would cross the floor the dragon takes
- * up (bodySpan: walking through a baby, it walked over it), a point behind the dragon's middle to go by (drawn behind
- * it there, the dragon hides the keeper's feet as it passes); else null.
+ * Walk a keeper on toward (x, y) along a planned way round the dragons (path.ts): planned when the spot changes and
+ * again every REPLAN frames; each leg walked by walkTo, one after the other in the same tick, so a keeper never
+ * stops at a corner. True on arrival (the keeper is not stepped then: the caller starts what comes next).
  */
-function roundBehind(d: DragonAgent, sx: number, sy: number, tx: number, ty: number): { x: number; y: number } | null {
-  const b = bodySpan(d);
-  // (the segment against the box, Liang-Barsky)
-  let t0 = 0, t1 = 1;
-  const dx = tx - sx, dy = ty - sy;
-  for (const [p, q] of [[-dx, sx - b.x0], [dx, b.x1 - sx], [-dy, sy - b.y0], [dy, b.y1 - sy]] as const) {
-    if (p === 0) { if (q < 0) return null; continue; }
-    const r = q / p;
-    if (p < 0) t0 = Math.max(t0, r); else t1 = Math.min(t1, r);
-    if (t0 > t1) return null;
+export function walkAlong(k: KeeperAgent, w: Walk | null, x: number, y: number, anim: string, world: readonly DragonAgent[], floor: Floor): { arrived: boolean; walk: Walk } {
+  let walk = w;
+  if (!walk || walk.to.x !== x || walk.to.y !== y || ++walk.t >= REPLAN) {
+    const obs = world.map((d) => obstacleOf(d, OBSTACLE_EYE, REPLAN));
+    walk = { to: { x, y }, path: findPath(k.x, k.y, x, y, walkerOf(k), obs, floor), t: 0 };
   }
-  return { x: Math.round(d.x), y: Math.round(b.y0 - ROUND_BEHIND * d.scale) };
+  while (walk.path.length && walkTo(k, walk.path[0].x, walk.path[0].y, anim)) walk.path.shift();
+  if (!walk.path.length) return { arrived: true, walk };
+  const x0 = k.x, p = walk.path[0];
+  stepKeeperAgent(k); clampTo(k, p.x, x0);
+  return { arrived: false, walk };
 }
+/** A walking keeper keeps this far off a dragon's eye box, px (the dragon moves while the keeper walks). */
+const OBSTACLE_EYE = 4;
 
-/** Walk a keeper to (x, y), by the act's way round first if it has one; true on arrival. */
+/** Walk an act's keeper to (x, y) round the act's dragons; true on arrival. */
 function walkLeg(a: CareAct, x: number, y: number, anim: string): boolean {
-  const k = a.k;
-  if (a.via) {
-    const x0 = k.x, v = a.via;
-    if (walkTo(k, v.x, v.y, anim)) a.via = null;
-    stepKeeperAgent(k); clampTo(k, v.x, x0);
-    return false;
-  }
-  const x0 = k.x, there = walkTo(k, x, y, anim);
-  if (!there) { stepKeeperAgent(k); clampTo(k, x, x0); }
-  return there;
+  const r = walkAlong(a.k, a.walk, x, y, anim, a.world(), a.floor);
+  a.walk = r.arrived ? null : r.walk;
+  return r.arrived;
 }
 
-/** The stroke's target this tick, in the keeper's ground space; the hand lifts a pixel on its way back. */
+/** Frames into the reach at which the hand is on its mark and the stroke begins (the settle, then the hand easing on). */
+const STROKE_FROM = SETTLE + 12;
+
+/**
+ * The stroke's target this tick, in the keeper's ground space: the mark's start while the hand eases on, then back
+ * along the mark and forward again, the hand lifting a pixel on its way forward. On the one stroke clock (strokeT), so
+ * the target never jumps as the phase changes.
+ */
 function strokeTarget(a: CareAct, period: number): HandT {
-  careTarget(a, petStroke(a.t, period, 1).x, PT);
+  const t = Math.max(0, a.strokeT - STROKE_FROM);
+  careTarget(a, petStroke(t, period, 1).x, PT);
   const g = toGround(a.k, PT.x, PT.y);
-  if (a.t % period >= period * 0.6) g.y -= 1;
+  if (t > 0 && t % period >= period * 0.6) g.y -= 1;
   return g;
 }
 
@@ -573,7 +593,7 @@ export function stepAct(a: CareAct): void {
       if (d.player.done && d.player.name === 'eat') {
         a.count++;
         if (a.count < FEED_BITES) playDragon(d, 'eat', { blend: 4 });
-        else { if (d.bowl) d.bowl.full = false; playDragon(d, 'happy', { blend: 8 }); d.mood = clamp(d.mood + 0.5, -1, 1); next(a, 'happy'); }
+        else { if (d.bowl) d.bowl.full = false; a.met = true; playDragon(d, 'happy', { blend: 8 }); d.mood = clamp(d.mood + 0.5, -1, 1); next(a, 'happy'); }
       }
       stepKeeperAgent(k);
       break;
@@ -595,7 +615,7 @@ export function stepAct(a: CareAct): void {
       break;
     case 'collect':
       for (const e of evs) if (e.name === 'grab') { d.bowl = null; k.rig.bowl = { w: d.spot.w, h: d.spot.h, full: false }; k.rig.weapon = TOOL_BOWL; }
-      if (k.player.done) { k.facing = -a.face; next(a, 'leave'); }
+      if (k.player.done) { next(a, 'leave'); }
       stepKeeperAgent(k);
       break;
     // ---- pet, groom and tuck-in ----
@@ -608,22 +628,28 @@ export function stepAct(a: CareAct): void {
     case 'reach':
       // the keeper settles into its pose (the anim's blend), then the hand eases onto its mark; a pet's dragon starts
       // its pet loop as the hand lands
-      if (a.t === SETTLE + 6 && a.kind === 'pet') playDragon(d, 'pet', { blend: 10 });
-      k.reachW = clamp((a.t - SETTLE) / 12, 0, 1);
+      if (a.t === 1) a.strokeT = 0;
+      a.strokeT++;
+      if (a.strokeT === SETTLE + 6 && a.kind === 'pet') playDragon(d, 'pet', { blend: 10 });
+      k.reachW = clamp((a.strokeT - SETTLE) / 12, 0, 1);
       k.reach = strokeTarget(a, a.kind === 'tuck' ? STROKE_TUCK : STROKE);
-      if (a.t >= SETTLE + 12) { a.count = 0; next(a, 'stroke'); }
+      if (a.strokeT >= STROKE_FROM) { a.count = 0; next(a, 'stroke'); }
       stepKeeperAgent(k);
       break;
     case 'stroke': {
       const period = a.kind === 'tuck' ? STROKE_TUCK : STROKE;
+      a.strokeT++;
       k.reach = strokeTarget(a, period);
       // a pet counts its strokes; a tuck-in strokes on until the dragon is asleep and counts the ones after that
-      if (a.t % period === 0 && (a.kind !== 'tuck' || d.player.pose.sleep >= 0.5)) a.count++;
-      if (a.count >= (a.kind === 'tuck' ? TUCK_STROKES : PET_STROKES)) next(a, 'let');
+      const asleep = d.player.pose.sleep >= 0.5;
+      if (a.kind === 'tuck' && asleep) a.met = true;
+      if ((a.strokeT - STROKE_FROM) % period === 0 && (a.kind !== 'tuck' || asleep)) a.count++;
+      if (a.count >= (a.kind === 'tuck' ? TUCK_STROKES : PET_STROKES)) { if (a.kind === 'pet') a.met = true; next(a, 'let'); }
       stepKeeperAgent(k);
       break;
     }
     case 'let':
+      a.strokeT++;
       k.reachW = clamp(1 - a.t / 10, 0, 1);
       k.reach = strokeTarget(a, a.kind === 'tuck' ? STROKE_TUCK : STROKE);
       if (a.t >= 10) {
@@ -640,19 +666,19 @@ export function stepAct(a: CareAct): void {
       // until the happy is over, then up off its knees and away
       if (a.t >= 20 && d.player.name !== 'happy') {
         if (a.low) { k.player.play('rise', { restart: true, blend: 8 }); next(a, 'rise'); }
-        else { k.facing = -a.face; next(a, 'leave'); }
+        else { next(a, 'leave'); }
       }
       stepKeeperAgent(k);
       break;
     case 'rise':
       if (k.player.done) {
         if (a.kind === 'tuck') { k.player.play('shh', { restart: true, blend: 8 }); next(a, 'shh'); }
-        else { k.facing = -a.face; next(a, 'leave'); }
+        else { next(a, 'leave'); }
       }
       stepKeeperAgent(k);
       break;
     case 'shh':
-      if (k.player.done) { k.facing = -a.face; next(a, 'leave'); }
+      if (k.player.done) { next(a, 'leave'); }
       stepKeeperAgent(k);
       break;
     case 'leave': {
@@ -661,7 +687,6 @@ export function stepAct(a: CareAct): void {
       if (walkLeg(a, a.exitX, a.exitY, anim)) {
         k.player.play(a.kind === 'feed' ? 'hold' : 'idle', { restart: true, blend: 8 });
         a.done = true;
-        quiet(d, false);
         stepKeeperAgent(k);
       }
       break;
