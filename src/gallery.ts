@@ -13,8 +13,9 @@
 //   view=grey | view=cvd       the lineup in greyscale / simulated deuteranopia (post-processed)
 //   view=strip&el=&stage=&anim=&n=   n evenly spaced frames of one anim, numbered, scale 2; from= / span= pick the
 //                              frames (a walk defaults to one cycle, over ground ticks that scroll with its `move`)
-//   view=habitat               640 x 360, straw floor, 8 mixed dragons, y-sorted, top-pass particles; walkers roam
-//                              (two overlapping pairs hold their places); anim=mix plays every act at once
+//   view=habitat               640 x 360, straw floor, 12 mixed dragons, y-sorted, top-pass particles; walkers roam
+//                              (two overlapping pairs and the elders' dark trio hold their places); anim=mix plays
+//                              every act at once
 //   view=floor | view=roots    the floor audit (nothing sinks through y = 0) and the leg-root audit (no far leg floats
 //                              free of the body); els= / stages= / anims= narrow them
 //   view=tails                 the tail-ceiling audit (a fluke never rises over 3 px above the back: 3.0), narrowed the same
@@ -568,29 +569,37 @@ function stripScene(P: GalleryParams): Scene {
 }
 
 /**
- * view=habitat (5.1 #13, 5.4): 9 dragons on straw, y-sorted, every element among them. The cast carries the risky
+ * view=habitat (5.1 #13, 5.4): 12 dragons on straw, y-sorted, every element among them. The cast carries the risky
  * looks -- adult lightning (the tallest cue) standing just BEHIND an adult slinkwing (spire behind fan), and an adult
  * water with its baby overlapping in front of it (parent over baby, one element) -- plus a young rock, an adult dusk
- * (its coral lamp ahead of the face, E12's neighbour of fire's glow; its Nightfall on the floor in the mix), and two
- * ELDERS: spike's, roaming with a baby spike (an elder shares the habitat with babies: 5.8's cross-stage gates), and
- * fire's; those two pairs hold their places (`fixed`), the others roam. (The first cast had no young or adult
- * lightning, no adult slinkwing, no young or baby water or rock, and no overlap that stayed put; the v1 cast had no
- * dusk.)
+ * (its coral lamp ahead of the face, E12's neighbour of fire's glow; its Nightfall on the floor in the mix), and five
+ * ELDERS: spike's, roaming with a baby spike (an elder shares the habitat with babies: 5.8's cross-stage gates), fire's,
+ * and the dark trio's at the back -- lightning's just behind slinkwing's, the greyed spire behind the greyed fans, with
+ * dusk's facing them, spaced by its lamp's reach (ElementSpec.reach) so its lantern hangs in the air between them, not
+ * on a neighbour (cast review v2: the check had only two elders, none of the dark three, and no airing). Those pairs
+ * and the trio hold their places (`fixed`), the others roam. (The first cast had no young or adult lightning, no adult
+ * slinkwing, no young or baby water or rock, and no overlap that stayed put; the v1 cast had no dusk.)
  */
 function habitatScene(P: GalleryParams): Scene {
   const cast: [DragonElement, Stage, number, number, number, boolean][] = [
+    ['lightning', 'elder', 318, 124, 1, true], ['slinkwing', 'elder', 336, 134, 1, true],
     ['spike', 'elder', 470, 170, -1, false], ['lightning', 'adult', 196, 176, 1, true], ['slinkwing', 'adult', 214, 186, 1, true],
     ['dusk', 'adult', 552, 218, -1, false],
     ['rock', 'young', 110, 262, 1, false], ['fire', 'elder', 340, 236, 1, false], ['water', 'adult', 520, 290, -1, true],
     ['water', 'baby', 506, 306, -1, true], ['spike', 'baby', 90, 336, 1, false],
   ];
-  // anim=mix: every act at once (the top pass carries the "z", the dazed stars and the embers; eat brings a bowl)
-  const MIX = ['walk', 'happy', 'sleep', 'breath', 'eat', 'breath', 'beg', 'pet', 'walk'];
+  cast.splice(2, 0, ['dusk', 'elder', 0, cast[1][3] + 4, -1, true]);
+  // anim=mix: every act at once (the top pass carries the "z", the dazed stars and the embers; eat brings a bowl), the
+  // elders' airing among them (lightning's storm-watch, slinkwing's sit-back spread) and dusk's lamp-bat
+  const MIX = ['airing', 'airing', 'fidget', 'walk', 'happy', 'sleep', 'breath', 'eat', 'breath', 'beg', 'pet', 'walk'];
   const pets = cast.map(([el, st, x, y, f, fixed], i) => {
     const p = makePet(el, st, P.seed + i * 17, P.anim === 'mix' ? MIX[i] : P.anim, x, y, { facing: f, mood: P.mood });
     p.roam = fixed ? null : [-40, 680];
     return p;
   });
+  // the dusk elder faces the slinkwing elder, its snout clear of the slinkwing's by its lamp's reach and 6 px more
+  const [slink, dusk] = [pets[1], pets[2]];
+  dusk.x = Math.round(extentX(slink)[1] + (ELEMENTS.dusk.reach?.elder ?? 0) + 6 + (dusk.x - extentX(dusk)[0]));
   return {
     w: 640, h: 360, pets, wary: true,
     draw(ctx) {
