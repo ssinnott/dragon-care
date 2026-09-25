@@ -22,8 +22,10 @@
 // audits -- every care act on all 28 looks (view=careaudit), every act the yard plays (view=yardaudit) -- fail a keeper
 // at work covering the dragon's eye (K7), a stroking hand more than REACH_MISS px off its mark, or an act that never
 // ends.
-// The base (view=base, docs/BASE_DESIGN.md): frozen, a minute in, the care simulation must have got jobs done; live,
-// a drag must pan the camera and a tap on the first job chip must Rush that job.
+// The base (view=base, docs/BASE_DESIGN.md): frozen, it starts with a young adult of every element (#9), the ages
+// preset has every stage, and a minute in the care simulation must have got jobs done; live (never saving: save=0), a
+// drag must pan the camera, a tap on the first job chip must Rush that job, and the gallery's keys (E, the arrows,
+// Space, the digits) must neither rebuild the world nor leave it.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -62,8 +64,50 @@ interface Case {
   care?: number;
   /** view=base: the care simulation must have done jobs by the frozen frame. */
   base?: boolean;
+  /** view=base: what's wrong with the base's hook (window.__dragonCare.base) at the frozen frame. */
+  check?: (hook: BaseHook) => string[];
   /** A live page to drive (pointer input); returns what went wrong. */
   act?: (page: any) => Promise<string[]>;
+}
+
+type BaseHook = NonNullable<NonNullable<Window['__dragonCare']>['base']>;
+
+/** The base's dragons: this many, every one at `stage` (null: any), with every element among them. */
+function castIs(n: number, stage: string | null) {
+  return (b: BaseHook): string[] => {
+    const out: string[] = [], els = new Set(b.dragons.map((d) => d.element));
+    if (b.dragons.length !== n) out.push(`${b.dragons.length} dragons, not ${n}`);
+    const off = stage ? b.dragons.filter((d) => d.stage !== stage) : [];
+    if (off.length) out.push(`not ${stage}: ${off.map((d) => `${d.name} (${d.stage})`).join(', ')}`);
+    const missing = DRAGON_ELEMENTS.filter((el) => !els.has(el));
+    if (missing.length) out.push(`no ${missing.join(', ')} dragon`);
+    if (!/^[0-9a-f]{8}$/.test(b.digest)) out.push(`the digest is ${JSON.stringify(b.digest)}, not 8 hex digits`);
+    return out;
+  };
+}
+/** The base's dragons include every stage. */
+function everyStage(b: BaseHook): string[] {
+  const st = new Set(b.dragons.map((d) => d.stage)), missing = AGE_STAGES.filter((s) => !st.has(s));
+  return missing.length ? [`no ${missing.join(', ')} dragon`] : [];
+}
+
+/**
+ * view=base, live: the gallery's keys are not the game's. Every one that once rebuilt the world (E, the digits) or
+ * left it (the arrows, Space) is pressed; the base must still be there, the same world, still running.
+ */
+async function baseKeys(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = () => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const a = (await st()).tick;
+  for (const key of ['e', 'E', 'ArrowRight', 'ArrowLeft', 'Space', '5']) { await page.keyboard.press(key); await page.waitForTimeout(50); }
+  await page.waitForTimeout(300);
+  const size = await page.evaluate(() => { const c = document.getElementById('stage') as HTMLCanvasElement; return [c.width, c.height]; });
+  if (size[0] !== 640 || size[1] !== 360) out.push(`the canvas is ${size[0]} x ${size[1]} after the keys, not the base's 640 x 360`);
+  const b = await st();
+  if (!b) return [...out, 'the base hook is gone after the keys'];
+  if (!(b.tick >= a + 10)) out.push(`the world restarted or stopped under the keys (tick ${a} -> ${b.tick})`);
+  return out;
 }
 
 /** view=base, live: a drag pans the camera the other way, and a tap on the first job chip Rushes that job. */
@@ -161,10 +205,13 @@ const CASES: Case[] = [
   // (and mirrored, the dragons facing left, on two elements: every plan, walk and pose the other way round)
   { query: 'view=careaudit&facing=-1&els=fire,dusk&t=0', minColours: 2, allScales: false, timeout: 300000, care: 32 },
   { query: 'view=yardaudit&t=0', minColours: 2, allScales: false, timeout: 300000, care: 14 },
-  // the base: its first seconds, a minute of care (jobs got done), and live input (a drag pans, a chip tap Rushes)
-  { query: 'view=base&t=600', minColours: 150, allScales: false },
+  // the base: its first seconds (a young adult of every element, #9), every stage (the ages preset), a minute of care
+  // (jobs got done), and live input, never saving (a drag pans, a chip tap Rushes, the gallery's keys do nothing)
+  { query: 'view=base&t=600', minColours: 150, allScales: false, check: castIs(7, 'adult') },
+  { query: 'view=base&preset=ages&t=60', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...everyStage(b)] },
   { query: 'view=base&t=3600', minColours: 150, allScales: false, base: true },
-  { query: 'view=base', minColours: 150, allScales: false, act: baseInput },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseInput },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseKeys },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -227,6 +274,11 @@ for (const c of CASES) {
       const b: { tick: number; done: number } | undefined = await page.evaluate(() => (window as any).__dragonCare?.base);
       if (!b) errors.push('the base reported nothing');
       else if (b.done < 1) errors.push(`the keepers finished no job in ${b.tick} steps`);
+    }
+    if (c.check) {
+      const b: BaseHook | undefined = await page.evaluate(() => (window as any).__dragonCare?.base);
+      if (!b) errors.push('the base reported nothing');
+      else errors.push(...c.check(b));
     }
     if (c.act) errors.push(...await c.act(page));
     const colours: number[] = await page.evaluate(() => {

@@ -1,5 +1,7 @@
 // The base a new game starts from, and the one view=base and tools/sim-check.ts run: the greybox mockups' rooms
-// (docs/base/), twelve dragons -- every element and every stage among them -- and the four named keepers.
+// (docs/base/), seven dragons -- one of each element, every one newly adult, 0 days into the stage (#9: "start with a
+// young adult dragon of each kind"; BASE_DESIGN's Decisions: *young adult* is the adult stage's first day) -- and the
+// four named keepers. Views that need other stages build their own casts (src/game/presets.ts).
 import type { RoomPlace, RoomKind } from './layout.ts';
 import type { NeedKind } from './needs.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
@@ -30,21 +32,20 @@ export const START_ROOMS: readonly RoomPlace[] = [
   { kind: 'lookout', part: 'towerR', floor: 4 },
 ];
 
-/** A dragon at home: its room (the first of that kind), where it stands across the room (0..1) and which way it faces. */
-export interface DragonPlace { name: string; element: DragonElement; stage: Stage; seed: number; room: RoomKind; at: number; facing: 1 | -1 }
+/**
+ * A dragon at home: its room (the first of that kind), where it stands across the room (0..1) and which way it faces;
+ * `days` is how far into its stage it is (game days, default 0: the stage has just begun).
+ */
+export interface DragonPlace { name: string; element: DragonElement; stage: Stage; seed: number; room: RoomKind; at: number; facing: 1 | -1; days?: number }
+/** One of each element, in the art bible's order, every one at the very start of the adult stage (ids 0-6 in this order). */
 export const START_DRAGONS: readonly DragonPlace[] = [
-  { name: 'EMBER', element: 'fire', stage: 'adult', seed: 11, room: 'kitchen', at: 0.62, facing: 1 },
-  { name: 'CINDER', element: 'fire', stage: 'baby', seed: 28, room: 'kitchen', at: 0.9, facing: -1 },
-  { name: 'PEBBLE', element: 'rock', stage: 'baby', seed: 62, room: 'hatchery', at: 0.78, facing: -1 },
-  { name: 'RIPPLE', element: 'water', stage: 'adult', seed: 79, room: 'bath', at: 0.3, facing: 1 },
-  { name: 'ZAP', element: 'lightning', stage: 'young', seed: 113, room: 'romp', at: 0.4, facing: 1 },
-  { name: 'BURR', element: 'spike', stage: 'baby', seed: 45, room: 'romp', at: 0.64, facing: -1 },
-  { name: 'SPLASH', element: 'water', stage: 'young', seed: 147, room: 'romp', at: 0.87, facing: -1 },
-  { name: 'BRAMBLE', element: 'spike', stage: 'adult', seed: 164, room: 'groom', at: 0.38, facing: 1 },
-  { name: 'WICK', element: 'dusk', stage: 'adult', seed: 181, room: 'dorm', at: 0.28, facing: 1 },
-  { name: 'ASH', element: 'fire', stage: 'elder', seed: 198, room: 'dorm', at: 0.8, facing: -1 },
-  { name: 'COBBLE', element: 'rock', stage: 'elder', seed: 215, room: 'sunloft', at: 0.55, facing: 1 },
-  { name: 'ECHO', element: 'slinkwing', stage: 'adult', seed: 266, room: 'roost', at: 0.35, facing: 1 },
+  { name: 'EMBER', element: 'fire', stage: 'adult', seed: 11, room: 'kitchen', at: 0.62, facing: 1, days: 0 },
+  { name: 'BRAMBLE', element: 'spike', stage: 'adult', seed: 164, room: 'groom', at: 0.38, facing: 1, days: 0 },
+  { name: 'COBBLE', element: 'rock', stage: 'adult', seed: 215, room: 'sunloft', at: 0.55, facing: 1, days: 0 },
+  { name: 'ZAP', element: 'lightning', stage: 'adult', seed: 113, room: 'romp', at: 0.4, facing: 1, days: 0 },
+  { name: 'RIPPLE', element: 'water', stage: 'adult', seed: 79, room: 'bath', at: 0.3, facing: 1, days: 0 },
+  { name: 'ECHO', element: 'slinkwing', stage: 'adult', seed: 266, room: 'roost', at: 0.35, facing: 1, days: 0 },
+  { name: 'WICK', element: 'dusk', stage: 'adult', seed: 181, room: 'dorm', at: 0.28, facing: 1, days: 0 },
 ];
 
 /**

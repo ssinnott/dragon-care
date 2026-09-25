@@ -2,7 +2,8 @@
 //
 // THE CONTRACT with tools/shot.ts: the query string picks the view, the anim and a frozen time `t` (60 Hz steps from
 // the anim's start); with `t` the page draws exactly that frame and then sets window.__dragonCare.ready. Without `t`
-// it runs live (keyboard: arrows / space cycle views, number keys pick anims) and sets ready after the first frame.
+// it runs live (keyboard: arrows / space cycle views, number keys pick anims; not on view=base, the game, whose keys
+// are its own) and sets ready after the first frame.
 //
 //   (no view=, or an unknown one)   the game: view=base, below -- this is the page a plain index.html load runs
 //   view=lineup                28 dragons: seven element columns (bible order) x baby / young / adult / elder rows
@@ -28,7 +29,9 @@
 //   view=neutral               the neutral-area recorder (each look's share of HSV S < 0.25 pixels, <= 40 %: 3.1)
 //   view=base                  the base (src/game/base.ts; docs/BASE_DESIGN.md): the barn and towers at 640 x 360 with the
 //                              care simulation running -- need bubbles, keepers, the job strip; live, drag to look around
-//                              and tap a bubble, a job or a dragon to Rush it; seed= seeds the world
+//                              and tap a bubble, a job or a dragon to Rush it; seed= seeds the world, cam=x,y starts the
+//                              camera there (world px), preset=<name> starts from a code-built world instead of the new
+//                              game (src/game/presets.ts: ages = every stage), save=0 keeps a live page from saving
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
 //   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
@@ -110,6 +113,10 @@ export interface GalleryParams {
   k: KeeperId | null;
   /** act=feed | pet | tuck: view=care plays that one care act (on el= / stage=) instead of the three. */
   act: ActKind | null;
+  /** view=base: cam=x,y, the camera's start (world px); preset=<name>, a code-built start; save=0 (false): never load or save. */
+  cam: { x: number; y: number } | null;
+  preset: string | null;
+  save: boolean;
 }
 
 export function parseParams(search: string): GalleryParams {
@@ -143,7 +150,16 @@ export function parseParams(search: string): GalleryParams {
     post: q.get('post') === 'grey' || q.get('post') === 'cvd' ? q.get('post') as 'grey' | 'cvd' : null,
     k: (KEEPER_IDS as readonly string[]).includes(q.get('k') || '') ? q.get('k') as KeeperId : null,
     act: ['feed', 'pet', 'tuck'].includes(q.get('act') || '') ? q.get('act') as ActKind : null,
+    cam: camParam(q.get('cam')),
+    preset: q.get('preset') || null,
+    save: q.get('save') !== '0',
   };
+}
+
+/** cam=x,y as two numbers (null unless both are). */
+function camParam(v: string | null): { x: number; y: number } | null {
+  const [x, y] = (v || '').split(',').map((c) => (c.trim() === '' ? NaN : Number(c)));
+  return isFinite(x) && isFinite(y) ? { x, y } : null;
 }
 
 /**
@@ -1310,7 +1326,8 @@ function makeScene(P: GalleryParams): Scene {
     case 'careaudit': return careAuditScene(P);
     case 'yard': return yardScene(P);
     case 'yardaudit': return yardAuditScene(P);
-    case 'base': return new BaseView(P.seed);
+    // (a frozen view never loads or saves: G4)
+    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save });
     default: return lineupScene(P);
   }
 }
@@ -1348,6 +1365,8 @@ export function startGallery(canvas: HTMLCanvasElement, search: string, onReady:
   scene.attach?.(canvas);
   const rebuild = () => { scene.detach?.(); scene = makeScene(P); size(); scene.attach?.(canvas); };
   window.addEventListener('keydown', (e) => {
+    // (the base is the game: its keys are its own, and E or an arrow must never rebuild or leave it)
+    if (P.view === 'base') return;
     const vi = VIEWS.indexOf(P.view);
     if (e.key === 'ArrowRight' || e.key === ' ') { P = { ...P, view: VIEWS[(vi + 1) % VIEWS.length] }; rebuild(); }
     else if (e.key === 'ArrowLeft') { P = { ...P, view: VIEWS[(vi + VIEWS.length - 1) % VIEWS.length] }; rebuild(); }

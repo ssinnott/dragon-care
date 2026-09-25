@@ -2,6 +2,9 @@
 // running underneath -- its dragons on the real rig, its keepers on the engine's paper doll -- the need bubbles, the
 // job strip, and two inputs: drag to look around, and tap a bubble, a job or a dragon to Rush it. A gallery scene
 // (view=base in src/gallery.ts), so the frozen-time contract holds: t= steps the world t times and draws that frame.
+// The world is built from a start (src/game/presets.ts: the new game, or a preset); its dragons are drawn by a cast
+// keyed by dragon id, which follows the simulation as dragons come, go and grow. The constructor never touches
+// storage; a live page that may save (opts.persist) will load in attach() (S4).
 import { drawDragon, rootToScreen } from '../art/dragon/rig.ts';
 import { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
 import { ELEMENT_ANIM_FALLBACK } from '../art/dragon/anims.ts';
@@ -10,7 +13,9 @@ import { makePet, petOpts, stepPet, stepWary, extentX, bowlFor, drawBowl } from 
 import type { Pet } from './pet.ts';
 import { CareSim } from './sim.ts';
 import type { Dragon, Job } from './sim.ts';
-import { START_ROOMS, START_DRAGONS, START_KEEPERS } from './start.ts';
+import { startSpec, buildSim } from './presets.ts';
+import { worldKey, fnv1a } from './save.ts';
+import type { Stage } from '../art/dragon/stages.ts';
 import { WORLD_W, WORLD_H, HOIST_CX, feetY } from './layout.ts';
 import { SOON, tierOf, chargeOf } from './needs.ts';
 import type { NeedKind } from './needs.ts';
@@ -33,12 +38,32 @@ const DRAG_PX = 4;
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
+/** How a base view starts: the world's seed, where the camera starts (world px, clamped), a preset, and whether it may save. */
+export interface BaseViewOpts {
+  seed: number;
+  cam?: { x: number; y: number } | null;
+  /** A start from presets.ts by name (null, or a name no preset has: the new game). */
+  preset?: string | null;
+  /** A live page that loads and autosaves (the gallery sets it only without t= and without save=0). Unused until S4. */
+  persist?: boolean;
+}
+
+/** One dragon on screen: its pet, playing its wake before it goes back to idle, its eat bowl (found once), and the stage it was built at. */
+export interface PetView {
+  pet: Pet;
+  waking: boolean;
+  bowl: { x: number; h: number; w: number } | null;
+  stage: Stage;
+}
+
 export class BaseView {
   readonly w = VIEW_W;
   readonly h = VIEW_H;
   readonly sim: CareSim;
-  /** One pet per dragon, in the simulation's order. */
-  readonly pets: Pet[] = [];
+  /** The dragons on screen, by dragon id, in id order (syncCast keeps it matched to the simulation). */
+  readonly cast = new Map<number, PetView>();
+  /** Whether this page may load and autosave (S4). */
+  readonly persist: boolean;
   camX = START_CAM.x;
   camY = START_CAM.y;
   /** Where the camera is easing to after a job chip was tapped (null: it stays put). */
@@ -48,9 +73,6 @@ export class BaseView {
   private readonly plates: HTMLCanvasElement;
   private readonly top = new TopPass(160);
   private readonly budget = new AmbientBudget();
-  /** Per pet: playing its wake before it goes back to idle; its eat bowl, found once. */
-  private readonly waking: boolean[];
-  private readonly bowls: ({ x: number; h: number; w: number } | null)[];
   private frame = 0;
   /** The hoist car's floor, world y: it rides with whoever is on it and waits where they left it. */
   private carY = feetY(0);
@@ -59,26 +81,47 @@ export class BaseView {
   private chips: { job: Job; r: Rect }[] = [];
   private detachers: (() => void)[] = [];
 
-  constructor(seed = 1) {
-    this.sim = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, seed);
-    for (const d of this.sim.dragons) this.pets.push(makePet(d.element, d.stage, d.seed, 'idle', d.x, this.feet(d), { facing: d.facing, mood: d.mood }));
-    this.waking = this.pets.map(() => false);
-    this.bowls = this.pets.map(() => null);
+  constructor(opts: BaseViewOpts) {
+    this.sim = buildSim(startSpec(opts.preset), opts.seed);
+    this.persist = !!opts.persist;
+    if (opts.cam) this.setCam(opts.cam.x, opts.cam.y);
+    this.syncCast();
     this.keeperAgents = this.sim.keepers.map((k) => makeKeeperAgent(k.look));
     this.building = drawBuilding(this.sim.rooms);
     this.plates = drawPlates(this.sim.rooms);
   }
 
+  /** Every dragon's pet, in id order. */
+  get pets(): Pet[] { return [...this.cast.values()].map((v) => v.pet); }
+
   /** A dragon's feet: its floor's straw band, a px apart from its neighbours' so the y-sort never ties. */
   private feet(d: Dragon): number { return feetY(d.f, (d.id % 3) - 1); }
+
+  /**
+   * Match the cast to the simulation's dragons: a pet for a dragon it hasn't seen, none for one that's gone, and a
+   * new one for a dragon that has grown into another stage (a new rig: its stage's proportions and anims).
+   */
+  private syncCast(): void {
+    const ids = new Set<number>();
+    for (const d of this.sim.dragons) {
+      ids.add(d.id);
+      const v = this.cast.get(d.id);
+      if (v && v.stage === d.stage) continue;
+      const pet = makePet(d.element, d.stage, d.seed, 'idle', d.x, this.feet(d), { facing: d.facing, mood: v ? v.pet.mood : d.mood });
+      this.cast.set(d.id, { pet, waking: false, bowl: null, stage: d.stage });
+    }
+    for (const id of this.cast.keys()) if (!ids.has(id)) this.cast.delete(id);
+  }
 
   // ---------- a step ----------
 
   step(): void {
     this.sim.step();
-    this.sim.dragons.forEach((d, i) => this.sync(d, i));
-    stepWary(this.pets);
-    for (const p of this.pets) stepPet(p);
+    this.syncCast();
+    for (const d of this.sim.dragons) this.sync(d, this.cast.get(d.id)!);
+    const pets = this.pets;
+    stepWary(pets);
+    for (const p of pets) stepPet(p);
     this.sim.keepers.forEach((k, i) => {
       if (k.climbing && Math.abs(k.x - HOIST_CX) < 1) this.carY = k.y;
       stepKeeperVisual(this.keeperAgents[i], k, k.climbing ? k.y : k.y - 3);
@@ -101,15 +144,15 @@ export class BaseView {
   }
 
   /** Point a pet at its dragon: its anim (a sleeper wakes before it idles), its bowl at a meal, its mood and charge. */
-  private sync(d: Dragon, i: number): void {
-    const p = this.pets[i], want = this.animFor(d);
-    if (this.waking[i] && p.player.done) { this.waking[i] = false; p.player.play('idle', { blend: 8 }); p.anim = 'idle'; }
-    if (want !== p.anim && !(this.waking[i] && want === 'idle')) {
-      if ((p.anim === 'sleep' || p.anim === 'tuckin') && want === 'idle') { p.player.play('wake', { blend: 8 }); p.anim = 'wake'; this.waking[i] = true; }
-      else { p.player.play(want, { blend: 8, fallback: ELEMENT_ANIM_FALLBACK[want] }); p.anim = want; this.waking[i] = false; }
+  private sync(d: Dragon, v: PetView): void {
+    const p = v.pet, want = this.animFor(d);
+    if (v.waking && p.player.done) { v.waking = false; p.player.play('idle', { blend: 8 }); p.anim = 'idle'; }
+    if (want !== p.anim && !(v.waking && want === 'idle')) {
+      if ((p.anim === 'sleep' || p.anim === 'tuckin') && want === 'idle') { p.player.play('wake', { blend: 8 }); p.anim = 'wake'; v.waking = true; }
+      else { p.player.play(want, { blend: 8, fallback: ELEMENT_ANIM_FALLBACK[want] }); p.anim = want; v.waking = false; }
       p.hold = 0;
     }
-    p.bowl = d.act && d.act.need === 'food' ? (this.bowls[i] ??= bowlFor(p.rig, p.player.anims.eat ? p.player.anims.eat.frames : [])) : null;
+    p.bowl = d.act && d.act.need === 'food' ? (v.bowl ??= bowlFor(p.rig, p.player.anims.eat ? p.player.anims.eat.frames : [])) : null;
     p.mood += (d.mood - p.mood) / 30;
     p.charge = chargeOf(d.element, d.needs);
   }
@@ -137,7 +180,7 @@ export class BaseView {
     // the cast, y-sorted by the feet; keepers stand a step behind the dragons they work with, so a dragon's head is
     // never covered (ART_BIBLE 1.4: nothing covers the eye)
     const cast: { y: number; pet?: Pet; keeper?: number }[] = [];
-    for (const p of this.pets) { const [a, b] = extentX(p); if (seen(a - 24, b + 24, p.y - 110, p.y + 12)) cast.push({ y: p.y, pet: p }); }
+    for (const { pet: p } of this.cast.values()) { const [a, b] = extentX(p); if (seen(a - 24, b + 24, p.y - 110, p.y + 12)) cast.push({ y: p.y, pet: p }); }
     this.sim.keepers.forEach((k, i) => { const y = k.climbing ? k.y : k.y - 3; if (seen(k.x - 30, k.x + 30, y - 100, y + 8)) cast.push({ y, keeper: i }); });
     cast.sort((a, b) => a.y - b.y);
     this.budget.begin(cast.filter((c) => c.pet).length, this.frame);
@@ -153,22 +196,24 @@ export class BaseView {
     // the bubbles: each awake dragon's most pressing job that no one is at work on yet
     this.bubbles = [];
     const pt = { x: 0, y: 0 };
-    this.sim.dragons.forEach((d, i) => {
-      if (d.act && d.act.need === 'sleep') return;
-      const j = this.waitingJob(d);
-      if (!j) return;
-      const p = this.pets[i], J = p.rig.j;
+    for (const d of this.sim.dragons) {
+      if (d.act && d.act.need === 'sleep') continue;
+      const j = this.waitingJob(d), v = this.cast.get(d.id);
+      if (!j || !v) continue;
+      const p = v.pet, J = p.rig.j;
       rootToScreen(p.rig, J.cran.x, J.top, pt);
-      if (!seen(pt.x - 24, pt.x + 24, pt.y - 34, pt.y)) return;
+      if (!seen(pt.x - 24, pt.x + 24, pt.y - 34, pt.y)) continue;
       this.bubbles.push({ job: j, r: drawBubble(ctx, pt.x, pt.y - 2, j.need, tierOf(d.needs[j.need]), !!j.keeper) });
-    });
+    }
     ctx.restore();
     ctx.drawImage(this.plates, cx, cy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
     this.hud(ctx);
     if (typeof window !== 'undefined' && window.__dragonCare) {
       const st = this.sim.stats;
       window.__dragonCare.base = { tick: this.sim.tick, camX: this.camX, camY: this.camY, jobs: this.sim.jobs.length, done: st.done, rushes: st.rushes, preempted: st.preempted,
-        chips: this.chips.map((c) => ({ ...c.r, dragon: c.job.dragon.name, need: c.job.need, rushed: c.job.rushed })) };
+        chips: this.chips.map((c) => ({ ...c.r, dragon: c.job.dragon.name, need: c.job.need, rushed: c.job.rushed })),
+        digest: fnv1a(worldKey(this.sim)),
+        dragons: this.sim.dragons.map((d) => ({ id: d.id, name: d.name, element: d.element, stage: d.stage, f: d.f, x: d.x })) };
     }
   }
 
@@ -208,11 +253,13 @@ export class BaseView {
     const wx = sx + Math.round(this.camX), wy = sy + Math.round(this.camY);
     for (const b of this.bubbles) if (hit(b.r, wx, wy)) { this.sim.rush(b.job); return; }
     const pt = { x: 0, y: 0 };
-    for (let i = this.pets.length - 1; i >= 0; i--) {
-      const p = this.pets[i], [a, b] = extentX(p);
+    for (let i = this.sim.dragons.length - 1; i >= 0; i--) {
+      const d = this.sim.dragons[i], v = this.cast.get(d.id);
+      if (!v) continue;
+      const p = v.pet, [a, b] = extentX(p);
       rootToScreen(p.rig, p.rig.j.cran.x, p.rig.j.top, pt);
       if (wx < a || wx > b || wy < pt.y || wy > p.y + 4) continue;
-      const j = this.waitingJob(this.sim.dragons[i]);
+      const j = this.waitingJob(d);
       if (j) this.sim.rush(j);
       return;
     }

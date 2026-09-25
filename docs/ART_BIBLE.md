@@ -3,7 +3,7 @@
 **What this covers.** This is how all 28 dragon looks are drawn:
 
 - **7 elements:** fire, spike, rock, lightning, water, slinkwing, and **dusk** (new in v2: 3.8).
-- **4 life stages:** baby, young adult, adult, and **elder** (new in v2: 2.1, 2.5, 2.6, 2.9, 4.1, 4.2).
+- **4 life stages:** baby, young, adult, and **elder** (new in v2: 2.1, 2.5, 2.6, 2.9, 4.1, 4.2).
 
 **What v2 changed.** The user asked for seven things, and this revision designs all of them:
 
@@ -262,7 +262,7 @@ In the sleep poses the eyes are closed. In rock's upset tuck one eye peeks out *
 ### 2.1 PROPORTIONS TABLE (fire is the reference; the element modifiers in 2.3 multiply these)
 All values are px at scale 1. Positions are given as (x, y) in body space unless marked otherwise.
 
-| Part | Parameter | **Baby** | **Young adult** | **Adult** | **Elder** (v2) |
+| Part | Parameter | **Baby** | **Young** | **Adult** | **Elder** (v2) |
 |---|---|---|---|---|---|
 | **Body** | hip ball r / chest ball r | 6.5 / 7.5 | 7 / 8.5 | 9 / 11 | 9.5 / 11 |
 | | ball gap, centre to centre (hip at −gap/2, chest at +gap/2, 1 px higher) | 5 | 14 | 19 | 20; the chest ball **level** with the hip ball (`chestLift` 0: the proud chest has settled) |
@@ -464,7 +464,7 @@ Everything else is also soft:
 
 The cue is a **seed**: small, soft and already in its adult zone. Where the baby's big head covers part of that zone, the seed moves to the part that shows: baby spike's nubs sit on the loin, rump and tail root, and baby lightning's bolt nubs stand over the hips as one spire, the far nub tucked inside the near one (3.3, 3.5).
 
-**Young adult.** The leggy in-between (leggy against the baby: its legs grow × 1.9 while the head grows × 1.06; against the adult it is close to a × 0.8 adult, see the Review log, R21):
+**Young.** The leggy in-between (leggy against the baby: its legs grow × 1.9 while the head grows × 1.06; against the adult it is close to a × 0.8 adult, see the Review log, R21):
 - the legs nearly double while the head barely grows;
 - the neck appears and lifts the head clear of the chest;
 - the wings are big for the body;
@@ -1182,7 +1182,7 @@ Lightning's tail is **stepped**: it snaps between poses on 4 f holds instead of 
 - **Durations:** baby about 0.6× the adult, young about 0.85×, elder (v2) **1.25×**.
 - **Squash range:** baby 0.85 to 1.15, young 0.94 to 1.06, adult 0.96 to 1.04, elder 0.97 to 1.03.
 - **Head lag:** the baby's head follows the body 6 f late at 2× amplitude (a heavy head on a small body). The adult's follows 8 f late at 1×, the elder's 10 f late at 0.8×.
-- **Easing:** babies use `out` (bouncy, quick to settle). Adults use `inout` (weight). Young adults overshoot. Elders use a **longer, softer `inout`** (the ease's middle third spread over half the key) at lower amplitude: **unhurried, never stiff**, and never a tremor (D21). There are **no key holds**: EL's 3 f hold at every key read as stiffness, itself a frailty signal, and it broke the walk, where a planted paw slides at exactly the walk speed (24 of the elder walk's 64 f frozen would skate the paws about 1 px a hold, or stop the root motion into a stop-go shuffle: the v2 review). The elder's age is in its tempo (× 1.25), its amplitude and its later head (the 10 f lag below).
+- **Easing:** babies use `out` (bouncy, quick to settle). Adults use `inout` (weight). The young overshoot. Elders use a **longer, softer `inout`** (the ease's middle third spread over half the key) at lower amplitude: **unhurried, never stiff**, and never a tremor (D21). There are **no key holds**: EL's 3 f hold at every key read as stiffness, itself a frailty signal, and it broke the walk, where a planted paw slides at exactly the walk speed (24 of the elder walk's 64 f frozen would skate the paws about 1 px a hold, or stop the root motion into a stop-go shuffle: the v2 review). The elder's age is in its tempo (× 1.25), its amplitude and its later head (the 10 f lag below).
 - **Idle variants:** every 6 to 10 s; elders every 8 to 12 s (the elder's pool adds the airing, 4.2). The element **fidget** runs at its own rule (stages.ts `FIDGET_TIMING`): the stage's tempo, but the elder's × 1.3 with its gestures at 0.8× (head turns, tail lifts, leans; never a reach the fidget needs, like a snout on a groomed quill or a belly on the floor).
 - **Blinks:** runtime, every 180 to 300 f; the elder's slower blink (3 / 5 / 3 frames) every 200 to 340 f (2.5).
 
@@ -1311,7 +1311,7 @@ The adult base comes to about 30 cel shapes: body, neck, 4 legs, 4 paws, tail, 2
 | Adult (≤ 45) | 32 | 33 (the comb is one shape, v2's 9 quills in one path; thorns) | 35 (dome + 3 crystals) | 33 | 36 (fluke, fins, dorsal, spots; 1 fin-ear ray, 2 fluke rays) | 35 (2 fans + 3 ribs on the near fan) | about 35 (the base − 2 horns + stalk, bail, lantern, cap, finial, core, tail tip and slate band, nose frost) |
 | Elder (≤ 45) | 37 (+ the coal bed; the heart is the core) | 39 (+ 2 sap-buds; the comb one path) | 39 (+ the 4th crystal; no hole; the finale ring is a transient effect) | 36 (the third tooth and the far bolt's tear are in the bolts' paths; no hole) | 40 (the pearls replace the dots; the 2 rays stay) | 40 (+ the frost band) | 40 (+ the resident moth) |
 
-Babies come in at about 18 to 22 and young adults at about 26 to 32. An elder adds the muzzle, the tuft, the beard (now its own inked shape) and one hole: 3 to 4 cel shapes over its adult, plus its elder-only extra: 36 to 40 in all.
+Babies come in at about 18 to 22 and the young at about 26 to 32. An elder adds the muzzle, the tuft, the beard (now its own inked shape) and one hole: 3 to 4 cel shapes over its adult, plus its elder-only extra: 36 to 40 in all.
 
 ### 5.4 Several dragons on screen
 - **Sorting.** Y-sort by feet. Every dragon has a ground-shadow ellipse and the full 1 px outline, so even two same-element dragons (a parent and its baby) separate when they overlap.

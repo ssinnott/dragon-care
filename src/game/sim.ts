@@ -1,13 +1,17 @@
 // The care simulation (docs/BASE_DESIGN.md 4): dragons whose needs drain, one queue of jobs, and the keepers who take
 // them -- fetch what a job needs from its room, walk and climb to the dragon, and do it while the need refills.
 // Deterministic and DOM-free: fixed 60 Hz steps, every tie broken by id, and the only randomness the starting needs
-// (seeded), so tools/sim-check.ts runs it headless and view=base's frozen frames (t=) come out the same every time.
+// (seeded; any later draw is stateless, src/game/rand.ts), so tools/sim-check.ts runs it headless and view=base's
+// frozen frames (t=) come out the same every time. Dragons have stable ids (a new one takes nextDragonId), the world
+// has a clock (game time, clock0 + tick), and the whole of it saves to plain JSON and loads back exactly (save.ts).
 import { makeRng } from '../lib/engine/rng.ts';
 import { NEEDS, QUEUE, ROOM_REGEN, OWN_NEED, drainRate, hasNeed, moodOf, tierOf, fullNeeds } from './needs.ts';
 import type { NeedKind, Needs } from './needs.ts';
 import { ROOM_INFO, placeRooms, postX, route, feetY, clampToFloor } from './layout.ts';
 import type { Room, RoomPlace, Leg, Spot } from './layout.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
+import { SAVE_VERSION, SaveVersionError, worldKey } from './save.ts';
+import type { SaveV } from './save.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
@@ -30,6 +34,26 @@ export const REACH: Readonly<Record<Stage, number>> = Object.freeze({ baby: 30, 
 /** A specialist is worth this many px of walking when a keeper is chosen for a job (4.4). */
 const SPECIALIST_PX = 300;
 
+// ---------- time ----------
+
+/** A game day, in steps at 1x: three minutes (docs/BASE_DESIGN.md 7). Tests pass a shorter SimOptions.dayLen. */
+export const DAY_STEPS = 10800;
+/** A new game starts at this hour (07:00 on day 1). */
+export const START_HOUR = 7;
+
+/** How a world is built: its seed (the starting needs, and every rngAt draw), the steps in a day, and the clock at tick 0. */
+export interface SimOptions {
+  /** Default 1. */
+  seed?: number;
+  /** Steps in a game day at 1x (default DAY_STEPS); a whole number divisible by 24. */
+  dayLen?: number;
+  /** The clock at tick 0, in steps from day 1's midnight (default START_HOUR's: 7 x dayLen / 24). */
+  clock0?: number;
+}
+
+/** What happened in a step, for the view to show (a union later slices extend: a grow-up, a hatch, a departure...). */
+export type SimEvent = { kind: 'none' };
+
 // ---------- the world's things ----------
 
 /** What a job is doing to a dragon: the need refilling from `from` to 1 over `len` steps (sleep: the tuck-in, then the nap). */
@@ -51,6 +75,8 @@ export interface Dragon {
   act: Act | null;
   /** Steps of its nap left after the keeper who tucked it in has gone (0: awake, or still being tucked in). */
   asleep: number;
+  /** The clock when its stage began (clock0 less the days it started into the stage). */
+  stageSince: number;
 }
 
 export type Phase = 'idle' | 'fetch' | 'pickup' | 'go' | 'work' | 'home';
@@ -107,31 +133,49 @@ export interface SimStats {
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 export class CareSim {
+  readonly seed: number;
+  readonly dayLen: number;
+  readonly clock0: number;
+  /** Steps since the world was built. */
   tick = 0;
+  /** The rooms as placed (what a save keeps), and the rooms themselves (a room's id is its index in both). */
+  readonly roomPlaces: readonly RoomPlace[];
   readonly rooms: Room[];
+  /** In id order; a dragon's id is never reused. */
   readonly dragons: Dragon[] = [];
   readonly keepers: Keeper[] = [];
   jobs: Job[] = [];
   readonly stats: SimStats = { opened: 0, done: 0, closed: 0, waitSum: 0, started: 0, waitMax: 0, queueMax: 0, rushes: 0, preempted: 0, emptySteps: 0 };
-  private nextJob = 1;
+  /** What the last step did (cleared at the start of every step). */
+  events: SimEvent[] = [];
+  /** The id the next dragon gets, and the next job (public so a save can keep them). */
+  nextDragonId = 0;
+  nextJob = 1;
 
-  constructor(rooms: readonly RoomPlace[], dragons: readonly DragonPlace[], keepers: readonly KeeperPlace[], seed = 1) {
+  constructor(rooms: readonly RoomPlace[], dragons: readonly DragonPlace[], keepers: readonly KeeperPlace[], opts: SimOptions = {}) {
+    this.seed = opts.seed ?? 1;
+    this.dayLen = opts.dayLen ?? DAY_STEPS;
+    if (!Number.isInteger(this.dayLen) || this.dayLen < 24 || this.dayLen % 24) throw new Error(`dayLen ${this.dayLen}: a day must be a whole number of steps divisible by 24`);
+    this.clock0 = opts.clock0 ?? START_HOUR * this.dayLen / 24;
+    if (!Number.isInteger(this.clock0)) throw new Error(`clock0 ${this.clock0}: the clock counts whole steps`);
+    this.roomPlaces = rooms.map((p) => ({ ...p }));
     this.rooms = placeRooms(rooms);
-    const rng = makeRng(seed);
+    const rng = makeRng(this.seed);
     const roomOf = (kind: string, who: string): Room => {
       const r = this.rooms.find((q) => q.kind === kind);
       if (!r) throw new Error(`${who}: no ${kind} in this base`);
       return r;
     };
-    dragons.forEach((p, id) => {
+    for (const p of dragons) {
       const room = roomOf(p.room, p.name);
       if (ROOM_INFO[room.kind].people) throw new Error(`${p.name}: the ${room.kind} is a room for people`);
       // the starting needs: seeded, most of them fine, a few already asking
       const needs = fullNeeds();
       for (const k of NEEDS) needs[k] = hasNeed(p.element, k) ? rng.range(0.42, 1) : 1;
-      this.dragons.push({ id, name: p.name, element: p.element, stage: p.stage, seed: p.seed, room, f: room.floor,
-        x: Math.round(room.x0 + p.at * (room.x1 - room.x0)), facing: p.facing, needs, mood: moodOf(p.element, needs), act: null, asleep: 0 });
-    });
+      this.dragons.push({ id: this.nextDragonId++, name: p.name, element: p.element, stage: p.stage, seed: p.seed, room, f: room.floor,
+        x: Math.round(room.x0 + p.at * (room.x1 - room.x0)), facing: p.facing, needs, mood: moodOf(p.element, needs), act: null, asleep: 0,
+        stageSince: this.clock0 - Math.round((p.days ?? 0) * this.dayLen) });
+    }
     keepers.forEach((p, id) => {
       const station = roomOf(p.station, p.name);
       // keepers sharing a station stand side by side at its post
@@ -140,6 +184,33 @@ export class CareSim {
       this.keepers.push({ id, name: p.name, look: p.look, specialty: p.specialty, station, stationX, f: station.floor, x: stationX, y: feetY(station.floor),
         climbing: false, legs: [], phase: 'idle', t: 0, job: null, carrying: null, rushing: false, facing: 1, walked: 0 });
     });
+  }
+
+  /** Game time: steps since day 1's midnight. */
+  get clock(): number { return this.clock0 + this.tick; }
+
+  /**
+   * A world from its save (save.ts serialize), exactly as it was: the rooms placed again, then every dragon, job and
+   * keeper rebuilt and their references relinked by id. A save of another version throws SaveVersionError.
+   */
+  static fromSave(s: SaveV): CareSim {
+    if (!s || typeof s !== 'object' || s.v !== SAVE_VERSION) throw new SaveVersionError(s && typeof s === 'object' ? s.v : s);
+    const sim = new CareSim(s.rooms, [], [], { seed: s.seed, dayLen: s.dayLen, clock0: s.clock0 });
+    sim.tick = s.tick; sim.nextDragonId = s.nextDragonId; sim.nextJob = s.nextJob;
+    const byId = <T extends { id: number }>(list: readonly T[], id: number, what: string): T => {
+      const v = list.find((q) => q.id === id);
+      if (!v) throw new Error(`save: no ${what} ${id}`);
+      return v;
+    };
+    for (const d of s.dragons) sim.dragons.push({ ...d, room: byId(sim.rooms, d.room, 'room'), needs: { ...d.needs }, act: d.act ? { ...d.act } : null });
+    const jobs: Job[] = s.jobs.map((j) => ({ ...j, dragon: byId(sim.dragons, j.dragon, 'dragon'), keeper: null }));
+    for (const k of s.keepers) {
+      sim.keepers.push({ ...k, station: byId(sim.rooms, k.station, 'room'), job: k.job == null ? null : byId(jobs, k.job, 'job'), legs: k.legs.map((l) => ({ ...l })) });
+    }
+    s.jobs.forEach((j, i) => { jobs[i].keeper = j.keeper == null ? null : byId(sim.keepers, j.keeper, 'keeper'); });
+    sim.jobs = jobs;
+    Object.assign(sim.stats, s.stats);
+    return sim;
   }
 
   // ---------- the queue (4.3) ----------
@@ -160,6 +231,7 @@ export class CareSim {
   // ---------- a step ----------
 
   step(): void {
+    this.events = [];
     this.tick++;
     // needs drain, rooms restore theirs (4.6), and a job under way refills its need
     for (const d of this.dragons) {
@@ -359,10 +431,6 @@ export class CareSim {
     k.legs = climb ? [climb, ...r.legs] : r.legs;
   }
 
-  /** The state as one string: two runs from the same seed must agree on it, step for step. */
-  digest(): string {
-    const n = (v: number) => v.toFixed(6);
-    return [this.tick, ...this.dragons.map((d) => NEEDS.map((k) => n(d.needs[k])).join(',') + (d.act ? `:${d.act.need}${d.act.t}` : '')),
-      ...this.keepers.map((k) => `${k.phase}${k.job ? k.job.id : '-'}@${n(k.x)},${n(k.y)}`), this.jobs.map((j) => j.id).join(',')].join('|');
-  }
+  /** The state as one string (the save's JSON, less the seed: save.ts worldKey): two runs from the same seed must agree on it, step for step. */
+  digest(): string { return worldKey(this); }
 }
