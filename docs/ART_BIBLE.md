@@ -1980,15 +1980,19 @@ ask of it, and how each is kept:
   and the earth (`ROAD_SCENE`), each gated by (w) as a backdrop.
 - **Walks never skate.** Each dragon walks by its own walk's root motion (the frames' `move`, gait.ts) at the slowest
   dragon's mean pace: its walk plays at speed s = V / its mean (1 or less), and its body moves exactly s times the
-  frame's move each step (sim-check 24 checks every travel step). The riders walk 56 px ahead of their dragon's root,
-  sorted a step behind it (drawn under the dragon: its eye stays clear).
+  frame's move each step (sim-check 24 checks every travel step). The view keeps its paws on that frame: a jump in
+  the clock bigger than 16 steps (the scene closed and reopened, a fast speed's draws) restarts the walk at the phase
+  the road says (sim-check 24 syncs the scene's dragons by jumps of 1, 8 and 40 steps and across a 1000-step gap and
+  checks the frame they play on every travel step). The riders walk 56 px to the right of their dragon's root (ahead
+  on the way out, behind on the way home, so none jumps across its dragon at the turn back), sorted a step behind it
+  (drawn under the dragon: its eye stays clear).
 - **Set pieces stand behind the team** (the fog bank too), and the big baddie behind them (its feet 4 px deeper).
   Nothing is drawn over a dragon's eye but the banner at the top and the result card (both clear of the team's heads
   at every stop; the card's bottom edge sits over the riders' heads once home).
 - **Nobody is hurt (D4).** A baddie's face is only ever `neutral`, `grumpy` (a flat brow and a pout, never a V),
   `surprised` or `sleepy` (the type holds it: missiondata.ts `BaddieFace`, missionview.ts `_Faces`); it walks in
-  grumpy, turns surprised as its two counters have their moments, and leaves calmed (sits and dozes, three 3 x 3 "z"s
-  stepping up over its head), outwitted (turns, and wanders off the wrong way behind the team) or driven off
+  grumpy, turns surprised as its two counters have their moments, and leaves calmed (sits and dozes, three 5 x 6 "z"s
+  in 2 px strokes, ringed in ink, stepping up over its head), outwitted (turns, and wanders off the wrong way behind the team) or driven off
   (shuffles off grumbling, kicking up puffs of dust that shrink as they settle: 2 px and up); on a failure it keeps
   the road, grumpy, and the team turns home. The scene's baddie has no hurt, health or defeat state (`_NoHurt`), and
   its exits are those three alone (`_Exits`): both compile-time checks.

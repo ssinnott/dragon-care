@@ -68,6 +68,8 @@ export function baddieParts(L: number): { enter: number; moments: number; exit: 
 const MOMENT_AT = 0.15, RESOLVED_AT = 0.5;
 /** A moment gives way to idle when its anim ends, or after this many steps at most (a looping one: Tomas's petLow). */
 export const MOMENT_MAX = 240;
+/** The most clock steps the view's team steps on by in one draw; a bigger jump replays a walk from the road's phase. */
+export const SYNC_GAP = 16;
 /** How fast a baddie leaves: the Roc wanders off, the Giant shuffles off (px a step). */
 const WANDER = 0.6, SHUFFLE = 0.45;
 
@@ -278,7 +280,8 @@ interface Actor { pet: Pet | null; agent: KeeperAgent | null; key: string | null
  * dragon on the real rig and its rider on the paper doll, played to the scene's acts. `sync` catches them up to the
  * frame: an act they were not playing starts fresh -- a walk at its speed and the phase the road says (exact), anything
  * else replayed from its start (a beat's worth at most: a frozen view shows the same moment a live one did) -- and one
- * they were playing steps on by the clock's advance.
+ * they were playing steps on by the clock's advance (SYNC_GAP steps at most; a bigger jump, or a rewind, restarts a
+ * walk at the road's phase, and steps anything else on by 120 at most).
  */
 export class ScenePets {
   readonly trip: Trip;
@@ -306,12 +309,16 @@ export class ScenePets {
       if (!act) return;
       const x = f.xs[i];
       this.play(a.d, act.dragon, f, clock, x, ROAD_Y);
-      if (a.k && act.rider) this.play(a.k, act.rider, f, clock, x + RIDER_AHEAD * f.facing, ROAD_Y - 3);
+      if (a.k && act.rider) this.play(a.k, act.rider, f, clock, x + RIDER_AHEAD, ROAD_Y - 3);
     });
   }
 
   private play(a: Actor, act: Act, f: SceneFrame, clock: number, x: number, y: number): void {
     let ticks: number;
+    // (a clock that jumped -- a view closed and reopened, a fast speed's draws, a rewind -- plays the act afresh: a
+    // walk at the phase the road says, so its paws never fall out of step with its body; see sim-check 24)
+    const gap = clock - a.clock;
+    if (a.key === act.key && (gap < 0 || gap > SYNC_GAP) && (act.anim === 'walk' || gap < 0)) a.key = null;
     if (a.key !== act.key) {
       a.key = act.key; a.momentDone = false; a.age = 0;
       if (a.pet) {
@@ -321,7 +328,7 @@ export class ScenePets {
       } else a.agent!.player.play(act.anim, { restart: true, speed: act.speed, blend: 6 });
       // (a walk starts where the road says: no replay for a dragon's; a rider's, and anything else, from its start)
       ticks = a.pet && act.anim === 'walk' ? 0 : Math.max(0, Math.min(act.anim === 'walk' ? 120 : 960, Math.round(f.E - act.start)));
-    } else ticks = Math.max(0, Math.min(16, clock - a.clock));
+    } else ticks = Math.max(0, Math.min(gap > SYNC_GAP ? 120 : SYNC_GAP, gap));
     a.clock = clock;
     for (let t = 0; t < ticks; t++) this.tick(a, act, x, y, f.facing);
     // (placed where the frame says even when nothing ticked)
@@ -345,6 +352,9 @@ export class ScenePets {
     }
   }
 
+  /** The walk frame each dragon is playing now (sim-check 24: the view's paws keep to the road). */
+  dragonFrames(): number[] { return this.actors.map((a) => a.d.pet!.player.frameIndex); }
+
   /** Draw the team (already synced): the riders a step behind their dragons, then the dragons, then the top pass. */
   draw(ctx: CanvasRenderingContext2D): void {
     const cast: { y: number; pet?: Pet; agent?: KeeperAgent }[] = [];
@@ -363,8 +373,8 @@ export class ScenePets {
   }
 }
 
-/** A "z" over the dozing baddie, and a puff of the driven-off one's dust (2 px and up: floor dust fades by shrinking). */
-const ZED: Sprite = { rows: ['zzz', '.z.', 'zzz'], colors: { z: '#f3e6c8' } };
+/** A "z" over the dozing baddie (2 px strokes; drawSprite rings it in ink: G6), and a puff of the driven-off one's dust (2 px and up: floor dust fades by shrinking). */
+const ZED: Sprite = { rows: ['zzzzz', 'zzzzz', '..zz.', '.zz..', 'zzzzz', 'zzzzz'], colors: { z: '#f3e6c8' } };
 const DUST = '#e8e0cc';
 /** How tall each baddie stands (its "z"s start over its head). */
 const BADDIE_H: Readonly<Record<BaddieId, number>> = Object.freeze({ moleking: 88, stormroc: 100, frostgiant: 140 });
@@ -410,7 +420,7 @@ export function drawMissionScene(ctx: CanvasRenderingContext2D, sim: CareSim, tr
     if (bd.fx === 'z') {
       // three "z"s stepping up over its head, one more every half second, then again
       const n = 1 + (Math.floor(bd.t / 30) % 3), top = BACK_Y - BADDIE_H[bd.id];
-      for (let k = 0; k < n; k++) drawSprite(ctx, ZED, bd.x + 20 + 6 * k, top - 4 - 9 * k);
+      for (let k = 0; k < n; k++) drawSprite(ctx, ZED, bd.x + 20 + 9 * k, top - 6 - 11 * k);
     } else if (bd.fx === 'dust') {
       // puffs kicked up behind its feet, each shrinking as it goes
       for (let k = 0; k < 3; k++) {

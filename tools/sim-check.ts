@@ -90,7 +90,9 @@
 //    every stop's beat, turning back at the end of the first uncovered stop's beat on a failure (never on a success),
 //    each travel step moving each dragon by exactly its walk's distance over that step at its speed (no skate: s times
 //    the frame's move, within 1e-9), a baddie's face only one of the four, and its exit (calmed, outwitted, driven off)
-//    shown on a success; the trip preset puts a team exactly that far along at the frozen step.
+//    shown on a success; the view's team (ScenePets), synced by clock jumps of 1, 8 and 40 and across a 1000-step gap,
+//    playing the walk frame the road says on every travel step; the trip preset puts a team exactly that far along at
+//    the frozen step.
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
@@ -133,7 +135,7 @@ import { DRAGON_ELEMENTS } from '../src/art/dragon/palettes.ts';
 import type { DragonElement } from '../src/art/dragon/palettes.ts';
 import type { Stage } from '../src/art/dragon/stages.ts';
 import { STAGES } from '../src/art/dragon/stages.ts';
-import { sceneAt, beatLen, baddieBeatLen, walkDist, frameAt, PAIR_BACK } from '../src/game/missionview.ts';
+import { sceneAt, beatLen, baddieBeatLen, walkDist, frameAt, PAIR_BACK, ScenePets } from '../src/game/missionview.ts';
 import type { SceneFrame } from '../src/game/missionview.ts';
 import { demoTrip } from '../src/game/tripdemo.ts';
 import { tripStart } from '../src/game/presets.ts';
@@ -1556,6 +1558,34 @@ if (MAIN) {
     if (!success && trip.exit != null) fail(`${what}: a failure has an exit (${trip.exit})`);
     lines.push(`${region} ${diff} ${success ? 'home safe' : `home early (turned at stop ${b}, E ${turnAt})`}${trip.mission.baddie ? `, ${trip.mission.baddie} ${trip.exit ?? 'keeps the road'}` : ''}`);
   }
+  // (the view keeps to the road: the team's pets, synced by clock jumps of 1, 8 and 40 steps and across a 1000-step gap
+  // -- a watch closed and reopened -- play on every travel step the very walk frame the road's walk distance is in)
+  let petChecks = 0;
+  for (const [region, diff, success, plans] of [['bramblewood', 'normal', false, [[1, 1, 1, 1, 1, 1, 1, 1, 1000], [8], [40]]], ['highfold', 'hard', true, [[40]]]] as [RegionId, Difficulty, boolean, number[][]][]) {
+    for (const plan of plans) {
+      const sim = newSim(1), trip = demoTrip(sim, region, diff, success), L = trip.mission.days * sim.dayLen;
+      trip.departAt = sim.clock; trip.returnAt = sim.clock + L;
+      const team = trip.pairs.map((p) => sim.dragons.find((d) => d.id === p.dragon)!), gaits = team.map((d) => gaitOf(d.element, d.stage));
+      const cast = new ScenePets(sim, trip), what = `scene view: ${region} ${diff} (${success ? 'success' : 'failure'}), steps of ${plan.join(', ')}`;
+      // (two stretches of the road, to keep to G14's time: the start, and from the turn back -- or the first stop -- on)
+      const j = success ? 0 : trip.turnBack!, T = Math.round(trip.stops[j].at * L) + (trip.stops[j].kind === 'baddie' ? baddieBeatLen(L) : beatLen(L));
+      const inside = (E: number) => E < 4000 || (E >= T - 500 && E < T + 3500);
+      let nb: number | null = null, k = 0, bad = 0;
+      for (let c = trip.departAt; c <= trip.returnAt; c += inside(c - trip.departAt) ? plan[k++ % plan.length] : 1) {
+        if (!inside(c - trip.departAt)) continue;
+        const f = sceneAt(sim, trip, c);
+        if (f.facing === -1 && nb == null) { for (let q = c; ; q--) { const g = sceneAt(sim, trip, q); if (g.facing === 1) { nb = g.n; break; } } }
+        cast.sync(f, c);
+        if (f.stop != null || f.done) continue;
+        cast.dragonFrames().forEach((fi, i) => {
+          petChecks++;
+          const want = frameAt(gaits[i], f.speeds[i] * (f.n - (f.facing < 0 ? nb! : 0)));
+          if (fi !== want && bad++ < 3) fail(`${what}: pair ${i} plays walk frame ${fi} at E ${f.E}, the road says ${want}`);
+        });
+      }
+    }
+  }
+  lines.push(`the view's walks on the road's frame at ${petChecks} synced travel steps (jumps of 1, 8, 40 and a 1000-step gap)`);
   // (the preset puts the trip exactly that far along at the frozen step)
   for (const [q, p] of [['oldmine:0.95', 0.95], ['millbrook:0.3', 0.3]] as const) {
     const w = buildSim(tripStart(q, 60), 1);

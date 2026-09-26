@@ -755,12 +755,17 @@ export class BaseView {
       const r = canvas.getBoundingClientRect();
       return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height };
     };
-    const onDown = (e: PointerEvent) => { down = { ...at(e), camX: this.camX, camY: this.camY, drag: false }; this.camTo = null; this.camAsked = null; canvas.setPointerCapture(e.pointerId); };
+    const onDown = (e: PointerEvent) => {
+      down = { ...at(e), camX: this.camX, camY: this.camY, drag: false };
+      // (over the watch overlay the barn's camera stays where the player left it: taps only)
+      if (this.screen !== 'watch') { this.camTo = null; this.camAsked = null; }
+      canvas.setPointerCapture(e.pointerId);
+    };
     const onMove = (e: PointerEvent) => {
       if (!down) return;
       const p = at(e);
       if (!down.drag && Math.hypot(p.x - down.x, p.y - down.y) > DRAG_PX) down.drag = true;
-      if (down.drag) this.setCam(down.camX - (p.x - down.x), down.camY - (p.y - down.y));
+      if (down.drag && this.screen !== 'watch') this.setCam(down.camX - (p.x - down.x), down.camY - (p.y - down.y));
     };
     const onUp = (e: PointerEvent) => { if (down && !down.drag) { const p = at(e); this.tap(p.x, p.y); } down = null; };
     const onCancel = () => { down = null; };
