@@ -13,8 +13,9 @@ import type { RoomPlace } from './layout.ts';
  * a keeper waiting at the bay's edge, the lift (its car, its rider by id, its calls), the travel stats.
  * 4 (S5): the eggs in the Hatchery's nests and the next egg's id; a dragon's `settle` goal (a baby walking to the
  * module slot it will grow up in); the longest stage-up delay (stats.growDelayMax).
+ * 5 (S5's review): a dragon's `hold` (steps it holds still where it is, growing up: its cheer, or waiting for room).
  */
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }

@@ -5,7 +5,9 @@
 // speed 1: the two are the same numbers, step for step, and nothing skates. A walk is not a constant pace -- a baby's
 // stumble, spike's creep and slinkwing's pointer pause stand still for whole frames -- so the table is kept frame by
 // frame. The frames' durations and moves depend on the element and the stage only, never the seed (sim-check 9), and
-// build under plain Node (no DOM): about 20 ms per element and stage, once, the first time a dragon of it walks.
+// build under plain Node (no DOM): about 20 ms per element and stage, once, the first time a dragon of it walks. The
+// same tables give a `happy`'s length (happyLen): how long the simulation holds a dragon that has just grown up, so the
+// view's `happy` -- its grow-up's cheer -- plays through (life.ts).
 import { dragonBuild } from '../art/dragon/build.ts';
 import { dragonAnims } from '../art/dragon/anims.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
@@ -52,6 +54,25 @@ export function gaitOf(el: DragonElement, stage: Stage): Gait {
   const g = gaitFrom(walk.frames, walk.loopFrom ?? 0);
   GAITS.set(key, g);
   return g;
+}
+
+const HAPPY = new Map<string, number>();
+
+/**
+ * The steps an element's `happy` lasts at a stage, played from its start at speed 1 (its frames' durations summed): the
+ * grow-up's cheer (life.ts), which the view plays as the dragon's one `happy` -- the simulation holds a dragon that has
+ * just grown up where it stands for exactly this long, so nothing cuts the cheer short. Like the walk, read from the
+ * table the pets play (a seed-1 build's dims), the same whatever the seed (sim-check 9), and built once.
+ */
+export function happyLen(el: DragonElement, stage: Stage): number {
+  const key = `${el}:${stage}`, had = HAPPY.get(key);
+  if (had != null) return had;
+  const b = dragonBuild({ element: el, stage, seed: 1 });
+  const happy = dragonAnims(stage, b.spec, b.dims).happy;
+  if (!happy || !happy.frames.length) throw new Error(`happy: ${el} ${stage} has no happy`);
+  const len = happy.frames.reduce((n, f) => n + (f.dur || 1), 0);
+  HAPPY.set(key, len);
+  return len;
 }
 
 /**

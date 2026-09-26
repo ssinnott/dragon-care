@@ -1,24 +1,33 @@
-// Growing up and hatching (docs/BASE_DESIGN.md 7; plan S5): the first thing in every step (sim.ts step). A dragon's
-// stage lasts STAGE_DAYS game days (30: baby -> young -> adult -> elder), counted on the world's clock from the step it
-// began (`stageSince`); the stage-up falls due then, and is applied once the dragon is SETTLED -- no act, no keeper on
-// any of its jobs, no route left, standing (not turning, not waiting at a landing or the bay's edge, not in the lift's
-// hands) -- so its keeper never stands at the old reach while the rig swaps. Then `stageSince` moves on by exactly the
-// stage's length (a late stage-up never shortens the next stage), the stage advances, and every per-stage thing (the
-// drains, the reach, the gait, the pad, the stand spot) follows from that step on. A baby in a baby sub-slot first
-// takes a module slot, which its next stage fits (a module holds one grown dragon or two babies: 3.3), and walks there
-// (goal `settle`); it grows once settled there, and waits in its sub-slot while none is free. An elder's next is
-// retirement (S6). An egg (sim.ts addEgg) hatches HATCH_DAYS game days after it was laid, as soon as a baby sub-slot is
-// free (the Hatchery's two first; else the nearest): a baby of its element, a new id, the next free name of its
-// element's (names.ts), the egg's seed, hungry (it asks for the kitchen at once), standing up in its nest and walking
-// to its sub-slot. With no sub-slot free it waits in its nest, and nothing is lost. DOM-free, deterministic, by id.
+// Growing up and hatching (docs/BASE_DESIGN.md 7; plan S5): life's half of every step (sim.ts step), after the needs
+// have drained and the acts under way have run -- so a dragon whose nap or job ended this step is caught settled
+// before it can set off -- and before any job opens or anyone moves. A dragon's stage lasts STAGE_DAYS game days (30:
+// baby -> young -> adult -> elder), counted on the world's clock from the step it began (`stageSince`); the stage-up
+// falls due then, and is applied once the dragon is SETTLED -- no act, no keeper on any of its jobs, no route left,
+// standing (not turning, not waiting at a landing or the bay's edge, not in the lift's hands) -- and has ROOM TO GROW:
+// no keeper stands where its new body will be, so no keeper is ever at the old stage's reach (or anywhere in the new
+// body) while the rig swaps. A dragon due and settled whose room a keeper is still in -- most often the one who has
+// just served it, turning for home -- HOLDS where it is (`hold`, a step at a time: it takes no goal, no keeper comes for
+// it and no one moves it on) until the keeper has walked out of it; else it would set off on its next errand the step
+// after being served, and seldom be settled with room. Then `stageSince` moves on by exactly the stage's length (a late
+// stage-up never shortens the next stage), the stage advances, and every per-stage thing (the drains, the reach, the
+// gait, the pad, the stand spot) follows from that step on; and the dragon CHEERS where it stands, holding for its new
+// stage's `happy` (gait.ts happyLen), so the view's `happy` plays through. A baby in a baby sub-slot first takes a module slot, which its next stage fits (a
+// module holds one grown dragon or two babies: 3.3), and walks there (goal `settle`); it grows once settled there, and
+// waits in its sub-slot while none is free. An elder's next is retirement (S6). An egg (sim.ts addEgg) hatches
+// HATCH_DAYS game days after it was laid, as soon as a baby sub-slot is free (the Hatchery's two first, the one nearest
+// its nest; else the nearest): a baby of its element, a new id, the next free name of its element's (names.ts), the
+// egg's seed, hungry (it asks for the kitchen at once), standing up in its nest and walking to its sub-slot. With no
+// sub-slot free it waits in its nest, and nothing is lost. DOM-free, deterministic, by id.
 import { STAGES } from '../art/dragon/stages.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import { STAGE_DAYS, HATCH_DAYS } from './clock.ts';
 import { fitsSlot, nestX } from './layout.ts';
 import { fullNeeds, moodOf } from './needs.ts';
-import { freeSlot, nearestFree, sendTo } from './travel.ts';
+import { nearestFree, sendTo, slotFree, bodySpan, KEEPER_HALF } from './travel.ts';
+import { happyLen } from './gait.ts';
 import { hatchName } from './names.ts';
 import type { CareSim, Dragon, Egg } from './sim.ts';
+import type { Slot } from './layout.ts';
 
 /** A new baby's food (plan S5: under QUEUE, so its first job, and its first walk after its sub-slot, is to the kitchen). */
 export const HATCH_FOOD = 0.45;
@@ -40,9 +49,21 @@ export function settled(sim: CareSim, d: Dragon): boolean {
 }
 
 /**
- * A dragon's stage-up, if it is due and the dragon settled: in a slot its next stage fits, it grows now; in a baby
- * sub-slot, it first takes the nearest free module slot (in any dragon room: the Hatchery has none) and walks there,
- * to grow once settled in it -- or, none free, waits where it is.
+ * The keeper standing where a dragon's body will be at `stage` -- its new body, the way it faces, on its floor, a
+ * keeper's half-width either side -- or null: room to grow. (The keeper who has just served it is still at the old
+ * stage's stand spot for a moment as they turn for home; the new body may reach over it.)
+ */
+export function inTheWayOfGrowing(sim: CareSim, d: Dragon, stage: Stage): string | null {
+  const [a, b] = bodySpan(stage, d.facing, d.x);
+  const k = sim.keepers.find((q) => !q.climbing && q.f === d.f && q.x + KEEPER_HALF > a && q.x - KEEPER_HALF < b);
+  return k ? k.name : null;
+}
+
+/**
+ * A dragon's stage-up, if it is due and settled: in a slot its next stage fits, it grows now if it has room -- and
+ * holds for its cheer -- or holds a step for a keeper to walk out of its room; in a baby sub-slot, it first takes the
+ * nearest free module slot (in any dragon room: the Hatchery has none) and walks there, to grow once settled in it --
+ * or, none free, waits where it is.
  */
 function growUp(sim: CareSim, d: Dragon): void {
   const next = nextStage(d.stage), due = stageDue(sim, d);
@@ -52,16 +73,20 @@ function growUp(sim: CareSim, d: Dragon): void {
     if (to) { d.goal = 'settle'; d.goalJob = null; sendTo(sim, d, to); }
     return;
   }
+  if (inTheWayOfGrowing(sim, d, next)) { d.hold = Math.max(d.hold, 1); return; }
   sim.stats.growDelayMax = Math.max(sim.stats.growDelayMax, sim.clock - due);
   d.stageSince = due;
   d.stage = next;
+  d.hold = happyLen(d.element, next);
   if (d.goal === 'settle') d.goal = null;
   sim.events.push({ kind: 'grow', dragon: d.id, stage: next });
 }
 
 /**
- * An egg due to hatch hatches if a baby sub-slot is free for its baby (the Hatchery's first, else the nearest by its
- * route from the nest): the baby stands up in the nest, facing west, and walks to it; the egg is gone. False: it waits.
+ * An egg due to hatch hatches if a baby sub-slot is free for its baby -- the Hatchery's, the one nearest its nest first
+ * (so a hatchling stands in front of its own nest, now empty, not another's egg; ties to the lower), else the nearest
+ * by its route from the nest: the baby stands up in the nest, facing west, and walks to it; the egg is gone. False: it
+ * waits.
  */
 function hatch(sim: CareSim, e: Egg): boolean {
   const room = sim.rooms.find((r) => r.kind === 'hatchery');
@@ -70,8 +95,10 @@ function hatch(sim: CareSim, e: Egg): boolean {
   needs.food = HATCH_FOOD;
   const baby: Dragon = { id: sim.nextDragonId, name: hatchName(sim, e.element), element: e.element, stage: 'baby', seed: e.seed, slot: null, goal: null, goalJob: null,
     f: room.floor, x: nestX(room, e.nest), facing: -1, legs: [], move: 'still', gaitT: 0, walkSeq: 0, turn: -1, waited: 0,
-    needs, mood: moodOf(e.element, needs), act: null, asleep: 0, stageSince: sim.clock };
-  const slot = freeSlot(sim, baby, room) ?? nearestFree(sim, baby);
+    needs, mood: moodOf(e.element, needs), act: null, asleep: 0, stageSince: sim.clock, hold: 0 };
+  let slot: Slot | null = null;
+  for (const s of room.slots) if (slotFree(sim, baby, s) && (!slot || Math.abs(s.x - baby.x) < Math.abs(slot.x - baby.x))) slot = s;
+  slot ??= nearestFree(sim, baby);
   if (!slot) return false;
   sim.nextDragonId++;
   sim.dragons.push(baby);
@@ -82,8 +109,12 @@ function hatch(sim: CareSim, e: Egg): boolean {
   return true;
 }
 
-/** Life's half of a step: every dragon due and settled grows up (by id), then every egg due hatches (by id) while a sub-slot is free. */
+/**
+ * Life's half of a step: every hold counts down, every dragon due and settled grows up (by id) -- or holds for room --
+ * then every egg due hatches (by id) while a sub-slot is free.
+ */
 export function stepLife(sim: CareSim): void {
+  for (const d of sim.dragons) if (d.hold > 0) d.hold--;
   for (const d of sim.dragons) growUp(sim, d);
   for (const e of sim.eggs.slice()) hatch(sim, e);
 }

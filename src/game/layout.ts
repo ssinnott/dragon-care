@@ -151,6 +151,19 @@ export function fitsSlot(slot: Slot, stage: Stage): boolean { return slot.baby =
 export const NESTS = 3;
 /** Nest i's middle, world x, in a hatchery room (the egg lies there, and the baby it hatches into stands up there). */
 export function nestX(r: Room, i: number): number { return r.x0 + 30 + 50 * i; }
+/**
+ * A nest's straw heap (building.ts): a half ellipse NEST_RX wide each way and NEST_RY high over its base (3 px into the
+ * floor's band, which covers its foot), inked round, with 4 x 2 strands on its flanks (NEST_STRANDS: each strand's
+ * left end and its top's height over the base). It is tall enough that an egg (eggs.ts) lies against its plain straw
+ * alone, ink ring, wobble and all, clear of the band and the strands (tools/palette-check.ts checks it, and gates the
+ * eggs against that straw: ART_BIBLE 5.9).
+ */
+export const NEST_RX = 20, NEST_RY = 21;
+export const NEST_STRANDS: readonly (readonly [number, number])[] = Object.freeze([[-17, 5], [-15, 11], [-12, 16], [8, 15], [11, 9], [13, 5]] as const);
+/** A floor's nest heaps' base line, world y. */
+export function nestBase(f: number): number { return floorTop(f) + WALL_H + 3; }
+/** Where an egg lies in its nest on floor f, world y: its ink ring's bottom row (eggs.ts drawEgg's y), 2 px over the floor's band. */
+export function eggBottom(f: number): number { return floorTop(f) + WALL_H - 2; }
 
 // ---------- walking: nets of floor spans and links, routes ----------
 

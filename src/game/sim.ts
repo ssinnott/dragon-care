@@ -6,8 +6,10 @@
 // (seeded; any later draw is stateless, src/game/rand.ts), so tools/sim-check.ts runs it headless and view=base's
 // frozen frames (t=) come out the same every time. Dragons have stable ids (a new one takes nextDragonId), the world
 // has a clock (game time, clock0 + tick), and the whole of it saves to plain JSON and loads back exactly (save.ts).
-// Life (life.ts) runs first in every step: a dragon grows into its next stage 30 game days into its stage, once it is
-// settled, and an egg in the Hatchery's nests (addEgg) hatches into a baby 2 game days after it was laid.
+// Life (life.ts) runs in every step once the needs have drained and the acts under way have run, before any job opens
+// or anyone moves: a dragon grows into its next stage 30 game days into its stage, once it is settled with room to grow
+// (then it cheers where it stands a moment), and an egg in the Hatchery's nests (addEgg) hatches into a baby 2 game days
+// after it was laid.
 import { makeRng } from '../lib/engine/rng.ts';
 import { NEEDS, QUEUE, OWN_NEED, drainRate, hasNeed, moodOf, tierOf, fullNeeds } from './needs.ts';
 import type { NeedKind, Needs } from './needs.ts';
@@ -19,6 +21,7 @@ import { mix32, TAG } from './rand.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
 import { SAVE_VERSION, SaveVersionError, worldKey } from './save.ts';
 import type { SaveV } from './save.ts';
+import { DRAGON_ELEMENTS } from '../art/dragon/palettes.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
@@ -125,6 +128,12 @@ export interface Dragon {
   asleep: number;
   /** The clock when its stage began (clock0 less the days it started into the stage). */
   stageSince: number;
+  /**
+   * Steps it holds still where it is, growing up (life.ts; 0: none): its grow-up's cheer, while the view plays its
+   * `happy` through (gait.ts happyLen), or a step at a time while a keeper is still where its new body will be. Holding,
+   * it chooses no goal, no keeper comes for it and no one moves it on.
+   */
+  hold: number;
 }
 
 /** A keeper's phase: free; fetching a supply, picking it up; going to the dragon's stand spot, waiting there for it; at work; going back. */
@@ -285,7 +294,7 @@ export class CareSim {
       for (const k of NEEDS) needs[k] = hasNeed(p.element, k) ? rng.range(0.42, 1) : 1;
       this.dragons.push({ id: this.nextDragonId++, name: p.name, element: p.element, stage: p.stage, seed: p.seed, slot, goal: null, goalJob: null,
         f: slot.f, x: slot.x, facing: slot.facing, legs: [], move: 'still', gaitT: 0, walkSeq: 0, turn: -1, waited: 0,
-        needs, mood: moodOf(p.element, needs), act: null, asleep: 0, stageSince: this.clock0 - Math.round((p.days ?? 0) * this.dayLen) });
+        needs, mood: moodOf(p.element, needs), act: null, asleep: 0, stageSince: this.clock0 - Math.round((p.days ?? 0) * this.dayLen), hold: 0 });
     }
     keepers.forEach((p, id) => {
       const station = roomOf(p.station, p.name);
@@ -303,12 +312,24 @@ export class CareSim {
 
   /**
    * A world from its save (save.ts serialize), exactly as it was: the rooms placed again, then every dragon, job and
-   * keeper rebuilt and their references relinked by id. A save of another version throws SaveVersionError.
+   * keeper rebuilt and their references relinked by id. A save of another version throws SaveVersionError. The life
+   * state is checked here (the eggs, each dragon's stage start and hold), and a save whose life state this build can't
+   * run throws too: an egg lies unseen and unstepped for days before it hatches or is drawn (off the start's camera), so
+   * the view's trial step and draw at load (base.ts load) would never meet a bad one, and the page would freeze days on.
    */
   static fromSave(s: SaveV): CareSim {
     if (!s || typeof s !== 'object' || s.v !== SAVE_VERSION) throw new SaveVersionError(s && typeof s === 'object' ? s.v : s);
     const sim = new CareSim(s.rooms, [], [], { seed: s.seed, dayLen: s.dayLen, clock0: s.clock0 });
     sim.tick = s.tick; sim.nextDragonId = s.nextDragonId; sim.nextJob = s.nextJob; sim.nextEggId = s.nextEggId;
+    const whole = (v: unknown, min = -Infinity): v is number => Number.isInteger(v) && (v as number) >= min;
+    if (!whole(s.nextEggId, 0) || !Array.isArray(s.eggs) || s.eggs.length > NESTS) throw new Error(`save: the eggs (${Array.isArray(s.eggs) ? s.eggs.length : typeof s.eggs}, next id ${s.nextEggId}) are not a hatchery's`);
+    let lastId = -1;
+    const nests = new Set<number>();
+    for (const e of s.eggs) {
+      if (!e || typeof e !== 'object' || !(DRAGON_ELEMENTS as readonly string[]).includes(e.element) || !whole(e.id, lastId + 1) || e.id >= s.nextEggId
+        || !whole(e.nest, 0) || e.nest >= NESTS || nests.has(e.nest) || !whole(e.laid) || !whole(e.seed, 1)) throw new Error(`save: an egg this build can't hatch: ${JSON.stringify(e)}`);
+      lastId = e.id; nests.add(e.nest);
+    }
     sim.eggs = s.eggs.map((e) => ({ ...e }));
     const byId = <T extends { id: number }>(list: readonly T[], id: number, what: string): T => {
       const v = list.find((q) => q.id === id);
@@ -320,7 +341,10 @@ export class CareSim {
       if (!slot) throw new Error(`save: no slot ${r.i} in room ${r.room}`);
       return slot;
     };
-    for (const d of s.dragons) sim.dragons.push({ ...d, slot: d.slot ? slotOf(d.slot) : null, needs: { ...d.needs }, act: d.act ? { ...d.act } : null, legs: d.legs.map((l) => ({ ...l })) });
+    for (const d of s.dragons) {
+      if (!whole(d.stageSince) || !whole(d.hold, 0)) throw new Error(`save: ${d.name}'s stage began at ${d.stageSince}, its hold ${d.hold}`);
+      sim.dragons.push({ ...d, slot: d.slot ? slotOf(d.slot) : null, needs: { ...d.needs }, act: d.act ? { ...d.act } : null, legs: d.legs.map((l) => ({ ...l })) });
+    }
     const jobs: Job[] = s.jobs.map((j) => ({ ...j, dragon: byId(sim.dragons, j.dragon, 'dragon'), keeper: null }));
     for (const k of s.keepers) {
       sim.keepers.push({ ...k, station: byId(sim.rooms, k.station, 'room'), job: k.job == null ? null : byId(jobs, k.job, 'job'), legs: k.legs.map((l) => ({ ...l })) });
@@ -350,10 +374,12 @@ export class CareSim {
   // ---------- a step ----------
 
   /**
-   * One step (plan S3, S5): life first -- a dragon due and settled grows up, an egg due hatches (life.ts) -- then the
-   * needs drain and the acts under way refill theirs; jobs open under QUEUE (and close only by being done: a need rises
-   * through a keeper's act alone); the dragons choose where to go, walk and turn, and the lift runs (travel.ts); then
-   * free keepers take jobs, and every keeper steps.
+   * One step (plan S3, S5): the needs drain and the acts under way refill theirs (an act done ends here); then life --
+   * a hold counts down, a dragon due, settled and with room grows up, an egg due hatches (life.ts) -- after the acts, so a dragon
+   * whose nap or job ended this step is caught settled before it can set off; then jobs open under QUEUE (and close only
+   * by being done: a need rises through a keeper's act alone), so a hatchling's food job opens the step it hatches; the
+   * dragons choose where to go, walk and turn, and the lift runs (travel.ts); then free keepers take jobs, and every
+   * keeper steps.
    */
   step(): void {
     this.events = [];
@@ -407,12 +433,12 @@ export class CareSim {
    * A job a keeper can go to (plan S3): its dragon is going for it, to a slot in the need's own room, and is there, or
    * past its lift ride and nearly there (LEAD_PX of route left) -- or, rushed, anywhere past its ride (the keeper runs:
    * they meet about when it arrives); so no keeper stands waiting at a stand spot while the dragon queues for the car.
-   * The dragon is awake, and no other keeper is on it.
+   * The dragon is awake, not holding still to grow up (life.ts), and no other keeper is on it.
    */
   private servable(j: Job): boolean {
     const d = j.dragon;
     if (d.goalJob !== j.id || !d.slot || this.rooms[d.slot.room].kind !== NEED_ROOM[j.need]) return false;
-    if (d.asleep > 0 || (d.act && d.act.need === 'sleep')) return false;
+    if (d.asleep > 0 || d.hold > 0 || (d.act && d.act.need === 'sleep')) return false;
     if (this.jobs.some((o) => o !== j && o.dragon === d && o.keeper)) return false;
     return arrived(this, d) || (!ridesLeft(this, d) && (j.rushed || remainingCost(this, d) <= LEAD_PX));
   }

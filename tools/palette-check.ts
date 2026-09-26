@@ -65,7 +65,10 @@
 // EGGS (counted apart, its own RESULT line: EGGS):
 //   (egg) eggs    : every element's egg (src/game/eggs.ts: its shell is the element's BABY scale colour, inked round)
 //                   keeps >= 25 % luminance from the Hatchery's nest straw it lies in (src/game/surfaces.ts NEST), so a
-//                   pale egg (rock's) and a dark one (slinkwing's, dusk's) both read in the nest.
+//                   pale egg (rock's) and a dark one (slinkwing's, dusk's) both read in the nest; and (egg-lie) the
+//                   straw is all it is seen against: every pixel just outside its ink ring, at every wobble, lies in
+//                   the nest heap's plain straw (src/game/layout.ts NEST_RX, NEST_RY, eggBottom: a px in from the
+//                   heap's inked edge, over the floor's band, off the strands), never the Hatchery's wall.
 // REPORTED, NOT GATED:
 //   (g) any scale pair that passes (b) on hue alone at the same stage (it would merge in greyscale); any body pair
 //       that passes (f) on simulated value alone under the dark-pair floor (they are told apart by zone); glow colours
@@ -84,6 +87,8 @@ import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
 import type { KeeperId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
 import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, stepped } from '../src/game/surfaces.ts';
+import { NEST_RX, NEST_RY, NEST_STRANDS, WALL_H, floorTop, nestBase, eggBottom } from '../src/game/layout.ts';
+import { SHELL, WOBBLE } from '../src/game/eggs.ts';
 import { PHASE_ORDER } from '../src/game/clock.ts';
 
 // ---------- thresholds ----------
@@ -845,6 +850,31 @@ for (const e of DRAGON_ELEMENTS) {
   eGates++;
   if (!ok) { eFailures++; eFailed.push(`(egg) ${e}`); }
   out.push(`${ok ? '  ok  ' : '  FAIL'} ${e.padEnd(10)} egg ${hex}  L ${lumOf(hex).toFixed(3)}  ${pct(d)} from the nest (${lumOf(hex) < lumOf(NEST) ? 'darker' : 'lighter'})`);
+}
+// (egg-lie) what the egg is seen against is the nest's straw, and only that: the pixels just outside its ink ring (the
+// ring is a 3 x 3 of ink round every shell pixel: icons.ts drawSprite), at each wobble, all inside the heap's fill a px
+// in from its antialiased inked edge, over the floor's band and off its strands. The heap is centred on the nest's x
+// (a pixel boundary: the egg's middle column is the pixel to its right), its base nestBase.
+{
+  const x = 0, y = eggBottom(0), base = nestBase(0), band = floorTop(0) + WALL_H;
+  const onStrand = (px: number, py: number) => NEST_STRANDS.some(([dx, dy]) => px >= x + dx && px < x + dx + 4 && py >= base - dy && py < base - dy + 2);
+  const inHeap = (px: number, py: number) => py + 0.5 < base && ((px + 0.5 - x) / (NEST_RX - 1)) ** 2 + ((base - py - 0.5) / (NEST_RY - 1)) ** 2 <= 1;
+  let bad = '', seen = 0;
+  for (const wob of new Set<number>(WOBBLE)) {
+    const shell = new Set<string>(), ring = new Set<string>();
+    SHELL.forEach((row, r) => [...row].forEach((c, k) => { if (c !== '.') shell.add(`${x + wob - 4 + k},${y - 12 + r}`); }));
+    const around = (set: Set<string>) => { const o = new Set<string>(); for (const p of set) { const [px, py] = p.split(',').map(Number); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) o.add(`${px + dx},${py + dy}`); } return o; };
+    for (const p of around(shell)) ring.add(p);
+    for (const p of around(ring)) {
+      if (ring.has(p)) continue;
+      seen++;
+      const [px, py] = p.split(',').map(Number);
+      if (!bad && (!inHeap(px, py) || py >= band || onStrand(px, py))) bad = `at wobble ${wob}, the pixel ${px - x}, ${py - base} from the heap's foot is ${py >= band ? 'the band' : onStrand(px, py) ? 'a strand' : 'off the straw'}`;
+    }
+  }
+  eGates++;
+  if (bad) { eFailures++; eFailed.push('(egg-lie) the egg is seen against more than the nest\'s straw'); }
+  out.push(`${bad ? '  FAIL' : '  ok  '} egg-lie    every egg lies against the nest's straw alone: the ${seen} pixels round its ink ring over its ${new Set(WOBBLE).size} wobbles, all in the heap (${NEST_RX} x ${NEST_RY} px), over the band, off the strands${bad ? ` -- ${bad}` : ''}`);
 }
 
 // ---------- verdict ----------

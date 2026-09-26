@@ -204,11 +204,16 @@ function blockers(sim: CareSim, d: Dragon, s: Slot): Dragon[] {
 }
 
 /**
- * The lowest-index slot of the room that fits the dragon (or a dragon of `stage`: the one it is about to grow into,
- * life.ts) and is free for it (nobody in its way, no one waiting over it), or null.
+ * Whether slot s fits the dragon (or a dragon of `stage`: the one it is about to grow into, life.ts) and is free for it
+ * (nobody in its way, no one waiting over it).
  */
+export function slotFree(sim: CareSim, d: Dragon, s: Slot, stage: Stage = d.stage): boolean {
+  return fitsSlot(s, stage) && !blockers(sim, d, s).length && !lineBlocks(sim, d, s, true, stage);
+}
+
+/** The lowest-index slot of the room that fits the dragon (or a dragon of `stage`) and is free for it, or null. */
 export function freeSlot(sim: CareSim, d: Dragon, room: Room, stage: Stage = d.stage): Slot | null {
-  for (const s of room.slots) if (fitsSlot(s, stage) && !blockers(sim, d, s).length && !lineBlocks(sim, d, s, true, stage)) return s;
+  for (const s of room.slots) if (slotFree(sim, d, s, stage)) return s;
   return null;
 }
 
@@ -228,23 +233,27 @@ export function nearestFree(sim: CareSim, d: Dragon, stage: Stage = d.stage, not
   return best;
 }
 
-/** A dragon standing still in its slot with nowhere to be, no act and no keeper coming (evictable, 3.3), for room `room`. */
+/**
+ * A dragon standing still in its slot with nowhere to be, no act, no keeper coming and not holding still to grow up
+ * (evictable, 3.3), for room `room`.
+ */
 function lingerer(sim: CareSim, o: Dragon, room: Room): boolean {
   const g = o.goalJob == null ? null : sim.jobs.find((j) => j.id === o.goalJob) ?? null;
-  return (!g || NEED_ROOM[g.need] !== room.kind) && !o.act && o.asleep === 0 && !o.legs.length && o.move === 'still'
+  return (!g || NEED_ROOM[g.need] !== room.kind) && !o.act && o.asleep === 0 && o.hold === 0 && !o.legs.length && o.move === 'still'
     && !sim.jobs.some((j) => j.dragon === o && j.keeper);
 }
 
-/** A holder a Rush may move on: no keeper at work with it, and not in the lift's hands or in its bay. */
+/** A holder a Rush may move on: no keeper at work with it, not holding still to grow up, and not in the lift's hands or in its bay. */
 function bumpable(sim: CareSim, o: Dragon): boolean {
-  return !o.act && o.asleep === 0 && sim.lift.rider !== o.id && !['call', 'board', 'ride', 'alight', 'bay'].includes(o.move) && !dragonInBay(o);
+  return !o.act && o.asleep === 0 && o.hold === 0 && sim.lift.rider !== o.id && !['call', 'board', 'ride', 'alight', 'bay'].includes(o.move) && !dragonInBay(o);
 }
 
 /**
  * A slot in `room` for dragon d: a free one; else one whose holders are all lingerers (the lowest id among them), each
- * moved to the nearest free slot elsewhere (an eviction); else, for a Rush (`bump`), one whose holders' keepers have
- * not started work, the lowest-ranked of them moved on (a slot bump). Null: the room is full and nobody can move, or
- * nowhere is free for them to go.
+ * moved to the nearest free slot elsewhere -- never the Hatchery's, which are hatchlings' first places, so a baby moved
+ * on never comes to rest in front of the nests -- (an eviction); else, for a Rush (`bump`), one whose holders' keepers
+ * have not started work, the lowest-ranked of them moved on (a slot bump). Null: the room is full and nobody can move,
+ * or nowhere is free for them to go.
  */
 function takeSlot(sim: CareSim, d: Dragon, room: Room, bump: boolean): Slot | null {
   const free = freeSlot(sim, d, room);
@@ -265,7 +274,7 @@ function takeSlot(sim: CareSim, d: Dragon, room: Room, bump: boolean): Slot | nu
   d.slot = pick.s;
   const moved: { o: Dragon; slot: Slot | null }[] = [];
   for (const o of pick.who) {
-    const to = nearestFree(sim, o);
+    const to = nearestFree(sim, o, o.stage, ['hatchery']);
     if (!to) { d.slot = was; for (const m of moved) m.o.slot = m.slot; return null; }
     moved.push({ o, slot: o.slot });
     o.slot = to;
@@ -306,14 +315,16 @@ export function sendTo(sim: CareSim, d: Dragon, slot: Slot): void {
 }
 
 /**
- * Make job j the dragon's goal: its slot, if it already holds one in the need's room; else a slot taken there (free,
- * or by moving a lingerer on, or for a Rush by bumping a holder), and the walk to it. False if no slot could be had
- * (the dragon keeps what it was doing; its bubble keeps showing).
+ * Make job j the dragon's goal: its slot, if it already holds one in the need's room that fits it; else a slot taken
+ * there (free, or by moving a lingerer on, or for a Rush by bumping a holder), and the walk to it. False if no slot
+ * could be had (the dragon keeps what it was doing; its bubble keeps showing). (A baby walking to grow up holds a module
+ * slot, which only its next stage fits: a job in that room still takes it to a sub-slot there, and its stage-up waits
+ * until it is served: life.ts.)
  */
 export function goFor(sim: CareSim, d: Dragon, j: Job, bump: boolean): boolean {
   const room = needRoom(sim, j.need);
   if (!room) return false;
-  if (d.slot && d.slot.room === room.id) { d.goal = 'need'; d.goalJob = j.id; return true; }
+  if (d.slot && d.slot.room === room.id && fitsSlot(d.slot, d.stage)) { d.goal = 'need'; d.goalJob = j.id; return true; }
   const slot = takeSlot(sim, d, room, bump);
   if (!slot) return false;
   d.goal = 'need'; d.goalJob = j.id;
@@ -338,11 +349,12 @@ function standingIn(sim: CareSim, d: Dragon): Room | null {
 }
 
 /**
- * Free to choose a goal: no act, awake, not in the lift's hands (waiting for it once it is sent, boarding, riding,
- * alighting), not held at the bay's edge or turning, and not standing in the bay (a walker in it walks on out).
+ * Free to choose a goal: no act, awake, not holding still to grow up (life.ts), not in the lift's hands (waiting for it
+ * once it is sent, boarding, riding, alighting), not held at the bay's edge or turning, and not standing in the bay (a
+ * walker in it walks on out).
  */
 function free(sim: CareSim, d: Dragon): boolean {
-  return !d.act && d.asleep === 0 && sim.lift.rider !== d.id && !['board', 'ride', 'alight', 'bay', 'turn'].includes(d.move) && !dragonInBay(d);
+  return !d.act && d.asleep === 0 && d.hold === 0 && sim.lift.rider !== d.id && !['board', 'ride', 'alight', 'bay', 'turn'].includes(d.move) && !dragonInBay(d);
 }
 
 /**
@@ -376,9 +388,13 @@ function choose(sim: CareSim, d: Dragon): void {
   goFor(sim, d, pick, false);
 }
 
-/** Rush (sim.ts rush): the dragon goes for job j at once -- mid-walk too, but never once the lift has it -- taking a slot in the room even from a holder. */
+/**
+ * Rush (sim.ts rush): the dragon goes for job j at once -- mid-walk too, but never once the lift has it, nor while it
+ * holds still to grow up (it goes when the hold is done: the job, rushed, is first in its queue) -- taking a slot in
+ * the room even from a holder.
+ */
 export function retarget(sim: CareSim, d: Dragon, j: Job): void {
-  if (d.act || d.asleep > 0 || sim.lift.rider === d.id || ['board', 'ride', 'alight'].includes(d.move) || dragonInBay(d)) return;
+  if (d.act || d.asleep > 0 || d.hold > 0 || sim.lift.rider === d.id || ['board', 'ride', 'alight'].includes(d.move) || dragonInBay(d)) return;
   goFor(sim, d, j, true);
 }
 

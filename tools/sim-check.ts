@@ -50,18 +50,21 @@
 // 13. Growing up (#8: "a 'month' of game time to have a dragon grow from one age class to another"; plan S5): on a
 //    600-step day, a baby grows young, adult and elder, one grow event each, its stage's start moved on exactly 30 days
 //    each time, after walking from the Hatchery to a module slot, and its drains follow the new stage; a stage-up only
-//    ever applies to a dragon settled in a slot it fits (no act, no keeper on it); the delay from falling due is short
-//    alone and bounded by an errand in the busy barn; and at the real day's length, 30 days less a minute in, an adult
-//    is an elder within a minute of play.
+//    ever applies to a dragon settled in a slot it fits (no act, no keeper on it) with no keeper where its new body
+//    will be, and it then holds still for exactly its `happy` (no walk, no turn, no act, no keeper coming); the delay
+//    from falling due is short alone and bounded by an errand in the busy barn; at the real day's length, 30 days less
+//    a minute in, an adult is an elder within a minute of play; and a baby on its way to grow up, Rushed to a need in
+//    the room it is going to, is served in a baby's sub-slot there, never in the module slot.
 // 14. Eggs (#5.4's Hatchery side): three eggs fill the three nests and a fourth is not taken; an egg hatches exactly two
 //    days after it was laid into a baby with a new id, its element's first free name and the egg's seed, the Hatchery's
-//    sub-slots first; the baby asks for food at once and is fed within three minutes; with every baby sub-slot taken an
-//    egg waits in its nest, nothing lost, and hatches as soon as one frees; names never repeat and stay within 8
-//    characters; two runs give the same names and seeds.
+//    sub-slots first (the one nearest its nest); the baby asks for food at once and is fed within three minutes; with
+//    every baby sub-slot taken an egg waits in its nest, nothing lost, and hatches as soon as one frees; a baby moved on
+//    never comes to rest in the Hatchery; names never repeat and stay within 8 characters; two runs give the same names
+//    and seeds.
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
 import { CareSim, REACH, DAY_STEPS, START_HOUR } from '../src/game/sim.ts';
-import { nextStage, stageDue, HATCH_FOOD } from '../src/game/life.ts';
+import { nextStage, stageDue, inTheWayOfGrowing, HATCH_FOOD } from '../src/game/life.ts';
 import { NAMES, NAME_MAX, hatchName } from '../src/game/names.ts';
 import { GROWUP_IN, HATCH_IN, EGGS_PRESET } from '../src/game/presets.ts';
 import type { DragonPlace } from '../src/game/start.ts';
@@ -70,7 +73,7 @@ import {
   NEED_ROOM, TURN_STEPS, TURN_HALF, WAIT_MAX, LEAD_PX, arrived, inTheBay, liftRange, needRoom, dragonSpan, dragonInBay, depthOf, eyeSpan, walking,
   landingEdge, ridesLeft, remainingCost, nearestFree,
 } from '../src/game/travel.ts';
-import { gaitOf, gaitFrom, moveAt, wrapT } from '../src/game/gait.ts';
+import { gaitOf, gaitFrom, moveAt, wrapT, happyLen } from '../src/game/gait.ts';
 import { TURN_HALF as YARD_TURN_HALF } from '../src/care/dragon.ts';
 import { dragonBuild } from '../src/art/dragon/build.ts';
 import { dragonAnims, baseAnims } from '../src/art/dragon/anims.ts';
@@ -92,7 +95,7 @@ import {
 } from '../src/game/layout.ts';
 import type { Spot, RoomKind } from '../src/game/layout.ts';
 import { NEEDS, FPS, OWN_NEED, hasNeed, drainRate } from '../src/game/needs.ts';
-import type { Needs } from '../src/game/needs.ts';
+import type { Needs, NeedKind } from '../src/game/needs.ts';
 import { DRAGON_ELEMENTS } from '../src/art/dragon/palettes.ts';
 import type { DragonElement } from '../src/art/dragon/palettes.ts';
 import type { Stage } from '../src/art/dragon/stages.ts';
@@ -144,11 +147,12 @@ const CAPACITY_RIDES = [123, 30, 20] as const, CAPACITY8 = { waitAvgS: 136, wait
 const PLANNED: ReadonlySet<string> = new Set(['tack', 'bunks', 'maproom', 'aerie']);
 /**
  * Section 13 (plan S5): a stage-up waits until its dragon is settled, so its delay is the rest of whatever the dragon
- * was doing when it fell due. Alone, a baby grows within GROW_ALONE of falling due (the plan's minute; measured 233 to
+ * was doing when it fell due (and, settled, a moment more while a keeper walks out of where its new body will be: it
+ * holds for that, life.ts). Alone, a baby grows within GROW_ALONE of falling due (the plan's minute; measured 233 to
  * 2920 steps over seeds 1-8). In the busy barn a dragon is on an errand nearly all the time -- walking to a need's
  * room, waiting for the one car, being met (S3's saturated lift, docs/BASE_DESIGN.md 4.7) -- so the plan's minute is
- * out of reach there: a stage-up waits out one errand, measured 4062 to 8874 steps at most (68 to 148 s) over seeds
- * 1-8 in section 13's busy run (seed 1: 7438), gated at GROW_BUSY (a real game day, 3 minutes: a thirtieth of a
+ * out of reach there: a stage-up waits out one errand, measured 4061 to 8665 steps at most (68 to 144 s) over seeds
+ * 1-8 in section 13's busy run (seed 1: 8665), gated at GROW_BUSY (a real game day, 3 minutes: a thirtieth of a
  * stage). At the real day's length, 30 days less a minute in, an adult (EMBER, seed 1: 2939 steps) is an elder within
  * 180 + GROW_REAL steps (the plan's).
  */
@@ -738,6 +742,23 @@ let firstRide = '';
     if (g.loopStart !== 0) loopsFrom.push(`${el} ${st}`);
     if (g.steps.some((m) => m === 0)) still++;
   }
+  // the grow-up's cheer (life.ts holds a dragon just grown up for happyLen): every look's happy is the same length for
+  // seeds 11 and 215 (rebuilt past the pets' cache, as the walks are), and a player playing it from its start at speed 1
+  // -- as the view does on the grow step -- is done after exactly happyLen ticks
+  const happies: number[] = [];
+  for (const el of DRAGON_ELEMENTS) for (const st of STAGES) {
+    const n = happyLen(el, st), sum = (f: readonly { dur?: number }[]) => f.reduce((a, q) => a + (q.dur || 1), 0);
+    happies.push(n);
+    for (const seed of [11, 215]) {
+      const b = dragonBuild({ element: el, stage: st, seed }), h = b.spec.anims?.overrides?.(st, b.dims)?.happy ?? baseAnims(st, animTuning(st, b.spec), b.dims, b.spec.stages[st].wing).happy;
+      if (!h || sum(h.frames) !== n) fail(`happy: the ${el} ${st} happy lasts ${h ? sum(h.frames) : 'nothing'} steps for seed ${seed}, not ${n}`);
+    }
+    const b1 = dragonBuild({ element: el, stage: st, seed: 1 }), pl = new DragonAnimPlayer(dragonAnims(st, b1.spec, b1.dims), 1);
+    pl.play('happy', { restart: true, speed: 1 });
+    let t = 0;
+    while (!pl.done && t < 1000) { pl.tick(); t++; }
+    if (t !== n || pl.name !== 'happy') fail(`happy: a player playing the ${el} ${st} happy was done after ${t} ticks, not ${n}`);
+  }
   // a walk with an intro (the spike adult walk, its creep standing still some frames, looping from its third frame):
   // the gait, the player and the view's catch-up (a pet met mid-bout is ticked wrapT(gaitT - 1) times from its start:
   // base.ts sync) agree past the wrap
@@ -787,7 +808,7 @@ let firstRide = '';
     const net = dragonNet(st), L = spanOf(f, landingEdge(st, -1), net) >= 0, R = spanOf(f, landingEdge(st, 1), net) >= 0;
     if (!L || (f !== AERIE_F && !R)) fail(`gait: a ${st}'s landing on floor ${f} is off its floor (${L ? '' : 'west '}${R ? '' : 'east'})`);
   }
-  console.log(`  9 gait: ${looks} walks, each the same for seeds 11 and 215, each moving as its frames and its anim player say for three cycles (${still} with steps standing still; ${loopsFrom.length ? `looping from past their start: ${loopsFrom.join(', ')}` : 'all looping whole'}; a walk with an intro wraps and catches up in step); a scripted spike walked ${went.toFixed(3)} px in 600 steps, as its gait and its anim player say; the paper turn flips at step ${TURN_HALF} of ${TURN_STEPS}`);
+  console.log(`  9 gait: ${looks} walks, each the same for seeds 11 and 215, each moving as its frames and its anim player say for three cycles (${still} with steps standing still; ${loopsFrom.length ? `looping from past their start: ${loopsFrom.join(', ')}` : 'all looping whole'}; a walk with an intro wraps and catches up in step); a scripted spike walked ${went.toFixed(3)} px in 600 steps, as its gait and its anim player say; the paper turn flips at step ${TURN_HALF} of ${TURN_STEPS}; ${happies.length} happies (a grow-up's cheer), ${Math.min(...happies)}-${Math.max(...happies)} steps, each the same for seeds 11 and 215 and played through in exactly that`);
   noteUse(sim); noteUse(t);
 }
 
@@ -931,16 +952,22 @@ let firstRide = '';
   /**
    * Step a world, checking every grow event as it comes: the stage it grew into is the next, its stage's start moved on
    * exactly one stage's length, and the dragon was settled as the step began (no keeper on any of its jobs, no route
-   * left, standing still in a slot its new stage fits, and no act but one ending that step: life runs after the acts,
-   * and the dragon may set off for a job later in the same step); the step after, each need not being met drains at
-   * the new stage's rate. And as it goes: every slot held fits its dragon's stage -- or, a baby on its way to grow up (goal `settle`),
-   * its next stage's -- and a module holds one grown dragon (such a baby counted as one) or two babies.
+   * left, standing still in a slot its new stage fits, and no act but one ending that step: life runs after the acts)
+   * with room to grow (no keeper where its new body is: life.ts inTheWayOfGrowing); the step after, each need not being
+   * met drains at the new stage's rate; and it cheers: it holds exactly its new stage's `happy` (gait.ts happyLen), and
+   * all that while it stands where it grew -- no route, no walk or turn, no act, no keeper coming for it -- so the view's
+   * `happy` plays through. And as it goes: every slot held fits its dragon's stage -- or, a baby on its way to grow up
+   * (goal `settle`), its next stage's -- and a module holds one grown dragon (such a baby counted as one) or two babies.
+   * (`each` runs before every step: a scenario's own doings.)
    */
-  const run = (w: CareSim, steps: number, what: string, done: () => boolean) => {
+  const run = (w: CareSim, steps: number, what: string, done: () => boolean, each: () => void = () => {}) => {
     const was = new Map(w.dragons.map((d) => [d.id, { stage: d.stage, since: d.stageSince }]));
     const grew: { t: number; d: Dragon; stage: string; at: string; delay: number }[] = [], walked = new Set<Dragon>();
-    let after: { d: Dragon; needs: Needs }[] = [], drains = 0;
-    for (let s = 1; s <= steps && !done(); s++) {
+    const cheering = new Map<Dragon, { until: number; x: number }>();
+    let after: { d: Dragon; needs: Needs }[] = [], drains = 0, cheers = 0;
+    // (a run ends when it is done and every cheer under way has played out)
+    for (let s = 1; s <= steps && !(done() && !cheering.size); s++) {
+      each();
       // (each dragon due by this step, as the step begins: whether it is settled -- life runs after the acts)
       const pre = new Map<Dragon, string>();
       for (const d of w.dragons) {
@@ -948,7 +975,7 @@ let firstRide = '';
         if (!next || stageDue(w, d) > w.clock + 1) continue;
         const why = [d.act && d.act.t + 1 < d.act.len ? `act ${d.act.need}` : '', d.legs.length ? `${d.legs.length} legs` : '', d.move !== 'still' ? d.move : '', d.turn >= 0 ? 'turning' : '',
           w.lift.rider === d.id ? 'the lift\'s rider' : '', w.jobs.some((j) => j.dragon === d && j.keeper) ? `${w.jobs.find((j) => j.dragon === d && j.keeper)!.keeper!.name} on it` : '',
-          !d.slot || !fitsSlot(d.slot, next) || d.x !== d.slot.x || d.f !== d.slot.f ? `in the ${where(w, d)}` : ''].filter(Boolean);
+          !d.slot || !fitsSlot(d.slot, next) || d.x !== d.slot.x || d.f !== d.slot.f ? `in the ${where(w, d)}` : '', inTheWayOfGrowing(w, d, next) ? `${inTheWayOfGrowing(w, d, next)} where it grows` : ''].filter(Boolean);
         pre.set(d, why.join(', '));
       }
       w.step();
@@ -959,6 +986,11 @@ let firstRide = '';
         if (Math.abs(got - want) > 1e-12) fail(`grow (${what}): ${d.name}'s ${k} drained ${got} the step after it grew ${d.stage}, not ${want}`);
       }
       after = [];
+      for (const [d, c] of cheering) {
+        if (w.tick >= c.until) { cheering.delete(d); cheers++; continue; }
+        const j = w.jobs.find((q) => q.dragon === d && q.keeper);
+        if (d.legs.length || d.move !== 'still' || d.act || d.x !== c.x || j || d.hold !== c.until - w.tick) { fail(`grow (${what}), step ${w.tick}: ${d.name}, ${c.until - w.tick} steps of its cheer left (hold ${d.hold}), is ${d.move}${d.legs.length ? ` with ${d.legs.length} legs` : ''}${d.act ? `, ${d.act.need} under way` : ''}${j ? `, ${j.keeper!.name} coming` : ''}`); cheering.delete(d); }
+      }
       for (const d of w.dragons) {
         if (d.goal === 'settle' && d.legs.length) walked.add(d);
         const sl = d.slot, next = nextStage(d.stage);
@@ -983,9 +1015,11 @@ let firstRide = '';
         grew.push({ t: w.tick, d, stage: e.stage, at: where(w, d), delay: w.clock - d.stageSince });
         was.set(d.id, { stage: d.stage, since: d.stageSince });
         after.push({ d, needs: { ...d.needs } });
+        if (d.hold !== happyLen(d.element, d.stage)) fail(`grow (${what}): ${d.name} grew ${d.stage} holding ${d.hold}, not its happy's ${happyLen(d.element, d.stage)} steps`);
+        cheering.set(d, { until: w.tick + d.hold, x: d.x });
       }
     }
-    return { grew, walked, drains };
+    return { grew, walked, drains, cheers };
   };
   // (a) alone: a baby in the Hatchery grows young, adult and elder, each 30 short days after the last
   const alone = new CareSim(START_ROOMS, [BURR], START_KEEPERS, { seed: 1, dayLen: SHORT }), burr = alone.dragons[0];
@@ -1014,8 +1048,30 @@ let firstRide = '';
   }
   if (dueIn !== 180 || at < 180 || ember.stage !== 'elder' || ember.stageSince - since0 !== STAGE_DAYS * DAY_STEPS) fail(`grow (real): EMBER, due in ${dueIn} steps, is ${ember.stage}${at > 0 ? ` from step ${at}` : ''} (want an elder from step 180 to ${180 + GROW_REAL}, its stage begun exactly ${STAGE_DAYS} days of ${DAY_STEPS} steps on)`);
   noteUse(real);
+  // (d) a baby walking to grow up, asked for by a need in the room it is going to (its module slot's room) and Rushed
+  // there -- or choosing it at a landing while the car serves another: either way travel.ts goFor gives it a slot in
+  // that room -- is served there in a baby's sub-slot, never in the module slot, which a baby doesn't fit (run's check,
+  // every step), then grows up, settled in a module slot. Every module slot on the ground floor is taken, so BURR's is
+  // upstairs, a ride away.
+  const up = ([['EMBER', 'kitchen', 0], ['ZAP', 'kitchen', 1], ['RIPPLE', 'bath', 0], ['WICK', 'bath', 1]] as const)
+    .map(([n, room, i]): DragonPlace => ({ ...START_DRAGONS.find((p) => p.name === n)!, slot: { room, i } }));
+  const call = new CareSim(START_ROOMS, [...up, { ...BURR, days: STAGE_DAYS }], START_KEEPERS, { seed: 1, dayLen: SHORT }), cb = call.dragons[4];
+  for (const d of call.dragons) for (const k of NEEDS) if (hasNeed(d.element, k)) d.needs[k] = 1;
+  let called = '', served = '', rushed = false, asked: NeedKind | null = null;
+  const c = run(call, 12000, 'called', () => cb.stage === 'young', () => {
+    if (!asked && cb.goal === 'settle' && cb.move === 'walk' && cb.slot) {
+      asked = NEEDS.find((k) => NEED_ROOM[k] === call.rooms[cb.slot!.room].kind && hasNeed(cb.element, k)) ?? null;
+      if (asked) { cb.needs[asked] = 0.3; called = `${asked}, for the ${where(call, cb)} it was going to`; }
+    }
+    const j = asked && !rushed ? call.jobs.find((q) => q.dragon === cb && q.need === asked) : null;
+    if (j) { call.rush(j); rushed = true; }
+    if (called && !served && cb.act && cb.slot) served = `${cb.act.need} in the ${where(call, cb)} (${cb.slot.baby ? 'a sub-slot' : 'a module slot'})`;
+  });
+  const cy = c.grew.find((g) => g.d === cb);
+  if (!called || !rushed || !served.endsWith('(a sub-slot)') || !cy || cy.d.slot?.baby) fail(`grow (called): BURR ${called ? `was called (${called}), ${rushed ? 'Rushed' : 'not Rushed'}, served ${served || 'never'}, grew ${cy ? `young in the ${cy.at}` : 'never'}` : 'never walked to grow up'}`);
+  noteUse(call);
   const fmt = (r: typeof b) => r.grew.map((g) => `${g.d.name} ${g.stage} ${g.delay}`).join(', ');
-  console.log(`  13 growing up: alone (a ${SHORT}-step day), BURR grew ${a.grew.map((g) => `${g.stage} at step ${g.t} (${g.at}, ${g.delay} late)`).join(', ')}, each stage exactly ${LEN} steps after the last, walking out of the Hatchery to a module slot first; ${a.drains + b.drains} needs drained at the new stage's rate the step after; the busy barn (seven adults and BURR falling due 5 s apart), steps late: ${fmt(b)} (at most ${busy.stats.growDelayMax}, gate ${GROW_BUSY}); the real day (${DAY_STEPS} steps), EMBER ${STAGE_DAYS} days less a minute in grew an elder at step ${at} (due at 180)`);
+  console.log(`  13 growing up: alone (a ${SHORT}-step day), BURR grew ${a.grew.map((g) => `${g.stage} at step ${g.t} (${g.at}, ${g.delay} late)`).join(', ')}, each stage exactly ${LEN} steps after the last, walking out of the Hatchery to a module slot first; ${a.drains + b.drains} needs drained at the new stage's rate the step after; ${a.cheers + b.cheers + c.cheers} grow-ups held for their happy, none moved on or met meanwhile, none with a keeper where it grew; the busy barn (seven adults and BURR falling due 5 s apart), steps late: ${fmt(b)} (at most ${busy.stats.growDelayMax}, gate ${GROW_BUSY}); the real day (${DAY_STEPS} steps), EMBER ${STAGE_DAYS} days less a minute in grew an elder at step ${at} (due at 180); Rushed on its way to grow up (${called}), BURR was served ${served} and grew young in the ${cy?.at ?? '-'}, ${cy?.delay ?? '-'} late`);
 }
 
 // ---------- 14. eggs and hatching (#5.4, the Hatchery) ----------
@@ -1083,6 +1139,27 @@ let firstRide = '';
   const baby = full.dragons.find((d) => full.events.some((e) => e.kind === 'hatch' && e.dragon === d.id));
   if (!baby || baby.slot !== freed || full.eggs.length || full.dragons.length !== n0) fail(`eggs: a sub-slot freed, the waiting egg ${baby ? `hatched into the ${baby.slot ? full.rooms[baby.slot.room].kind : '-'}:${baby.slot?.i}, not the freed one` : 'did not hatch'} (${full.eggs.length} eggs, ${full.dragons.length} dragons)`);
   noteUse(full);
+  // a hatchling takes the Hatchery's sub-slot nearest its own nest (standing in front of its nest, now empty, not in
+  // front of another's egg): the egg in nest 2, due first, hatches into the hatchery:1 (x 1152), not the hatchery:0
+  const near = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1, dayLen: SHORT });
+  near.addEgg('fire'); near.addEgg('dusk'); near.addEgg('spike', near.clock - H);
+  near.step();
+  const hn = near.dragons.find((d) => near.events.some((e) => e.kind === 'hatch' && e.dragon === d.id));
+  const hnAt = hn?.slot ? `${near.rooms[hn.slot.room].kind}:${hn.slot.i}` : '-';
+  if (!hn || hnAt !== 'hatchery:1' || near.eggs.length !== 2) fail(`eggs: the egg in nest 2 hatched into ${hn ? `${hn.name} in the ${hnAt}` : 'nothing'}, not a baby in the hatchery:1 in front of its own nest`);
+  noteUse(near);
+  // a baby moved on (a lingerer evicted, or a Rush's bump) never comes to rest in the Hatchery's sub-slots -- they are
+  // the hatchlings' first places, so the nests stay in view: BURR, lingering in the bathhouse's second module, is moved
+  // on for ZAP's bath, the Hatchery's sub-slot the nearest free, and goes elsewhere
+  const P = (n: string, room: RoomKind, i: number): DragonPlace => ({ ...START_DRAGONS.find((p) => p.name === n)!, slot: { room, i } });
+  const ev = new CareSim(START_ROOMS, [{ name: 'BURR', element: 'spike', stage: 'baby', seed: 45, slot: { room: 'bath', i: 5 } }, P('RIPPLE', 'bath', 0), P('ZAP', 'kitchen', 0)], START_KEEPERS, { seed: 1, dayLen: SHORT });
+  for (const d of ev.dragons) for (const k of NEEDS) if (hasNeed(d.element, k)) d.needs[k] = 1;
+  const eb = ev.dragons[0], ez = ev.dragons[2];
+  ez.needs.bath = 0.3;
+  for (let s = 0; s < 600 && eb.goal !== 'evict'; s++) ev.step();
+  const evAt = eb.slot ? `${ev.rooms[eb.slot.room].kind}:${eb.slot.i}` : '-';
+  if (eb.goal !== 'evict' || !ez.slot || ev.rooms[ez.slot.room].kind !== 'bath' || evAt.startsWith('hatchery') || evAt === 'bath:5') fail(`eggs: BURR, in ZAP's way to its bath, was ${eb.goal === 'evict' ? `moved on to the ${evAt}` : 'not moved on'} (ZAP going to the ${ez.slot ? `${ev.rooms[ez.slot.room].kind}:${ez.slot.i}` : '-'})`);
+  noteUse(ev);
   // names: every element's own six, none over NAME_MAX and none shared; past them a number, still unique and short
   const fake = (names: readonly string[]) => ({ dragons: names.map((name) => ({ name })) }) as unknown as CareSim;
   const all = Object.values(NAMES).flat();
@@ -1091,7 +1168,7 @@ let firstRide = '';
   const got: string[] = [];
   for (let i = 0; i < 80; i++) got.push(hatchName(fake(got), 'lightning'));
   if (new Set(got).size !== got.length || got.some((n) => n.length > NAME_MAX)) fail(`names: 80 lightning hatchlings gave ${new Set(got).size} names, the longest ${Math.max(...got.map((n) => n.length))} characters`);
-  console.log(`  14 eggs: three eggs in nests 0-2, a fourth not taken; each hatched exactly ${H} steps (2 days of ${SHORT}) after it was laid: ${r.hatched.map((h) => `${h.d.name} (id ${h.d.id}, seed ${h.d.seed}) into the ${h.at}, fed ${((fedIn.get(h.d) ?? NaN) / FPS).toFixed(1)} s later`).join('; ')}; two runs alike; every sub-slot taken, the egg waited ${H} steps, nothing lost, and hatched into the ${freed ? `${full.rooms[freed.room].kind}:${freed.i}` : '-'} the step it freed; 80 lightning names, the last ${got[got.length - 1]}`);
+  console.log(`  14 eggs: three eggs in nests 0-2, a fourth not taken; each hatched exactly ${H} steps (2 days of ${SHORT}) after it was laid: ${r.hatched.map((h) => `${h.d.name} (id ${h.d.id}, seed ${h.d.seed}) into the ${h.at}, fed ${((fedIn.get(h.d) ?? NaN) / FPS).toFixed(1)} s later`).join('; ')}; two runs alike; every sub-slot taken, the egg waited ${H} steps, nothing lost, and hatched into the ${freed ? `${full.rooms[freed.room].kind}:${freed.i}` : '-'} the step it freed; 80 lightning names, the last ${got[got.length - 1]}; a hatchling in front of its own nest (${hn?.name} from nest 2 into the ${hnAt}); a baby moved on never to the Hatchery (BURR, in ZAP's way, to the ${evAt})`);
 }
 
 // ---------- 8 (the whole suite). every named room used (#11) ----------

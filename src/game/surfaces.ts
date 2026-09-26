@@ -50,9 +50,10 @@ export const WALLS: Readonly<Partial<Record<RoomKind, string>>> = Object.freeze(
 export const PROPS = Object.freeze({ hearth: '#9c948a', firebox: '#3a2626', tub: '#a47a52', pallet: '#a47a52', mattress: '#e6dcc4' });
 
 /**
- * The Hatchery's nest mounds, the straw an egg lies in (L 0.72): every element's egg -- its baby's scale colour, eggs.ts
- * -- keeps >= 25 % luminance from it (tools/palette-check.ts, the egg gate), so a dark egg and a pale one both read in
- * the nest. Its strands and the cup's rim are 2 px marks on it.
+ * The Hatchery's nests' straw heaps, the straw an egg lies nestled in (L 0.72): every element's egg -- its baby's scale
+ * colour, eggs.ts -- keeps >= 25 % luminance from it (tools/palette-check.ts, the egg gate), so a dark egg and a pale
+ * one both read in the nest, and the egg is seen against this straw alone (the gate's egg-lie: layout.ts NEST_RY). Its
+ * strands are 2 px marks on the heap's flanks, clear of the egg.
  */
 export const NEST = '#e6dcc4';
 

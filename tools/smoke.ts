@@ -200,14 +200,18 @@ async function liveOldSave(page: any): Promise<string[]> {
 const OLD_SAVE = JSON.stringify({ ...JSON.parse(PLANTED), v: 999, tick: 9999 });
 /**
  * Saves of this version that parse but that the view can't build (a dragon of an element no one knows, a keeper no one
- * knows) or draw (a job for a need no one knows: it builds, and only the load's trial draw finds it), each with the
- * word that marks it.
+ * knows) or draw (a job for a need no one knows: it builds, and only the load's trial draw finds it), or whose egg this
+ * build can't hatch (an element no one knows, a nest there isn't: the egg lies unstepped and off the start's camera for
+ * days, so only CareSim.fromSave's own checks find it), each with the text that marks it in a save.
  */
 const BROKEN = (mark: string, f: (s: any) => void): { blob: string; mark: string } => { const s = JSON.parse(PLANTED); f(s); return { blob: JSON.stringify(s), mark }; };
+const EGG = (s: any, e: object) => { s.eggs = [{ id: 0, element: 'fire', seed: 77, laid: s.clock0 + s.tick, nest: 0, ...e }]; s.nextEggId = 1; };
 const BROKEN_SAVES = [
-  BROKEN('plasma', (s) => { s.dragons[2].element = 'plasma'; }),
-  BROKEN('nobody', (s) => { s.keepers[1].look = 'nobody'; }),
-  BROKEN('dance', (s) => { s.jobs[0].need = 'dance'; }),
+  BROKEN('"plasma"', (s) => { s.dragons[2].element = 'plasma'; }),
+  BROKEN('"nobody"', (s) => { s.keepers[1].look = 'nobody'; }),
+  BROKEN('"dance"', (s) => { s.jobs[0].need = 'dance'; }),
+  BROKEN('"lava"', (s) => EGG(s, { element: 'lava' })),
+  BROKEN('"nest":7', (s) => EGG(s, { nest: 7 })),
 ];
 
 /**
@@ -225,7 +229,7 @@ function liveBrokenSave({ blob, mark }: { blob: string; mark: string }) {
     if ((await stored(page, BACKUP_KEY)) !== blob) out.push('the broken save was not kept at the backup key');
     const T: number = await page.evaluate(() => (window as any).__dragonCare.baseSaveNow());
     const saved = await stored(page, SAVE_KEY), s = saved ? JSON.parse(saved) : null;
-    if (!s || s.tick !== T || s.tick > 2000 || saved!.includes(`"${mark}"`)) out.push(`the save written is ${s ? `at tick ${s.tick}` : 'nothing'}, not the new barn: the broken one ('${mark}') was written back`);
+    if (!s || s.tick !== T || s.tick > 2000 || saved!.includes(mark)) out.push(`the save written is ${s ? `at tick ${s.tick}` : 'nothing'}, not the new barn: the broken one (${mark}) was written back`);
     return out;
   };
 }
@@ -297,7 +301,9 @@ function hatchedOne(b: BaseHook): string[] {
 /**
  * view=base, live (save=0): the dragon card. Paused (so nothing changes under the pointer), a tap on the head of a
  * dragon on screen that has no job waiting (the hook's `waiting` false, its `head` clear of the top bar, the job strip
- * and every waiting dragon's bubble) opens its card (the hook's `card` is its name); a tap on the card closes it.
+ * and every waiting dragon's bubble) opens its card (the hook's `card` is its name) and Rushes nothing; a tap on the
+ * card closes it; and a tap on the head of a dragon with a job waiting opens its card too, and Rushes that job (exactly
+ * one Rush).
  */
 async function baseCard(page: any): Promise<string[]> {
   const out: string[] = [];
@@ -321,8 +327,17 @@ async function baseCard(page: any): Promise<string[]> {
   await page.mouse.click(box.x + 40 * k, box.y + 60 * k);
   await page.waitForTimeout(150);
   if ((await st()).card !== null) out.push('tapping the card did not close it');
+  // (a waiting dragon's head, clear of the card, the bars and every other bubble but its own)
+  const w = b.dragons.find((q) => q.waiting && q.head && q.head.x > 180 && clear(q, q.head));
+  if (w) {
+    await page.mouse.click(box.x + w.head!.x * k, box.y + w.head!.y * k);
+    await page.waitForTimeout(150);
+    const e = await st();
+    if (e.card !== w.name) out.push(`tapping ${w.name}'s head (a job waiting) opened ${e.card === null ? 'no card' : `${e.card}'s card`}`);
+    if (e.rushes !== rushes + 1) out.push(`tapping ${w.name} (a job waiting) made ${e.rushes - rushes} Rushes, not 1`);
+  } else out.push(`no dragon with a job waiting has its head on screen clear of the bubbles (${b.dragons.map((q) => `${q.name} ${q.waiting ? 'waiting' : 'free'} ${q.head ? `${Math.round(q.head.x)},${Math.round(q.head.y)}` : 'off'}`).join('; ')})`);
   await page.keyboard.press('p');
-  if (!out.length) console.log(`        card: ${d.name}'s opened by a tap on its head, closed by a tap on it`);
+  if (!out.length) console.log(`        card: ${d.name}'s opened by a tap on its head (nothing waiting, no Rush), closed by a tap on it; ${w!.name}'s opened by a tap on its head and its job Rushed`);
   return out;
 }
 

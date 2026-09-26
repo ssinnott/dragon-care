@@ -72,6 +72,9 @@ const pairs: string[] = [
   'shots/base_growup.png=view=base&preset=growup&t=36',
   'shots/base_hatchery.png=view=base&preset=eggs&t=600&cam=872,376',
   'shots/base_hatch.png=view=base&preset=hatch&t=70&cam=872,376',
+  // the Hatchery with a hatchling at home: the eggs preset's water egg hatched (step 2160) into SPLASH, standing in front
+  // of its own nest, now empty, with the rock and dusk eggs still in view in theirs
+  'shots/base_hatchery_home.png=view=base&preset=eggs&t=2230&cam=872,376',
 ];
 for (const el of ['fire', 'rock', 'slinkwing']) {
   for (const stage of ['elder', 'adult', 'young', 'baby']) {

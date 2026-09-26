@@ -14,11 +14,13 @@
 // 600 frames and when the page is hidden or left (storage.ts); a frozen page never calls attach(), so t= is always the
 // new game (or the preset) stepped t times at 1x.
 // Growing up and eggs (7; plan S5): a dragon that grows up is rebuilt at its new stage, drawn flat in its glow's
-// highlight inside its own ink for 12 steps (the grow-up's flash, ART_BIBLE 4.2: the one flash the base draws, never
-// for the time of day) and plays `happy` once, with a toast;
+// highlight inside its own ink for 12 frames (the grow-up's flash, ART_BIBLE 4.2: the one flash the base draws, never
+// for the time of day; frames shown, not world steps, so it shows as long at 8x) and plays `happy` once -- the
+// simulation holds it where it stands for exactly that long (life.ts: its hold) -- with a toast; toasts of life's news
+// (grow-ups, the dawn's tip) wait their turn, and grow-ups into one stage that come together share one;
 // the Hatchery's eggs lie in their nests (eggs.ts: their cracks and wobble), and one that hatches throws its shell bits
-// as the baby stands up; at 05:00 a tip says who grows up within two days. A tap on a dragon with nothing waiting opens
-// its card (its stage and day of it, its needs: hud.ts); a tap on one with a job waiting still Rushes it.
+// as the baby stands up; at 05:00 a tip says who grows up within two days. A tap on a dragon opens its card (its stage
+// and day of it, its needs: hud.ts); a tap on one with a job waiting also Rushes that job, as it always has.
 import { drawDragon, rootToScreen } from '../art/dragon/rig.ts';
 import { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
 import { ELEMENT_ANIM_FALLBACK } from '../art/dragon/anims.ts';
@@ -39,7 +41,7 @@ import type { ButtonName } from './hud.ts';
 import { loadSave, writeSave, clearSave, backupSave } from './storage.ts';
 import { freshSeed } from '../lib/engine/rng.ts';
 import type { Stage } from '../art/dragon/stages.ts';
-import { WORLD_W, WORLD_H, feetY, nestX } from './layout.ts';
+import { WORLD_W, WORLD_H, feetY, nestX, eggBottom } from './layout.ts';
 import { drawEgg, drawShellBits, BITS_FRAMES } from './eggs.ts';
 import { stageDue } from './life.ts';
 import { walking, feetOf } from './travel.ts';
@@ -81,10 +83,23 @@ const NEW_FRAMES = 120;
 const RATES = [1, 2, 4, 8] as const;
 type Rate = typeof RATES[number];
 const DIDNT_FIT = 'NEW BARN: THE OLD SAVE DIDN\'T FIT';
-/** A dragon that has just grown up is drawn flat (its glow's highlight, inside its ink) this many world steps (ART_BIBLE 4.2: the new silhouette's 12 f flash). */
+/**
+ * A dragon that has just grown up is drawn flat (its glow's highlight, inside its ink) this many frames shown (ART_BIBLE
+ * 4.2: the new silhouette's 12 f flash) -- frames, not world steps, so it lasts as long at 8x (paused, it holds).
+ */
 const GROW_FLASH = 12;
-/** What a grow-up's toast calls the new stage: "EMBER IS AN ELDER NOW!". */
+/** What a grow-up's toast calls the new stage, for one dragon and for more: "EMBER IS AN ELDER NOW!", "EMBER AND ZAP ARE ELDERS NOW!". */
 const STAGE_NOW: Readonly<Record<Stage, string>> = Object.freeze({ baby: 'A BABY', young: 'YOUNG', adult: 'AN ADULT', elder: 'AN ELDER' });
+const STAGES_NOW: Readonly<Record<Stage, string>> = Object.freeze({ baby: 'BABIES', young: 'YOUNG', adult: 'ADULTS', elder: 'ELDERS' });
+/** Life's news waiting for the toast: dragons that grew into a stage (together), or a line (the dawn's tip). */
+type News = { stage: Stage; names: string[] } | { text: string };
+/** The toast's line for a piece of news: one dragon grown up, two, or two named and how many more. */
+function newsText(n: News): string {
+  if ('text' in n) return n.text;
+  const [a, b] = n.names;
+  return n.names.length === 1 ? `${a} IS ${STAGE_NOW[n.stage]} NOW!`
+    : `${n.names.length === 2 ? `${a} AND ${b}` : `${a}, ${b} AND ${n.names.length - 2} MORE`} ARE ${STAGES_NOW[n.stage]} NOW!`;
+}
 /** The dawn's tip looks this many game days ahead for stage-ups. */
 const TIP_DAYS = 2;
 
@@ -110,7 +125,7 @@ export interface BaseViewOpts {
 /**
  * One dragon on screen: its pet, playing its wake before it goes back to idle, its eat bowl (found once), the stage it
  * was built at, the walk bout its walk anim was started for (-1: none yet; travel.ts Dragon.walkSeq), and after a
- * grow-up the world steps of its flash left and whether its `happy` is still playing (cheering).
+ * grow-up the frames of its flash left and whether its `happy` is still playing (cheering).
  */
 export interface PetView {
   pet: Pet;
@@ -148,8 +163,12 @@ export class BaseView {
   /** World steps drawn (the ambient budget's clock), and frames shown (the UI's: toasts, NEW's second tap, the autosave). */
   private frame = 0;
   private uiFrame = 0;
-  /** The toast showing and the frames it has left; NEW's frames left to be tapped again (0: not asked). */
+  /**
+   * The toast showing and the frames it has left; life's news waiting to be shown, in turn; NEW's frames left to be
+   * tapped again (0: not asked).
+   */
   private toast: { text: string; left: number } | null = null;
+  private news: News[] = [];
   private newArmed = 0;
   /** Attached with saving on: the autosave runs. */
   private saving = false;
@@ -158,8 +177,8 @@ export class BaseView {
   private chips: { job: Job; r: Rect }[] = [];
   /** The dragon whose card is open (by id; null: none). */
   private card: number | null = null;
-  /** Hatches whose shell bits are flying: the egg's element, its nest's spot (world px) and the world steps since. */
-  private hatches: { el: Dragon['element']; x: number; y: number; age: number }[] = [];
+  /** Hatches whose shell bits are flying: the baby's id, the egg's element, its egg's spot (world px) and the world steps since. */
+  private hatches: { id: number; el: Dragon['element']; x: number; y: number; age: number }[] = [];
   /** Last frame's heads of the dragons drawn (screen px, by dragon id), for the hook. */
   private heads = new Map<number, { x: number; y: number }>();
   private detachers: (() => void)[] = [];
@@ -184,7 +203,7 @@ export class BaseView {
     this.cast.clear();
     for (const [id, v] of cast) this.cast.set(id, v);
     this.keeperAgents = agents; this.building = building; this.plates = plates;
-    this.bubbles = []; this.chips = []; this.card = null; this.hatches = []; this.heads.clear();
+    this.bubbles = []; this.chips = []; this.card = null; this.hatches = []; this.heads.clear(); this.news = [];
   }
 
   /**
@@ -251,6 +270,8 @@ export class BaseView {
    * the UI's timers run once. Paused, only the camera and the UI move. A frozen page's steps are always at 1x.
    */
   step(): void {
+    // (a grow-up's flash counts the frames shown that step the world: as long at 8x as at 1x, and held while paused)
+    if (this.speed > 0) for (const v of this.cast.values()) if (v.flash > 0) v.flash--;
     for (let n = this.speed; n > 0; n--) this.worldStep();
     if (this.camTo) {
       this.setCam(this.camX + (this.camTo.x - this.camX) / 6, this.camY + (this.camTo.y - this.camY) / 6);
@@ -258,13 +279,13 @@ export class BaseView {
     }
     this.uiFrame++;
     if (this.toast && --this.toast.left <= 0) this.toast = null;
+    if (!this.toast && this.news.length) this.say(newsText(this.news.shift()!));
     if (this.newArmed > 0) this.newArmed--;
     if (this.saving && this.uiFrame % AUTOSAVE_FRAMES === 0) this.save();
   }
 
-  /** One world step, and the view kept in step with it (a grow-up's flash and cheer, a hatch's shell bits, the dawn's tip). */
+  /** One world step, and the view kept in step with it (a grow-up's `happy`, a hatch's shell bits, the dawn's tip). */
   private worldStep(): void {
-    for (const v of this.cast.values()) if (v.flash > 0) v.flash--;
     for (const h of this.hatches) h.age++;
     this.hatches = this.hatches.filter((h) => h.age < BITS_FRAMES);
     this.sim.step();
@@ -280,9 +301,9 @@ export class BaseView {
 
   /**
    * What the step's life events look like (plan S5): a dragon grown up -- already rebuilt at its new stage (syncCast) --
-   * flashes flat for GROW_FLASH steps and plays `happy` once, and a toast says so; a hatch throws its egg's shell
-   * bits from the nest the baby stands up in. And at 05:00 (the dawn), a tip: the dragons whose stage-up falls due
-   * within TIP_DAYS days.
+   * flashes flat for GROW_FLASH frames and plays `happy` once (the simulation holds it for that: its hold), and a
+   * toast says so (in turn; the step's grow-ups into one stage share one); a hatch throws its egg's shell bits from the
+   * nest the baby stands up in. And at 05:00 (the dawn), a tip: the dragons whose stage-up falls due within TIP_DAYS days.
    */
   private lifeEvents(): void {
     const sim = this.sim;
@@ -292,15 +313,18 @@ export class BaseView {
       if (e.kind === 'grow') {
         v.flash = GROW_FLASH; v.cheering = true;
         v.pet.player.play('happy', { restart: true, blend: 4 }); v.pet.anim = 'happy'; v.waking = false;
-        this.say(`${d.name} IS ${STAGE_NOW[e.stage]} NOW!`);
+        // (news of a grow-up into this stage still waiting to be shown -- this step's, or one queued behind a toast --
+        // takes this name too)
+        const same = this.news.find((n): n is { stage: Stage; names: string[] } => 'stage' in n && n.stage === e.stage);
+        if (same) same.names.push(d.name); else this.news.push({ stage: e.stage, names: [d.name] });
       } else {
         const room = sim.rooms.find((r) => r.kind === 'hatchery');
-        if (room) this.hatches.push({ el: d.element, x: nestX(room, Math.max(0, Math.min(2, Math.round((d.x - nestX(room, 0)) / 50)))), y: feetY(room.floor) - 12, age: 0 });
+        if (room) this.hatches.push({ id: d.id, el: d.element, x: nestX(room, Math.max(0, Math.min(2, Math.round((d.x - nestX(room, 0)) / 50)))), y: eggBottom(room.floor), age: 0 });
       }
     }
     if (sim.clock % sim.dayLen === PHASE_HOURS.dawn * hourSteps(sim.dayLen)) {
       const soon = sim.dragons.filter((d) => d.stage !== 'elder' && stageDue(sim, d) - sim.clock <= TIP_DAYS * sim.dayLen);
-      if (soon.length) this.say(soon.length === 1 ? `${soon[0].name} GROWS UP IN ${TIP_DAYS} DAYS` : `${soon.length} DRAGONS GROW UP IN ${TIP_DAYS} DAYS`);
+      if (soon.length) this.news.push({ text: soon.length === 1 ? `${soon[0].name} GROWS UP IN ${TIP_DAYS} DAYS` : `${soon.length} DRAGONS GROW UP IN ${TIP_DAYS} DAYS` });
     }
   }
 
@@ -338,8 +362,9 @@ export class BaseView {
         p.anim = 'walk'; v.walkSeq = d.walkSeq; v.waking = false; p.hold = 0;
       }
     } else {
-      // (a grow-up's happy plays through before anything else: the dragon is settled, so nothing else is asked of it yet)
-      if (v.cheering && (p.player.done || p.player.name !== 'happy')) v.cheering = false;
+      // (a grow-up's happy plays through: the simulation holds the dragon where it stands meanwhile -- its hold, as long
+      // as this happy: life.ts -- so it neither walks nor turns; an act that starts once the hold is done takes over)
+      if (v.cheering && (p.player.done || p.player.name !== 'happy' || d.act)) v.cheering = false;
       const want = v.cheering ? 'happy' : this.animFor(d);
       if (v.waking && p.player.done) { v.waking = false; p.player.play('idle', { blend: 8 }); p.anim = 'idle'; }
       if (want !== p.anim && !(v.waking && want === 'idle')) {
@@ -388,12 +413,14 @@ export class BaseView {
     ctx.save();
     ctx.translate(-cx, -cy);
     drawLiftCar(ctx, this.sim.lift.y);
-    // the eggs in their nests (on the building, under the cast)
+    // the eggs in their nests (on the building, under the cast), and a hatch's shell bits bursting from behind the baby
+    // standing up in the nest (under the cast too: never over a dragon, or an eye)
     const hatchery = this.sim.rooms.find((r) => r.kind === 'hatchery');
     if (hatchery) for (const e of this.sim.eggs) {
-      const x = nestX(hatchery, e.nest), y = feetY(hatchery.floor) - 12;
+      const x = nestX(hatchery, e.nest), y = eggBottom(hatchery.floor);
       if (seen(x - 8, x + 8, y - 16, y + 2)) drawEgg(ctx, e.element, x, y, this.progress(e), this.sim.tick);
     }
+    for (const h of this.hatches) drawShellBits(ctx, h.el, h.x, h.y, h.age);
     // the cast, y-sorted by the feet; keepers stand a step behind the dragons they work with, so a dragon's head is
     // never covered (ART_BIBLE 1.4: nothing covers the eye) -- and one on a ladder, behind the dragons of both floors it
     // climbs between (sorted a step behind the upper floor's), so a head at a landing beside the ladder stays clear
@@ -407,7 +434,7 @@ export class BaseView {
     this.budget.begin(cast.filter((c) => c.pet).length, this.frame);
     let slot = 0;
     this.heads.clear();
-    const head = { x: 0, y: 0 }, eyes: { x: number; y: number; w: number; h: number }[] = [];
+    const head = { x: 0, y: 0 };
     for (const c of cast) {
       if (c.pet) {
         const p = c.pet;
@@ -417,17 +444,15 @@ export class BaseView {
         if (p.bowl) drawBowl(ctx, p);
         rootToScreen(p.rig, p.rig.j.cran.x, p.rig.j.cran.y, head);
         this.heads.set(c.id!, { x: head.x - cx, y: head.y - cy });
-        if (this.hatches.length) { rootToScreen(p.rig, p.rig.j.eye.x, p.rig.j.eye.y, head); eyes.push({ x: head.x - 6, y: head.y - 6, w: 12, h: 12 }); }
       } else if (c.keeper != null) drawKeeperVisual(ctx, this.keeperAgents[c.keeper], this.sim.keepers[c.keeper]);
     }
-    // a hatch's shell bits jump out of the nest over the baby standing up in it -- never over an eye
-    for (const h of this.hatches) drawShellBits(ctx, h.el, h.x, h.y, h.age, eyes);
     this.top.flush(ctx);
-    // the bubbles: each awake dragon's most pressing job that no one is at work on yet
+    // the bubbles: each awake dragon's most pressing job that no one is at work on yet (a hatchling's once its shell's
+    // bits have landed: they fly where its bubble stands)
     this.bubbles = [];
     const pt = { x: 0, y: 0 };
     for (const d of this.sim.dragons) {
-      if (d.act && d.act.need === 'sleep') continue;
+      if ((d.act && d.act.need === 'sleep') || this.hatches.some((h) => h.id === d.id)) continue;
       const j = this.waitingJob(d), v = this.cast.get(d.id);
       if (!j || !v) continue;
       const p = v.pet, J = p.rig.j;
@@ -497,7 +522,7 @@ export class BaseView {
     }
   }
 
-  /** Show a toast (it replaces the one showing). */
+  /** Show a toast now (it replaces the one showing; life's news waits its turn behind it). */
   private say(text: string): void { this.toast = { text, left: TOAST_FRAMES }; }
 
   /** Pick a speed (1, 2, 4 or 8 steps a frame), playing; pause and play. */
@@ -537,8 +562,9 @@ export class BaseView {
   /**
    * A tap: a top-bar button first (the rest of the bar takes the tap too: it covers the world there); then an open
    * dragon card closes (it covers the world there too); a job chip rushes its job and brings its dragon into view; a
-   * bubble, or the dragon itself, rushes its job -- and a dragon with no job waiting opens its card. A tap on anything
-   * else closes the card (the buttons leave it open: the game can be paused to read it).
+   * bubble rushes its job; a tap on the dragon itself opens its card -- and rushes its job, if one is waiting (plan S5:
+   * a tap on a waiting dragon still Rushes it; the card comes with it, so its age can be read whatever it is waiting
+   * for). A tap on anything else closes the card (the buttons leave it open: the game can be paused to read it).
    */
   tap(sx: number, sy: number): void {
     if (this.layers === 'all') {
@@ -561,7 +587,7 @@ export class BaseView {
       if (wx < a || wx > b || wy < pt.y || wy > p.y + 4) continue;
       const j = this.waitingJob(d);
       if (j) this.sim.rush(j);
-      else this.card = d.id;
+      this.card = d.id;
       return;
     }
   }

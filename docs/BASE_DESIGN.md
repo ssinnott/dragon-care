@@ -355,15 +355,19 @@ be moved on, and in 80 000 steps its egg never finds a sub-slot while needs sit 
 - **Bubbles** over the dragons.
 - **The job strip** along the bottom: the top five jobs in order, numbered, each chip in its tier's colour with a
   check or an hourglass. Tapping a chip pans to that dragon and rushes the job.
-- **A dragon's card** (160 x 76 at 8, 20): tap a dragon with no job waiting (one with a job waiting is Rushed, as
-  ever) and its card opens: its name and element, its stage and `DAY d OF 30` (d is the day of its stage, 7), the
-  stage's 30 days as a bar, and its needs, each an icon over a bar. A tap on the card, or anywhere else in the world,
-  closes it (the top bar's buttons leave it open, so the game can be paused to read it).
+- **A dragon's card** (160 x 76 at 8, 20): tap a dragon and its card opens (one with a job waiting is Rushed too, as
+  ever: a dragon has a job waiting most of the time, 60 to 79 % of it in the start barn, so the card comes with the Rush
+  rather than only without one): its name and element, its stage and `DAY d OF 30` (d is the day of its stage, 7), the
+  stage's 30 days as a bar, and its needs, each an icon over a bar. A tap on a bubble or a chip Rushes only. A tap on
+  the card, or anywhere else in the world, closes it (the top bar's buttons leave it open, so the game can be paused
+  to read it).
 - **The hint** (drag to look around, tap a bubble to Rush) on an ink strip at the bottom right, beside the job strip;
   it gives way when the strip reaches it.
 - **Toasts**, centred under the top bar for 3 s: "SURE? TAP AGAIN", "A NEW BARN", "NEW BARN: THE OLD SAVE DIDN'T FIT",
   a grow-up ("EMBER IS AN ELDER NOW!") and the dawn's tip at 05:00 ("3 DRAGONS GROW UP IN 2 DAYS": the dragons whose
-  stage-up falls due within two game days).
+  stage-up falls due within two game days). Life's news (the grow-ups, the tip) waits its turn behind the toast
+  showing, never cutting it short, and grow-ups into one stage still waiting to be shown share one toast ("EMBER AND
+  ZAP ARE ELDERS NOW!", "EMBER, BRAMBLE AND 2 MORE ARE ELDERS NOW!": the new game's seven all fall due at once).
 - **Panning:** drag the barn. **Keys:** 1 to 4 pick 1x, 2x, 4x and 8x; p pauses and plays.
 
 **4.9 First numbers** (tuning, not law):
@@ -507,27 +511,38 @@ stand spot <= 20 s, the bay's edge <= 60 s.
   seven start on the adult stage's first day. A dragon's stage-up falls due 30 days after its stage began, and is
   applied as soon as the dragon is **settled**: no act (a sleeper has one), no keeper on any of its jobs (coming, waiting
   at the stand spot or at work), no route left, standing still in its slot (not turning, waiting for the car or held at
-  the bay's edge). So a keeper never stands at the old stage's reach while the new body is swapped in. It stays
+  the bay's edge) -- and has **room to grow**: no keeper stands where its new body will be. A dragon settled but for a
+  keeper in that room (most often the one who has just served it, turning for home, or one at a post pickup) holds
+  where it is, taking no errand, until the keeper has walked out of it (at most 184 steps, 3 s, over 91 grow-ups
+  measured); without that hold it would set off on its next errand the step after being served and seldom be settled
+  with room. So a keeper never stands at the old stage's reach, or anywhere in the new body, while it is swapped in. It stays
   **exact**: the next stage counts from the day this one fell due, never from the day it was applied (`src/game/life.ts`;
   `npm run sim` section 13: each stage exactly 18 000 steps on a 600-step day). A baby in a baby sub-slot first takes a
   free module slot, which its next stage fits (3), and walks there; with none free it waits. Everything that goes by
   stage follows from that step on: the drains (a baby's 1.25 times, an elder's 0.8), the reach, the walk, the body's
   room. How long a stage-up waits is how long the dragon takes to finish what it was doing: alone, at most a minute
   (seeds 1 to 8 on a short day: 4 s to 49 s); in the busy barn, one errand (the walk to a need's room, the wait for the
-  one car, the job: 68 s to 148 s at most over seeds 1 to 8, checked against 3 minutes, a thirtieth of a stage: 4.7).
-  An elder's next is retirement to the garden (S6). **On screen:** the new stage's body appears at once, drawn flat in
-  its glow's highlight inside its own ink for 12 frames (the grow-up's flash, the one flash the base draws: never for
-  the time of day), then it plays `happy` and a toast says so ("EMBER IS AN ELDER NOW!"); ART_BIBLE 4.2's 240-frame
-  grow-up is not built yet. At 05:00 a toast names how many dragons grow up within two days, and a dragon's card (4.8)
-  shows the day of its stage.
+  one car, the job: 68 s to 144 s at most over seeds 1 to 8, checked against 3 minutes, a thirtieth of a stage: 4.7).
+  A baby on its way to its module slot that a need calls (or a Rush) to the room it is going to is met there in a
+  baby's sub-slot, like any baby, and goes on growing up after. An elder's next is retirement to the garden (S6).
+  **The cheer:** just grown up, a dragon holds where it stands for exactly its new stage's `happy` (61 to 139 steps,
+  read from the anim tables: `src/game/gait.ts` `happyLen`; the hold is the dragon's own `hold` and is saved): it takes
+  no errand, no keeper comes for it and no one moves it on, so nothing cuts the cheer short (`npm run sim` section 13
+  checks every grow-up). **On screen:** the new stage's body appears at once, drawn flat in its glow's highlight inside
+  its own ink for 12 frames (the grow-up's flash, the one flash the base draws: never for the time of day; frames
+  shown, so it lasts as long at 8x, and holds while paused), then it plays `happy` through and a toast says so
+  ("EMBER IS AN ELDER NOW!"); ART_BIBLE 4.2's 240-frame grow-up is not built yet. At 05:00 a toast names how many
+  dragons grow up within two days, and a dragon's card (4.8) shows the day of its stage.
 - **Eggs.** An egg (`CareSim.addEgg`: only a mission brings one, 5.6) lies in the lowest free of the Hatchery's three
   nests. It hatches **2 game days** after it was laid, as soon as a baby sub-slot is free for the baby (the Hatchery's
-  two first, else the nearest): a baby of the egg's element, with a new id, the first of its element's six names no
-  dragon has (then CINDER2, ASH2, ...; never over 8 characters), and a seed drawn from the world's seed and the egg's
-  id. It stands up in the nest, hungry (it asks for the kitchen at once), and walks to its sub-slot; the egg is gone.
-  With every baby sub-slot taken the egg waits in its nest, and nothing is lost. The egg is drawn as its baby's colour,
-  cracks at half way and at 85 %, wobbles over its last 15 %, and throws its shell's bits when it hatches (ART_BIBLE
-  5.9).
+  two first, the one nearest its nest, so it stands in front of its own nest, now empty; else the nearest): a baby of
+  the egg's element, with a new id, the first of its element's six names no dragon has (then CINDER2, ASH2, ...; never
+  over 8 characters), and a seed drawn from the world's seed and the egg's id. It stands up in the nest, hungry (it
+  asks for the kitchen at once), and walks to its sub-slot; the egg is gone. With every baby sub-slot taken the egg
+  waits in its nest, and nothing is lost. The Hatchery's two sub-slots stand in front of nests 0 and 2, so they are
+  the hatchlings' first places only: no baby moved on (an eviction, a Rush's bump) is sent to them, and the nests stay
+  in view. The egg is drawn as its baby's colour, nestled in its nest's straw heap, cracks at half way and at 85 %,
+  wobbles over its last 15 %, and throws its shell's bits when it hatches (ART_BIBLE 5.9).
 - **Speed.** The top bar's speed button and the keys 1 to 4 run 1, 2, 4 or 8 whole world steps a frame; pause (II, or
   p) runs none, and only the camera and the HUD move. A faster speed is more of the same fixed steps, never longer
   ones, so the world is the same at every speed, only sooner. Speed is the view's: never saved, and 1x after a load.
@@ -567,8 +582,9 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    page, a page given an hour never loads or saves, so it always starts at that hour) and `layers=world` (the world
    drawn alone, for the no-tint check).
    **Growing up and eggs are built too** (7): a dragon grows into its next stage 30 game days into its stage, once it
-   is settled (the flash, `happy`, a toast), eggs in the Hatchery's nests hatch 2 days after they were laid into babies
-   that grow up, the dawn's tip names who grows up soon, and a tap on a dragon with no job waiting opens its card (4.8).
+   is settled with room to grow (the flash, `happy` held through, a toast), eggs in the Hatchery's nests hatch 2 days
+   after they were laid into babies that grow up, the dawn's tip names who grows up soon, and a tap on a dragon opens
+   its card (4.8).
    Only a mission brings an egg (S8), so the presets show them: `preset=growup` (EMBER grows up a half second in),
    `preset=eggs` (three eggs in the nests, one just laid, one cracked, one about to hatch), `preset=hatch` (an egg
    hatching at step 60) and `preset=full` (every baby sub-slot taken: a due egg waits).
@@ -597,7 +613,7 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    | `src/game/names.ts` | the hatchlings' names, six per element, the first free one taken |
    | `src/game/eggs.ts` | the eggs, drawn: the shell, its cracks and wobble, the hatch's shell bits |
    | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks, turns and rides) and their anims, the lift's car, the eggs, the grow-up's flash, the sky and the lights, the speed, the camera, the HUD (the dragon card too) and the input; a live page loads and saves the barn |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled every time, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days) and eggs (the nests, hatching exactly 2 days on into a new baby, fed within 3 minutes, a full barn's egg waiting, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled with room to grow every time, each grow-up held still for its `happy`, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days; a baby Rushed on its way to grow up met in a sub-slot) and eggs (the nests, hatching exactly 2 days on into a new baby, in front of its own nest, fed within 3 minutes, a full barn's egg waiting, no baby moved on to the Hatchery, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up |
 
    Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play (seed
    1), 136 jobs opened and 128 were done, every one by a keeper (none closed on its own). A keeper started on a job
@@ -625,7 +641,7 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    - nothing uses the riders' rooms or the Aerie yet (section 3's table says which slice does), so no dragon rides the
      lift to the Aerie yet; nothing lays an egg in play yet (a mission will: S8), only the presets do;
    - the grow-up is a stand-in (the flash and `happy`), not ART_BIBLE 4.2's 240-frame grow-up with its "look at me";
-     a hatch has no toast;
+     a hatch has no toast; at 8x the `happy` plays at 8x, like everything else (its flash counts frames);
    - one car serves seven grown dragons well and eight at a stretch; more (hatchlings, Aerie trips) need a decision
      first (4.7);
    - a dragon walking past one waiting at a landing (an alighter walking off toward it, a crosser through a line)

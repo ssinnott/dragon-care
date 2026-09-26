@@ -6,8 +6,10 @@
 // spot). It cracks as it comes due: one 2 px ink zig-zag from half way, a second from 85 % (each with a lit rim on its
 // left, the shell's highlight, so it reads on a dark shell); and over its last 15 % it
 // wobbles, a px either way, stepping 0, +1, 0, -1 every 30 steps of the world's own tick (so a frozen frame is the same
-// every time). When it hatches, six 2 x 2 bits of its shell jump outward and up over three stepped places across 20
-// frames (over the baby standing up where the egg lay, but never over an eye), then are gone: no alpha, no gradient.
+// every time). It lies nestled in the front of its nest's straw heap, against the straw alone (layout.ts NEST_RY,
+// eggBottom). When it hatches, six 2 x 2 bits of its shell jump outward and up over three stepped places across 20
+// frames, from behind the baby standing up where the egg lay (drawn under the cast: never over it or an eye) and out
+// wide of it, then are gone: no alpha, no gradient.
 import { makeTones } from '../lib/art/shading.ts';
 import { agedPalette } from '../art/dragon/palettes.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
@@ -20,12 +22,13 @@ export const EGG_W = 9, EGG_H = 12;
 /** From this far on (0..1 of its time in the nest) an egg shows its first crack, its second, and wobbles. */
 export const CRACK1 = 0.5, CRACK2 = 0.85, WOBBLE_FROM = 0.85;
 /** The wobble: a px offset per 30-step beat of the world's tick. */
-const WOBBLE = [0, 1, 0, -1] as const, WOBBLE_BEAT = 30;
+export const WOBBLE = [0, 1, 0, -1] as const;
+const WOBBLE_BEAT = 30;
 /** Frames the hatch's shell bits fly, and the frames each of their three places lasts. */
 export const BITS_FRAMES = 20;
 
 // s: shell, h: its highlight (top-left), d: its shadow band (low right), b: the belly-colour spot, k: a crack (ink)
-const SHELL = [
+export const SHELL: readonly string[] = [
   '...hhs...',
   '..hhsss..',
   '.hhsssss.',
@@ -67,36 +70,41 @@ export function cracksAt(progress: number): number { return progress >= CRACK2 ?
 export function wobbleAt(progress: number, tick: number): number { return progress >= WOBBLE_FROM ? WOBBLE[Math.floor(tick / WOBBLE_BEAT) % WOBBLE.length] : 0; }
 
 /**
- * An egg lying in its nest: (x, y) is the middle of its bottom row (world px, the nest's cup), `progress` 0..1 of its
- * time in the nest (its cracks and wobble), `tick` the world's (the wobble's beat).
+ * An egg lying in its nest: (x, y) is its ink ring's bottom row, the middle column (world px: layout.ts nestX,
+ * eggBottom; the shell's own rows are y - 12 .. y - 1, its columns x - 4 .. x + 4, the ring one more all round),
+ * `progress` 0..1 of its time in the nest (its cracks and wobble), `tick` the world's (the wobble's beat).
  */
 export function drawEgg(ctx: CanvasRenderingContext2D, el: DragonElement, x: number, y: number, progress: number, tick: number): void {
   drawSprite(ctx, eggSprite(el, cracksAt(progress)), Math.round(x) + wobbleAt(progress, tick) + 0.5, Math.round(y) - EGG_H / 2);
 }
 
-/** The six shell bits' three places, px from the egg's middle (outward and up, then falling a little): x, y per place. */
+/**
+ * The six shell bits' three places, px from the egg's middle: up and out to both sides, then falling a little. The
+ * second and third clear the baby's head (up to 22 px over its feet: the bits there fly over it), and none goes more
+ * than 26 px to a side, so from a nest 30 px in from the Hatchery's wall (layout.ts nestX) none flies through it. (The
+ * baby's need bubble waits for the bits to land: base.ts.)
+ */
 const BITS: readonly (readonly [number, number][])[] = [
-  [[-6, -6], [-13, -10], [-19, -8]],
-  [[-4, -9], [-8, -16], [-12, -15]],
-  [[-2, -11], [-3, -20], [-5, -22]],
-  [[2, -11], [4, -19], [6, -21]],
-  [[4, -9], [9, -15], [13, -14]],
-  [[6, -6], [14, -9], [20, -7]],
+  [[-6, -18], [-15, -34], [-23, -28]],
+  [[-3, -22], [-8, -42], [-13, -39]],
+  [[-10, -12], [-21, -26], [-26, -18]],
+  [[3, -22], [8, -42], [13, -39]],
+  [[6, -18], [15, -34], [23, -28]],
+  [[10, -12], [21, -26], [26, -18]],
 ];
 
 /**
  * The hatch: six 2 x 2 bits of the shell (its colour, inked round) jumping out of the nest at (x, y) (the egg's bottom
- * middle, world px), `age` frames since it hatched: three stepped places across BITS_FRAMES frames, then nothing. They
- * fly over the baby standing up in the nest, so the caller names the eyes (world px boxes): a bit that would touch one
- * is not drawn at that place (nothing is drawn over a dragon's eye).
+ * middle, world px), `age` frames since it hatched: three stepped places across BITS_FRAMES frames, then nothing. The
+ * view draws them under the cast, so they burst from behind the baby standing up in the nest -- never over it, nor over
+ * any dragon's eye -- and fly out wide of it (BITS).
  */
-export function drawShellBits(ctx: CanvasRenderingContext2D, el: DragonElement, x: number, y: number, age: number, eyes: readonly { x: number; y: number; w: number; h: number }[] = []): void {
+export function drawShellBits(ctx: CanvasRenderingContext2D, el: DragonElement, x: number, y: number, age: number): void {
   if (age < 0 || age >= BITS_FRAMES) return;
   const step = Math.min(2, Math.floor(age * 3 / BITS_FRAMES)), shell = agedPalette(el, 'baby').scale;
   const cx = Math.round(x), cy = Math.round(y) - EGG_H / 2;
   for (const b of BITS) {
     const [dx, dy] = b[step], bx = cx + dx - 1, by = cy + dy - 1;
-    if (eyes.some((e) => bx + 3 > e.x && bx - 1 < e.x + e.w && by + 3 > e.y && by - 1 < e.y + e.h)) continue;
     ctx.fillStyle = INK; ctx.fillRect(bx - 1, by - 1, 4, 4);
     ctx.fillStyle = shell; ctx.fillRect(bx, by, 2, 2);
   }
