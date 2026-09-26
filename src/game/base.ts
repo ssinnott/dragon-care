@@ -13,6 +13,12 @@
 // storage: a live page that may save (opts.persist) loads the player's barn in attach() and saves it as it goes, every
 // 600 frames and when the page is hidden or left (storage.ts); a frozen page never calls attach(), so t= is always the
 // new game (or the preset) stepped t times at 1x.
+// Growing up and eggs (7; plan S5): a dragon that grows up is rebuilt at its new stage, drawn flat in its glow's
+// highlight inside its own ink for 12 steps (the grow-up's flash, ART_BIBLE 4.2: the one flash the base draws, never
+// for the time of day) and plays `happy` once, with a toast;
+// the Hatchery's eggs lie in their nests (eggs.ts: their cracks and wobble), and one that hatches throws its shell bits
+// as the baby stands up; at 05:00 a tip says who grows up within two days. A tap on a dragon with nothing waiting opens
+// its card (its stage and day of it, its needs: hud.ts); a tap on one with a job waiting still Rushes it.
 import { drawDragon, rootToScreen } from '../art/dragon/rig.ts';
 import { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
 import { ELEMENT_ANIM_FALLBACK } from '../art/dragon/anims.ts';
@@ -25,18 +31,20 @@ import type { Dragon, Job } from './sim.ts';
 import { startSpec, buildSim } from './presets.ts';
 import { worldKey, barnKey, fnv1a, serialize } from './save.ts';
 import type { SaveV } from './save.ts';
-import { readClock } from './clock.ts';
+import { readClock, hourSteps, PHASE_HOURS, HATCH_DAYS } from './clock.ts';
 import type { Speed, ClockRead } from './clock.ts';
 import { drawSky } from './sky.ts';
-import { drawTopBar, drawToast, drawHint, buttonAt, BUTTONS, BAR_H, TOAST_FRAMES } from './hud.ts';
+import { drawTopBar, drawToast, drawHint, drawCard, buttonAt, BUTTONS, BAR_H, TOAST_FRAMES, CARD } from './hud.ts';
 import type { ButtonName } from './hud.ts';
 import { loadSave, writeSave, clearSave, backupSave } from './storage.ts';
 import { freshSeed } from '../lib/engine/rng.ts';
 import type { Stage } from '../art/dragon/stages.ts';
-import { WORLD_W, WORLD_H, feetY } from './layout.ts';
+import { WORLD_W, WORLD_H, feetY, nestX } from './layout.ts';
+import { drawEgg, drawShellBits, BITS_FRAMES } from './eggs.ts';
+import { stageDue } from './life.ts';
 import { walking, feetOf } from './travel.ts';
 import { gaitOf, wrapT } from './gait.ts';
-import { SOON, tierOf, chargeOf } from './needs.ts';
+import { NEEDS, SOON, tierOf, chargeOf, hasNeed } from './needs.ts';
 import type { NeedKind } from './needs.ts';
 import { drawBuilding, drawPlates, drawLiftCar, drawLights } from './building.ts';
 import { makeKeeperAgent, stepKeeperVisual, drawKeeperVisual } from './people.ts';
@@ -73,6 +81,12 @@ const NEW_FRAMES = 120;
 const RATES = [1, 2, 4, 8] as const;
 type Rate = typeof RATES[number];
 const DIDNT_FIT = 'NEW BARN: THE OLD SAVE DIDN\'T FIT';
+/** A dragon that has just grown up is drawn flat (its glow's highlight, inside its ink) this many world steps (ART_BIBLE 4.2: the new silhouette's 12 f flash). */
+const GROW_FLASH = 12;
+/** What a grow-up's toast calls the new stage: "EMBER IS AN ELDER NOW!". */
+const STAGE_NOW: Readonly<Record<Stage, string>> = Object.freeze({ baby: 'A BABY', young: 'YOUNG', adult: 'AN ADULT', elder: 'AN ELDER' });
+/** The dawn's tip looks this many game days ahead for stage-ups. */
+const TIP_DAYS = 2;
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
@@ -95,7 +109,8 @@ export interface BaseViewOpts {
 
 /**
  * One dragon on screen: its pet, playing its wake before it goes back to idle, its eat bowl (found once), the stage it
- * was built at, and the walk bout its walk anim was started for (-1: none yet; travel.ts Dragon.walkSeq).
+ * was built at, the walk bout its walk anim was started for (-1: none yet; travel.ts Dragon.walkSeq), and after a
+ * grow-up the world steps of its flash left and whether its `happy` is still playing (cheering).
  */
 export interface PetView {
   pet: Pet;
@@ -103,6 +118,8 @@ export interface PetView {
   bowl: { x: number; h: number; w: number } | null;
   stage: Stage;
   walkSeq: number;
+  flash: number;
+  cheering: boolean;
 }
 
 export class BaseView {
@@ -139,6 +156,12 @@ export class BaseView {
   /** Last frame's bubbles (world px) and chips (screen px), for tapping. */
   private bubbles: { job: Job; r: Rect }[] = [];
   private chips: { job: Job; r: Rect }[] = [];
+  /** The dragon whose card is open (by id; null: none). */
+  private card: number | null = null;
+  /** Hatches whose shell bits are flying: the egg's element, its nest's spot (world px) and the world steps since. */
+  private hatches: { el: Dragon['element']; x: number; y: number; age: number }[] = [];
+  /** Last frame's heads of the dragons drawn (screen px, by dragon id), for the hook. */
+  private heads = new Map<number, { x: number; y: number }>();
   private detachers: (() => void)[] = [];
 
   constructor(opts: BaseViewOpts) {
@@ -161,7 +184,7 @@ export class BaseView {
     this.cast.clear();
     for (const [id, v] of cast) this.cast.set(id, v);
     this.keeperAgents = agents; this.building = building; this.plates = plates;
-    this.bubbles = []; this.chips = [];
+    this.bubbles = []; this.chips = []; this.card = null; this.hatches = []; this.heads.clear();
   }
 
   /**
@@ -172,7 +195,7 @@ export class BaseView {
    * the broken save, and a broken save can never freeze the page or be written back.
    */
   private load(save: SaveV): boolean {
-    const was = this.sim, frame = this.frame;
+    const was = this.sim, frame = this.frame, toast = this.toast;
     try {
       this.use(CareSim.fromSave(save));
       this.worldStep();
@@ -185,8 +208,9 @@ export class BaseView {
       this.use(was);
       return false;
     } finally {
-      // (and nothing of the trial is left over for the first real frame: the frame count, the top pass's queue)
-      this.frame = frame; this.top.clear();
+      // (and nothing of the trial is left over for the first real frame: the frame count, the top pass's queue, a toast
+      // its step said)
+      this.frame = frame; this.top.clear(); this.toast = toast;
     }
   }
 
@@ -214,7 +238,7 @@ export class BaseView {
       const v = cast.get(d.id);
       if (v && v.stage === d.stage) continue;
       const pet = makePet(d.element, d.stage, d.seed, 'idle', d.x, feetOf(sim, d), { facing: d.facing, mood: v ? v.pet.mood : d.mood });
-      cast.set(d.id, { pet, waking: false, bowl: null, stage: d.stage, walkSeq: -1 });
+      cast.set(d.id, { pet, waking: false, bowl: null, stage: d.stage, walkSeq: -1, flash: 0, cheering: false });
     }
     for (const id of cast.keys()) if (!ids.has(id)) cast.delete(id);
   }
@@ -238,16 +262,46 @@ export class BaseView {
     if (this.saving && this.uiFrame % AUTOSAVE_FRAMES === 0) this.save();
   }
 
-  /** One world step, and the view kept in step with it. */
+  /** One world step, and the view kept in step with it (a grow-up's flash and cheer, a hatch's shell bits, the dawn's tip). */
   private worldStep(): void {
+    for (const v of this.cast.values()) if (v.flash > 0) v.flash--;
+    for (const h of this.hatches) h.age++;
+    this.hatches = this.hatches.filter((h) => h.age < BITS_FRAMES);
     this.sim.step();
     this.syncCast();
+    this.lifeEvents();
     for (const d of this.sim.dragons) this.sync(d, this.cast.get(d.id)!);
     const pets = this.pets;
     stepWary(pets);
     for (const p of pets) stepPet(p);
     this.sim.keepers.forEach((k, i) => stepKeeperVisual(this.keeperAgents[i], k, k.climbing ? k.y : k.y - 3));
     this.frame++;
+  }
+
+  /**
+   * What the step's life events look like (plan S5): a dragon grown up -- already rebuilt at its new stage (syncCast) --
+   * flashes flat for GROW_FLASH steps and plays `happy` once, and a toast says so; a hatch throws its egg's shell
+   * bits from the nest the baby stands up in. And at 05:00 (the dawn), a tip: the dragons whose stage-up falls due
+   * within TIP_DAYS days.
+   */
+  private lifeEvents(): void {
+    const sim = this.sim;
+    for (const e of sim.events) {
+      const d = sim.dragons.find((q) => q.id === e.dragon), v = this.cast.get(e.dragon);
+      if (!d || !v) continue;
+      if (e.kind === 'grow') {
+        v.flash = GROW_FLASH; v.cheering = true;
+        v.pet.player.play('happy', { restart: true, blend: 4 }); v.pet.anim = 'happy'; v.waking = false;
+        this.say(`${d.name} IS ${STAGE_NOW[e.stage]} NOW!`);
+      } else {
+        const room = sim.rooms.find((r) => r.kind === 'hatchery');
+        if (room) this.hatches.push({ el: d.element, x: nestX(room, Math.max(0, Math.min(2, Math.round((d.x - nestX(room, 0)) / 50)))), y: feetY(room.floor) - 12, age: 0 });
+      }
+    }
+    if (sim.clock % sim.dayLen === PHASE_HOURS.dawn * hourSteps(sim.dayLen)) {
+      const soon = sim.dragons.filter((d) => d.stage !== 'elder' && stageDue(sim, d) - sim.clock <= TIP_DAYS * sim.dayLen);
+      if (soon.length) this.say(soon.length === 1 ? `${soon[0].name} GROWS UP IN ${TIP_DAYS} DAYS` : `${soon.length} DRAGONS GROW UP IN ${TIP_DAYS} DAYS`);
+    }
   }
 
   /**
@@ -284,7 +338,9 @@ export class BaseView {
         p.anim = 'walk'; v.walkSeq = d.walkSeq; v.waking = false; p.hold = 0;
       }
     } else {
-      const want = this.animFor(d);
+      // (a grow-up's happy plays through before anything else: the dragon is settled, so nothing else is asked of it yet)
+      if (v.cheering && (p.player.done || p.player.name !== 'happy')) v.cheering = false;
+      const want = v.cheering ? 'happy' : this.animFor(d);
       if (v.waking && p.player.done) { v.waking = false; p.player.play('idle', { blend: 8 }); p.anim = 'idle'; }
       if (want !== p.anim && !(v.waking && want === 'idle')) {
         if ((p.anim === 'sleep' || p.anim === 'tuckin') && want === 'idle') { p.player.play('wake', { blend: 8 }); p.anim = 'wake'; v.waking = true; }
@@ -332,11 +388,17 @@ export class BaseView {
     ctx.save();
     ctx.translate(-cx, -cy);
     drawLiftCar(ctx, this.sim.lift.y);
+    // the eggs in their nests (on the building, under the cast)
+    const hatchery = this.sim.rooms.find((r) => r.kind === 'hatchery');
+    if (hatchery) for (const e of this.sim.eggs) {
+      const x = nestX(hatchery, e.nest), y = feetY(hatchery.floor) - 12;
+      if (seen(x - 8, x + 8, y - 16, y + 2)) drawEgg(ctx, e.element, x, y, this.progress(e), this.sim.tick);
+    }
     // the cast, y-sorted by the feet; keepers stand a step behind the dragons they work with, so a dragon's head is
     // never covered (ART_BIBLE 1.4: nothing covers the eye) -- and one on a ladder, behind the dragons of both floors it
     // climbs between (sorted a step behind the upper floor's), so a head at a landing beside the ladder stays clear
-    const cast: { y: number; pet?: Pet; keeper?: number }[] = [];
-    for (const { pet: p } of this.cast.values()) { const [a, b] = extentX(p); if (seen(a - 24, b + 24, p.y - 110, p.y + 12)) cast.push({ y: p.y, pet: p }); }
+    const cast: { y: number; pet?: Pet; view?: PetView; id?: number; keeper?: number }[] = [];
+    for (const [id, v] of this.cast) { const p = v.pet, [a, b] = extentX(p); if (seen(a - 24, b + 24, p.y - 110, p.y + 12)) cast.push({ y: p.y, pet: p, view: v, id }); }
     this.sim.keepers.forEach((k, i) => {
       const y = k.climbing ? k.y : k.y - 3, key = k.climbing && k.legs.length ? Math.min(k.y, feetY(Math.max(k.f, k.legs[0].f))) - 3 : y;
       if (seen(k.x - 30, k.x + 30, y - 100, y + 8)) cast.push({ y: key, keeper: i });
@@ -344,13 +406,22 @@ export class BaseView {
     cast.sort((a, b) => a.y - b.y);
     this.budget.begin(cast.filter((c) => c.pet).length, this.frame);
     let slot = 0;
+    this.heads.clear();
+    const head = { x: 0, y: 0 }, eyes: { x: number; y: number; w: number; h: number }[] = [];
     for (const c of cast) {
       if (c.pet) {
         const p = c.pet;
-        drawDragon(ctx, p.rig, p.player.pose, petOpts(p, { still: true, top: this.top, budget: this.budget, slot: slot++ }));
+        // (a dragon that has just grown up is drawn flat in its glow's highlight inside its own ink: the grow-up's flash,
+        // ART_BIBLE 4.2 -- the one flash the base draws)
+        drawDragon(ctx, p.rig, p.player.pose, petOpts(p, { still: true, top: this.top, budget: this.budget, slot: slot++, flat: !!c.view && c.view.flash > 0 }));
         if (p.bowl) drawBowl(ctx, p);
+        rootToScreen(p.rig, p.rig.j.cran.x, p.rig.j.cran.y, head);
+        this.heads.set(c.id!, { x: head.x - cx, y: head.y - cy });
+        if (this.hatches.length) { rootToScreen(p.rig, p.rig.j.eye.x, p.rig.j.eye.y, head); eyes.push({ x: head.x - 6, y: head.y - 6, w: 12, h: 12 }); }
       } else if (c.keeper != null) drawKeeperVisual(ctx, this.keeperAgents[c.keeper], this.sim.keepers[c.keeper]);
     }
+    // a hatch's shell bits jump out of the nest over the baby standing up in it -- never over an eye
+    for (const h of this.hatches) drawShellBits(ctx, h.el, h.x, h.y, h.age, eyes);
     this.top.flush(ctx);
     // the bubbles: each awake dragon's most pressing job that no one is at work on yet
     this.bubbles = [];
@@ -382,15 +453,24 @@ export class BaseView {
         buttons: { ...BUTTONS },
         dragons: this.sim.dragons.map((d) => ({ id: d.id, name: d.name, element: d.element, stage: d.stage, f: d.f, x: d.x, move: d.move,
           room: this.sim.rooms.find((r) => r.floor === d.f && d.x >= r.x0 && d.x <= r.x1)?.kind ?? null,
-          slot: d.slot ? `${this.sim.rooms[d.slot.room].kind}:${d.slot.i}` : null })),
+          slot: d.slot ? `${this.sim.rooms[d.slot.room].kind}:${d.slot.i}` : null,
+          waiting: !!this.waitingJob(d), head: this.heads.get(d.id) ?? null })),
         lift: { y: this.sim.lift.y, rider: this.sim.lift.rider },
-        walked: st.dragonWalked };
+        walked: st.dragonWalked,
+        eggs: this.sim.eggs.map((e) => ({ element: e.element, nest: e.nest, progress: this.progress(e) })),
+        card: this.cardDragon()?.name ?? null };
     }
   }
 
+  /** How far on an egg is: 0 laid, 1 due (its HATCH_DAYS in the nest; one past it waits for a sub-slot at 1). */
+  private progress(e: { laid: number }): number { return Math.max(0, Math.min(1, (this.sim.clock - e.laid) / (HATCH_DAYS * this.sim.dayLen))); }
+
+  /** The dragon whose card is open, if it is still in the world (null: none). */
+  private cardDragon(): Dragon | null { return this.card == null ? null : this.sim.dragons.find((d) => d.id === this.card) ?? null; }
+
   /**
    * The HUD (4.8): the top bar (the time, the jobs, the keepers' badges, NEW, pause and the speed: hud.ts), the job
-   * strip along the bottom, and the two gestures at the bottom right.
+   * strip along the bottom, the two gestures at the bottom right, and a dragon's card if one is open.
    */
   private hud(ctx: CanvasRenderingContext2D, read: ClockRead): void {
     const text = (s: string, x: number, y: number, color: string) => drawText(ctx, s, x, y, { color, shadow: false });
@@ -410,6 +490,11 @@ export class BaseView {
       x += 6 * s.length + 7;
     }
     drawHint(ctx, x);
+    const d = this.cardDragon();
+    if (d) {
+      const needs = Object.fromEntries(NEEDS.map((k) => [k, hasNeed(d.element, k) ? d.needs[k] : null])) as Record<NeedKind, number | null>;
+      drawCard(ctx, { name: d.name, element: d.element, stage: d.stage, day: Math.floor((this.sim.clock - d.stageSince) / this.sim.dayLen) + 1, needs });
+    }
   }
 
   /** Show a toast (it replaces the one showing). */
@@ -450,15 +535,19 @@ export class BaseView {
   }
 
   /**
-   * A tap: a top-bar button first (the rest of the bar takes the tap too: it covers the world there); then a job chip
-   * rushes its job and brings its dragon into view; a bubble, or the dragon itself, rushes its job.
+   * A tap: a top-bar button first (the rest of the bar takes the tap too: it covers the world there); then an open
+   * dragon card closes (it covers the world there too); a job chip rushes its job and brings its dragon into view; a
+   * bubble, or the dragon itself, rushes its job -- and a dragon with no job waiting opens its card. A tap on anything
+   * else closes the card (the buttons leave it open: the game can be paused to read it).
    */
   tap(sx: number, sy: number): void {
     if (this.layers === 'all') {
       const b = buttonAt(sx, sy);
       if (b) { this.press(b); return; }
       if (sy < BAR_H) return;
+      if (this.cardDragon() && hit(CARD, sx, sy)) { this.card = null; return; }
     }
+    this.card = null;
     for (const c of this.chips) if (hit(c.r, sx, sy)) { this.sim.rush(c.job); this.focus(c.job.dragon); return; }
     const wx = sx + Math.round(this.camX), wy = sy + Math.round(this.camY);
     // (the top-most bubble first: later ones are drawn over earlier ones)
@@ -472,6 +561,7 @@ export class BaseView {
       if (wx < a || wx > b || wy < pt.y || wy > p.y + 4) continue;
       const j = this.waitingJob(d);
       if (j) this.sim.rush(j);
+      else this.card = d.id;
       return;
     }
   }

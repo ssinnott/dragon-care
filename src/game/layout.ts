@@ -147,6 +147,11 @@ export function waitX(r: Room): number { const w = ROOM_INFO[r.kind].wait; retur
 /** Whether a dragon of this stage fits a slot: a baby takes a sub-slot, anyone older a module slot. */
 export function fitsSlot(slot: Slot, stage: Stage): boolean { return slot.baby === (stage === 'baby'); }
 
+/** The Hatchery's nests (3.2): three, on its floor's band, 30, 80 and 130 px in (x 1062, 1112 and 1162 in the start's hatchery). */
+export const NESTS = 3;
+/** Nest i's middle, world x, in a hatchery room (the egg lies there, and the baby it hatches into stands up there). */
+export function nestX(r: Room, i: number): number { return r.x0 + 30 + 50 * i; }
+
 // ---------- walking: nets of floor spans and links, routes ----------
 
 /** A floor's walkable stretch, [x0, x1]. */

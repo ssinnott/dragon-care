@@ -65,6 +65,13 @@ const pairs: string[] = [
   'shots/base_dawn.png=view=base&t=600&hour=5',
   'shots/base_night_roof.png=view=base&t=600&hour=22&cam=300,100',
   'shots/base_night_west.png=view=base&t=600&hour=22&cam=0,300',
+  // growing up and eggs (7; plan S5): EMBER six steps into its grow-up (the new elder's silhouette flat in its glow's
+  // highlight inside its own ink, the toast), the Hatchery's three eggs (a rock egg just laid, a dusk one with its first
+  // crack, a water one with two and its wobble), and a hatch (CINDER standing up in the first nest, its shell's bits
+  // flying)
+  'shots/base_growup.png=view=base&preset=growup&t=36',
+  'shots/base_hatchery.png=view=base&preset=eggs&t=600&cam=872,376',
+  'shots/base_hatch.png=view=base&preset=hatch&t=70&cam=872,376',
 ];
 for (const el of ['fire', 'rock', 'slinkwing']) {
   for (const stage of ['elder', 'adult', 'young', 'baby']) {

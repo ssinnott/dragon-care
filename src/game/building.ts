@@ -17,10 +17,10 @@ import { drawText, measureText } from '../lib/engine/text.ts';
 import {
   WORLD_W, WORLD_H, GROUND, PITCH, MOD, TOWER_W, WALL, WALL_H, BAND, SLAB, TOWER_L, TOWER_R, BARN_X, RIDGE_X, RIDGE_Y,
   KNEE_DX, KNEE_Y, BARN_FLOORS, TOWER_FLOORS, BARN_MODS, LIFT_MOD, LIFT_X0, LIFT_X1, LIFT_STOPS, CAR_X0, CAR_X1, LADDER_BAY_X0,
-  LADDER_BAY_X1, AERIE_F, DECK_X0, DECK_X1, HEAD_Y, PULLEY_Y, KEEPER_NET, floorTop, feetY, modX, platesOf,
+  LADDER_BAY_X1, AERIE_F, DECK_X0, DECK_X1, HEAD_Y, PULLEY_Y, KEEPER_NET, NESTS, floorTop, feetY, modX, nestX, platesOf,
 } from './layout.ts';
 import type { Room, Link } from './layout.ts';
-import { FLOORS, INK, EMPTY_WALL, LIFT_WALL, STONE, STRAW_SEAM, WALLS, PROPS, LIGHTS, LAMP_RINGS, HEARTH_RING, skyBands } from './surfaces.ts';
+import { FLOORS, INK, EMPTY_WALL, LIFT_WALL, STONE, STRAW_SEAM, WALLS, PROPS, NEST, LIGHTS, LAMP_RINGS, HEARTH_RING, skyBands } from './surfaces.ts';
 import type { ClockRead } from './clock.ts';
 import { lightsOf } from './sky.ts';
 
@@ -160,11 +160,14 @@ function bunk(g: CanvasRenderingContext2D, x: number, fl: number, a: string, b: 
   box(g, x, fl - 62, 4, 62, '#7a5838', false); box(g, x + 56, fl - 62, 4, 62, '#7a5838', false);
   for (const [dy, c] of [[16, a], [50, b]] as const) { box(g, x + 2, fl - dy, 56, 8, TIMBER); box(g, x + 6, fl - dy - 6, 40, 7, c); box(g, x + 44, fl - dy - 6, 12, 7, '#f0ead8'); }
 }
-/** An empty nest on the band's back edge, its top above the band: a straw mound with its rim (the eggs are S5's). */
+/**
+ * A nest on the band's back edge, its top above the band: a straw mound (surfaces.ts NEST) with its rim; an egg lies in
+ * its cup (eggs.ts, drawn by the view over the building).
+ */
 function nest(g: CanvasRenderingContext2D, cx: number, band: number): void {
   const base = band + 3, rx = 20, ry = 11;
   g.fillStyle = INK; g.beginPath(); g.ellipse(cx, base, rx + 1, ry + 1, 0, Math.PI, Math.PI * 2); g.closePath(); g.fill();
-  g.fillStyle = '#e6dcc4'; g.beginPath(); g.ellipse(cx, base, rx, ry, 0, Math.PI, Math.PI * 2); g.closePath(); g.fill();
+  g.fillStyle = NEST; g.beginPath(); g.ellipse(cx, base, rx, ry, 0, Math.PI, Math.PI * 2); g.closePath(); g.fill();
   // (the straw's strands, 2 px, and the cup: its rim, and the hollow inside it the eggs will lie in)
   for (const [dx, dy] of [[-14, 4], [-6, 6], [3, 5], [11, 3], [-10, 1], [7, 1]]) rect(g, cx + dx, base - dy - 1, 4, 2, '#c8b68c');
   oval(g, cx, base - ry + 2, 13, 3, '#b8a47a');
@@ -238,9 +241,9 @@ function props(g: CanvasRenderingContext2D, r: Room): void {
       break;
     }
     case 'hatchery':
-      // the heat lamp on its cord, and the three nests the eggs will lie in
+      // the heat lamp on its cord, and the three nests the eggs lie in (layout.ts nestX)
       rect(g, x + 40, t, 1, 30, INK); poly(g, [x + 30, t + 30, x + 50, t + 30, x + 46, t + 38, x + 34, t + 38], '#f2c14e');
-      for (const nx of [x + 30, x + 80, x + 130]) nest(g, nx, t + WALL_H);
+      for (let i = 0; i < NESTS; i++) nest(g, nestX(r, i), t + WALL_H);
       break;
     case 'bath': {
       for (let y = t + 18; y < t + WALL_H; y += 10) rect(g, x, y, r.x1 - x, 1, '#a0adb6');

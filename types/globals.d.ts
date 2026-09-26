@@ -48,19 +48,26 @@ interface Window {
      * left out, so two worlds started at different hours but stepped alike agree on it), the clock as the view reads it
      * (day 1-based, hour, minute, the day's phase), the speed (world steps a frame: 0 paused, 1, 2, 4 or 8), whether
      * the page loads and saves the player's barn (`persist`), and the top bar's buttons (canvas px, by name: `new`,
-     * `pause`, `speed`). Gone once the base is detached (the page left it).
+     * `pause`, `speed`). Growing up and eggs (S5): each dragon's `waiting` (it has a job no keeper is at work on yet:
+     * a tap on it Rushes that job, where a tap on one not waiting opens its card) and `head` (the middle of its head in
+     * canvas px as last drawn, or null when it was not drawn: off screen); the eggs in the Hatchery's nests (each one's
+     * element, its nest 0-2 and how far on it is, 0 laid to 1 due); and the name of the dragon whose card is open, or
+     * null. Gone once the base is detached (the page left it).
      */
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
       chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[];
       digest: string;
-      dragons: { id: number; name: string; element: string; stage: string; f: number; x: number; move: string; room: string | null; slot: string | null }[];
+      dragons: { id: number; name: string; element: string; stage: string; f: number; x: number; move: string; room: string | null; slot: string | null;
+        waiting: boolean; head: { x: number; y: number } | null }[];
       lift: { y: number; rider: number | null };
       walked: number;
       barnDigest: string;
       clock: { day: number; hour: number; minute: number; phase: 'dawn' | 'day' | 'dusk' | 'night' };
       speed: number;
       persist: boolean;
-      buttons: Record<string, { x: number; y: number; w: number; h: number }> };
+      buttons: Record<string, { x: number; y: number; w: number; h: number }>;
+      eggs: { element: string; nest: number; progress: number }[];
+      card: string | null };
     /**
      * view=base, live and saving (src/game/base.ts attach, only when the page loads and saves the player's barn): save
      * the barn now, and return the step it was saved at. Gone once the base is detached.

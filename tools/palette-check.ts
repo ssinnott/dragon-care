@@ -62,6 +62,10 @@
 //                   slinkwing is as far from it by relDiff, and black), so night stays mid-value (the blue hour, never
 //                   black: a dark dragon on the Aerie at night still shows) and a wall is never the colour of a dark
 //                   body; a big prop may lie either way (the hearth's firebox is a dark mouth behind kitchen slot 0).
+// EGGS (counted apart, its own RESULT line: EGGS):
+//   (egg) eggs    : every element's egg (src/game/eggs.ts: its shell is the element's BABY scale colour, inked round)
+//                   keeps >= 25 % luminance from the Hatchery's nest straw it lies in (src/game/surfaces.ts NEST), so a
+//                   pale egg (rock's) and a dark one (slinkwing's, dusk's) both read in the nest.
 // REPORTED, NOT GATED:
 //   (g) any scale pair that passes (b) on hue alone at the same stage (it would merge in greyscale); any body pair
 //       that passes (f) on simulated value alone under the dark-pair floor (they are told apart by zone); glow colours
@@ -79,7 +83,7 @@ import type { KeeperPalette } from '../src/art/keeper/palettes.ts';
 import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
 import type { KeeperId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
-import { FLOORS, INK, BACKDROPS, WALLS, PROPS, LAMP_RINGS, HEARTH_RING, stepped } from '../src/game/surfaces.ts';
+import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, stepped } from '../src/game/surfaces.ts';
 import { PHASE_ORDER } from '../src/game/clock.ts';
 
 // ---------- thresholds ----------
@@ -832,10 +836,22 @@ function lighterBy(a: string, b: string): number {
   }
 }
 
+// ---------- (egg) the Hatchery's eggs (src/game/eggs.ts) ----------
+let eGates = 0, eFailures = 0;
+const eFailed: string[] = [];
+head(`(egg) EGGS  (each element's egg is its baby's scale colour, inked round: >= ${LUM_MIN * 100}% luminance from the nest ${NEST} it lies in, L ${lumOf(NEST).toFixed(3)})`);
+for (const e of DRAGON_ELEMENTS) {
+  const hex = PAL(e, 'baby').scale, d = relDiff(hex, NEST), ok = d >= LUM_MIN;
+  eGates++;
+  if (!ok) { eFailures++; eFailed.push(`(egg) ${e}`); }
+  out.push(`${ok ? '  ok  ' : '  FAIL'} ${e.padEnd(10)} egg ${hex}  L ${lumOf(hex).toFixed(3)}  ${pct(d)} from the nest (${lumOf(hex) < lumOf(NEST) ? 'darker' : 'lighter'})`);
+}
+
 // ---------- verdict ----------
 out.push('');
 out.push(failures ? `RESULT: FAIL  ${failures} of ${gates} gates failed: ${failed.join('; ')}` : `RESULT: PASS  ${gates} of ${gates} gates passed`);
 out.push(kFailures ? `KEEPERS: FAIL  ${kFailures} of ${kGates} gates failed: ${kFailed.join('; ')}` : `KEEPERS: PASS  ${kGates} of ${kGates} gates passed`);
 out.push(wFailures ? `BACKDROPS: FAIL  ${wFailures} of ${wGates} gates failed: ${wFailed.join('; ')}` : `BACKDROPS: PASS  ${wGates} of ${wGates} gates passed`);
+out.push(eFailures ? `EGGS: FAIL  ${eFailures} of ${eGates} gates failed: ${eFailed.join('; ')}` : `EGGS: PASS  ${eGates} of ${eGates} gates passed`);
 console.log(out.join('\n'));
-if (failures || kFailures || wFailures) process.exitCode = 1;
+if (failures || kFailures || wFailures || eFailures) process.exitCode = 1;

@@ -33,7 +33,10 @@
 // a frozen page with a save in storage neither loads nor writes it, and nor does a live page given hour=; a live page
 // that saves resumes its world after a reload, and one whose save doesn't fit -- another version, or one of this
 // version the view can't build or draw (an unknown element, keeper or need) -- starts a new barn without a page
-// error, keeps the old save aside, and never writes it back.
+// error, keeps the old save aside, and never writes it back. Growing up and eggs (plan S5): the growup preset's EMBER
+// is an elder a second in, the eggs preset shows its three eggs in the Hatchery's nests, the hatch preset's egg has
+// hatched into a baby by t=120; live, a tap on the head of a dragon with nothing waiting opens its card, and a tap on
+// the card closes it.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -274,6 +277,55 @@ async function baseSpeed(page: any): Promise<string[]> {
   return out;
 }
 
+/** view=base&preset=growup: EMBER has grown up, an elder (plan S5), and nobody else has. */
+function grownUp(b: BaseHook): string[] {
+  const e = b.dragons.find((d) => d.name === 'EMBER'), others = b.dragons.filter((d) => d.name !== 'EMBER' && d.stage !== 'adult');
+  return [...(e?.stage === 'elder' ? [] : [`EMBER is ${e?.stage ?? 'missing'}, not an elder`]), ...(others.length ? [`${others.map((d) => d.name).join(', ')} grew too`] : [])];
+}
+/** view=base&preset=eggs: three eggs in the nests, each its element in its nest, as far on as the preset laid it (and 600 steps more). */
+function eggsIn(b: BaseHook): string[] {
+  const want = [['rock', 0.028], ['dusk', 0.578], ['water', 0.928]] as const;
+  if (!Array.isArray(b.eggs) || b.eggs.length !== 3) return [`the hook has ${b.eggs?.length ?? 'no'} eggs, not 3`];
+  return b.eggs.flatMap((e, i) => (e.element === want[i][0] && e.nest === i && Math.abs(e.progress - want[i][1]) < 0.002 ? [] : [`egg ${i} is ${e.element} in nest ${e.nest} at ${e.progress.toFixed(3)}, not ${want[i][0]} at ${want[i][1]}`]));
+}
+/** view=base&preset=hatch: the egg has hatched into a baby (the start's seven and one more), and the nests are empty. */
+function hatchedOne(b: BaseHook): string[] {
+  const babies = b.dragons.filter((d) => d.stage === 'baby');
+  return [...(babies.length === 1 && b.dragons.length === 8 ? [] : [`${babies.length} babies among ${b.dragons.length} dragons, not 1 among 8`]), ...(b.eggs?.length === 0 ? [] : [`${b.eggs?.length} eggs left in the nests`])];
+}
+
+/**
+ * view=base, live (save=0): the dragon card. Paused (so nothing changes under the pointer), a tap on the head of a
+ * dragon on screen that has no job waiting (the hook's `waiting` false, its `head` clear of the top bar, the job strip
+ * and every waiting dragon's bubble) opens its card (the hook's `card` is its name); a tap on the card closes it.
+ */
+async function baseCard(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  await page.keyboard.press('p');
+  await page.waitForTimeout(150);
+  const b = await st(), box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  // (clear: on the canvas, off the top bar and the job strip, under no waiting dragon's bubble -- it stands up to 60 px
+  // over that dragon's head -- and no other dragon's head near: the tap is its alone)
+  const clear = (d: BaseHook['dragons'][number], h: { x: number; y: number }) => h.x > 12 && h.x < 628 && h.y > 24 && h.y < 330
+    && !b.dragons.some((o) => o !== d && o.head && ((o.waiting && Math.abs(o.head.x - h.x) < 36 && o.head.y - h.y > -8 && o.head.y - h.y < 64) || (Math.abs(o.head.x - h.x) < 70 && Math.abs(o.head.y - h.y) < 40)));
+  const d = b.dragons.find((q) => !q.waiting && q.head && clear(q, q.head));
+  if (!d) return [`no dragon with nothing waiting has its head on screen clear of the bubbles (${b.dragons.map((q) => `${q.name} ${q.waiting ? 'waiting' : 'free'} ${q.head ? `${Math.round(q.head.x)},${Math.round(q.head.y)}` : 'off'}`).join('; ')})`];
+  const rushes = b.rushes;
+  await page.mouse.click(box.x + d.head!.x * k, box.y + d.head!.y * k);
+  await page.waitForTimeout(150);
+  const c = await st();
+  if (c.card !== d.name) out.push(`tapping ${d.name}'s head (nothing waiting) opened ${c.card === null ? 'no card' : `${c.card}'s card`}`);
+  if (c.rushes !== rushes) out.push(`tapping ${d.name} (nothing waiting) Rushed a job`);
+  await page.mouse.click(box.x + 40 * k, box.y + 60 * k);
+  await page.waitForTimeout(150);
+  if ((await st()).card !== null) out.push('tapping the card did not close it');
+  await page.keyboard.press('p');
+  if (!out.length) console.log(`        card: ${d.name}'s opened by a tap on its head, closed by a tap on it`);
+  return out;
+}
+
 /** The base's dragons include every stage. */
 function everyStage(b: BaseHook): string[] {
   const st = new Set(b.dragons.map((d) => d.stage)), missing = AGE_STAGES.filter((s) => !st.has(s));
@@ -426,6 +478,12 @@ const CASES: Case[] = [
   { query: 'view=base', minColours: 150, allScales: false, init: plant(OLD_SAVE), act: liveOldSave },
   ...BROKEN_SAVES.map((b): Case => ({ query: 'view=base', minColours: 150, allScales: false, init: plant(b.blob), act: liveBrokenSave(b) })),
   { query: 'view=base&hour=22', minColours: 150, allScales: false, init: plant(PLANTED), act: liveHourNoSave },
+  // growing up and eggs (plan S5): EMBER grown an elder, three eggs in the Hatchery's nests, an egg hatched into a baby;
+  // live, a dragon's card
+  { query: 'view=base&preset=growup&t=60', minColours: 150, allScales: false, check: (b) => [...grownUp(b), ...travels(b)] },
+  { query: 'view=base&preset=eggs&t=600&cam=872,376', minColours: 150, allScales: false, check: (b) => [...eggsIn(b), ...travels(b)] },
+  { query: 'view=base&preset=hatch&t=120&cam=872,376', minColours: 150, allScales: false, check: (b) => [...hatchedOne(b), ...travels(b)] },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseCard },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);

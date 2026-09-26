@@ -846,6 +846,12 @@ export interface DrawDragonOpts {
   mood?: number;
   /** Whole-dragon white flash, or a tint composited over the silhouette (offscreen pass). */
   flash?: boolean;
+  /**
+   * The grow-up's flash (ART_BIBLE 4.2: "the new silhouette flashes flat `glow.hi` at α 1.0"): every fill flat in its
+   * own `glow.hi` INSIDE its own ink, drawn straight (the element flash's path: `rig.keepInk`), so the new shape reads
+   * on the pale straw. Omitted = false.
+   */
+  flat?: boolean;
   tint?: string | null;
   tintAlpha?: number;
   /** Multiplied into globalAlpha. */
@@ -956,7 +962,7 @@ export function drawDragon(ctx: CanvasRenderingContext2D, rig: DragonRig, pose: 
   // own ink, so the shape and the bolt still read on a pale floor. At any partial alpha a yellow over lightning's
   // blue body came out grey, a dropout rather than a flash; all flat, ink too, it was a pale ghost on the straw
   const et = rig.spec.tint && !o.silhouette ? rig.spec.tint(P, fillInfo(rig, 'ambient', false, rig.pal, 0, 0, 0)) : 0;
-  const eFlash = et >= 1 ? tones(rig, rig.pal.glow).hi : null;
+  const eFlash = (o.flat && !o.silhouette) || et >= 1 ? tones(rig, rig.pal.glow).hi : null;
   const tint = eFlash ? o.tint : et > 0 ? rig.pal.glow : o.tint, tintA = !eFlash && et > 0 ? et : o.tintAlpha;
   ctx.save();
   if (o.alpha != null && o.alpha < 1) ctx.globalAlpha *= o.alpha;

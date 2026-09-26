@@ -49,6 +49,13 @@ export const WALLS: Readonly<Partial<Record<RoomKind, string>>> = Object.freeze(
  */
 export const PROPS = Object.freeze({ hearth: '#9c948a', firebox: '#3a2626', tub: '#a47a52', pallet: '#a47a52', mattress: '#e6dcc4' });
 
+/**
+ * The Hatchery's nest mounds, the straw an egg lies in (L 0.72): every element's egg -- its baby's scale colour, eggs.ts
+ * -- keeps >= 25 % luminance from it (tools/palette-check.ts, the egg gate), so a dark egg and a pale one both read in
+ * the nest. Its strands and the cup's rim are 2 px marks on it.
+ */
+export const NEST = '#e6dcc4';
+
 /** Every sky, hill and cloud colour at each phase of the day (the bands top to bottom: world y 0-200, 200-420, 420 to the ground), and the building's own backdrops. */
 export interface Backdrops {
   sky: Readonly<Record<DayPhase, readonly [string, string, string]>>;

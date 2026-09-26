@@ -1,13 +1,16 @@
 // The base's screen furniture (docs/BASE_DESIGN.md 4.8, 7): the top bar -- the time of day (a sun or a moon and
 // `DAY 3 14:00`), the open jobs, a badge per keeper and the buttons (NEW, pause, speed) with their hit rects -- the
-// toasts over the barn, and the hint at the bottom right. House style: every box a 1 px #1a1018 outline, flat fills,
+// toasts over the barn, the hint at the bottom right, and a dragon's card (its name, element, stage, its day of the
+// stage's 30 and its needs: a tap on a dragon with nothing waiting opens it). House style: every box a 1 px #1a1018 outline, flat fills,
 // the engine's 5 x 7 font (it has no dot or arrow glyphs, so those are little inked sprites: icons.ts drawSprite).
 // Drawing only: base.ts owns what the buttons do.
 import { drawText, drawTextOutlined, measureText } from '../lib/engine/text.ts';
-import { drawSprite } from './icons.ts';
+import { drawSprite, ICONS } from './icons.ts';
 import type { Rect, Sprite } from './icons.ts';
 import type { ClockRead, Speed } from './clock.ts';
-import { clockLabel } from './clock.ts';
+import { clockLabel, STAGE_DAYS } from './clock.ts';
+import { NEEDS, QUEUE, tierOf } from './needs.ts';
+import type { NeedKind } from './needs.ts';
 import { lightsOf } from './sky.ts';
 import { INK } from './surfaces.ts';
 import { KEEPER_PALETTES } from '../art/keeper/palettes.ts';
@@ -112,4 +115,44 @@ export function drawHint(ctx: CanvasRenderingContext2D, stripEnd: number): void 
   if (stripEnd + 8 > x - w - 4) return;
   ctx.fillStyle = INK; ctx.fillRect(x - w - 4, y, w + 8, 17);
   text(ctx, s, x, y + 5, HINT, 'right');
+}
+
+// ---------- the dragon card (plan S5) ----------
+
+/** Where a dragon's card opens (screen px): under the top bar at the left, clear of the toasts (centred at x 320). */
+export const CARD: Readonly<Rect> = Object.freeze({ x: 8, y: 20, w: 160, h: 76 });
+/** What a dragon's card shows: its name, element and stage, its day of the stage (1..STAGE_DAYS), and each need (null: one it hasn't got). */
+export interface CardInfo { name: string; element: string; stage: string; day: number; needs: Readonly<Record<NeedKind, number | null>> }
+/** A day of the stage's bar: a filled day, a day to come. A need's bar: full enough (over QUEUE), then by its tier (soon, now). */
+const DAY_ON = '#e3b23e', DAY_OFF = '#2e2428', NEED_OK = '#7bbf6a', NEED_TIER = ['#f2d36a', '#e3b23e', '#d8402e'];
+
+/**
+ * A dragon's card (160 x 76 at 8, 20): its name (outlined) and element; its stage and `DAY d OF 30`; the stage's 30
+ * days as a bar of 4 x 5 segments a px apart, the days so far filled; and its needs, each its icon over a 20 x 4 bar
+ * (a need it hasn't got -- fire's bath -- left out, the rest centred). The stage's days are the art of the age readout: a player
+ * sees how far into its month a dragon is.
+ */
+export function drawCard(ctx: CanvasRenderingContext2D, c: CardInfo): void {
+  const { x, y, w, h } = CARD;
+  ctx.fillStyle = INK; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = FACE; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+  drawTextOutlined(ctx, c.name, x + 6, y + 5, { size: 1, color: TEXT, outline: INK, thickness: 1, shadow: false });
+  text(ctx, c.element.toUpperCase(), x + w - 6, y + 5, HINT, 'right');
+  const day = Math.max(1, Math.min(STAGE_DAYS, c.day));
+  text(ctx, `${c.stage.toUpperCase()} - DAY ${day} OF ${STAGE_DAYS}`, x + 6, y + 18);
+  // (the stage's 30 days: 4 x 5 segments, 1 px of ink between)
+  const bx = x + 5, by = y + 29;
+  ctx.fillStyle = INK; ctx.fillRect(bx, by, STAGE_DAYS * 5 + 1, 7);
+  for (let i = 0; i < STAGE_DAYS; i++) { ctx.fillStyle = i < day ? DAY_ON : DAY_OFF; ctx.fillRect(bx + 1 + i * 5, by + 1, 4, 5); }
+  // (the needs it has: columns of 30 px, centred -- fire has four, no bath -- each its icon over its bar)
+  const has = NEEDS.filter((k) => c.needs[k] != null), x0 = x + Math.round((w - has.length * 30) / 2);
+  has.forEach((k, i) => {
+    const v = c.needs[k]!;
+    const cx = x0 + i * 30;
+    drawSprite(ctx, ICONS[k], cx + 15, y + 50);
+    ctx.fillStyle = INK; ctx.fillRect(cx + 4, y + 60, 22, 6);
+    ctx.fillStyle = DAY_OFF; ctx.fillRect(cx + 5, y + 61, 20, 4);
+    ctx.fillStyle = v >= QUEUE ? NEED_OK : NEED_TIER[tierOf(v)];
+    ctx.fillRect(cx + 5, y + 61, Math.round(20 * Math.max(0, Math.min(1, v))), 4);
+  });
 }

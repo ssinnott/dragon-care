@@ -203,21 +203,25 @@ function blockers(sim: CareSim, d: Dragon, s: Slot): Dragon[] {
   return sim.dragons.filter((o) => o !== d && o.slot && o.slot.room === s.room && (o.slot === s || (o.slot.mod === s.mod && (!s.baby || !o.slot.baby))));
 }
 
-/** The lowest-index slot of the room that fits the dragon and is free for it (nobody in its way, no one waiting over it), or null. */
-function freeSlot(sim: CareSim, d: Dragon, room: Room): Slot | null {
-  for (const s of room.slots) if (fitsSlot(s, d.stage) && !blockers(sim, d, s).length && !lineBlocks(sim, d, s)) return s;
+/**
+ * The lowest-index slot of the room that fits the dragon (or a dragon of `stage`: the one it is about to grow into,
+ * life.ts) and is free for it (nobody in its way, no one waiting over it), or null.
+ */
+export function freeSlot(sim: CareSim, d: Dragon, room: Room, stage: Stage = d.stage): Slot | null {
+  for (const s of room.slots) if (fitsSlot(s, stage) && !blockers(sim, d, s).length && !lineBlocks(sim, d, s, true, stage)) return s;
   return null;
 }
 
 /**
- * The nearest free slot that fits the dragon in any dragon room, by its route there -- a ride counted RIDE_PX more,
- * for the car's time and the wait for it, so one on its own floor comes first -- ties by room id, then slot index.
+ * The nearest free slot that fits the dragon (or a dragon of `stage`) in any dragon room but the kinds in `not`, by its
+ * route there on its own net -- a ride counted RIDE_PX more, for the car's time and the wait for it, so one on its own
+ * floor comes first -- ties by room id, then slot index.
  */
-function nearestFree(sim: CareSim, d: Dragon): Slot | null {
+export function nearestFree(sim: CareSim, d: Dragon, stage: Stage = d.stage, not: readonly RoomKind[] = []): Slot | null {
   const net = dragonNet(d.stage);
   let best: Slot | null = null, bestCost = Infinity;
   for (const r of sim.rooms) for (const s of r.slots) {
-    if (!fitsSlot(s, d.stage) || blockers(sim, d, s).length || lineBlocks(sim, d, s)) continue;
+    if (not.includes(r.kind) || !fitsSlot(s, stage) || blockers(sim, d, s).length || lineBlocks(sim, d, s, true, stage)) continue;
     const rt = route({ f: d.f, x: d.x }, { f: s.f, x: s.x }, net), cost = rt ? rt.cost + (s.f !== d.f ? RIDE_PX : 0) : Infinity;
     if (cost < bestCost) { bestCost = cost; best = s; }
   }
@@ -286,7 +290,7 @@ function takeSlot(sim: CareSim, d: Dragon, room: Room, bump: boolean): Slot | nu
  * on is dropped -- unless the new route rides from this landing too, when the call keeps its turn, its wait and its
  * place, with its new stop.
  */
-function sendTo(sim: CareSim, d: Dragon, slot: Slot): void {
+export function sendTo(sim: CareSim, d: Dragon, slot: Slot): void {
   d.slot = slot;
   const r = route({ f: d.f, x: d.x }, { f: slot.f, x: slot.x }, dragonNet(d.stage));
   if (!r) throw new Error(`${d.name}: no way from floor ${d.f} x ${Math.round(d.x)} to floor ${slot.f} x ${slot.x}`);
@@ -530,11 +534,12 @@ export function landingPlace(sim: CareSim, d: Dragon, s: Side = lineSide(sim, d)
 function callX(sim: CareSim, d: Dragon): number { return landingPlace(sim, d).x; }
 
 /**
- * Whether dragon d standing in slot s would have its eye under the body of a dragon waiting in a landing's line on
- * that floor (drawn over it): the slot is not d's to take while that one waits there (3.3; ART_BIBLE 1.4).
+ * Whether dragon d standing in slot s (as a dragon of `stage`) would have its eye under the body of a dragon waiting in
+ * a landing's line on that floor (drawn over it): the slot is not d's to take while that one waits there (3.3;
+ * ART_BIBLE 1.4).
  */
-function lineBlocks(sim: CareSim, d: Dragon, s: Slot, callers = true): boolean {
-  const eye = eyeSpan(d.stage, s.facing, s.x), body = bodySpan(d.stage, s.facing, s.x);
+function lineBlocks(sim: CareSim, d: Dragon, s: Slot, callers = true, stage: Stage = d.stage): boolean {
+  const eye = eyeSpan(stage, s.facing, s.x), body = bodySpan(stage, s.facing, s.x);
   const meet = (p: readonly [number, number], q: readonly [number, number]) => p[0] <= q[1] && p[1] >= q[0];
   for (const side of [-1, 1] as const) {
     for (const w of landingLine(sim, s.f, side)) {

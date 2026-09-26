@@ -6,12 +6,16 @@
 // (seeded; any later draw is stateless, src/game/rand.ts), so tools/sim-check.ts runs it headless and view=base's
 // frozen frames (t=) come out the same every time. Dragons have stable ids (a new one takes nextDragonId), the world
 // has a clock (game time, clock0 + tick), and the whole of it saves to plain JSON and loads back exactly (save.ts).
+// Life (life.ts) runs first in every step: a dragon grows into its next stage 30 game days into its stage, once it is
+// settled, and an egg in the Hatchery's nests (addEgg) hatches into a baby 2 game days after it was laid.
 import { makeRng } from '../lib/engine/rng.ts';
 import { NEEDS, QUEUE, OWN_NEED, drainRate, hasNeed, moodOf, tierOf, fullNeeds } from './needs.ts';
 import type { NeedKind, Needs } from './needs.ts';
-import { ROOM_INFO, REACH, LIFT_X0, LIFT_X1, placeRooms, postX, waitX, route, feetY, clampToFloor, standSpot, fitsSlot } from './layout.ts';
+import { ROOM_INFO, REACH, LIFT_X0, LIFT_X1, NESTS, placeRooms, postX, waitX, route, feetY, clampToFloor, standSpot, fitsSlot } from './layout.ts';
 import type { Room, RoomPlace, RoomKind, Leg, Spot, Slot } from './layout.ts';
 import { NEED_ROOM, LEAD_PX, WAIT_MAX, KEEPER_HALF, stepTravel, arrived, remainingCost, ridesLeft, retarget, raiseCall, bayShut, inBay } from './travel.ts';
+import { stepLife } from './life.ts';
+import { mix32, TAG } from './rand.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
 import { SAVE_VERSION, SaveVersionError, worldKey } from './save.ts';
 import type { SaveV } from './save.ts';
@@ -56,8 +60,18 @@ export interface SimOptions {
   clock0?: number;
 }
 
-/** What happened in a step, for the view to show (a union later slices extend: a grow-up, a hatch, a departure...). */
-export type SimEvent = { kind: 'none' };
+/**
+ * What happened in a step, for the view to show (a union later slices extend: a departure, a return...): a dragon grew
+ * into `stage` (life.ts), or an egg hatched into a baby, the dragon `dragon`.
+ */
+export type SimEvent = { kind: 'grow'; dragon: number; stage: Stage } | { kind: 'hatch'; dragon: number; egg: number };
+
+/**
+ * An egg in the Hatchery (plan S5): its id, its element, the seed its baby will have (a stateless draw from the world's
+ * seed and the egg's id), the clock it was laid at, and its nest (0-2). It hatches HATCH_DAYS game days after it was
+ * laid, once a baby sub-slot is free for the baby (life.ts).
+ */
+export interface Egg { id: number; element: DragonElement; seed: number; laid: number; nest: 0 | 1 | 2 }
 
 // ---------- the world's things ----------
 
@@ -70,8 +84,11 @@ export interface Act { need: NeedKind; t: number; len: number; from: number }
  * at the lift bay's edge while the car moves (`bay`, the bay rule).
  */
 export type DragonMove = 'still' | 'walk' | 'turn' | 'call' | 'board' | 'ride' | 'alight' | 'bay';
-/** Why a dragon is on the move: to a slot in its need's room, or out of a slot another dragon needed (a later slice adds more). */
-export type DragonGoal = 'need' | 'evict';
+/**
+ * Why a dragon is on the move: to a slot in its need's room; out of a slot another dragon needed; or, a baby due to grow
+ * up, to a module slot its next stage fits (life.ts: it grows once it is settled there). A later slice adds more.
+ */
+export type DragonGoal = 'need' | 'evict' | 'settle';
 
 export interface Dragon {
   id: number;
@@ -196,10 +213,12 @@ export interface SimStats {
   slotBumps: number;
   /**
    * Each room's (and structure's) uses by kind (#11: a named room earns its name by being used): a need room each
-   * time a keeper starts meeting its need there, a supply room each time its supply is picked up, and the lift each
-   * ride completed.
+   * time a keeper starts meeting its need there, a supply room each time its supply is picked up, the lift each ride
+   * completed, and the Hatchery each egg laid in it and each egg hatched.
    */
   used: Record<string, number>;
+  /** The longest a stage-up waited, steps, from falling due to being applied (the dragon settled: life.ts). */
+  growDelayMax: number;
 }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -218,7 +237,7 @@ export class CareSim {
   readonly keepers: Keeper[] = [];
   jobs: Job[] = [];
   readonly stats: SimStats = { opened: 0, done: 0, closed: 0, waitSum: 0, started: 0, waitMax: 0, queueMax: 0, rushes: 0, preempted: 0, emptySteps: 0,
-    dragonWalked: 0, liftRides: 0, liftWaitMax: 0, keeperWaitSum: 0, keeperWaits: 0, waitTimeouts: 0, evictions: 0, slotBumps: 0, used: {} };
+    dragonWalked: 0, liftRides: 0, liftWaitMax: 0, keeperWaitSum: 0, keeperWaits: 0, waitTimeouts: 0, evictions: 0, slotBumps: 0, used: {}, growDelayMax: 0 };
   /** The Dragon Lift: its car starts parked at the ground floor. */
   lift: LiftState = { y: feetY(0), f: 0, target: null, rider: null, moving: false, closing: false, blockedSince: -1, calls: [] };
   /** What the last step did (cleared at the start of every step). */
@@ -226,6 +245,9 @@ export class CareSim {
   /** The id the next dragon gets, and the next job (public so a save can keep them). */
   nextDragonId = 0;
   nextJob = 1;
+  /** The eggs in the Hatchery's nests, in id order (at most one a nest), and the id the next egg gets. */
+  eggs: Egg[] = [];
+  nextEggId = 0;
 
   constructor(rooms: readonly RoomPlace[], dragons: readonly DragonPlace[], keepers: readonly KeeperPlace[], opts: SimOptions = {}) {
     this.seed = opts.seed ?? 1;
@@ -286,7 +308,8 @@ export class CareSim {
   static fromSave(s: SaveV): CareSim {
     if (!s || typeof s !== 'object' || s.v !== SAVE_VERSION) throw new SaveVersionError(s && typeof s === 'object' ? s.v : s);
     const sim = new CareSim(s.rooms, [], [], { seed: s.seed, dayLen: s.dayLen, clock0: s.clock0 });
-    sim.tick = s.tick; sim.nextDragonId = s.nextDragonId; sim.nextJob = s.nextJob;
+    sim.tick = s.tick; sim.nextDragonId = s.nextDragonId; sim.nextJob = s.nextJob; sim.nextEggId = s.nextEggId;
+    sim.eggs = s.eggs.map((e) => ({ ...e }));
     const byId = <T extends { id: number }>(list: readonly T[], id: number, what: string): T => {
       const v = list.find((q) => q.id === id);
       if (!v) throw new Error(`save: no ${what} ${id}`);
@@ -327,9 +350,10 @@ export class CareSim {
   // ---------- a step ----------
 
   /**
-   * One step (plan S3): the needs drain and the acts under way refill theirs; jobs open under QUEUE (and close only by
-   * being done: a need rises through a keeper's act alone); the dragons choose where to go, walk and turn, and the lift
-   * runs (travel.ts); then free keepers take jobs, and every keeper steps.
+   * One step (plan S3, S5): life first -- a dragon due and settled grows up, an egg due hatches (life.ts) -- then the
+   * needs drain and the acts under way refill theirs; jobs open under QUEUE (and close only by being done: a need rises
+   * through a keeper's act alone); the dragons choose where to go, walk and turn, and the lift runs (travel.ts); then
+   * free keepers take jobs, and every keeper steps.
    */
   step(): void {
     this.events = [];
@@ -346,6 +370,7 @@ export class CareSim {
       d.mood = moodOf(d.element, d.needs);
       for (const k of NEEDS) if (d.needs[k] <= 0) this.stats.emptySteps++;
     }
+    stepLife(this);
     for (const d of this.dragons) for (const k of NEEDS) {
       if (!hasNeed(d.element, k) || d.needs[k] >= QUEUE || (d.act && d.act.need === k)) continue;
       if (this.jobs.some((j) => j.dragon === d && j.need === k)) continue;
@@ -561,8 +586,28 @@ export class CareSim {
 
   private workLen(k: Keeper, need: NeedKind): number { return Math.round(WORK[need] * (k.specialty === need ? SPECIALIST_TIME : 1)); }
 
-  /** Count one use of a room or structure (stats.used, #11): travel.ts counts the lift's rides here too. */
+  /** Count one use of a room or structure (stats.used, #11): travel.ts counts the lift's rides here too, life.ts the hatches. */
   use(kind: RoomKind | 'lift' | 'aerie'): void { this.stats.used[kind] = (this.stats.used[kind] ?? 0) + 1; }
+
+  // ---------- eggs ----------
+
+  /**
+   * Lay an egg of an element in the Hatchery (a mission brings eggs home: S8), in its lowest free nest, laid at clock
+   * `laidAt` (default now; a preset may lay one earlier). Its baby's seed is a stateless draw from the world's seed and
+   * the egg's id. Null if every nest holds an egg (or the base has no hatchery): the egg is not taken. #11: the
+   * Hatchery is used.
+   */
+  addEgg(element: DragonElement, laidAt: number = this.clock): Egg | null {
+    if (!this.rooms.some((r) => r.kind === 'hatchery')) return null;
+    let nest = -1;
+    for (let i = 0; i < NESTS && nest < 0; i++) if (!this.eggs.some((e) => e.nest === i)) nest = i;
+    if (nest < 0) return null;
+    const id = this.nextEggId++;
+    const egg: Egg = { id, element, seed: (mix32(this.seed, TAG.EGG, id) & 0x7fffffff) || 1, laid: laidAt, nest: nest as 0 | 1 | 2 };
+    this.eggs.push(egg);
+    this.use('hatchery');
+    return egg;
+  }
 
   // ---------- where things are ----------
 

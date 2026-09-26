@@ -24,14 +24,15 @@
 // 5. The start cast (#9): seven dragons, one of each element, every one adult and 0 days into the stage, ids 0-6.
 // 6. Saves: a world saved at step 5000 and loaded (through JSON) steps on to the same world as the one it came from,
 //    from that save and from more taken mid-fetch, mid-climb, mid-job, mid-Rush, mid-walk, mid-turn, at a landing,
-//    boarding, mid-ride and alighting (and one at the first ride of all); a save survives JSON unchanged, every field is
-//    in it; another version throws.
+//    boarding, mid-ride and alighting (and one at the first ride of all); and on a short day, with eggs incubating (plan
+//    S5), a baby walking to the module slot it will grow up in, an egg just hatched and a dragon just grown up; a save
+//    survives JSON unchanged, every field is in it; another version throws.
 // 7. rngAt: the same keys give the same draws, different tags different ones, and the draws are even.
 // 8. Rooms (#11): every room kind and structure has a purpose, each need is met in exactly one kind of room, the plates
 //    name only rooms and structures there are (none on a bare slot), placing rooms and dragons keeps the building's
 //    rules (no room on the lift; a slot per dragon, fitting its stage), a keeper waits clear of every slot's body; and
-//    over the whole suite every named room, the lift and the Aerie were used (sim.stats.used), unless their mechanic is
-//    still PLANNED -- and a PLANNED one that shows a use fails, so its entry must go.
+//    (checked at the end, over the whole suite) every named room, the lift and the Aerie were used (sim.stats.used),
+//    unless their mechanic is still PLANNED -- and a PLANNED one that shows a use fails, so its entry must go.
 // 9. Gait (#7: dragons walk by their anims' own root motion): every walk's table is the same whatever the seed, it
 //    moves as its anim table's frames and an anim player playing it say (a walk with an intro too, wrapping and caught
 //    up as the view does), and a dragon walked by the simulation moves exactly as far as the anim player playing its
@@ -46,14 +47,28 @@
 // 12. Night is not the barn's (plan G8): a world started at 07:00 and one started at 19:00, the same seed, are the same
 //    barn (save.ts barnKey: every absolute clock left out) every 1000 steps for 20000 -- so view=base's no-tint check,
 //    day against night, compares one world -- and no simulation module reads the day's phase.
+// 13. Growing up (#8: "a 'month' of game time to have a dragon grow from one age class to another"; plan S5): on a
+//    600-step day, a baby grows young, adult and elder, one grow event each, its stage's start moved on exactly 30 days
+//    each time, after walking from the Hatchery to a module slot, and its drains follow the new stage; a stage-up only
+//    ever applies to a dragon settled in a slot it fits (no act, no keeper on it); the delay from falling due is short
+//    alone and bounded by an errand in the busy barn; and at the real day's length, 30 days less a minute in, an adult
+//    is an elder within a minute of play.
+// 14. Eggs (#5.4's Hatchery side): three eggs fill the three nests and a fourth is not taken; an egg hatches exactly two
+//    days after it was laid into a baby with a new id, its element's first free name and the egg's seed, the Hatchery's
+//    sub-slots first; the baby asks for food at once and is fed within three minutes; with every baby sub-slot taken an
+//    egg waits in its nest, nothing lost, and hatches as soon as one frees; names never repeat and stay within 8
+//    characters; two runs give the same names and seeds.
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
 import { CareSim, REACH, DAY_STEPS, START_HOUR } from '../src/game/sim.ts';
+import { nextStage, stageDue, HATCH_FOOD } from '../src/game/life.ts';
+import { NAMES, NAME_MAX, hatchName } from '../src/game/names.ts';
+import { GROWUP_IN, HATCH_IN, EGGS_PRESET } from '../src/game/presets.ts';
 import type { DragonPlace } from '../src/game/start.ts';
 import type { Keeper, Dragon } from '../src/game/sim.ts';
 import {
   NEED_ROOM, TURN_STEPS, TURN_HALF, WAIT_MAX, LEAD_PX, arrived, inTheBay, liftRange, needRoom, dragonSpan, dragonInBay, depthOf, eyeSpan, walking,
-  landingEdge, ridesLeft, remainingCost,
+  landingEdge, ridesLeft, remainingCost, nearestFree,
 } from '../src/game/travel.ts';
 import { gaitOf, gaitFrom, moveAt, wrapT } from '../src/game/gait.ts';
 import { TURN_HALF as YARD_TURN_HALF } from '../src/care/dragon.ts';
@@ -62,9 +77,9 @@ import { dragonAnims, baseAnims } from '../src/art/dragon/anims.ts';
 import { animTuning } from '../src/art/dragon/tuning.ts';
 import { DragonAnimPlayer } from '../src/art/dragon/anim.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts';
-import { startSpec, PRESETS } from '../src/game/presets.ts';
+import { startSpec, buildSim, PRESETS } from '../src/game/presets.ts';
 import { serialize, barnKey, SaveVersionError, SAVE_VERSION } from '../src/game/save.ts';
-import { readClock, clockLabel, hourSteps, PHASE_ORDER } from '../src/game/clock.ts';
+import { readClock, clockLabel, hourSteps, PHASE_ORDER, STAGE_DAYS, HATCH_DAYS } from '../src/game/clock.ts';
 import type { ClockRead } from '../src/game/clock.ts';
 import { skyBands, BACKDROPS } from '../src/game/surfaces.ts';
 import { lightsOf, nightness } from '../src/game/sky.ts';
@@ -72,11 +87,12 @@ import { jobsAt, CLOCK_X, BADGE_X0 } from '../src/game/hud.ts';
 import { measureText } from '../src/lib/engine/text.ts';
 import { rngAt, mix32, TAG } from '../src/game/rand.ts';
 import {
-  route, spanOf, postX, placeRooms, platesOf, standSpot, fitsSlot, slotBody, dragonNet, feetY, floorTop, KEEPER_NET, ROOM_INFO, ROOM_KINDS, STRUCTURES,
+  route, spanOf, postX, placeRooms, platesOf, standSpot, fitsSlot, slotBody, dragonNet, feetY, floorTop, nestX, KEEPER_NET, ROOM_INFO, ROOM_KINDS, STRUCTURES,
   AERIE_F, BARN_X, TOWER_R, TOWER_L, TOWER_W, DECK_X0, DECK_X1, LIFT_X0, LIFT_X1, LIFT_CX, LIFT_STOPS, CLIMB_COST, WALL_H, DRAGON_PAD,
 } from '../src/game/layout.ts';
 import type { Spot, RoomKind } from '../src/game/layout.ts';
-import { NEEDS, FPS, OWN_NEED, hasNeed } from '../src/game/needs.ts';
+import { NEEDS, FPS, OWN_NEED, hasNeed, drainRate } from '../src/game/needs.ts';
+import type { Needs } from '../src/game/needs.ts';
 import { DRAGON_ELEMENTS } from '../src/art/dragon/palettes.ts';
 import type { DragonElement } from '../src/art/dragon/palettes.ts';
 import type { Stage } from '../src/art/dragon/stages.ts';
@@ -122,10 +138,21 @@ const GATE = { done: 120, waitAvgS: 100, waitMaxS: 360, keeperWaitAvgS: 20, lift
 const CAPACITY_RIDES = [123, 30, 20] as const, CAPACITY8 = { waitAvgS: 136, waitMaxS: 338 } as const;
 /**
  * The rooms and structures whose mechanic a later slice builds (plan 3.9): they must show no use yet, and each entry
- * goes when its mechanic lands (S5 the hatchery; S8 the tack room, the bunks, the map room, the Aerie). The lift's
- * landed in S3: dragons ride it.
+ * goes when its mechanic lands (S8 the tack room, the bunks, the map room, the Aerie). The lift's landed in S3 (dragons
+ * ride it), the hatchery's in S5 (eggs are laid and hatch in it).
  */
-const PLANNED: ReadonlySet<string> = new Set(['hatchery', 'tack', 'bunks', 'maproom', 'aerie']);
+const PLANNED: ReadonlySet<string> = new Set(['tack', 'bunks', 'maproom', 'aerie']);
+/**
+ * Section 13 (plan S5): a stage-up waits until its dragon is settled, so its delay is the rest of whatever the dragon
+ * was doing when it fell due. Alone, a baby grows within GROW_ALONE of falling due (the plan's minute; measured 233 to
+ * 2920 steps over seeds 1-8). In the busy barn a dragon is on an errand nearly all the time -- walking to a need's
+ * room, waiting for the one car, being met (S3's saturated lift, docs/BASE_DESIGN.md 4.7) -- so the plan's minute is
+ * out of reach there: a stage-up waits out one errand, measured 4062 to 8874 steps at most (68 to 148 s) over seeds
+ * 1-8 in section 13's busy run (seed 1: 7438), gated at GROW_BUSY (a real game day, 3 minutes: a thirtieth of a
+ * stage). At the real day's length, 30 days less a minute in, an adult (EMBER, seed 1: 2939 steps) is an elder within
+ * 180 + GROW_REAL steps (the plan's).
+ */
+const GROW_ALONE = 3600, GROW_BUSY = 10800, GROW_REAL = 3600;
 
 // ---------- 1. routes on both nets ----------
 {
@@ -479,7 +506,22 @@ const PLANNED: ReadonlySet<string> = new Set(['hatchery', 'tack', 'bunks', 'mapr
   const stages = new Set(ages.dragons.map((d) => d.stage));
   if (STAGES.some((st) => !stages.has(st))) fail(`preset ages: stages ${[...stages].join(' ')}, not all four`);
   if (startSpec(null).dragons !== START_DRAGONS || startSpec('nope').dragons !== START_DRAGONS) fail('startSpec: no preset should be the new game');
-  console.log(`  5 start: ${ds.map((d) => `${d.id} ${d.name} (${d.element})`).join(', ')}; all adult, 0 days in, at clock ${sim.clock}; presets ${Object.keys(PRESETS).join(' ')} (ages: ${ages.dragons.length} dragons, ${stages.size} stages)`);
+  // growup: EMBER, settled, grows up (an elder) at step GROWUP_IN; eggs: three at their progress; hatch: its egg hatches
+  // at step HATCH_IN; full: seventeen dragons, every baby sub-slot taken, and a due egg
+  const gu = buildSim(startSpec('growup'), 1), guE = gu.dragons.find((d) => d.name === 'EMBER')!;
+  let guAt = -1;
+  for (let s = 1; s <= GROWUP_IN + 10 && guAt < 0; s++) { gu.step(); if (gu.events.some((e) => e.kind === 'grow' && e.dragon === guE.id)) guAt = s; }
+  if (guAt !== GROWUP_IN || guE.stage !== 'elder') fail(`preset growup: EMBER grew ${guE.stage} at step ${guAt}, not an elder at step ${GROWUP_IN}`);
+  const eg = buildSim(startSpec('eggs'), 1), egP = eg.eggs.map((e) => (eg.clock - e.laid) / (HATCH_DAYS * eg.dayLen));
+  if (eg.eggs.length !== EGGS_PRESET.length || eg.eggs.some((e, i) => e.element !== EGGS_PRESET[i].element || e.nest !== i || Math.abs(egP[i] - EGGS_PRESET[i].progress) > 1e-4)) fail(`preset eggs: ${eg.eggs.map((e, i) => `${e.element} in nest ${e.nest} at ${egP[i].toFixed(4)}`).join(', ')}`);
+  const ht = buildSim(startSpec('hatch'), 1);
+  let htAt = -1;
+  for (let s = 1; s <= HATCH_IN + 10 && htAt < 0; s++) { ht.step(); if (ht.events.some((e) => e.kind === 'hatch')) htAt = s; }
+  if (htAt !== HATCH_IN || ht.dragons.length !== 8 || ht.dragons[7].stage !== 'baby') fail(`preset hatch: the egg hatched at step ${htAt}, not ${HATCH_IN}`);
+  const fl = buildSim(startSpec('full'), 1);
+  if (fl.dragons.length !== 17 || fl.eggs.length !== 1 || fl.clock - fl.eggs[0].laid < HATCH_DAYS * fl.dayLen) fail(`preset full: ${fl.dragons.length} dragons and ${fl.eggs.length} eggs`);
+  noteUse(gu); noteUse(eg); noteUse(ht); noteUse(fl);
+  console.log(`  5 start: ${ds.map((d) => `${d.id} ${d.name} (${d.element})`).join(', ')}; all adult, 0 days in, at clock ${sim.clock}; presets ${Object.keys(PRESETS).join(' ')} (ages: ${ages.dragons.length} dragons, ${stages.size} stages; growup: EMBER an elder at step ${guAt}; eggs: ${eg.eggs.map((e, i) => `${e.element} ${egP[i].toFixed(2)}`).join(', ')}; hatch: ${ht.dragons[7]?.name} at step ${htAt}; full: ${fl.dragons.length} dragons and a due egg)`);
 }
 
 // ---------- 6. saves: exact, by id, through JSON ----------
@@ -562,6 +604,38 @@ let firstRide = '';
   if (!(threw instanceof SaveVersionError)) fail(`save: a version-999 save ${threw ? `threw ${threw}` : 'loaded'}, not a SaveVersionError`);
   console.log(`  6 saves: ${JSON.stringify(blob).length} bytes at step 5000; loaded, it, one at the first ride (${firstRide}) and ${forks.length} more saves (steps ${forks.map((f) => f.at).join(' ')}: ${[...caught].join(', ')}) step on 5000 to the same world; v 999 throws ${threw instanceof Error ? threw.name : threw}`);
 }
+{
+  // life (plan S5): on a short day, the new game with a baby about to grow up and three eggs in the nests (one hatching
+  // at step 300, one at 900, one at 1200); saved while the eggs incubate, while the baby walks to the module slot it
+  // will grow up in, the step an egg hatches and the step a dragon grows up -- each loaded (through JSON) and stepped
+  // 5000 on in lockstep with the run it came from, to the same world
+  const through = <T>(v: T): T => JSON.parse(JSON.stringify(v));
+  const mk = () => {
+    const w = new CareSim(START_ROOMS, [...START_DRAGONS, { name: 'BURR', element: 'spike', stage: 'baby', seed: 45, slot: { room: 'hatchery', i: 0 }, days: STAGE_DAYS - 0.1 }], START_KEEPERS, { seed: 1, dayLen: 600 });
+    w.addEgg('rock', w.clock - 900); w.addEgg('dusk', w.clock - 300); w.addEgg('water');
+    return w;
+  };
+  const ref = mk(), forks: { sim: CareSim; at: number; what: string; used: Record<string, number> }[] = [], seen = new Set<string>();
+  const WANT = ['egg', 'settle', 'hatch', 'grow'];
+  for (let s = 1; s <= 12000 && (seen.size < WANT.length || forks.some((f) => s <= f.at + 5000)); s++) {
+    ref.step();
+    for (const f of forks) if (s <= f.at + 5000) f.sim.step();
+    for (const f of forks) if (s === f.at + 5000 && f.sim.digest() !== ref.digest()) fail(`save: a world saved at step ${f.at} (${f.what}) and loaded drifted by step ${s}`);
+    const now = [...(s === 100 && ref.eggs.length ? ['egg'] : []), ...(ref.dragons.some((d) => d.goal === 'settle' && d.legs.length) ? ['settle'] : []),
+      ...ref.events.map((e) => e.kind)].filter((k) => WANT.includes(k) && !seen.has(k));
+    if (now.length) {
+      const blob = serialize(ref), sim = CareSim.fromSave(through(blob));
+      if (blob.eggs.length !== ref.eggs.length || sim.eggs === ref.eggs || JSON.stringify(sim.eggs) !== JSON.stringify(ref.eggs) || sim.nextEggId !== ref.nextEggId) fail(`save: the eggs were not saved and loaded as their own copy (step ${s})`);
+      forks.push({ sim, at: s, what: now.join('+'), used: { ...sim.stats.used } });
+      for (const k of now) seen.add(k);
+    }
+  }
+  for (const k of WANT) if (!seen.has(k)) fail(`save: no save caught a world with ${k === 'egg' ? 'an egg incubating' : k === 'settle' ? 'a baby walking to grow up' : `a ${k}`}`);
+  noteUse(ref);
+  for (const f of forks) noteUse(f.sim, f.used);
+  const said: Readonly<Record<string, string>> = { egg: 'eggs incubating', settle: 'BURR walking to grow up', hatch: 'an egg just hatched', grow: 'a dragon just grown up' };
+  console.log(`  6 saves (life, a 600-step day): ${forks.map((f) => `step ${f.at} (${f.what.split('+').map((k) => said[k]).join(', ')})`).join(', ')} step on 5000 to the same world`);
+}
 
 // ---------- 7. rngAt: stateless draws ----------
 {
@@ -633,14 +707,7 @@ let firstRide = '';
   // each need's room (travel.ts NEED_ROOM) is the one kind that meets it, and the base has it
   const needRooms: Readonly<Record<string, string>> = { food: 'kitchen', bath: 'bath', play: 'romp', love: 'groom', sleep: 'dorm' };
   for (const n of NEEDS) if (NEED_ROOM[n] !== needRooms[n] || ROOM_INFO[NEED_ROOM[n]].meets !== n || !needRoom(sim, n)) fail(`rooms: ${n} is met in the ${NEED_ROOM[n]}, not the ${needRooms[n]}`);
-  // every named room in the start, the lift and the Aerie: used somewhere in this suite, unless PLANNED; a PLANNED one unused
-  const named = [...new Set([...START_ROOMS.map((r) => r.kind as string), ...Object.keys(STRUCTURES)])];
-  for (const k of named) {
-    const n = USED[k] ?? 0;
-    if (PLANNED.has(k) ? n > 0 : n === 0) fail(PLANNED.has(k) ? `rooms: the ${k} is PLANNED but was used ${n} times: its mechanic has landed, take it off PLANNED` : `rooms: the ${k} is named and furnished but nothing used it (#11)`);
-  }
-  for (const k of PLANNED) if (!named.includes(k)) fail(`rooms: PLANNED names ${k}, which the building hasn't got`);
-  console.log(`  8 rooms: ${ROOM_KINDS.length} kinds and ${Object.keys(STRUCTURES).length} structures, each with a purpose; ${NEEDS.length} needs, one room each; ${plates.length} plates, none on a bare slot; keepers wait at ${sim.keepers.map((k) => `${k.name} ${k.stationX}`).join(', ')}, clear of every slot; used over the suite: ${named.filter((k) => !PLANNED.has(k)).map((k) => `${k} ${USED[k] ?? 0}`).join(', ')}; planned: ${[...PLANNED].join(', ')}`);
+  console.log(`  8 rooms: ${ROOM_KINDS.length} kinds and ${Object.keys(STRUCTURES).length} structures, each with a purpose; ${NEEDS.length} needs, one room each; ${plates.length} plates, none on a bare slot; keepers wait at ${sim.keepers.map((k) => `${k.name} ${k.stationX}`).join(', ')}, clear of every slot (the rooms' uses are checked at the end, over the whole suite)`);
 }
 
 // ---------- 9. gait: dragons walk by their walks' own root motion ----------
@@ -848,11 +915,195 @@ let firstRide = '';
   const phases = new Set<string>();
   for (let s = 0; s <= 20000; s += 450) phases.add(readClock(eve.clock0 + s).phase);
   // (the simulation's own modules: none reads the phase, the hour or the sky; only the view does)
-  const SIM_FILES = ['sim.ts', 'travel.ts', 'needs.ts', 'layout.ts', 'gait.ts', 'save.ts', 'start.ts', 'presets.ts', 'rand.ts'];
+  const SIM_FILES = ['sim.ts', 'travel.ts', 'needs.ts', 'layout.ts', 'gait.ts', 'save.ts', 'start.ts', 'presets.ts', 'rand.ts', 'life.ts', 'names.ts'];
   const reads = SIM_FILES.filter((f) => /\b(readClock|phaseOf|PHASE_HOURS|PHASE_ORDER|DayPhase|skyBands|nightness|dimness|skyPhase|lightsOf)\b/.test(fs.readFileSync(new URL(`../src/game/${f}`, import.meta.url), 'utf8')));
   if (reads.length) fail(`night: ${reads.join(', ')} read the day's phase (only the view may: plan G8)`);
   console.log(`  12 night: a barn started at 07:00 and one at 19:00 (seed 1) agree on barnKey at all ${checked} checks over 20000 steps, through ${[...phases].join(', ')}; ${SIM_FILES.length} simulation modules, none reading the day's phase`);
   noteUse(day); noteUse(eve);
+}
+
+// ---------- 13. growing up: a month a stage (#8) ----------
+{
+  const SHORT = 600, LEN = STAGE_DAYS * SHORT;
+  const BURR: DragonPlace = { name: 'BURR', element: 'spike', stage: 'baby', seed: 45, slot: { room: 'hatchery', i: 0 } };
+  const where = (w: CareSim, d: Dragon) => (d.slot ? `${w.rooms[d.slot.room].kind}:${d.slot.i}` : 'no slot');
+  const LEN_OF = (w: CareSim) => STAGE_DAYS * w.dayLen;
+  /**
+   * Step a world, checking every grow event as it comes: the stage it grew into is the next, its stage's start moved on
+   * exactly one stage's length, and the dragon was settled as the step began (no keeper on any of its jobs, no route
+   * left, standing still in a slot its new stage fits, and no act but one ending that step: life runs after the acts,
+   * and the dragon may set off for a job later in the same step); the step after, each need not being met drains at
+   * the new stage's rate. And as it goes: every slot held fits its dragon's stage -- or, a baby on its way to grow up (goal `settle`),
+   * its next stage's -- and a module holds one grown dragon (such a baby counted as one) or two babies.
+   */
+  const run = (w: CareSim, steps: number, what: string, done: () => boolean) => {
+    const was = new Map(w.dragons.map((d) => [d.id, { stage: d.stage, since: d.stageSince }]));
+    const grew: { t: number; d: Dragon; stage: string; at: string; delay: number }[] = [], walked = new Set<Dragon>();
+    let after: { d: Dragon; needs: Needs }[] = [], drains = 0;
+    for (let s = 1; s <= steps && !done(); s++) {
+      // (each dragon due by this step, as the step begins: whether it is settled -- life runs after the acts)
+      const pre = new Map<Dragon, string>();
+      for (const d of w.dragons) {
+        const next = nextStage(d.stage);
+        if (!next || stageDue(w, d) > w.clock + 1) continue;
+        const why = [d.act && d.act.t + 1 < d.act.len ? `act ${d.act.need}` : '', d.legs.length ? `${d.legs.length} legs` : '', d.move !== 'still' ? d.move : '', d.turn >= 0 ? 'turning' : '',
+          w.lift.rider === d.id ? 'the lift\'s rider' : '', w.jobs.some((j) => j.dragon === d && j.keeper) ? `${w.jobs.find((j) => j.dragon === d && j.keeper)!.keeper!.name} on it` : '',
+          !d.slot || !fitsSlot(d.slot, next) || d.x !== d.slot.x || d.f !== d.slot.f ? `in the ${where(w, d)}` : ''].filter(Boolean);
+        pre.set(d, why.join(', '));
+      }
+      w.step();
+      for (const { d, needs } of after) for (const k of NEEDS) {
+        if (!hasNeed(d.element, k) || (d.act && d.act.need === k) || needs[k] < 0.01) continue;
+        drains++;
+        const got = needs[k] - d.needs[k], want = drainRate(d.element, d.stage, k);
+        if (Math.abs(got - want) > 1e-12) fail(`grow (${what}): ${d.name}'s ${k} drained ${got} the step after it grew ${d.stage}, not ${want}`);
+      }
+      after = [];
+      for (const d of w.dragons) {
+        if (d.goal === 'settle' && d.legs.length) walked.add(d);
+        const sl = d.slot, next = nextStage(d.stage);
+        if (sl && !fitsSlot(sl, d.stage) && !(d.goal === 'settle' && next && fitsSlot(sl, next))) fail(`grow (${what}), step ${w.tick}: ${d.name} (${d.stage}, goal ${d.goal}) holds the ${where(w, d)}, which it doesn't fit`);
+      }
+      if (s % 30 === 0) {
+        const mods = new Map<string, { grown: number; babies: number }>();
+        for (const d of w.dragons) if (d.slot) {
+          const key = `${d.slot.room}/${d.slot.mod}`, m = mods.get(key) ?? { grown: 0, babies: 0 };
+          if (d.slot.baby) m.babies++; else m.grown++;
+          mods.set(key, m);
+          if (m.grown > 1 || m.babies > 2 || (m.grown && m.babies)) fail(`grow (${what}), step ${w.tick}: module ${d.slot.mod} of the ${w.rooms[d.slot.room].kind} holds ${m.grown} grown and ${m.babies} babies`);
+        }
+        for (const d of w.dragons) if (d.move !== 'ride' && spanOf(d.f, d.x, dragonNet(d.stage)) < 0) fail(`grow (${what}), step ${w.tick}: ${d.name} (${d.stage}) stands off its floor at f${d.f} x ${d.x.toFixed(1)}`);
+      }
+      for (const e of w.events) {
+        if (e.kind !== 'grow') continue;
+        const d = w.dragons.find((q) => q.id === e.dragon)!, was0 = was.get(d.id)!;
+        if (e.stage !== nextStage(was0.stage) || d.stage !== e.stage) fail(`grow (${what}): ${d.name} grew from ${was0.stage} into ${e.stage} (now ${d.stage})`);
+        if (d.stageSince - was0.since !== LEN_OF(w)) fail(`grow (${what}): ${d.name}'s stage began ${d.stageSince - was0.since} steps after the last, not ${LEN_OF(w)} (exactly ${STAGE_DAYS} days)`);
+        if (pre.get(d) !== '') fail(`grow (${what}): ${d.name} grew ${e.stage} unsettled (${pre.get(d) ?? 'not due'})`);
+        grew.push({ t: w.tick, d, stage: e.stage, at: where(w, d), delay: w.clock - d.stageSince });
+        was.set(d.id, { stage: d.stage, since: d.stageSince });
+        after.push({ d, needs: { ...d.needs } });
+      }
+    }
+    return { grew, walked, drains };
+  };
+  // (a) alone: a baby in the Hatchery grows young, adult and elder, each 30 short days after the last
+  const alone = new CareSim(START_ROOMS, [BURR], START_KEEPERS, { seed: 1, dayLen: SHORT }), burr = alone.dragons[0];
+  const a = run(alone, 3 * LEN + GROW_ALONE + 60, 'alone', () => burr.stage === 'elder');
+  if (a.grew.map((g) => g.stage).join() !== 'young,adult,elder') fail(`grow (alone): BURR grew ${a.grew.map((g) => g.stage).join(', ') || 'never'}, not young, adult, elder once each`);
+  if (burr.stageSince !== alone.clock0 + 3 * LEN) fail(`grow (alone): BURR's elder stage began at clock ${burr.stageSince}, not ${alone.clock0 + 3 * LEN} (three stages of exactly ${LEN} steps)`);
+  if (alone.stats.growDelayMax > GROW_ALONE) fail(`grow (alone): a stage-up waited ${alone.stats.growDelayMax} steps to be applied (want <= ${GROW_ALONE})`);
+  const young = a.grew[0];
+  if (!young || !a.walked.has(burr) || young.at.startsWith('hatchery') || young.at.endsWith(':') || !young.d.slot || young.d.slot.baby) fail(`grow (alone): BURR grew young in the ${young?.at ?? '-'}${a.walked.has(burr) ? '' : ', never walking to a module slot first'}`);
+  noteUse(alone);
+  // (b) the busy barn: the start's seven adults (and BURR) fall due a few seconds apart, every one mid-errand in a barn
+  // whose one car is nearly always busy (4.7); each grows once, settled, within an errand
+  const cast: DragonPlace[] = [...START_DRAGONS.map((p, i) => ({ ...p, days: STAGE_DAYS - (600 + 300 * i) / SHORT })), { ...BURR, days: STAGE_DAYS - 3000 / SHORT }];
+  const busy = new CareSim(START_ROOMS, cast, START_KEEPERS, { seed: 1, dayLen: SHORT });
+  const b = run(busy, 3000 + GROW_BUSY + 600, 'busy', () => busy.dragons.every((d) => d.stage === (d.name === 'BURR' ? 'young' : 'elder')));
+  for (const d of busy.dragons) if (b.grew.filter((g) => g.d === d).length !== 1) fail(`grow (busy): ${d.name} grew ${b.grew.filter((g) => g.d === d).length} times, not once (${d.stage} after ${busy.tick} steps)`);
+  if (busy.stats.growDelayMax > GROW_BUSY) fail(`grow (busy): a stage-up waited ${busy.stats.growDelayMax} steps to be applied (want <= ${GROW_BUSY}: one errand)`);
+  noteUse(busy);
+  // (c) the real day: EMBER 30 days less a minute into adulthood is an elder a minute (and at most one more) on
+  const real = new CareSim(START_ROOMS, START_DRAGONS.map((p) => (p.name === 'EMBER' ? { ...p, days: STAGE_DAYS - 1 / 60 } : p)), START_KEEPERS, { seed: 1 });
+  const ember = real.dragons[0], since0 = ember.stageSince, dueIn = stageDue(real, ember) - real.clock;
+  let at = -1;
+  for (let s = 1; s <= 180 + GROW_REAL && at < 0; s++) {
+    real.step();
+    for (const e of real.events) if (e.kind === 'grow') { if (e.dragon === ember.id) at = s; else fail(`grow (real): ${real.dragons.find((q) => q.id === e.dragon)?.name} grew too`); }
+  }
+  if (dueIn !== 180 || at < 180 || ember.stage !== 'elder' || ember.stageSince - since0 !== STAGE_DAYS * DAY_STEPS) fail(`grow (real): EMBER, due in ${dueIn} steps, is ${ember.stage}${at > 0 ? ` from step ${at}` : ''} (want an elder from step 180 to ${180 + GROW_REAL}, its stage begun exactly ${STAGE_DAYS} days of ${DAY_STEPS} steps on)`);
+  noteUse(real);
+  const fmt = (r: typeof b) => r.grew.map((g) => `${g.d.name} ${g.stage} ${g.delay}`).join(', ');
+  console.log(`  13 growing up: alone (a ${SHORT}-step day), BURR grew ${a.grew.map((g) => `${g.stage} at step ${g.t} (${g.at}, ${g.delay} late)`).join(', ')}, each stage exactly ${LEN} steps after the last, walking out of the Hatchery to a module slot first; ${a.drains + b.drains} needs drained at the new stage's rate the step after; the busy barn (seven adults and BURR falling due 5 s apart), steps late: ${fmt(b)} (at most ${busy.stats.growDelayMax}, gate ${GROW_BUSY}); the real day (${DAY_STEPS} steps), EMBER ${STAGE_DAYS} days less a minute in grew an elder at step ${at} (due at 180)`);
+}
+
+// ---------- 14. eggs and hatching (#5.4, the Hatchery) ----------
+{
+  const SHORT = 600, H = HATCH_DAYS * SHORT;
+  const seedOf = (w: CareSim, id: number) => (mix32(w.seed, TAG.EGG, id) & 0x7fffffff) || 1;
+  /** The new game on a short day with three eggs laid at once (rock, dusk, water), stepped until all three have hatched; each hatch as it came. */
+  const hatchRun = () => {
+    const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1, dayLen: SHORT }), laid = w.clock;
+    const eggs = (['rock', 'dusk', 'water'] as const).map((el) => w.addEgg(el));
+    const hatched: { t: number; d: Dragon; egg: number; at: string; job: number | null }[] = [];
+    for (let s = 1; s <= H + 60 && w.eggs.length; s++) {
+      w.step();
+      for (const e of w.events) if (e.kind === 'hatch') {
+        const d = w.dragons.find((q) => q.id === e.dragon)!, job = w.jobs.find((j) => j.dragon === d && j.need === 'food');
+        hatched.push({ t: w.clock - laid, d, egg: e.egg, at: d.slot ? `${w.rooms[d.slot.room].kind}:${d.slot.i}` : 'no slot', job: job ? job.id : null });
+        if (d.stage !== 'baby' || d.stageSince !== w.clock || d.seed !== seedOf(w, e.egg) || d.needs.food !== HATCH_FOOD || !d.slot?.baby) fail(`eggs: egg ${e.egg} hatched into ${d.name}, ${d.stage}, its stage from ${d.stageSince} (now ${w.clock}), seed ${d.seed} (the egg's ${seedOf(w, e.egg)}), food ${d.needs.food.toFixed(3)}, in the ${hatched[hatched.length - 1].at}`);
+      }
+    }
+    return { w, eggs, laid, hatched };
+  };
+  const r = hatchRun(), w = r.w;
+  // the nests: three eggs fill them, in order; a fourth is not taken (and not counted)
+  if (r.eggs.some((e, i) => !e || e.nest !== i || e.id !== i)) fail(`eggs: three eggs went to nests ${r.eggs.map((e) => e?.nest).join(', ')}, not 0, 1, 2`);
+  {
+    const x = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1, dayLen: SHORT });
+    for (const el of ['rock', 'dusk', 'water'] as const) x.addEgg(el);
+    const used = x.stats.used.hatchery;
+    if (x.addEgg('fire') !== null || x.eggs.length !== 3 || x.nextEggId !== 3 || used !== 3 || x.stats.used.hatchery !== 3) fail(`eggs: a fourth egg in three full nests was taken (${x.eggs.length} eggs, next id ${x.nextEggId}, the hatchery used ${x.stats.used.hatchery} times)`);
+  }
+  // each hatched exactly two days after it was laid, into a new dragon: ids after the start's, its element's first free
+  // name, the egg's seed, a baby sub-slot (the Hatchery's two first); its food job open at once, and fed within 3 minutes
+  const want = ['PEBBLE', 'GLOAM', 'SPLASH'];
+  if (r.hatched.length !== 3) fail(`eggs: ${r.hatched.length} of 3 eggs hatched by ${H + 60} steps`);
+  r.hatched.forEach((h, i) => {
+    if (h.t !== H || h.d.id !== START_DRAGONS.length + i || h.d.name !== want[i] || h.egg !== i) fail(`eggs: egg ${h.egg} hatched ${h.t} steps after it was laid (want ${H}) into ${h.d.name} (id ${h.d.id}; want ${want[i]}, id ${START_DRAGONS.length + i})`);
+    if (h.job == null) fail(`eggs: ${h.d.name} hatched with no food job open`);
+  });
+  if (r.hatched.slice(0, 2).some((h) => !h.at.startsWith('hatchery:')) || r.hatched[2]?.at.startsWith('hatchery:')) fail(`eggs: the babies went to ${r.hatched.map((h) => h.at).join(', ')}, not the Hatchery's two sub-slots first`);
+  if (new Set(w.dragons.map((d) => d.name)).size !== w.dragons.length) fail('eggs: two dragons share a name');
+  const fedIn = new Map<Dragon, number>();
+  for (let s = 1; s <= 3 * 60 * FPS && fedIn.size < r.hatched.length; s++) {
+    w.step();
+    for (const h of r.hatched) if (!fedIn.has(h.d) && !w.jobs.some((j) => j.id === h.job)) fedIn.set(h.d, s);
+  }
+  for (const h of r.hatched) if (!fedIn.has(h.d)) fail(`eggs: ${h.d.name} was not fed within 3 minutes of hatching (a baby's first job is its food)`);
+  noteUse(w);
+  // two runs: the same names and seeds
+  const again = hatchRun();
+  if (again.hatched.map((h) => `${h.d.name}/${h.d.seed}`).join() !== r.hatched.map((h) => `${h.d.name}/${h.d.seed}`).join()) fail('eggs: two runs hatched different names or seeds');
+  // every baby sub-slot taken (the `full` preset, everyone's needs full so nobody moves): the due egg waits in its nest,
+  // nothing lost; one baby goes out (as one will to the garden or on a trip: S6, S8), and the egg hatches into its sub-slot
+  const spec = startSpec('full'), full = new CareSim(spec.rooms, spec.dragons, spec.keepers, { seed: 1, dayLen: SHORT });
+  spec.after!(full);
+  for (const d of full.dragons) for (const k of NEEDS) if (hasNeed(d.element, k)) d.needs[k] = 1;
+  const n0 = full.dragons.length, egg = full.eggs[0], probe = { ...full.dragons.find((d) => d.stage === 'baby')!, id: -1, slot: null };
+  if (!egg || full.clock - egg.laid < H || nearestFree(full, probe) !== null) fail('eggs: the full preset has no due egg, or a baby sub-slot free');
+  let early = 0;
+  for (let s = 1; s <= H; s++) { full.step(); if (full.events.some((e) => e.kind === 'hatch')) early++; }
+  if (early || full.eggs.length !== 1 || full.eggs[0] !== egg || full.dragons.length !== n0 || full.dragons.some((d) => !d.slot)) fail(`eggs: with every sub-slot taken the egg ${early ? 'hatched' : full.eggs.length ? 'was kept' : 'was lost'} (${full.eggs.length} eggs, ${full.dragons.length} dragons of ${n0})`);
+  const out = full.dragons.findIndex((d) => d.slot && full.rooms[d.slot.room].kind === 'hatchery' && !d.legs.length && !full.jobs.some((j) => j.dragon === d));
+  const freed = full.dragons[out]?.slot;
+  full.dragons.splice(out, 1);
+  full.step();
+  const baby = full.dragons.find((d) => full.events.some((e) => e.kind === 'hatch' && e.dragon === d.id));
+  if (!baby || baby.slot !== freed || full.eggs.length || full.dragons.length !== n0) fail(`eggs: a sub-slot freed, the waiting egg ${baby ? `hatched into the ${baby.slot ? full.rooms[baby.slot.room].kind : '-'}:${baby.slot?.i}, not the freed one` : 'did not hatch'} (${full.eggs.length} eggs, ${full.dragons.length} dragons)`);
+  noteUse(full);
+  // names: every element's own six, none over NAME_MAX and none shared; past them a number, still unique and short
+  const fake = (names: readonly string[]) => ({ dragons: names.map((name) => ({ name })) }) as unknown as CareSim;
+  const all = Object.values(NAMES).flat();
+  if (new Set(all).size !== all.length || all.some((n) => n.length > NAME_MAX)) fail('names: two elements share a name, or one is over 8 characters');
+  if (hatchName(fake(NAMES.fire), 'fire') !== 'CINDER2' || hatchName(fake([...NAMES.fire, 'CINDER2']), 'fire') !== 'ASH2') fail(`names: past fire's six, ${hatchName(fake(NAMES.fire), 'fire')} then ${hatchName(fake([...NAMES.fire, 'CINDER2']), 'fire')}, not CINDER2 then ASH2`);
+  const got: string[] = [];
+  for (let i = 0; i < 80; i++) got.push(hatchName(fake(got), 'lightning'));
+  if (new Set(got).size !== got.length || got.some((n) => n.length > NAME_MAX)) fail(`names: 80 lightning hatchlings gave ${new Set(got).size} names, the longest ${Math.max(...got.map((n) => n.length))} characters`);
+  console.log(`  14 eggs: three eggs in nests 0-2, a fourth not taken; each hatched exactly ${H} steps (2 days of ${SHORT}) after it was laid: ${r.hatched.map((h) => `${h.d.name} (id ${h.d.id}, seed ${h.d.seed}) into the ${h.at}, fed ${((fedIn.get(h.d) ?? NaN) / FPS).toFixed(1)} s later`).join('; ')}; two runs alike; every sub-slot taken, the egg waited ${H} steps, nothing lost, and hatched into the ${freed ? `${full.rooms[freed.room].kind}:${freed.i}` : '-'} the step it freed; 80 lightning names, the last ${got[got.length - 1]}`);
+}
+
+// ---------- 8 (the whole suite). every named room used (#11) ----------
+{
+  // every named room in the start, the lift and the Aerie: used somewhere in this suite, unless PLANNED; a PLANNED one unused
+  const named = [...new Set([...START_ROOMS.map((r) => r.kind as string), ...Object.keys(STRUCTURES)])];
+  for (const k of named) {
+    const n = USED[k] ?? 0;
+    if (PLANNED.has(k) ? n > 0 : n === 0) fail(PLANNED.has(k) ? `rooms: the ${k} is PLANNED but was used ${n} times: its mechanic has landed, take it off PLANNED` : `rooms: the ${k} is named and furnished but nothing used it (#11)`);
+  }
+  for (const k of PLANNED) if (!named.includes(k)) fail(`rooms: PLANNED names ${k}, which the building hasn't got`);
+  console.log(`  8 rooms used over the suite: ${named.filter((k) => !PLANNED.has(k)).map((k) => `${k} ${USED[k] ?? 0}`).join(', ')}; planned: ${[...PLANNED].join(', ')}`);
 }
 
 if (fails.length) { console.log('SIM: FAIL\n' + fails.map((f) => '  ' + f).join('\n')); process.exit(1); }
