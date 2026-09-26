@@ -374,15 +374,16 @@ export class CareSim {
 
   /**
    * A job a keeper can go to (plan S3): its dragon is going for it, to a slot in the need's own room, and is there, or
-   * nearly (LEAD_PX of route left) -- or, rushed, past its lift ride (the keeper runs: they meet about when it
-   * arrives, and no keeper stands waiting while it queues for the car); the dragon is awake; and no other keeper is on it.
+   * past its lift ride and nearly there (LEAD_PX of route left) -- or, rushed, anywhere past its ride (the keeper runs:
+   * they meet about when it arrives); so no keeper stands waiting at a stand spot while the dragon queues for the car.
+   * The dragon is awake, and no other keeper is on it.
    */
   private servable(j: Job): boolean {
     const d = j.dragon;
     if (d.goalJob !== j.id || !d.slot || this.rooms[d.slot.room].kind !== NEED_ROOM[j.need]) return false;
     if (d.asleep > 0 || (d.act && d.act.need === 'sleep')) return false;
     if (this.jobs.some((o) => o !== j && o.dragon === d && o.keeper)) return false;
-    return arrived(this, d) || remainingCost(this, d) <= LEAD_PX || (j.rushed && !ridesLeft(this, d));
+    return arrived(this, d) || (!ridesLeft(this, d) && (j.rushed || remainingCost(this, d) <= LEAD_PX));
   }
 
   /**
