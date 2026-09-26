@@ -1,10 +1,14 @@
-// The missions' shared vocabulary (plan S8/S9, docs/BASE_DESIGN.md 5 and 6): the six climates, the eleven challenges,
-// the four rider skills and the three big baddies, with their faces, poses and exits. Data only, no drawing and no
-// simulation: the mission art kit (backdrops.ts, setpieces.ts, baddies.ts, npcs.ts, missionicons.ts) draws from these
-// names, and S8's regions.ts imports them rather than redefining them. Safe to import from Node.
+// The words missions are made of (plan S8/S9, docs/BASE_DESIGN.md 5 and 6): the six regions and their climates, the
+// eleven challenges and the four rider skills that meet some of them, the difficulties, and the three big baddies
+// with their faces, poses and exits. Data only, no drawing and no simulation: shared by the mission model
+// (missions.ts, regions.ts), the mission art kit (backdrops.ts, setpieces.ts, baddies.ts, npcs.ts, missionicons.ts)
+// and the mission scene (missionview.ts), so each can be built without the others. Safe to import from Node.
 //
 // Cozy (D4, P14): a baddie is calmed, outwitted or driven off, never hurt -- no hurt, defeat or health exists here, and
 // no face is angry (a grumpy face is a flat brow and a pout, never a V).
+
+/** The six regions on the Map Room's board (S8's regions.ts names and places them). */
+export type RegionId = 'millbrook' | 'oldmine' | 'bramblewood' | 'highfold' | 'frostmere' | 'emberfell';
 
 /** A region's kind of place: the chooser's climate picture and the road scene's backdrop (backdrops.ts). */
 export type Climate = 'meadow' | 'caves' | 'forest' | 'peaks' | 'ice' | 'ash';
@@ -17,6 +21,9 @@ export const CHALLENGE_IDS: readonly ChallengeId[] = Object.freeze(['dark', 'hea
 /** A rider's skill (P13): Bea CHARM, Tomas MEDIC, Iris NAVIGATOR, Pip NIMBLE. */
 export type Skill = 'charm' | 'medic' | 'navigator' | 'nimble';
 export const SKILLS: readonly Skill[] = Object.freeze(['charm', 'medic', 'navigator', 'nimble'] as Skill[]);
+
+/** A mission's difficulty: 2 challenges easy, 3 normal, 3 or 4 hard (hard ends in a big baddie). */
+export type Difficulty = 'easy' | 'normal' | 'hard';
 
 /** The three big baddies (P14): THE MOLE KING (Old Mine Road), THE STORM ROC (Highfold), THE FROST GIANT (Frostmere). */
 export type BaddieId = 'moleking' | 'stormroc' | 'frostgiant';
@@ -34,8 +41,12 @@ export const BADDIE_FACES: readonly BaddieFace[] = Object.freeze(['neutral', 'gr
 export type BaddiePose = 'walk' | 'stand' | 'sit' | 'turn' | 'leave';
 export const BADDIE_POSES: readonly BaddiePose[] = Object.freeze(['walk', 'stand', 'sit', 'turn', 'leave'] as BaddiePose[]);
 
-/** The grumpy miller's two states (npcs.ts): grumpy at the mill until CHARM's moment, then talked round. */
-export type MillerState = 'grumpy' | 'talkedRound';
+/** The grumpy miller's two looks (npcs.ts): grumpy at the mill until a CHARM rider talks him round, then talked round. */
+export type MillerMood = 'grumpy' | 'talkedRound';
 
-/** A set piece's state on the road (setpieces.ts): still ahead of the team, met (the problem visibly solved), or unmet (nobody could help). */
-export type SetPieceState = 'ahead' | 'met' | 'unmet';
+/** A set piece's state on the road (setpieces.ts): not reached yet, met by the team's counter (the problem visibly solved), or left unmet (they wait it out). */
+export type StopState = 'ahead' | 'met' | 'unmet';
+/** @deprecated Merge-time alias: use MillerMood. */
+export type MillerState = MillerMood;
+/** @deprecated Merge-time alias: use StopState. */
+export type SetPieceState = StopState;
