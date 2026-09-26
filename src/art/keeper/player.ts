@@ -71,6 +71,12 @@ export class KeeperPlayer {
     return ok;
   }
 
+  /**
+   * Play on at `s` steps per tick without restarting (a walk kept in step with the pace its owner moves the keeper at:
+   * a walk's `move` is its world speed at 1).
+   */
+  setSpeed(s: number): void { this.inner.speed = s; }
+
   /** Advance one fixed step (60 Hz). */
   tick(): void {
     this.clock++;

@@ -11,7 +11,8 @@ export interface Sprite { rows: readonly string[]; colors: Readonly<Record<strin
 
 export const ICONS: Readonly<Record<NeedKind | 'check' | 'wait' | 'rush', Sprite>> = Object.freeze({
   food: { rows: ['..ooooo..', '.ooyyyoo.', 'bbbbbbbbb', '.bbbbbbb.', '..bbbbb..'], colors: { o: '#e0903a', y: '#f6c46a', b: '#8c4a3a' } },
-  play: { rows: ['..rrr..', '.rrrrr.', 'rrrrrrr', 'wwwwwww', 'rrrrrrr', '.rrrrr.', '..rrr..'], colors: { r: '#e0664a', w: '#f6ecd6' } },
+  // (a ball: lit at the top left, its shade low on the right -- never a band across it, which reads as "no entry")
+  play: { rows: ['..rrr..', '.rwwrr.', 'rrwrrrr', 'rrrrrrr', 'rrrrrdr', '.rrrdd.', '..ddd..'], colors: { r: '#e0664a', w: '#f6ecd6', d: '#a83c34' } },
   bath: { rows: ['...b...', '..bbb..', '.bbbbb.', 'bbwbbbb', 'bwbbbbb', 'bbbbbbb', '.bbbbb.'], colors: { b: '#4aa8d8', w: '#cdeefa' } },
   sleep: { rows: ['..yyyy.', '.yyy...', 'yyy....', 'yyy....', 'yyy....', '.yyy...', '..yyyy.'], colors: { y: '#f2d36a' } },
   love: { rows: ['.pp.pp.', 'ppppppp', 'ppwpppp', '.ppppp.', '..ppp..', '...p...'], colors: { p: '#e8507a', w: '#ffc0d0' } },

@@ -22,8 +22,43 @@
 // audits -- every care act on all 28 looks (view=careaudit), every act the yard plays (view=yardaudit) -- fail a keeper
 // at work covering the dragon's eye (K7), a stroking hand more than REACH_MISS px off its mark, or an act that never
 // ends.
-// The base (view=base, docs/BASE_DESIGN.md): frozen, a minute in, the care simulation must have got jobs done; live,
-// a drag must pan the camera and a tap on the first job chip must Rush that job.
+// The base (view=base, docs/BASE_DESIGN.md): frozen, it starts with a young adult of every element (#9), the ages
+// preset has every stage, and a minute in the care simulation must have got jobs done with the dragons walking (#7:
+// its hook reports each dragon's move, room and slot, the lift, and the px walked; and between the frames at t=600 and
+// t=3600 at least three dragons stand somewhere else); live (never saving: save=0), a drag must pan the camera, a tap
+// on the first job chip must Rush that job, and the gallery's keys (E, the arrows, Space, the digits) must neither
+// rebuild the world nor leave it. Time (docs/BASE_DESIGN.md 7): hour=22 is night; the cast drawn alone (layers=cast)
+// is the same picture and the same barn at noon and at ten at night, while the whole frame is not: at least 35 % of
+// its pixels change, darker and cooler, and no floor pixel does (BASE_DESIGN 7: the sky, the lights and the moonlit
+// walls, never a dragon or a floor), and the walls step with the dusk and the dawn; live, the speed button and the keys 1-4 and p run the world faster, and pause it;
+// a frozen page with a save in storage neither loads nor writes it, and nor does a live page given hour=; a live page
+// that saves resumes its world after a reload, and one whose save doesn't fit -- another version, or one of this
+// version the view can't build or draw (an unknown element, keeper or need) -- starts a new barn without a page
+// error, keeps the old save aside, and never writes it back. Growing up and eggs (BASE_DESIGN 7): the growup preset's EMBER
+// is an elder a second in, the eggs preset shows its three eggs in the Hatchery's nests, the hatch preset's egg has
+// hatched into a baby by t=120; live, a tap on the head of a dragon with nothing waiting opens its card (clear of the
+// other heads on screen where it can be), a tap on the card closes it, and a tap on the head of one with a job waiting
+// opens its card and Rushes the job -- a head drawn over a keeper included. The elder garden (BASE_DESIGN 3): the new game's garden has its two empty plots; the garden preset's
+// three residents live on three plots, by day and by night (each dragon says where it lives: the barn or the garden).
+// The watchable scene (BASE_DESIGN 6): frozen with a team away (preset=trip&trip=...&panel=watch), the scene is on screen at
+// the baddie (the Mole King in view, dozing off calmed; in its beat, surprised), at a challenge the team met (with its
+// banner), turned back on a failure, and home with the result card; live, the TEAM OUT chip opens the scene over the
+// barn, the world steps on under it, and BACK TO BARN closes it; beside a keeper held by hand (who stands still under
+// it), a badge or Esc goes back to the barn.
+// Taking a keeper (BASE_DESIGN 4.10, #6; take= frames too): a tap on a keeper or their badge takes them, d and the pad's
+// arrows walk them, the pad and the line over it (what E does) show while one is held, Esc and LET GO let go, a touch
+// in the pad's gaps is the pad's, and a badge takes and lets go while paused; no dragon's head is under the pad or the
+// line.
+// The Map Room (BASE_DESIGN 5; panel=map and panel=mission frames too): MAP opens the world map, a pin its chooser
+// (the climate picture, the challenges and who meets them, the odds, the egg's notice), BEST TEAM fills the team and
+// SEND starts the muster and eases the camera to the Aerie. The mission loop, live at 8x: the muster to the deck, the
+// TEAM OUT chip to the watch scene, TRIP LOG open and shut, BACK TO BARN.
+// The mission art kit (ART_BIBLE 5.10, view=missionart): every sheet -- the climates (and one as a scrolling road scene), the
+// set pieces, the baddies, the people (the miller beside the keepers) and the icons -- draws every item on it, with
+// no page error, in enough colours.
+// Barn capacity (BASE_DESIGN 4.7): the hook counts the barn's dragons against its cap (7 of 12 in the new game, the twelve
+// preset at the cap, the full preset forced over it with its due egg waiting in its nest, and the capped preset at the
+// cap with its due egg waiting in plain view, nobody in front of its nest).
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -32,6 +67,13 @@ import type { AgeStage } from '../src/art/dragon/palettes.ts';
 import { KEEPER_PALETTES } from '../src/art/keeper/palettes.ts';
 import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
 import { REACH_MISS } from '../src/care/limits.ts';
+import { CareSim } from '../src/game/sim.ts';
+import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts';
+import { serialize } from '../src/game/save.ts';
+import { SAVE_KEY, BACKUP_KEY } from '../src/game/storage.ts';
+import { FLOORS, STRAW_SEAM, PATH_EDGE } from '../src/game/surfaces.ts';
+import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS } from '../src/game/missiondata.ts';
+import { PHASE_ORDER } from '../src/game/clock.ts';
 
 const require = createRequire(import.meta.url);
 function loadPlaywright(): any {
@@ -62,8 +104,585 @@ interface Case {
   care?: number;
   /** view=base: the care simulation must have done jobs by the frozen frame. */
   base?: boolean;
+  /** view=base: what's wrong with the base's hook (window.__dragonCare.base) at the frozen frame. */
+  check?: (hook: BaseHook) => string[];
   /** A live page to drive (pointer input); returns what went wrong. */
   act?: (page: any) => Promise<string[]>;
+  /** Before the page loads (a save planted in its storage). */
+  init?: (page: any) => Promise<void>;
+  /** view=missionart (ART_BIBLE 5.10): the sheet the page's hook must name, and every item it must have drawn. */
+  art?: { sheet: string; want: readonly string[] };
+  /** The Map Room's panel (inside its border, screen px 12-628 x 22-332): at most this many colours (flat pixel-art fills, no anti-aliased edges: the house style). */
+  maxPanelColours?: number;
+  /** Hash the frame (an in-page FNV-1a over the canvas's pixels) for TINT: the whole frame, and the world between the HUD's bars (rows 16-338). */
+  hash?: boolean;
+  /** Keep the frame's pixels (0xRRGGBB each) for TINT's day-and-night comparison (BASE_DESIGN 7). */
+  pixels?: boolean;
+}
+
+type BaseHook = NonNullable<NonNullable<Window['__dragonCare']>['base']>;
+
+/** The base's dragons: this many, every one at `stage` (null: any), with every element among them. */
+function castIs(n: number, stage: string | null) {
+  return (b: BaseHook): string[] => {
+    const out: string[] = [], els = new Set(b.dragons.map((d) => d.element));
+    if (b.dragons.length !== n) out.push(`${b.dragons.length} dragons, not ${n}`);
+    const off = stage ? b.dragons.filter((d) => d.stage !== stage) : [];
+    if (off.length) out.push(`not ${stage}: ${off.map((d) => `${d.name} (${d.stage})`).join(', ')}`);
+    const missing = DRAGON_ELEMENTS.filter((el) => !els.has(el));
+    if (missing.length) out.push(`no ${missing.join(', ')} dragon`);
+    if (!/^[0-9a-f]{8}$/.test(b.digest)) out.push(`the digest is ${JSON.stringify(b.digest)}, not 8 hex digits`);
+    return out;
+  };
+}
+/**
+ * While a keeper is held, the pad and the line under it cover no dragon's eye (ART_BIBLE 1.4): no dragon's head
+ * (its cranium, 6 px either way for the eye) inside a pad button or the line's strip.
+ */
+function hudClear(b: BaseHook): string[] {
+  if (!b.action) return [];
+  const rects = [...Object.entries(b.pad), ...(b.line ? [['line', b.line] as const] : [])];
+  const out: string[] = [];
+  for (const d of b.dragons) {
+    if (!d.head) continue;
+    for (const [name, r] of rects) if (d.head.x + 6 > r.x && d.head.x - 6 < r.x + r.w && d.head.y + 6 > r.y && d.head.y - 6 < r.y + r.h) out.push(`${d.name}'s head (${d.head.x.toFixed(0)}, ${d.head.y.toFixed(0)}) under the ${name} (t ${b.tick}, cam ${b.camX.toFixed(0)},${b.camY.toFixed(0)})`);
+  }
+  return out;
+}
+/** The keeper held by hand (by name) shows whole under the top bar: their mark (17 px over the head, 5 tall) and the "?" (30 over) at y 16 or more. */
+function markShown(name: string) {
+  return (b: BaseHook): string[] => {
+    const k = b.keepers.find((q) => q.name === name);
+    if (!k || b.controlled !== name) return [`${name} is not held (controlled ${b.controlled})`];
+    return k.box.y - 30 - 5 >= 16 ? [] : [`${name}'s mark and "?" are under the top bar (head at screen y ${k.box.y.toFixed(0)}, cam ${b.camX.toFixed(0)},${b.camY.toFixed(0)})`];
+  };
+}
+/** The hook reports the dragons on the move (#7): each one's move, room and slot, the lift's car, and the px walked. */
+function travels(b: BaseHook): string[] {
+  const out: string[] = [];
+  for (const d of b.dragons) {
+    if (typeof d.move !== 'string' || !d.move) out.push(`${d.name} has no move`);
+    if (!(d.room === null || typeof d.room === 'string') || !(d.slot === null || /^[a-z]+:\d+$/.test(d.slot))) out.push(`${d.name}'s room ${d.room} / slot ${d.slot} is not a kind or null / kind:index or null`);
+  }
+  if (!b.lift || typeof b.lift.y !== 'number' || !(b.lift.rider === null || typeof b.lift.rider === 'number')) out.push(`the hook's lift is ${JSON.stringify(b.lift)}`);
+  if (typeof b.walked !== 'number') out.push('the hook has no walked');
+  return out;
+}
+/** The dragons have walked more than this many px by the frozen frame. */
+function walkedOver(px: number) {
+  return (b: BaseHook): string[] => [...travels(b), ...(b.walked > px ? [] : [`the dragons walked ${b.walked} px in ${b.tick} steps, not over ${px}`])];
+}
+/** Two frozen frames of one world (by query): at least `n` dragons stand at a different x in the second (#7: they move around the rooms). */
+const PAIRS: { a: string; b: string; n: number }[] = [{ a: 'view=base&t=600', b: 'view=base&t=3600', n: 3 }];
+
+/**
+ * Day against night (BASE_DESIGN 7): each pair is one world at noon and at ten at night. `same`: the cast alone
+ * (layers=cast: the dragons, the keepers and the bubbles on a flat colour) must be the same picture and the same barn
+ * (barnDigest) -- night never tints a dragon (BASE_DESIGN 7). Otherwise the frames must differ, in the world between the HUD's
+ * bars too; with `differ`, in at least that share of the frame's pixels, the changed pixels darker and cooler by night
+ * than by day (it reads as night: BASE_DESIGN 7), and every floor pixel of the day's frame (FLOORS) the same by night.
+ */
+const TINT: { a: string; b: string; same: boolean; differ?: number }[] = [
+  { a: 'view=base&t=600&hour=12&layers=cast', b: 'view=base&t=600&hour=22&layers=cast', same: true },
+  { a: 'view=base&t=600&hour=12', b: 'view=base&t=600&hour=22', same: false, differ: 0.35 },
+];
+/** The in-page hashes of each hashed case's frame, by query. */
+const frames = new Map<string, { all: string; world: string }>();
+/** The kept pixels of each case that keeps them (0xRRGGBB, row by row), and the frame's width, by query. */
+const pixels = new Map<string, { w: number; px: number[] }>();
+
+/** A real save, built in Node: the new game stepped 5000 (the planted-save cases put it in the page's storage). */
+const PLANTED = JSON.stringify((() => { const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1 }); for (let i = 0; i < 5000; i++) w.step(); return serialize(w); })());
+/** Put a blob at the save's key before the page's scripts run. */
+const plant = (blob: string) => async (page: any) => { await page.addInitScript(([k, v]: [string, string]) => { try { localStorage.setItem(k, v); } catch { /* none */ } }, [SAVE_KEY, blob]); };
+const stored = (page: any, key: string): Promise<string | null> => page.evaluate((k: string) => localStorage.getItem(k), key);
+
+/** The hook's time and saving fields (BASE_DESIGN 7: the clock, the speed, saves). */
+function timeFields(phase: string | null, persist: boolean, night?: number) {
+  return (b: BaseHook): string[] => {
+    const out: string[] = [];
+    // (BASE_DESIGN 7: the building's walls and shell drawn at the night's step, 0 by day to 3 at night)
+    if (night !== undefined && b.night !== night) out.push(`the building is drawn at night step ${b.night}, not ${night}`);
+    if (!b.clock || typeof b.clock.day !== 'number' || typeof b.clock.hour !== 'number') out.push(`the hook's clock is ${JSON.stringify(b.clock)}`);
+    else if (phase && b.clock.phase !== phase) out.push(`it is ${b.clock.phase} at ${b.clock.hour}:${b.clock.minute}, not ${phase}`);
+    if (b.speed !== 1) out.push(`a frozen page runs at speed ${b.speed}, not 1`);
+    if (b.persist !== persist) out.push(`persist is ${b.persist}, not ${persist}`);
+    if (!/^[0-9a-f]{8}$/.test(b.barnDigest)) out.push(`the barn digest is ${JSON.stringify(b.barnDigest)}`);
+    for (const k of ['new', 'pause', 'speed']) { const r = b.buttons?.[k]; if (!r || !(r.w > 0 && r.h > 0) || r.y > 15) out.push(`no ${k} button in the top bar (${JSON.stringify(r)})`); }
+    return out;
+  };
+}
+
+/**
+ * view=base, a frozen page with the player's save in storage (BASE_DESIGN 7, Saves): it is not loaded -- the frame is the new game's
+ * at t=600, the same digest as a clean page's -- and it is not written (the blob is as planted).
+ */
+async function plantedFrozen(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare?.base);
+  const clean = hooks.get('view=base&t=600');
+  if (b.tick !== 600) out.push(`the frozen page is at tick ${b.tick}, not 600: it loaded the save`);
+  if (!clean) out.push('no clean view=base&t=600 hook to compare with');
+  else if (b.digest !== clean.digest) out.push(`its digest ${b.digest} is not the clean page's ${clean.digest}: it loaded the save`);
+  if (b.persist) out.push('a frozen page says it persists');
+  if ((await stored(page, SAVE_KEY)) !== PLANTED) out.push('the frozen page wrote the save');
+  return out;
+}
+
+/**
+ * view=base, live and saving (no save=0; its own page, so its own storage): run to tick 300, save now, reload; the
+ * world resumes (its tick at or past the save's: a new game would start again from 0) and says it persists.
+ */
+async function livePersist(page: any): Promise<string[]> {
+  const out: string[] = [];
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) >= 300, null, { timeout: 20000 });
+  const T: number = await page.evaluate(() => (window as any).__dragonCare.baseSaveNow());
+  const saved = await stored(page, SAVE_KEY);
+  if (!saved || JSON.parse(saved).tick !== T) out.push(`baseSaveNow returned ${T}, the stored save is at ${saved ? JSON.parse(saved).tick : 'nothing'}`);
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => (window as any).__dragonCare?.ready === true && !!(window as any).__dragonCare?.base, null, { timeout: 15000 });
+  const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare.base);
+  if (!(b.tick >= T)) out.push(`after the reload the world is at tick ${b.tick}, before the save's ${T}: it did not resume`);
+  if (b.persist !== true) out.push(`after the reload persist is ${b.persist}`);
+  return out;
+}
+
+/** view=base, live and saving, with a save of another version in storage: a new barn, no page error, the old save kept aside. */
+async function liveOldSave(page: any): Promise<string[]> {
+  const out: string[] = [];
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 5, null, { timeout: 15000 });
+  const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare.base);
+  if (b.tick > 2000) out.push(`the world is at tick ${b.tick}: it loaded the old save`);
+  if ((await stored(page, BACKUP_KEY)) !== OLD_SAVE) out.push('the old save was not kept at the backup key');
+  return out;
+}
+const OLD_SAVE = JSON.stringify({ ...JSON.parse(PLANTED), v: 999, tick: 9999 });
+/**
+ * Saves of this version that parse but that the view can't build (a dragon of an element no one knows, a keeper no one
+ * knows) or draw (a job for a need no one knows: it builds, and only the load's trial draw finds it), or whose egg this
+ * build can't hatch (an element no one knows, a nest there isn't: the egg lies unstepped and off the start's camera for
+ * days, so only CareSim.fromSave's own checks find it), or whose dragon lives somewhere this build hasn't got (BASE_DESIGN 3, The Garden:
+ * CareSim.fromSave's garden checks), each with the text that marks it in a save.
+ */
+const BROKEN = (mark: string, f: (s: any) => void): { blob: string; mark: string } => { const s = JSON.parse(PLANTED); f(s); return { blob: JSON.stringify(s), mark }; };
+const EGG = (s: any, e: object) => { s.eggs = [{ id: 0, element: 'fire', seed: 77, laid: s.clock0 + s.tick, nest: 0, ...e }]; s.nextEggId = 1; };
+const BROKEN_SAVES = [
+  BROKEN('"plasma"', (s) => { s.dragons[2].element = 'plasma'; }),
+  BROKEN('"nobody"', (s) => { s.keepers[1].look = 'nobody'; }),
+  BROKEN('"dance"', (s) => { s.jobs[0].need = 'dance'; }),
+  BROKEN('"lava"', (s) => EGG(s, { element: 'lava' })),
+  BROKEN('"nest":7', (s) => EGG(s, { nest: 7 })),
+  // (a dragon somewhere this build has no place for: the elder garden's saves, BASE_DESIGN 3, The Garden)
+  BROKEN('"moon"', (s) => { s.dragons[0].place = 'moon'; }),
+];
+
+/**
+ * view=base, live and saving, with a broken save of this version in storage (BASE_DESIGN 7, Saves): a new barn (the planted one is
+ * at tick 5000), with its seven young adults, the page running (the runner fails on any page error), the save kept at
+ * the backup key -- and a save now writes the new barn over it, never the broken one back.
+ */
+function liveBrokenSave({ blob, mark }: { blob: string; mark: string }) {
+  return async (page: any): Promise<string[]> => {
+    const out: string[] = [];
+    await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 5, null, { timeout: 15000 });
+    const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare.base);
+    if (b.tick > 2000) out.push(`the world is at tick ${b.tick}: it kept the broken save`);
+    out.push(...castIs(7, 'adult')(b));
+    if ((await stored(page, BACKUP_KEY)) !== blob) out.push('the broken save was not kept at the backup key');
+    const T: number = await page.evaluate(() => (window as any).__dragonCare.baseSaveNow());
+    const saved = await stored(page, SAVE_KEY), s = saved ? JSON.parse(saved) : null;
+    if (!s || s.tick !== T || s.tick > 2000 || saved!.includes(mark)) out.push(`the save written is ${s ? `at tick ${s.tick}` : 'nothing'}, not the new barn: the broken one (${mark}) was written back`);
+    return out;
+  };
+}
+
+/**
+ * view=base&hour=22, live, with the player's save in storage: a page given its start hour is not the player's barn (like
+ * a preset page) -- it neither loads the save (it is night, at a low tick, persist false) nor writes it.
+ */
+async function liveHourNoSave(page: any): Promise<string[]> {
+  const out: string[] = [];
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 5, null, { timeout: 15000 });
+  const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare.base);
+  if (b.tick > 2000) out.push(`the world is at tick ${b.tick}: it loaded the save`);
+  if (b.persist) out.push('a page given hour= says it persists');
+  if (b.clock?.phase !== 'night') out.push(`it is ${b.clock?.phase} on a page started at 22:00`);
+  if (await page.evaluate(() => typeof (window as any).__dragonCare.baseSaveNow) !== 'undefined') out.push('a page given hour= lends baseSaveNow');
+  if ((await stored(page, SAVE_KEY)) !== PLANTED) out.push('a page given hour= wrote the save');
+  return out;
+}
+
+/**
+ * view=base, live (save=0): the speed. The speed button's rect (the hook's) picks 2x; the key 4 picks 8x, which runs at
+ * least four times as many world steps in a second as 1x did; p pauses (the tick stands still); 1 plays at 1x again.
+ */
+async function baseSpeed(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const delta = async (ms: number) => { const a = (await st()).tick; await page.waitForTimeout(ms); return (await st()).tick - a; };
+  const one = await delta(1000);
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640, r = (await st()).buttons.speed;
+  await page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  await page.waitForTimeout(100);
+  if ((await st()).speed !== 2) out.push(`the speed button made the speed ${(await st()).speed}, not 2`);
+  await page.keyboard.press('4');
+  await page.waitForTimeout(100);
+  if ((await st()).speed !== 8) out.push(`the key 4 made the speed ${(await st()).speed}, not 8`);
+  const eight = await delta(1000);
+  if (!(eight >= 4 * one)) out.push(`at 8x the world ran ${eight} steps in a second, at 1x ${one}: not 4 times as many`);
+  await page.keyboard.press('p');
+  await page.waitForTimeout(100);
+  const paused = await delta(500);
+  if (paused !== 0 || (await st()).speed !== 0) out.push(`paused, the world ran ${paused} steps in 500 ms (speed ${(await st()).speed})`);
+  await page.keyboard.press('1');
+  await page.waitForTimeout(200);
+  const again = await delta(500);
+  if ((await st()).speed !== 1 || !(again > 0)) out.push(`the key 1 left the speed ${(await st()).speed}, ${again} steps in 500 ms`);
+  if (!out.length) console.log(`        speed: 1x ${one} steps in a second, 8x ${eight}; paused 0 in 500 ms`);
+  return out;
+}
+
+/** view=base&preset=growup: EMBER has grown up, an elder (BASE_DESIGN 7), and nobody else has. */
+function grownUp(b: BaseHook): string[] {
+  const e = b.dragons.find((d) => d.name === 'EMBER'), others = b.dragons.filter((d) => d.name !== 'EMBER' && d.stage !== 'adult');
+  return [...(e?.stage === 'elder' ? [] : [`EMBER is ${e?.stage ?? 'missing'}, not an elder`]), ...(others.length ? [`${others.map((d) => d.name).join(', ')} grew too`] : [])];
+}
+/** view=base&preset=eggs: three eggs in the nests, each its element in its nest, as far on as the preset laid it (and 600 steps more). */
+function eggsIn(b: BaseHook): string[] {
+  const want = [['rock', 0.028], ['dusk', 0.578], ['water', 0.928]] as const;
+  if (!Array.isArray(b.eggs) || b.eggs.length !== 3) return [`the hook has ${b.eggs?.length ?? 'no'} eggs, not 3`];
+  return b.eggs.flatMap((e, i) => (e.element === want[i][0] && e.nest === i && Math.abs(e.progress - want[i][1]) < 0.002 ? [] : [`egg ${i} is ${e.element} in nest ${e.nest} at ${e.progress.toFixed(3)}, not ${want[i][0]} at ${want[i][1]}`]));
+}
+/** view=base&preset=hatch: the egg has hatched into a baby (the start's seven and one more), and the nests are empty. */
+function hatchedOne(b: BaseHook): string[] {
+  const babies = b.dragons.filter((d) => d.stage === 'baby');
+  return [...(babies.length === 1 && b.dragons.length === 8 ? [] : [`${babies.length} babies among ${b.dragons.length} dragons, not 1 among 8`]), ...(b.eggs?.length === 0 ? [] : [`${b.eggs?.length} eggs left in the nests`])];
+}
+
+/**
+ * view=base, live (save=0): the dragon card. Paused (so nothing changes under the pointer), a tap on the head of a
+ * dragon on screen that has no job waiting (the hook's `waiting` false, its `head` clear of the top bar, the job strip
+ * and every waiting dragon's bubble) opens its card (the hook's `card` is its name) on the far side of the screen from
+ * it (`cardBox`: at the right for a dragon in the left half, at 8, 20 for one in the right half -- never over the head
+ * tapped -- or on the near side if another head is under the far one and none under the near) and Rushes nothing; a tap
+ * on the card closes it; and a tap on the head of a dragon with a job waiting opens its card too, and Rushes that job
+ * (exactly one Rush) -- a head drawn in front of a keeper included: the tap is the dragon's, not the keeper's.
+ */
+async function baseCard(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  await page.keyboard.press('p');
+  await page.waitForTimeout(150);
+  const b = await st(), box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  // (clear: on the canvas, off the top bar and the job strip, under no waiting dragon's bubble -- it stands up to 60 px
+  // over that dragon's head -- and no other dragon's head near: the tap is its alone)
+  const clear = (d: BaseHook['dragons'][number], h: { x: number; y: number }) => h.x > 12 && h.x < 628 && h.y > 24 && h.y < 330
+    && !b.dragons.some((o) => o !== d && o.head && ((o.waiting && Math.abs(o.head.x - h.x) < 36 && o.head.y - h.y > -8 && o.head.y - h.y < 64) || (Math.abs(o.head.x - h.x) < 70 && Math.abs(o.head.y - h.y) < 40)));
+  const d = b.dragons.find((q) => !q.waiting && q.head && clear(q, q.head));
+  if (!d) return [`no dragon with nothing waiting has its head on screen clear of the bubbles (${b.dragons.map((q) => `${q.name} ${q.waiting ? 'waiting' : 'free'} ${q.head ? `${Math.round(q.head.x)},${Math.round(q.head.y)}` : 'off'}`).join('; ')})`];
+  const rushes = b.rushes;
+  await page.mouse.click(box.x + d.head!.x * k, box.y + d.head!.y * k);
+  await page.waitForTimeout(150);
+  const c = await st();
+  if (c.card !== d.name) out.push(`tapping ${d.name}'s head (nothing waiting) opened ${c.card === null ? 'no card' : `${c.card}'s card`}`);
+  if (c.rushes !== rushes) out.push(`tapping ${d.name} (nothing waiting) Rushed a job`);
+  // (the far side -- 472, 38 for a head left of x 320, else 8, 20 -- unless a head on screen is under it there and none
+  // is on the near side: hud.ts cardAt, each head's centre kept 10 px clear)
+  const cb = c.cardBox, h = d.head!, heads = b.dragons.flatMap((q) => (q.head ? [q.head] : []));
+  const LEFT = { x: 8, y: 20, w: 160, h: 76 }, RIGHT = { x: 472, y: 38, w: 160, h: 76 }, [farR, nearR] = h.x < 320 ? [RIGHT, LEFT] : [LEFT, RIGHT];
+  const covers = (r: typeof LEFT) => heads.some((q) => q.x > r.x - 10 && q.x < r.x + r.w + 10 && q.y > r.y - 10 && q.y < r.y + r.h + 10);
+  const want = covers(farR) && !covers(nearR) ? nearR : farR, side = want === farR ? 'the far side' : 'the near side (a head under the far side)';
+  if (!cb || cb.x !== want.x || cb.y !== want.y || cb.w !== want.w || cb.h !== want.h || (h.x >= cb.x && h.x <= cb.x + cb.w && h.y >= cb.y && h.y <= cb.y + cb.h)) out.push(`${d.name}'s card (head at ${Math.round(h.x)}, ${Math.round(h.y)}) opened at ${JSON.stringify(cb)}, not at ${JSON.stringify(want)} (${side})`);
+  const at = cb ?? { x: 8, y: 20, w: 160, h: 76 };
+  await page.mouse.click(box.x + (at.x + at.w / 2) * k, box.y + (at.y + at.h / 2) * k);
+  await page.waitForTimeout(150);
+  if ((await st()).card !== null) out.push('tapping the card did not close it');
+  // (a waiting dragon's head, clear of the card, the bars and every other bubble but its own)
+  const w = b.dragons.find((q) => q.waiting && q.head && q.head.x > 180 && clear(q, q.head));
+  if (w) {
+    await page.mouse.click(box.x + w.head!.x * k, box.y + w.head!.y * k);
+    await page.waitForTimeout(150);
+    const e = await st();
+    if (e.card !== w.name) out.push(`tapping ${w.name}'s head (a job waiting) opened ${e.card === null ? 'no card' : `${e.card}'s card`}`);
+    if (e.rushes !== rushes + 1) out.push(`tapping ${w.name} (a job waiting) made ${e.rushes - rushes} Rushes, not 1`);
+  } else out.push(`no dragon with a job waiting has its head on screen clear of the bubbles (${b.dragons.map((q) => `${q.name} ${q.waiting ? 'waiting' : 'free'} ${q.head ? `${Math.round(q.head.x)},${Math.round(q.head.y)}` : 'off'}`).join('; ')})`);
+  await page.keyboard.press('p');
+  if (!out.length) console.log(`        card: ${d.name}'s opened by a tap on its head (x ${Math.round(h.x)}: nothing waiting, no Rush) at ${at.x}, ${at.y}, ${side}, closed by a tap on it; ${w!.name}'s opened by a tap on its head and its job Rushed`);
+  return out;
+}
+
+/**
+ * The elder garden (BASE_DESIGN 3, The Garden): this many residents on this many plots, the world as wide as that garden makes it
+ * (1304 + 176 a plot + 32), every dragon saying where it lives -- each resident an elder, in the garden.
+ */
+function gardenIs(residents: number, plots: number) {
+  return (b: BaseHook): string[] => {
+    const out: string[] = [], g = b.garden;
+    if (!g || g.residents !== residents || g.plots !== plots || g.worldW !== 1304 + 176 * plots + 32) out.push(`the garden is ${JSON.stringify(g)}, not ${residents} residents on ${plots} plots`);
+    const inGarden = b.dragons.filter((d) => d.place === 'garden');
+    if (b.dragons.some((d) => d.place !== 'barn' && d.place !== 'garden')) out.push(`a dragon lives nowhere: ${b.dragons.map((d) => `${d.name} ${d.place}`).join(', ')}`);
+    if (inGarden.length !== residents || inGarden.some((d) => d.stage !== 'elder' || d.f !== 0 || d.x < 1304 || d.slot !== null)) out.push(`the garden's dragons are ${inGarden.map((d) => `${d.name} (${d.stage}, f${d.f} x ${Math.round(d.x)}, slot ${d.slot})`).join(', ') || 'none'}`);
+    return out;
+  };
+}
+
+/**
+ * The watchable scene (BASE_DESIGN 6), frozen: the overlay is the scene, and the scene is as `want` says (the last stop
+ * reached, whether it was met, the baddie in view, its exit, the way the team faces...), with a banner once a stop is
+ * reached.
+ */
+function sceneIs(want: Partial<NonNullable<BaseHook['scene']>>) {
+  return (b: BaseHook): string[] => {
+    const out: string[] = [], s = b.scene;
+    if (b.ui?.screen !== 'watch') out.push(`the overlay is ${b.ui?.screen}, not watch`);
+    if (!b.ui?.back || b.ui.back.w <= 0) out.push('no BACK TO BARN button while watching');
+    if (!s) return [...out, 'no scene in the hook'];
+    for (const [k, v] of Object.entries(want)) if ((s as Record<string, unknown>)[k] !== v) out.push(`scene.${k} is ${JSON.stringify((s as Record<string, unknown>)[k])}, not ${JSON.stringify(v)}`);
+    if (s.stop != null && !s.banner) out.push(`the team is past the ${s.stop} and no banner shows`);
+    if (!(s.progress >= 0 && s.progress <= 1)) out.push(`the progress is ${s.progress}`);
+    return out;
+  };
+}
+
+/**
+ * view=base&preset=trip, live (save=0): a team is out, so the TEAM OUT chip shows under the top bar; a tap on
+ * it opens the scene over the barn (the world stepping on underneath), and BACK TO BARN closes it. Then the watch
+ * overlay beside taking a keeper (BASE_DESIGN 4.10), with keepers who are not on the trip (its riders, BEA and IRIS,
+ * are away on the road, and never taken): TOMAS taken by his badge and the scene opened, he
+ * stays held but stands still under it -- d held walks him nowhere, and the line over the pad is gone -- a tap on the
+ * pad's arrow or on the world is the overlay's (swallowed: never a pad press, nor empty space letting him go), Esc goes
+ * back to the barn with him still held and walking on with d still down, and over the scene again PIP's badge goes
+ * back to the barn and takes him.
+ */
+async function baseWatch(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 10, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const a = await st(), chip = a.ui?.chip;
+  if (a.ui?.screen !== 'none' || !chip) return [`with a team out the overlay is ${a.ui?.screen} and the chip ${JSON.stringify(chip)}`];
+  await page.mouse.click(box.x + (chip.x + chip.w / 2) * k, box.y + (chip.y + chip.h / 2) * k);
+  await page.waitForTimeout(300);
+  const b = await st();
+  if (b.ui?.screen !== 'watch' || !b.scene) out.push(`tapping the TEAM OUT chip left the overlay ${b.ui?.screen}`);
+  await page.waitForTimeout(300);
+  const c = await st();
+  if (!(c.tick > b.tick)) out.push(`the world stood still under the scene (tick ${b.tick} -> ${c.tick})`);
+  const back = c.ui?.back;
+  if (!back) return [...out, 'no BACK TO BARN button while watching'];
+  await page.mouse.click(box.x + (back.x + back.w / 2) * k, box.y + (back.y + back.h / 2) * k);
+  await page.waitForTimeout(300);
+  const d = await st();
+  if (d.ui?.screen !== 'none') out.push(`BACK TO BARN left the overlay ${d.ui?.screen}`);
+  // the overlay beside a keeper held by hand
+  const click = (x: number, y: number) => page.mouse.click(box.x + x * k, box.y + y * k);
+  const held = (name: string | null) => page.waitForFunction((n: string | null) => (window as any).__dragonCare?.base?.controlled === n, name, { timeout: 5000 }).then(() => true, () => false);
+  const screen = (want: string) => page.waitForFunction((w: string) => (window as any).__dragonCare?.base?.ui?.screen === w, want, { timeout: 5000 }).then(() => true, () => false);
+  const tomasX = (h: BaseHook) => h.keepers.find((q) => q.name === 'TOMAS')!.x;
+  const tb = d.badges.TOMAS, pb = d.badges.PIP;
+  await click(tb.x + tb.w / 2, tb.y + tb.h / 2);
+  if (!(await held('TOMAS'))) return [...out, `a tap on TOMAS's badge: controlled is ${(await st()).controlled}`];
+  await page.waitForTimeout(200);
+  await click(chip.x + chip.w / 2, chip.y + chip.h / 2);
+  if (!(await screen('watch'))) return [...out, `TOMAS held, the TEAM OUT chip left the overlay ${(await st()).ui?.screen}`];
+  const e = await st(), ex = tomasX(e);
+  if (e.controlled !== 'TOMAS' || e.action !== null) out.push(`the scene opened with TOMAS held: controlled ${e.controlled}, the line ${JSON.stringify(e.action)}`);
+  // (d stays down from here until TOMAS has walked on in the barn)
+  await page.keyboard.down('d'); await page.waitForTimeout(400);
+  const pr = e.pad.right;
+  await click(pr.x + pr.w / 2, pr.y + pr.h / 2);
+  await click(320, 200);
+  await page.waitForTimeout(150);
+  const f = await st(), fx = tomasX(f);
+  if (Math.abs(fx - ex) > 0.5) out.push(`over the scene, d and a tap on the pad's arrow walked TOMAS from x ${ex.toFixed(1)} to ${fx.toFixed(1)}`);
+  if (f.ui?.screen !== 'watch' || f.controlled !== 'TOMAS') out.push(`taps on the pad and the world over the scene: the overlay ${f.ui?.screen}, controlled ${f.controlled}`);
+  await page.keyboard.press('Escape');
+  if (!(await screen('none'))) out.push(`Esc over the scene left the overlay ${(await st()).ui?.screen}`);
+  if ((await st()).controlled !== 'TOMAS') out.push(`Esc over the scene let go of TOMAS (controlled ${(await st()).controlled})`);
+  const g0 = tomasX(await st());
+  await page.waitForTimeout(400);
+  const gx = tomasX(await st());
+  await page.keyboard.up('d');
+  if (!(gx > g0 + 5)) out.push(`back in the barn with d still down, TOMAS stood (x ${g0.toFixed(1)} -> ${gx.toFixed(1)})`);
+  await click(chip.x + chip.w / 2, chip.y + chip.h / 2);
+  if (!(await screen('watch'))) out.push(`the TEAM OUT chip again left the overlay ${(await st()).ui?.screen}`);
+  await click(pb.x + pb.w / 2, pb.y + pb.h / 2);
+  if (!(await screen('none')) || !(await held('PIP'))) out.push(`over the scene, PIP's badge: the overlay ${(await st()).ui?.screen}, controlled ${(await st()).controlled}`);
+  await page.keyboard.press('Escape');
+  if (!(await held(null))) out.push(`back in the barn, Esc left ${(await st()).controlled} held`);
+  if (!out.length) console.log(`        watch: the chip opened the scene (${b.scene?.stop ?? 'on the road'}, ${Math.round((b.scene?.progress ?? 0) * 100)} % along), the world stepped on under it, BACK returned to the barn; TOMAS (not a rider) held under the scene stood still (x ${ex.toFixed(0)} -> ${fx.toFixed(0)} through d, the pad and a tap on the world), Esc back to the barn with him held, walking on with d still down (x ${g0.toFixed(0)} -> ${gx.toFixed(0)}), PIP's badge over the scene back to the barn and him taken`);
+  return out;
+}
+
+/**
+ * The Map Room's table (BASE_DESIGN 5): the overlay open is `screen`, with the board's three missions (day 1: THE LOST NEST
+ * first) and the coin on the hook; the map shows a pin per mission, the chooser its BEST TEAM, SEND and BACK.
+ */
+function tableIs(screen: 'map' | 'mission') {
+  return (b: BaseHook): string[] => {
+    const out: string[] = [];
+    if (!b.ui || b.ui.screen !== screen) out.push(`the table's screen is ${b.ui?.screen}, not ${screen}`);
+    if (!Array.isArray(b.board) || b.board.length !== 3 || b.board[0].title !== 'THE LOST NEST') out.push(`the board is ${JSON.stringify(b.board?.map((m) => m.title))}, not three missions with THE LOST NEST first`);
+    if (b.coin !== 0 || b.trip !== null) out.push(`coin ${b.coin}, trip ${JSON.stringify(b.trip)}: a new game has none`);
+    if (screen === 'map' && (b.ui?.pins.length !== 3 || !b.ui.buttons.back)) out.push(`the map has ${b.ui?.pins.length} pins and buttons ${Object.keys(b.ui?.buttons ?? {})}`);
+    if (screen === 'mission' && (!b.ui?.buttons.best || !b.ui.buttons.send || !b.ui.buttons.back || b.ui.mission !== b.board[0]?.id)) out.push(`the chooser shows mission ${b.ui?.mission} with buttons ${Object.keys(b.ui?.buttons ?? {})}`);
+    return out;
+  };
+}
+/** The chooser's line about the egg (the hook's `ui.notice`, as drawMissionScreen draws it): `want`, or none. */
+function noticeIs(want: string | null) {
+  return (b: BaseHook): string[] => (b.ui?.notice === want ? [] : [`the chooser's egg line is ${JSON.stringify(b.ui?.notice)}, not ${JSON.stringify(want)}`]);
+}
+/** The muster preset at the step its team all stands on the Aerie deck (npm run sim section 20): leaving now, every dragon in the barn's world (none away yet). */
+function mustered(b: BaseHook): string[] {
+  const t = b.trip, team = t ? t.pairs.map((p) => b.dragons.find((d) => d.id === p.dragon)) : [];
+  if (!t || t.state !== 'depart' || t.mission !== 'THE LOST NEST') return [`the trip is ${JSON.stringify(t)}, not THE LOST NEST departing`];
+  return team.every((d) => d && d.f === 5 && d.place === 'barn') ? [] : [`the team is ${team.map((d) => d && `${d.name} f${d.f} ${d.place}`).join(', ')}, not on the Aerie`];
+}
+/**
+ * view=base, live (save=0): the Map Room's table (BASE_DESIGN 5, #5: launched from the Aerie). MAP eases the camera to the Map Room and opens the
+ * map (within 2 s); a tap on the first pin opens its mission's chooser; BEST TEAM puts a team together; SEND sends it
+ * -- the table closes, the trip is mustering, and the camera is at the Aerie within 2 s.
+ */
+async function baseMission(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (r: { x: number; y: number; w: number; h: number }) => page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  await click((await st()).buttons.map);
+  try { await page.waitForFunction(() => (window as any).__dragonCare?.base?.ui?.screen === 'map', null, { timeout: 2000 }); } catch { return [`MAP did not open the map within 2 s (screen ${(await st()).ui.screen})`]; }
+  const tick = (await st()).tick;
+  await page.waitForTimeout(300);
+  if ((await st()).tick !== tick) out.push(`the world ran on under the map (tick ${tick} -> ${(await st()).tick})`);
+  const pin = (await st()).ui.pins[0];
+  if (!pin) return [...out, 'the map has no pin'];
+  await click(pin);
+  await page.waitForTimeout(100);
+  const m = await st();
+  if (m.ui.screen !== 'mission' || !m.ui.buttons.best) return [...out, `the pin opened ${m.ui.screen}, not a mission's chooser`];
+  await click(m.ui.buttons.best);
+  await page.waitForTimeout(100);
+  const team = (await st()).ui.pairs;
+  if (!team.length) out.push('BEST TEAM put nobody on the team');
+  await click((await st()).ui.buttons.send);
+  await page.waitForTimeout(100);
+  const s = await st();
+  if (!s.trip || s.trip.state !== 'muster' || s.ui.screen !== 'none') out.push(`after SEND the trip is ${JSON.stringify(s.trip?.state)} and the table ${s.ui.screen}`);
+  try { await page.waitForFunction(() => ((window as any).__dragonCare?.base?.camY ?? 999) <= 200, null, { timeout: 2000 }); } catch { out.push(`the camera is at y ${(await st()).camY} 2 s after SEND, not at the Aerie (<= 200)`); }
+  if (!(await st()).ui.buttons.chip) out.push('no TEAM OUT chip with the team out');
+  if (!out.length) console.log(`        mission: MAP, pin 1 (${m.board[0].title}), BEST TEAM (${team.length} pairs), SEND: mustering, camera at y ${(await st()).camY}`);
+  return out;
+}
+
+/**
+ * view=base, live (save=0; BASE_DESIGN 5, 6): the whole mission loop, as a player plays it -- MAP opens the Map Room's
+ * map; the first pin (THE LOST NEST) its chooser; BEST TEAM puts a team together; SEND (a command the world takes at its
+ * next step) closes the table and the team musters; at 8x the team stands together on the Aerie deck (the muster done:
+ * leaving over the sky bridge); the TEAM OUT chip opens the watch overlay -- the team on its road, the world stepping
+ * on underneath -- its TRIP LOG opens the trip's log and closes it again, and BACK TO BARN goes back to the barn.
+ */
+async function baseLoop(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  const until = (fn: string, ms: number) => page.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (r: { x: number; y: number; w: number; h: number }) => page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  await click((await st()).buttons.map);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "map"', 2000))) return [`MAP did not open the map (screen ${(await st()).ui.screen})`];
+  await click((await st()).ui.pins[0]);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "mission"', 2000))) return [`the first pin opened ${(await st()).ui.screen}, not its chooser`];
+  const m = await st(), title = m.board.find((q) => q.id === m.ui.mission)?.title;
+  await click(m.ui.buttons.best);
+  await page.waitForTimeout(100);
+  const pairs = (await st()).ui.pairs;
+  if (!pairs.length) return ['BEST TEAM put nobody on the team'];
+  await click((await st()).ui.buttons.send);
+  if (!(await until('window.__dragonCare?.base?.trip?.state === "muster"', 2000))) return [`after SEND the trip is ${JSON.stringify((await st()).trip)} (the table ${(await st()).ui.screen})`];
+  // (8x: the muster -- the team's dragons up by the lift, the riders' saddles from the Tack Room -- in a few seconds)
+  await page.keyboard.press('4');
+  if (!(await until('["depart", "away"].includes(window.__dragonCare?.base?.trip?.state)', 40000))) return [`the team never stood together on the Aerie (the trip ${(await st()).trip?.state})`];
+  const deck = await st();
+  await page.keyboard.press('1');
+  const chip = (await st()).ui.chip;
+  if (!chip) return [`no TEAM OUT chip with the team ${deck.trip?.state}`];
+  await click(chip);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "watch"', 2000))) return [`the TEAM OUT chip left the overlay ${(await st()).ui.screen}`];
+  const w = await st();
+  if (!w.scene || w.scene.progress < 0 || !w.ui.back || !w.ui.buttons.log) out.push(`the watch overlay: scene ${JSON.stringify(w.scene)}, back ${JSON.stringify(w.ui.back)}, log ${JSON.stringify(w.ui.buttons.log)}`);
+  await click(w.ui.buttons.log);
+  if (!(await until('window.__dragonCare?.base?.ui?.log === true', 2000))) out.push('TRIP LOG did not open the trip\'s log');
+  await click(w.ui.buttons.log);
+  if (!(await until('window.__dragonCare?.base?.ui?.log === false', 2000))) out.push('TRIP LOG again did not close the log');
+  const t0 = (await st()).tick;
+  await page.waitForTimeout(300);
+  if (!((await st()).tick > t0)) out.push('the world stood still under the watch overlay');
+  await click((await st()).ui.back!);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "none"', 2000))) out.push(`BACK TO BARN left the overlay ${(await st()).ui.screen}`);
+  if (!out.length) console.log(`        loop: MAP, pin 1 (${title}), BEST TEAM (${pairs.length} pairs), SEND, the muster at 8x to the Aerie deck (${deck.trip?.state} at step ${deck.tick}), the TEAM OUT chip to the watch scene (${Math.round((w.scene?.progress ?? 0) * 100)} % along), TRIP LOG open and shut, BACK TO BARN`);
+  return out;
+}
+
+/**
+ * Barn capacity (BASE_DESIGN 4.7): the hook's count of the barn's dragons against its cap (life.ts BARN_CAP, 12) -- every
+ * dragon not living in the garden -- as the top bar's `BARN n/12` shows it.
+ */
+function barnIs(count: number) {
+  return (b: BaseHook): string[] => {
+    const inBarn = b.dragons.filter((d) => d.place !== 'garden').length;
+    return b.barn && b.barn.count === count && b.barn.cap === 12 && inBarn === count ? [] : [`the barn is ${JSON.stringify(b.barn)} with ${inBarn} dragons out of the garden, not ${count} of 12`];
+  };
+}
+/** view=base&preset=full and capped: the due egg still in its nest (the barn at or over its cap: it waits, and its nest shows it). */
+function eggWaits(b: BaseHook): string[] {
+  return b.eggs?.length === 1 && b.eggs[0].progress === 1 ? [] : [`the eggs are ${JSON.stringify(b.eggs)}, not one due and waiting`];
+}
+/**
+ * view=base&preset=capped: nobody stands in front of the waiting egg's nest (the first, world x 228 in the hayloft), so
+ * the egg and its dots show (a baby's body reaches 30 px either way of its root: layout.ts DRAGON_PAD).
+ */
+function nestClear(b: BaseHook): string[] {
+  const by = b.dragons.filter((d) => d.f === 2 && Math.abs(d.x - 228) < 40);
+  return by.length ? [`${by.map((d) => `${d.name} (x ${Math.round(d.x)})`).join(', ')} stands in front of the waiting egg's nest`] : [];
+}
+
+/** The base's dragons include every stage. */
+function everyStage(b: BaseHook): string[] {
+  const st = new Set(b.dragons.map((d) => d.stage)), missing = AGE_STAGES.filter((s) => !st.has(s));
+  return missing.length ? [`no ${missing.join(', ')} dragon`] : [];
+}
+
+/**
+ * view=base, live: the gallery's keys are not the game's. Every one that once rebuilt the world (E, the digits) or
+ * left it (the arrows, Space) is pressed; the base must still be there, the same world, still running. Each key is
+ * judged on its own, by the clock and not by how long it took: a rebuilt world's tick starts again from 0 (any fall
+ * fails), and leaving the base detaches it, which takes its hook away.
+ */
+async function baseKeys(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook | undefined> => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const a = (await st())!, ids = a.dragons.map((d) => d.id).join(',');
+  let last = a.tick;
+  for (const key of ['e', 'E', 'ArrowRight', 'ArrowLeft', 'Space', '5']) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(50);
+    const b = await st();
+    if (!b) { out.push(`the base hook is gone after ${key}: the page left the base`); break; }
+    if (b.tick < last) out.push(`${key} restarted the world (tick ${last} -> ${b.tick})`);
+    last = b.tick;
+  }
+  await page.waitForTimeout(300);
+  const size = await page.evaluate(() => { const c = document.getElementById('stage') as HTMLCanvasElement; return [c.width, c.height]; });
+  if (size[0] !== 640 || size[1] !== 360) out.push(`the canvas is ${size[0]} x ${size[1]} after the keys, not the base's 640 x 360`);
+  const b = await st();
+  if (!b) return out.length ? out : ['the base hook is gone after the keys'];
+  if (!(b.tick >= a.tick + 10)) out.push(`the world restarted or stopped under the keys (tick ${a.tick} -> ${b.tick})`);
+  if (b.dragons.map((d) => d.id).join(',') !== ids) out.push(`the dragons changed under the keys (${ids} -> ${b.dragons.map((d) => d.id).join(',')})`);
+  return out;
 }
 
 /** view=base, live: a drag pans the camera the other way, and a tap on the first job chip Rushes that job. */
@@ -88,6 +707,82 @@ async function baseInput(page: any): Promise<string[]> {
   if (d.rushes !== b.rushes + 1) out.push(`tapping ${c.dragon}'s ${c.need} chip Rushed ${d.rushes - b.rushes} jobs, not 1`);
   return out;
 }
+/**
+ * view=base, live (save=0): taking a keeper (BASE_DESIGN 4.10, #6). A tap on BEA's badge takes her (the hook's `controlled`);
+ * holding d walks her right; Esc lets go; a tap on her body (low in her box: a bubble over a dragon's head may stand
+ * over its top) takes her again; holding the pad's right arrow walks her right; a tap on LET GO lets go. The pad and the
+ * line over it are there while she is held (the hook's `action`), and gone after.
+ */
+async function baseControl(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  const bea = (b: BaseHook) => b.keepers.find((k) => k.name === 'BEA')!;
+  const held = (name: string | null) => page.waitForFunction((n: string | null) => (window as any).__dragonCare?.base?.controlled === n, name, { timeout: 5000 }).then(() => true, () => false);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (x: number, y: number) => page.mouse.click(box.x + x * k, box.y + y * k);
+  const b0 = await st(), badge = b0.badges.BEA;
+  if (!badge || badge.y + badge.h > 15) return [`BEA's badge is ${JSON.stringify(badge)}, not in the top bar`];
+  // 1. her badge
+  await click(badge.x + badge.w / 2, badge.y + badge.h / 2);
+  if (!(await held('BEA'))) out.push(`a tap on BEA's badge: controlled is ${(await st()).controlled}`);
+  const b1 = await st();
+  if (!b1.action || !b1.action.startsWith('BEA')) out.push(`BEA held, the line over the pad is ${JSON.stringify(b1.action)}`);
+  // 2. d held 600 ms
+  await page.waitForTimeout(200);
+  const x1 = bea(await st()).x;
+  await page.keyboard.down('d');
+  for (let i = 0; i < 6; i++) { await page.waitForTimeout(100); out.push(...hudClear(await st())); }
+  await page.keyboard.up('d');
+  await page.waitForTimeout(100);
+  const x2 = bea(await st()).x;
+  if (!(x2 > x1 + 5)) out.push(`holding d walked BEA from x ${x1.toFixed(1)} to ${x2.toFixed(1)}`);
+  // 3. Esc
+  await page.keyboard.press('Escape');
+  if (!(await held(null))) out.push(`Esc left ${(await st()).controlled} held`);
+  if ((await st()).action !== null) out.push('let go, the line over the pad is still there');
+  // 4. her body
+  await page.waitForTimeout(150);
+  const kb = bea(await st()).box;
+  await click(kb.x + kb.w / 2, kb.y + kb.h * 0.75);
+  if (!(await held('BEA'))) out.push(`a tap on BEA's body (${JSON.stringify(kb)}): controlled is ${(await st()).controlled}`);
+  // 5. the pad's right arrow held 500 ms
+  await page.waitForTimeout(200);
+  const b5 = await st(), right = b5.pad.right, x5 = bea(b5).x;
+  await page.mouse.move(box.x + (right.x + right.w / 2) * k, box.y + (right.y + right.h / 2) * k);
+  await page.mouse.down(); await page.waitForTimeout(500); await page.mouse.up();
+  await page.waitForTimeout(100);
+  const b6 = await st(), x6 = bea(b6).x;
+  if (!(x6 > x5 + 5)) out.push(`the pad's right arrow held walked BEA from x ${x5.toFixed(1)} to ${x6.toFixed(1)}`);
+  if (b6.controlled !== 'BEA') out.push(`holding the pad let go of BEA (controlled ${b6.controlled})`);
+  out.push(...hudClear(b6));
+  // (a tap in the pad's gaps goes to the nearest button, never through to the world: that would let go)
+  await click(b6.pad.up.x - 1, b6.pad.up.y + b6.pad.up.h / 2);
+  await click(b6.pad.act.x + b6.pad.act.w / 2, b6.pad.act.y - 3);
+  await page.waitForTimeout(150);
+  if ((await st()).controlled !== 'BEA') out.push(`a tap between the pad's buttons let go of BEA (controlled ${(await st()).controlled})`);
+  // 6. LET GO
+  const lg = b6.pad.letgo;
+  await click(lg.x + lg.w / 2, lg.y + lg.h / 2);
+  if (!(await held(null))) out.push(`a tap on LET GO left ${(await st()).controlled} held`);
+  // 7. paused (p): a badge takes TOMAS at once as far as the screen goes (his line), a second tap lets go again, and
+  // played on, nobody is held
+  await page.keyboard.press('p');
+  const tb = b6.badges.TOMAS;
+  await click(tb.x + tb.w / 2, tb.y + tb.h / 2);
+  await page.waitForTimeout(100);
+  const p1 = await st();
+  if (p1.speed !== 0 || !p1.action?.startsWith('TOMAS')) out.push(`paused, a tap on TOMAS's badge: speed ${p1.speed}, the line ${JSON.stringify(p1.action)}`);
+  await click(tb.x + tb.w / 2, tb.y + tb.h / 2);
+  await page.waitForTimeout(100);
+  if ((await st()).action !== null) out.push(`paused, a second tap on TOMAS's badge left the line ${JSON.stringify((await st()).action)}`);
+  await page.keyboard.press('p');
+  await page.waitForTimeout(200);
+  if ((await st()).controlled !== null) out.push(`paused, TOMAS taken and let go: played on, ${(await st()).controlled} is held`);
+  if (!out.length) console.log(`        control: BEA taken by her badge, walked by d (x ${x1.toFixed(0)} -> ${x2.toFixed(0)}), let go by Esc, taken by a tap on her, walked by the pad (x ${x5.toFixed(0)} -> ${x6.toFixed(0)}), held through taps in the pad's gaps, let go by LET GO; paused, TOMAS taken and let go by his badge; no dragon's head under the pad or the line`);
+  return out;
+}
+
 const CASES: Case[] = [
   { query: 'view=lineup&t=0', minColours: 150, allScales: true },
   { query: 'view=lineup&t=45&mood=-1', minColours: 150, allScales: true },
@@ -161,10 +856,78 @@ const CASES: Case[] = [
   // (and mirrored, the dragons facing left, on two elements: every plan, walk and pose the other way round)
   { query: 'view=careaudit&facing=-1&els=fire,dusk&t=0', minColours: 2, allScales: false, timeout: 300000, care: 32 },
   { query: 'view=yardaudit&t=0', minColours: 2, allScales: false, timeout: 300000, care: 14 },
-  // the base: its first seconds, a minute of care (jobs got done), and live input (a drag pans, a chip tap Rushes)
-  { query: 'view=base&t=600', minColours: 150, allScales: false },
-  { query: 'view=base&t=3600', minColours: 150, allScales: false, base: true },
-  { query: 'view=base', minColours: 150, allScales: false, act: baseInput },
+  // the base: its first seconds (a young adult of every element, #9), every stage (the ages preset), a minute of care
+  // (jobs got done), and live input, never saving (a drag pans, a chip tap Rushes, the gallery's keys do nothing)
+  { query: 'view=base&t=600', minColours: 150, allScales: false, check: (b) => [...castIs(7, 'adult')(b), ...travels(b), ...gardenIs(0, 2)(b), ...barnIs(7)(b)] },
+  { query: 'view=base&preset=ages&t=60', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...everyStage(b), ...travels(b)] },
+  { query: 'view=base&t=3600', minColours: 150, allScales: false, base: true, check: walkedOver(100) },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseInput },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseKeys },
+  // time: night by the hour, day against night (the world layer the same, the frame not), the speed, and saves --
+  // a frozen page ignores the one in storage, and so does a live page given hour=; a live page resumes its own after a
+  // reload, and sets aside one that doesn't fit, of another version or broken (the only live cases without save=0,
+  // each in its own page and storage)
+  { query: 'view=base&t=600&hour=22', minColours: 150, allScales: false, hash: true, pixels: true, check: (b) => [...castIs(7, 'adult')(b), ...timeFields('night', false, 3)(b)] },
+  { query: 'view=base&t=600&hour=12', minColours: 150, allScales: false, hash: true, pixels: true, check: timeFields('day', false, 0) },
+  { query: 'view=base&t=600&hour=12&layers=cast', minColours: 150, allScales: false, hash: true, check: timeFields('day', false, 0) },
+  { query: 'view=base&t=600&hour=22&layers=cast', minColours: 150, allScales: false, hash: true, check: timeFields('night', false, 3) },
+  // (the dusk's and the dawn's turn: the walls a third and two thirds of the way, 18:20 and 05:20)
+  { query: 'view=base&t=600&hour=17', minColours: 150, allScales: false, check: timeFields('dusk', false, 1) },
+  { query: 'view=base&t=600&hour=4', minColours: 150, allScales: false, check: timeFields('dawn', false, 2) },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseSpeed },
+  { query: 'view=base&t=600', minColours: 150, allScales: false, init: plant(PLANTED), act: plantedFrozen },
+  { query: 'view=base', minColours: 150, allScales: false, act: livePersist, timeout: 45000 },
+  { query: 'view=base', minColours: 150, allScales: false, init: plant(OLD_SAVE), act: liveOldSave },
+  ...BROKEN_SAVES.map((b): Case => ({ query: 'view=base', minColours: 150, allScales: false, init: plant(b.blob), act: liveBrokenSave(b) })),
+  { query: 'view=base&hour=22', minColours: 150, allScales: false, init: plant(PLANTED), act: liveHourNoSave },
+  // growing up and eggs (BASE_DESIGN 7): EMBER grown an elder, three eggs in the Hatchery's nests, an egg hatched into a baby;
+  // live, a dragon's card
+  { query: 'view=base&preset=growup&t=60', minColours: 150, allScales: false, check: (b) => [...grownUp(b), ...travels(b)] },
+  { query: 'view=base&preset=eggs&t=600&cam=168,280', minColours: 150, allScales: false, check: (b) => [...eggsIn(b), ...travels(b)] },
+  { query: 'view=base&preset=hatch&t=120&cam=168,280', minColours: 150, allScales: false, check: (b) => [...hatchedOne(b), ...travels(b)] },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseCard },
+  // taking a keeper (BASE_DESIGN 4.10): frozen, BEA held from the first step (the pad, her mark, the line); live, taken and let
+  // go by her badge, the keys, a tap on her and the pad
+  { query: 'view=base&t=120&take=bea', minColours: 150, allScales: false, check: (b) => [...castIs(7, 'adult')(b), ...(b.controlled === 'BEA' && b.action?.startsWith('BEA') && b.keepers.find((k) => k.name === 'BEA')?.phase === 'manual' ? [] : [`take=bea: controlled ${b.controlled}, the line ${JSON.stringify(b.action)}`]), ...markShown('BEA')(b), ...hudClear(b)] },
+  // (held in the hayloft, at night: the camera frames her floor, so her mark shows under the top bar, and the ground
+  // floor's heads are off the screen, not under the pad)
+  { query: 'view=base&t=200&hour=22&take=iris', minColours: 120, allScales: false, check: (b) => [...markShown('IRIS')(b), ...hudClear(b), ...(b.keepers.find((k) => k.name === 'IRIS')?.f === 2 ? [] : ['take=iris: IRIS is not in the hayloft'])] },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseControl },
+  // the elder garden (BASE_DESIGN 3, The Garden): the garden preset's three residents on their plots, past the Garden Gate, by day and at
+  // night (napping, the lanterns lit)
+  { query: 'view=base&preset=garden&cam=1304,376&t=600', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...travels(b)] },
+  { query: 'view=base&preset=garden&cam=1304,376&t=600&hour=22', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...timeFields('night', false, 3)(b)] },
+  // barn capacity (BASE_DESIGN 4.7): the capacity benchmark's twelve, the barn at its cap (BARN 12/12), every element among
+  // them; and the full preset, forced 9 over it (BARN 21/12), its due egg waiting in its nest in the hayloft's corner
+  { query: 'view=base&preset=twelve&t=600', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...travels(b), ...barnIs(12)(b)] },
+  { query: 'view=base&preset=full&t=60&cam=168,280', minColours: 150, allScales: false, check: (b) => [...castIs(21, null)(b), ...barnIs(21)(b), ...eggWaits(b)] },
+  // and the capped preset, the barn at its cap (BARN 12/12), its egg due on the first step waiting in the Hatchery's
+  // first nest with nobody in front of it (the nest's dots in view)
+  { query: 'view=base&preset=capped&t=60&cam=168,280', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...barnIs(12)(b), ...eggWaits(b), ...nestClear(b)] },
+  { query: 'view=base&preset=trip&trip=oldmine:0.95&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', baddie: 'moleking', exit: 'calmed', facing: 1 }) },
+  { query: 'view=base&preset=trip&trip=oldmine:0.91&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', beat: true, baddie: 'moleking', face: 'surprised' }) },
+  { query: 'view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ covered: true, baddie: null, facing: 1 })(b), ...(b.scene?.stop && b.scene.stop !== 'baddie' ? [] : [`the last stop is ${b.scene?.stop}, not a challenge`])] },
+  { query: 'view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ facing: -1, exit: null }) },
+  { query: 'view=base&preset=trip&trip=oldmine:1&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result: 'HOME SAFE!' }) },
+  { query: 'view=base&preset=trip&trip=oldmine:0.2&save=0', minColours: 150, allScales: false, act: baseWatch },
+  // the mission art kit (ART_BIBLE 5.10): every sheet draws everything on it (the page's hook lists it), in its colours
+  { query: 'view=missionart&sheet=climates&t=0', minColours: 1000, allScales: false, art: { sheet: 'climates', want: CLIMATES.flatMap((c) => PHASE_ORDER.map((p) => `${c}:${p}`)) } },
+  { query: 'view=missionart&sheet=climates&climate=peaks&phase=night&t=90', minColours: 500, allScales: false, art: { sheet: 'climates', want: ['peaks:night:scene'] } },
+  { query: 'view=missionart&sheet=setpieces&t=60', minColours: 1000, allScales: false, art: { sheet: 'setpieces', want: CHALLENGE_IDS } },
+  { query: 'view=missionart&sheet=baddies&t=30', minColours: 1000, allScales: false, art: { sheet: 'baddies', want: [...BADDIE_IDS, ...BADDIE_IDS.map((b) => `${b}:portrait`)] } },
+  { query: 'view=missionart&sheet=people&t=50', minColours: 1000, allScales: false, keepers: true, art: { sheet: 'people', want: ['miller:grumpy', 'miller:talkedRound', ...KEEPER_IDS] } },
+  { query: 'view=missionart&sheet=icons&t=0', minColours: 300, allScales: false, art: { sheet: 'icons', want: [...CHALLENGE_IDS.map((c) => `challenge:${c}`), ...SKILLS.map((k) => `skill:${k}`), 'saddle', ...DRAGON_ELEMENTS.map((e) => `egg:${e}`), ...BADDIE_IDS.map((b) => `portrait:${b}`)] } },
+  // missions (BASE_DESIGN 5): the Map Room's world map and a mission's chooser (frozen, the world stepped first), the muster
+  // preset's team all on the Aerie deck, and live, MAP -> a pin -> BEST TEAM -> SEND
+  { query: 'view=base&t=60&panel=map', minColours: 100, maxPanelColours: 40, allScales: false, check: tableIs('map') },
+  { query: 'view=base&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: (b) => [...tableIs('mission')(b), ...noticeIs(null)(b)] },
+  // (and over a full barn: the twelve preset at the cap, the chooser open on THE LOST NEST, its egg to wait)
+  { query: 'view=base&preset=twelve&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: (b) => [...tableIs('mission')(b), ...barnIs(12)(b), ...noticeIs('BARN FULL: THE EGG WILL WAIT')(b)] },
+  { query: 'view=base&preset=muster&t=2186&cam=0,20', minColours: 150, allScales: false, check: (b) => [...mustered(b), ...travels(b)] },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseMission },
+  // the whole loop live (BASE_DESIGN 5, 6): MAP -> a pin -> BEST TEAM -> SEND -> the muster on the Aerie -> the TEAM
+  // OUT chip -> the watch scene (its trip log) -> BACK
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseLoop },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -177,6 +940,8 @@ const port = (server.address() as { port: number }).port;
 const { chromium } = loadPlaywright();
 const browser = await launch(chromium);
 let bad = 0;
+/** The base's hook at each frozen base case's frame, by query (for PAIRS). */
+const hooks = new Map<string, BaseHook>();
 
 for (const c of CASES) {
   const page = await browser.newPage();
@@ -185,6 +950,7 @@ for (const c of CASES) {
   page.on('console', (m: any) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   let msg = '';
   try {
+    if (c.init) await c.init(page);
     // (the audits run while the page loads, so the load itself gets the case's timeout)
     await page.goto(`http://localhost:${port}/index.html?${c.query}`, { waitUntil: 'load', timeout: c.timeout ?? 30000 });
     await page.waitForFunction(() => (window as any).__dragonCare?.ready === true, null, { timeout: c.timeout ?? 15000 });
@@ -228,6 +994,38 @@ for (const c of CASES) {
       if (!b) errors.push('the base reported nothing');
       else if (b.done < 1) errors.push(`the keepers finished no job in ${b.tick} steps`);
     }
+    if (c.check) {
+      const b: BaseHook | undefined = await page.evaluate(() => (window as any).__dragonCare?.base);
+      if (!b) errors.push('the base reported nothing');
+      else { errors.push(...c.check(b)); if (!hooks.has(c.query)) hooks.set(c.query, b); }
+    }
+    if (c.hash) {
+      const h: { all: string; world: string } = await page.evaluate(() => {
+        const cv = document.getElementById('stage') as HTMLCanvasElement, d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
+        const fnv = (from: number, to: number) => { let x = 0x811c9dc5; for (let i = from; i < to; i++) x = Math.imul(x ^ d[i], 0x01000193); return (x >>> 0).toString(16).padStart(8, '0'); };
+        return { all: fnv(0, d.length), world: fnv(16 * cv.width * 4, 339 * cv.width * 4) };
+      });
+      const b: BaseHook | undefined = await page.evaluate(() => (window as any).__dragonCare?.base);
+      frames.set(c.query, h);
+      if (b && !hooks.has(c.query)) hooks.set(c.query, b);
+    }
+    if (c.pixels) {
+      pixels.set(c.query, await page.evaluate(() => {
+        const cv = document.getElementById('stage') as HTMLCanvasElement, d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
+        const px: number[] = [];
+        for (let i = 0; i < d.length; i += 4) px.push((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
+        return { w: cv.width, px };
+      }));
+    }
+    if (c.art) {
+      const h: { sheet: string; drawn: string[] } | undefined = await page.evaluate(() => (window as any).__dragonCare?.missionart);
+      if (!h) errors.push('the mission art sheet reported nothing');
+      else {
+        if (h.sheet !== c.art.sheet) errors.push(`the sheet is ${h.sheet}, not ${c.art.sheet}`);
+        const missing = c.art.want.filter((w) => !h.drawn.includes(w));
+        if (missing.length) errors.push(`not drawn: ${missing.join(', ')}`);
+      }
+    }
     if (c.act) errors.push(...await c.act(page));
     const colours: number[] = await page.evaluate(() => {
       const cv = document.getElementById('stage') as HTMLCanvasElement;
@@ -236,6 +1034,15 @@ for (const c of CASES) {
       for (let i = 0; i < d.length; i += 4) seen.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
       return [...seen];
     });
+    if (c.maxPanelColours != null) {
+      const n: number = await page.evaluate(() => {
+        const cv = document.getElementById('stage') as HTMLCanvasElement, s = cv.width / 640;
+        const d = cv.getContext('2d')!.getImageData(Math.round(12 * s), Math.round(22 * s), Math.round(616 * s), Math.round(310 * s)).data, seen = new Set<number>();
+        for (let i = 0; i < d.length; i += 4) seen.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
+        return seen.size;
+      });
+      if (n > c.maxPanelColours) errors.push(`the map's panel has ${n} colours (want <= ${c.maxPanelColours}): anti-aliased edges?`);
+    }
     const set = new Set(colours);
     if (colours.length < c.minColours) errors.push(`only ${colours.length} distinct colours (want >= ${c.minColours}): were dragons drawn?`);
     if (c.keepers) {
@@ -256,7 +1063,64 @@ for (const c of CASES) {
   await page.close();
 }
 
+/**
+ * Day against night, pixel by pixel (BASE_DESIGN 7): the share of the frame's pixels that differ; over those, the
+ * mean luminance and the mean blue less red (warmth) by day and by night; and the day's floor pixels (a FLOORS colour, the straw seam or the path edge,
+ * in the world between the HUD's bars) and how many of them differ by night.
+ */
+function nightDiff(w: number, day: number[], night: number[]) {
+  const floors = new Set([...Object.values(FLOORS), STRAW_SEAM, PATH_EDGE].map(hexToInt));
+  const lum = (c: number) => (0.2126 * ((c >> 16) & 255) + 0.7152 * ((c >> 8) & 255) + 0.0722 * (c & 255)) / 255;
+  const cool = (c: number) => (c & 255) - ((c >> 16) & 255);
+  let changed = 0, lumDay = 0, lumNight = 0, coolDay = 0, coolNight = 0, floor = 0, floorMoved = 0;
+  for (let i = 0; i < day.length; i++) {
+    const a = day[i], b = night[i], y = Math.floor(i / w);
+    if (a !== b) { changed++; lumDay += lum(a); lumNight += lum(b); coolDay += cool(a); coolNight += cool(b); }
+    if (y >= 16 && y < 339 && floors.has(a)) { floor++; if (a !== b) floorMoved++; }
+  }
+  const k = Math.max(1, changed);
+  return { share: changed / day.length, lumDay: lumDay / k, lumNight: lumNight / k, coolDay: coolDay / k, coolNight: coolNight / k, floor, floorMoved };
+}
+
+// the frozen pairs: the same world at two moments, its dragons moved between them
+for (const p of PAIRS) {
+  const a = hooks.get(p.a), b = hooks.get(p.b), errors: string[] = [];
+  if (!a || !b) errors.push(`no hook from ${a ? p.b : p.a}`);
+  else {
+    const moved = a.dragons.filter((d) => { const e = b.dragons.find((q) => q.id === d.id); return e && (e.x !== d.x || e.f !== d.f); });
+    if (moved.length < p.n) errors.push(`only ${moved.length} dragons moved from ${p.a} to ${p.b} (${moved.map((d) => d.name).join(', ') || 'none'}), not ${p.n} or more`);
+    else console.log(`  ok:   ${p.a} -> ${p.b}  (${moved.length} dragons moved: ${moved.map((d) => d.name).join(', ')})`);
+  }
+  if (errors.length) { bad++; console.log(`  FAIL: ${p.a} -> ${p.b} -> ${errors.join(' | ')}`); }
+}
+
+// day against night: the world layer the same picture and the same barn; the whole frame (and its world) not
+for (const p of TINT) {
+  const a = frames.get(p.a), b = frames.get(p.b), ha = hooks.get(p.a), hb = hooks.get(p.b), errors: string[] = [];
+  if (!a || !b || !ha || !hb) errors.push(`no frame from ${a && ha ? p.b : p.a}`);
+  else if (p.same) {
+    if (a.all !== b.all) errors.push(`the world layer differs by night (${a.all} / ${b.all}): night tints the world`);
+    if (ha.barnDigest !== hb.barnDigest) errors.push(`the barn differs by night (${ha.barnDigest} / ${hb.barnDigest}): the simulation reads the hour`);
+  } else if (a.all === b.all || a.world === b.world) errors.push(`noon and night draw ${a.all === b.all ? 'the same frame' : 'the same world under the HUD'}: night is not drawn`);
+  let seen = '';
+  if (p.differ !== undefined && a && b) {
+    const pa = pixels.get(p.a), pb = pixels.get(p.b);
+    if (!pa || !pb || pa.px.length !== pb.px.length) errors.push('no pixels kept for the day-and-night comparison');
+    else {
+      const n = nightDiff(pa.w, pa.px, pb.px);
+      if (n.share < p.differ) errors.push(`night changes ${(n.share * 100).toFixed(1)} % of the frame's pixels, under ${p.differ * 100} %: night can't be told from day at a glance`);
+      if (!(n.lumNight < n.lumDay)) errors.push(`the changed pixels are no darker by night (L ${n.lumDay.toFixed(3)} by day, ${n.lumNight.toFixed(3)} by night)`);
+      if (!(n.coolNight > n.coolDay)) errors.push(`the changed pixels are no cooler by night (blue less red ${n.coolDay.toFixed(1)} by day, ${n.coolNight.toFixed(1)} by night)`);
+      if (n.floorMoved > 0) errors.push(`${n.floorMoved} of the day's ${n.floor} floor pixels change by night: a floor is moonlit`);
+      seen = `; ${(n.share * 100).toFixed(1)} % of the pixels changed, darker (L ${n.lumDay.toFixed(3)} -> ${n.lumNight.toFixed(3)}) and cooler (blue less red ${n.coolDay.toFixed(1)} -> ${n.coolNight.toFixed(1)}); all ${n.floor} floor pixels the same`;
+    }
+  }
+  if (errors.length) { bad++; console.log(`  FAIL: ${p.a} / ${p.b} -> ${errors.join(' | ')}`); }
+  else console.log(`  ok:   ${p.a} / ${p.b}  (${p.same ? `the same frame ${a!.all} and barn ${ha!.barnDigest}` : `frames ${a!.all} / ${b!.all}, world ${a!.world} / ${b!.world}${seen}`})`);
+}
+
 await browser.close();
 server.close();
-console.log(bad ? `SMOKE: ${bad} of ${CASES.length} views failed` : `SMOKE: all ${CASES.length} views drew dragons (and keepers), no page errors`);
+const total = CASES.length + PAIRS.length + TINT.length;
+console.log(bad ? `SMOKE: ${bad} of ${total} views and pairs failed` : `SMOKE: all ${CASES.length} views drew dragons (and keepers), no page errors; ${PAIRS.length} pair${PAIRS.length === 1 ? '' : 's'} moved; day and night: the cast alike, the frame not`);
 process.exit(bad ? 1 : 0);

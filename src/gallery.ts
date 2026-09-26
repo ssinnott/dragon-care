@@ -2,7 +2,8 @@
 //
 // THE CONTRACT with tools/shot.ts: the query string picks the view, the anim and a frozen time `t` (60 Hz steps from
 // the anim's start); with `t` the page draws exactly that frame and then sets window.__dragonCare.ready. Without `t`
-// it runs live (keyboard: arrows / space cycle views, number keys pick anims) and sets ready after the first frame.
+// it runs live (keyboard: arrows / space cycle views, number keys pick anims; not on view=base, the game, whose keys
+// are its own -- the cycle steps over it, so every view it reaches keeps them) and sets ready after the first frame.
 //
 //   (no view=, or an unknown one)   the game: view=base, below -- this is the page a plain index.html load runs
 //   view=lineup                28 dragons: seven element columns (bible order) x baby / young / adult / elder rows
@@ -26,9 +27,27 @@
 //   view=tails                 the tail-ceiling audit (a fluke never rises over 3 px above the back: 3.0), narrowed the same
 //   view=pour                  the pour-column audit (no breath effect joins the mouth to the floor: 3.8), narrowed the same
 //   view=neutral               the neutral-area recorder (each look's share of HSV S < 0.25 pixels, <= 40 %: 3.1)
+//   view=missionart            the mission art kit (src/game/missionart.ts): sheet=climates (&climate=<c>&phase=<p>:
+//                              one climate as a scrolling road scene) | setpieces | baddies | people | icons
 //   view=base                  the base (src/game/base.ts; docs/BASE_DESIGN.md): the barn and towers at 640 x 360 with the
 //                              care simulation running -- need bubbles, keepers, the job strip; live, drag to look around
-//                              and tap a bubble, a job or a dragon to Rush it; seed= seeds the world
+//                              and tap a bubble, a job or a dragon to Rush it; seed= seeds the world, cam=x,y starts the
+//                              camera there (world px), preset=<name> starts from a code-built world instead of the new
+//                              game (src/game/presets.ts: ages = every stage), save=0 keeps a live page from saving
+//                              (a preset page, like a frozen one, never loads or saves: it isn't the player's barn),
+//                              hour=0..23 starts day 1 at that hour (22: night; nor does a page given an hour load or
+//                              save, so it always starts there), layers=world draws the world alone (the
+//                              building, the lift's car, the cast, the bubbles and the plates: no sky, lights or HUD),
+//                              layers=cast the cast and the bubbles alone on a flat colour (the no-tint check);
+//                              live, the keys 1-4 pick 1x, 2x, 4x or 8x, p pauses and m opens the Map Room's table;
+//                              take=<keeper> (bea, tomas, iris,
+//                              pip) takes that keeper by hand at the first step (frozen too: the pad, the mark and the
+//                              line show); live, a tap on a keeper or their badge takes them, WASD or the arrows walk
+//                              them, E or Space does the chore in reach, Esc lets go; preset=trip&trip=<region>:
+//                              <progress>[:fail] has a team away on the region's hard mission, that far along its road
+//                              at the frozen t (BASE_DESIGN 6); panel=map | mission | watch opens the Map Room table's world
+//                              map or a mission's chooser (mission=0..2: which of the board's), or the
+//                              watchable scene of the team out, over the barn at the first frame
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
 //   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
@@ -63,13 +82,17 @@ import { beginFeed, beginPet, beginTuck, stepAct, approachSide } from './care/ac
 import type { ActKind, CareAct } from './care/acts.ts';
 import { Yard } from './care/yard.ts';
 import { REACH_MISS, ACT_MAX, YARD_ACT_MAX } from './care/limits.ts';
+import { FLOORS } from './game/surfaces.ts';
+import { missionArtScene } from './game/missionart.ts';
 
-/** The reference habitat floor (5.4, gate i). */
-export const STRAW = '#e0d6b8';
+/** The reference habitat floor (5.4, gate i): the base's straw (src/game/surfaces.ts, every floor gated by tools/palette-check.ts). */
+export const STRAW = FLOORS.straw;
 const LABEL = '#3a2a30';
 
-export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings', 'keepers', 'care', 'careaudit', 'yard', 'yardaudit', 'base'] as const;
+export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings', 'keepers', 'care', 'careaudit', 'yard', 'yardaudit', 'missionart', 'base'] as const;
 export type View = typeof VIEWS[number];
+/** The views the arrows and Space cycle through: every one but the game's (view=base keeps its keys, so it could never be left). */
+const RING: readonly View[] = VIEWS.filter((v) => v !== 'base');
 
 export interface GalleryParams {
   view: View;
@@ -110,6 +133,23 @@ export interface GalleryParams {
   k: KeeperId | null;
   /** act=feed | pet | tuck: view=care plays that one care act (on el= / stage=) instead of the three. */
   act: ActKind | null;
+  /** view=base: cam=x,y, the camera's start (world px); preset=<name>, a code-built start; save=0 (false): never load or save. */
+  cam: { x: number; y: number } | null;
+  preset: string | null;
+  save: boolean;
+  /** view=base: hour=0..23, the hour of day 1 the world starts at (null: 07:00); layers=world, the world without the sky, lights or HUD; layers=cast, the cast and bubbles alone. */
+  hour: number | null;
+  layers: 'all' | 'world' | 'cast';
+  /** view=base: take=<keeper name>, a keeper taken by hand at the first step (null: none). */
+  take: string | null;
+  /**
+   * view=base: panel=map | mission, the Map Room table's overlay open from the first frame (BASE_DESIGN 5), or panel=watch,
+   * the watchable scene (BASE_DESIGN 6); mission=<i>, the board's mission the chooser shows (0-2); trip=<region>:<progress>
+   * [:fail], preset=trip's team away.
+   */
+  panel: 'map' | 'mission' | 'watch' | null;
+  mission: number;
+  trip: string | null;
 }
 
 export function parseParams(search: string): GalleryParams {
@@ -143,7 +183,28 @@ export function parseParams(search: string): GalleryParams {
     post: q.get('post') === 'grey' || q.get('post') === 'cvd' ? q.get('post') as 'grey' | 'cvd' : null,
     k: (KEEPER_IDS as readonly string[]).includes(q.get('k') || '') ? q.get('k') as KeeperId : null,
     act: ['feed', 'pet', 'tuck'].includes(q.get('act') || '') ? q.get('act') as ActKind : null,
+    cam: camParam(q.get('cam')),
+    preset: q.get('preset') || null,
+    save: q.get('save') !== '0',
+    hour: hourParam(q.get('hour')),
+    layers: q.get('layers') === 'world' ? 'world' : q.get('layers') === 'cast' ? 'cast' : 'all',
+    take: q.get('take') || null,
+    panel: q.get('panel') === 'map' || q.get('panel') === 'mission' || q.get('panel') === 'watch' ? q.get('panel') as 'map' | 'mission' | 'watch' : null,
+    mission: Math.max(0, Math.min(2, Math.round(num('mission', 0)))),
+    trip: q.get('trip') || null,
   };
+}
+
+/** hour= as a whole hour 0-23 (null otherwise). */
+function hourParam(v: string | null): number | null {
+  const h = v == null || v.trim() === '' ? NaN : Number(v);
+  return Number.isInteger(h) && h >= 0 && h <= 23 ? h : null;
+}
+
+/** cam=x,y as two numbers (null unless both are). */
+function camParam(v: string | null): { x: number; y: number } | null {
+  const [x, y] = (v || '').split(',').map((c) => (c.trim() === '' ? NaN : Number(c)));
+  return isFinite(x) && isFinite(y) ? { x, y } : null;
 }
 
 /**
@@ -1310,7 +1371,11 @@ function makeScene(P: GalleryParams): Scene {
     case 'careaudit': return careAuditScene(P);
     case 'yard': return yardScene(P);
     case 'yardaudit': return yardAuditScene(P);
-    case 'base': return new BaseView(P.seed);
+    case 'missionart': return missionArtScene(location.search);
+    // (a frozen view never loads or saves (BASE_DESIGN 7, Saves), and nor does a preset, a start hour or an overlay asked for (panel=):
+    // loading would hide it, autosaving would put it in place of the player's barn)
+    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset && P.hour == null && !P.panel, hour: P.hour, layers: P.layers,
+      take: P.take, panel: P.panel, mission: P.mission, trip: P.trip, at: P.t ?? 0 });
     default: return lineupScene(P);
   }
 }
@@ -1348,9 +1413,11 @@ export function startGallery(canvas: HTMLCanvasElement, search: string, onReady:
   scene.attach?.(canvas);
   const rebuild = () => { scene.detach?.(); scene = makeScene(P); size(); scene.attach?.(canvas); };
   window.addEventListener('keydown', (e) => {
-    const vi = VIEWS.indexOf(P.view);
-    if (e.key === 'ArrowRight' || e.key === ' ') { P = { ...P, view: VIEWS[(vi + 1) % VIEWS.length] }; rebuild(); }
-    else if (e.key === 'ArrowLeft') { P = { ...P, view: VIEWS[(vi + VIEWS.length - 1) % VIEWS.length] }; rebuild(); }
+    // (the base is the game: its keys are its own, and E or an arrow must never rebuild or leave it)
+    if (P.view === 'base') return;
+    const vi = RING.indexOf(P.view);
+    if (e.key === 'ArrowRight' || e.key === ' ') { P = { ...P, view: RING[(vi + 1) % RING.length] }; rebuild(); }
+    else if (e.key === 'ArrowLeft') { P = { ...P, view: RING[(vi + RING.length - 1) % RING.length] }; rebuild(); }
     else if (e.key === 'e' || e.key === 'E') { P = { ...P, el: ELEMENT_IDS[(ELEMENT_IDS.indexOf(P.el) + 1) % ELEMENT_IDS.length] }; rebuild(); }
     else if (/^[0-9]$/.test(e.key) && ANIM_NAMES[(Number(e.key) + 9) % 10]) { P = { ...P, anim: ANIM_NAMES[(Number(e.key) + 9) % 10] }; rebuild(); }
     else return;

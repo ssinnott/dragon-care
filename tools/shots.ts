@@ -46,9 +46,103 @@ const pairs: string[] = [
   ...STAGES.map((st) => `shots/cast_${st}.png=view=cast&stage=${st}&t=0&scale=1`),
   // the elders' wing wear (2.9): the hole at full spread and at home (the airing), the tears in the preen
   'shots/wings_elder.png=view=wings&t=0',
-  // the base (docs/BASE_DESIGN.md): its first seconds, and a minute of care
+  // the base (docs/BASE_DESIGN.md): its first seconds (the start camera: the barn's west half under the Hatchery, the
+  // lift, EMBER crossing its bay for the ground floor's Lamp Dorm; and the east half), a minute of care (the dragons
+  // walked to their needs' rooms: every room repeats, so most never leave their floor), a ride (ECHO on the Dragon
+  // Lift's car on its way down from the hayloft, which has no Bathhouse, to the ground floor's: BASE_DESIGN 3), every stage
+  // at once (the ages preset: the barn at its cap, BARN 12/12), and the roof: the Aerie deck, its gantry, the lift's
+  // shaft and headframe
   'shots/base_t600.png=view=base&t=600',
+  'shots/base_t600_east.png=view=base&t=600&cam=560,376',
   'shots/base_t3600.png=view=base&t=3600',
+  'shots/base_lift.png=view=base&t=3010&cam=328,300',
+  'shots/base_ages.png=view=base&preset=ages&t=60',
+  'shots/base_aerie.png=view=base&t=60&cam=0,0',
+  // the time of day (7): the start frame at night, at dusk and at dawn (t=600 is an hour and twenty minutes on from the
+  // hour: 23:20, 19:20, 06:20) -- the dragons' pixels the same as base_t600's; night in the sky, the windows, the lamps
+  // and the moonlit walls and shell (BASE_DESIGN 7: the building's night colours, never a dragon's or a floor's), all the way
+  // at 19:20, gone again by 06:20 -- the dusk's and the dawn's turns a step at a time (18:20: the walls a third of the
+  // way to night, the lamps' inner ring; 05:20: two thirds), the cast alone at night on a flat colour (layers=cast: the
+  // no-tint check's picture), and the night seen outside: the sky over the roof (the stars, the moon's blue hour, the
+  // skylight, the dorm lamp's rings) and the west tower's lit slits by the hearth's glow
+  'shots/base_night.png=view=base&t=600&hour=22',
+  'shots/base_dusk.png=view=base&t=600&hour=18',
+  'shots/base_dawn.png=view=base&t=600&hour=5',
+  'shots/base_dusk_turn.png=view=base&t=600&hour=17',
+  'shots/base_dawn_turn.png=view=base&t=600&hour=4',
+  'shots/base_night_cast.png=view=base&t=600&hour=22&layers=cast',
+  'shots/base_night_roof.png=view=base&t=600&hour=22&cam=300,100',
+  'shots/base_night_west.png=view=base&t=600&hour=22&cam=0,300',
+  // growing up and eggs (BASE_DESIGN 7): EMBER six steps into its grow-up (the new elder's silhouette flat in its glow's
+  // highlight inside its own ink, the toast), the Hatchery's three eggs (a rock egg just laid, a dusk one with its first
+  // crack, a water one with two and its wobble), and a hatch (CINDER standing up in the first nest, its shell's bits
+  // flying) -- the Hatchery in the hayloft's west corner, under the roof's slope (BASE_DESIGN 3)
+  'shots/base_growup.png=view=base&preset=growup&t=36',
+  'shots/base_hatchery.png=view=base&preset=eggs&t=600&cam=168,280',
+  'shots/base_hatch.png=view=base&preset=hatch&t=70&cam=168,280',
+  // the Hatchery with a hatchling just out: the eggs preset's water egg hatched (step 2160) into SPLASH, which walked next
+  // door into the hayloft's Hearth Kitchen (the Hatchery's second sub-slot stands in front of the dusk egg's nest too:
+  // a hatchling never hides another's egg while a sub-slot is free elsewhere), the rock and dusk eggs in view in theirs
+  'shots/base_hatchery_home.png=view=base&preset=eggs&t=2230&cam=168,280',
+  // the elder garden (BASE_DESIGN 3, The Garden): the garden preset's three residents on their plots past the Garden Gate, by day (sitting
+  // and napping by their nest mounds, the hedge, the apple trees, the lanterns, the pale path underfoot) and at night
+  // (napping, the lanterns' rings on the hedge, the hedge, lawn, trees and fence moonlit, the path the same); and the retire preset's first elder under the gate's arch, walking out
+  // (step 1950: WICK, from the ground floor's Lamp Dorm, npm run sim section 15)
+  'shots/base_garden.png=view=base&preset=garden&cam=1304,376&t=600',
+  'shots/base_garden_night.png=view=base&preset=garden&cam=1304,376&t=600&hour=22',
+  'shots/base_gate.png=view=base&preset=retire&cam=1060,376&t=1950',
+  // barn capacity (BASE_DESIGN 4.7): the capacity benchmark's twelve -- the barn at its cap, BARN 12/12 -- a minute and a half
+  // in, west and east (a need's rooms repeat on every floor: the herd is met on its own floors, the lift nearly idle);
+  // the full preset, 21 dragons forced over the cap (BARN 21/12, amber): its egg fell due on the first step (the toast
+  // THE BARN IS FULL) and waits in its nest, three dots over it (partly behind the baby resting in front of it); and the
+  // capped preset, the twelve at the cap (BARN 12/12, amber), its babies out of the Hatchery: the egg waiting in the
+  // first nest in plain view, its three dots over it, and the toast
+  'shots/base_twelve.png=view=base&preset=twelve&t=5400',
+  'shots/base_twelve_east.png=view=base&preset=twelve&t=5400&cam=560,376',
+  'shots/base_full.png=view=base&preset=full&t=60&cam=168,280',
+  'shots/base_capped.png=view=base&preset=capped&t=60&cam=168,280',
+  // taking a keeper (BASE_DESIGN 4.10): BEA held by hand from the first step -- the mark over her head in her colour, her badge
+  // lit, the line over the pad and the pad at the bottom right, the camera following her
+  'shots/base_control.png=view=base&t=120&take=bea',
+  // the watchable scene (BASE_DESIGN 6; frozen, preset=trip: a team away on the region's hard mission, that far along its road
+  // at t=60): on the road past a challenge met (its banner); each big baddie in its beat -- walked in, grumpy (0.906:
+  // the beat is 0.900-0.928 of a three-day trip) -- and leaving (0.921: the Mole King dozing, the Storm Roc wandering
+  // off the wrong way, up the road; 0.918: the Frost Giant shuffling off up it, before it leaves the screen); the Mole King's two counters' moments (dusk's breath, Bea's
+  // wave); a failure turned back for home; the result card; the TEAM OUT chip over the barn; and the barn at t=1800
+  'shots/base_watch.png=view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60',
+  'shots/base_baddie_moleking.png=view=base&preset=trip&trip=oldmine:0.906&panel=watch&t=60',
+  'shots/base_baddie_stormroc.png=view=base&preset=trip&trip=highfold:0.906&panel=watch&t=60',
+  'shots/base_baddie_frostgiant.png=view=base&preset=trip&trip=frostmere:0.906&panel=watch&t=60',
+  'shots/base_baddie_moleking_moments.png=view=base&preset=trip&trip=oldmine:0.912&panel=watch&t=60',
+  'shots/base_baddie_moleking_exit.png=view=base&preset=trip&trip=oldmine:0.921&panel=watch&t=60',
+  'shots/base_baddie_stormroc_exit.png=view=base&preset=trip&trip=highfold:0.921&panel=watch&t=60',
+  'shots/base_baddie_frostgiant_exit.png=view=base&preset=trip&trip=frostmere:0.918&panel=watch&t=60',
+  'shots/base_turnback.png=view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60',
+  'shots/base_result.png=view=base&preset=trip&trip=oldmine:1&panel=watch&t=60',
+  'shots/base_team_chip.png=view=base&preset=trip&trip=oldmine:0.2&t=60',
+  'shots/base_final.png=view=base&t=1800',
+  // the mission art kit (ART_BIBLE 5.10; docs/ART_BIBLE.md "Mission art"): the six climates at the four phases (the chooser's
+  // 300 x 112 pictures), two of them filling a road scene, the eleven set pieces ahead and met (a dragon in the fog,
+  // which stands behind it), the three baddies' faces, poses and exits beside an adult dragon, the grumpy miller
+  // grumpy and talked round beside the keepers (and their silhouettes), and the icons
+  'shots/missionart_climates.png=view=missionart&sheet=climates&t=0',
+  'shots/missionart_road_caves.png=view=missionart&sheet=climates&climate=caves&phase=day&t=120',
+  'shots/missionart_road_ice_night.png=view=missionart&sheet=climates&climate=ice&phase=night&t=120',
+  'shots/missionart_setpieces.png=view=missionart&sheet=setpieces&t=60',
+  'shots/missionart_baddies.png=view=missionart&sheet=baddies&t=30',
+  'shots/missionart_people.png=view=missionart&sheet=people&t=50',
+  'shots/missionart_icons.png=view=missionart&sheet=icons&t=0',
+  // missions (BASE_DESIGN 5): the Map Room table's world map (the three start regions, the fog hatched over the rest, the
+  // roads, HOME, the board's three pins) and THE LOST NEST's chooser (the climate picture, the challenges and who at
+  // home meets them, the dragons, the odds) -- each over the world stepped a second -- and the muster preset's team all
+  // on the Aerie deck, each rider beside its dragon, the last step of the muster (the chip still MUSTER; they walk off at step 2186: npm
+  // run sim section 20)
+  'shots/base_map.png=view=base&panel=map&t=60',
+  'shots/base_mission.png=view=base&panel=mission&mission=0&t=60',
+  // and the chooser over a full barn (the twelve preset: BARN 12/12): THE LOST NEST's sure egg says BARN FULL: THE EGG
+  // WILL WAIT (it still comes home, and waits in its nest until a dragon leaves: BASE_DESIGN 4.7)
+  'shots/base_mission_full.png=view=base&preset=twelve&panel=mission&mission=0&t=60',
+  'shots/base_muster.png=view=base&preset=muster&t=2185&cam=0,20',
 ];
 for (const el of ['fire', 'rock', 'slinkwing']) {
   for (const stage of ['elder', 'adult', 'young', 'baby']) {

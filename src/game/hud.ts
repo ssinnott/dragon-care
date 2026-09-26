@@ -1,0 +1,302 @@
+// The base's screen furniture (docs/BASE_DESIGN.md 4.8, 7): the top bar -- the time of day (a sun or a moon and
+// `DAY 3 14:00`), the open jobs, a badge per keeper (busy, held by hand -- a tap takes them: 4.10 -- away on a mission,
+// resting after one), the coin the missions have brought home, the barn's dragons against its cap (`BARN 9/12`), and
+// the buttons (NEW, pause, speed, MAP: the Map Room's table) with their hit rects -- the
+// toasts over the barn, the hint at the bottom right, and a dragon's card (its name, element, stage, its day of the
+// stage's 30 and its needs: a tap on a dragon with nothing waiting opens it). House style: every box a 1 px #1a1018 outline, flat fills,
+// the engine's 5 x 7 font (it has no dot or arrow glyphs, so those are little inked sprites: icons.ts drawSprite).
+// Drawing only: base.ts owns what the buttons do.
+import { drawText, drawTextOutlined, measureText } from '../lib/engine/text.ts';
+import { drawSprite, ICONS } from './icons.ts';
+import type { Rect, Sprite } from './icons.ts';
+import type { ClockRead, Speed } from './clock.ts';
+import { clockLabel, STAGE_DAYS } from './clock.ts';
+import { NEEDS, QUEUE, tierOf } from './needs.ts';
+import type { NeedKind } from './needs.ts';
+import { lightsOf } from './sky.ts';
+import { INK } from './surfaces.ts';
+import { KEEPER_PALETTES } from '../art/keeper/palettes.ts';
+import type { KeeperId } from '../art/keeper/cast.ts';
+
+/** The top bar's height; the text colour; a button's face, and its face while active; the hint's colour. */
+export const BAR_H = 15;
+const TEXT = '#f3e6c8', FACE = '#3a2e34', ACTIVE = '#6b4a34', HINT = '#b8ac8e';
+
+/** The top bar's buttons (screen px, 640 x 360): NEW (tap twice), pause, the speed that cycles 1x, 2x, 4x, 8x, and MAP (the Map Room's table: BASE_DESIGN 5). */
+export type ButtonName = 'new' | 'pause' | 'speed' | 'map';
+export const BUTTONS: Readonly<Record<ButtonName, Rect>> = Object.freeze({
+  new: { x: 528, y: 1, w: 26, h: 13 },
+  pause: { x: 558, y: 1, w: 16, h: 13 },
+  speed: { x: 578, y: 1, w: 28, h: 13 },
+  map: { x: 610, y: 1, w: 26, h: 13 },
+});
+/** Where the coin the missions have brought home is shown (after the keepers' badges, which end at 328). */
+export const COIN_X = 334;
+/** The keepers' badges: 46 x 13 each from x 138, 48 apart; a tap on one takes that keeper, or lets go of the one held (BASE_DESIGN 4.10). */
+export const BADGE_X0 = 138, BADGE_DX = 48, BADGE_W = 46, BADGE_Y = 1, BADGE_H = 13;
+/**
+ * `BARN n/12`, the barn's dragons against its cap (life.ts BARN_CAP; BASE_DESIGN 4.7), at x 392 -- or a space after a
+ * longer `COIN n` (barnAt: from 1 000 coin), never over it. Up to `COIN 9999999` and `BARN 99/12` it ends by x 472,
+ * clear of NEW (x 528); the TEAM OUT chip (maptable.ts CHIP, x 394, y 19) is under the bar. Full, it turns amber.
+ */
+export const BARN_COUNT_X = 392;
+const BARN_FULL_TEXT = '#f2c14e';
+/** Where `BARN n/12` starts after the coin's label (null: no coin shown): x 392, or a space after a longer label. */
+export function barnAt(coinLabel: string | null): number { return coinLabel == null ? BARN_COUNT_X : Math.max(BARN_COUNT_X, COIN_X + measureText(coinLabel) + 7); }
+/** The clock's x, and JOBS's while the clock is short (to day 9). */
+export const CLOCK_X = 16, JOBS_X = 90;
+/**
+ * Where `JOBS n` starts after the clock `label`: x 90, or a space after a longer label (from day 10: 94) -- never over
+ * it. With clock.ts's label (12 glyphs at most to day 99 999) and two-digit jobs it ends by x 135, clear of the badges
+ * (sim-check 11 holds it).
+ */
+export function jobsAt(label: string): number { return Math.max(JOBS_X, CLOCK_X + measureText(label) + 7); }
+/** A toast's life, frames (3 s). */
+export const TOAST_FRAMES = 180;
+
+/** The time of day in the corner, as the sky shows it (sky.ts lightsOf): the sun by day, a low orange sun at dawn and dusk, the moon at night (9 x 9). */
+const SUN_ROWS = ['....s....', '.s.....s.', '...sss...', '..sssss..', 's.sssss.s', '..sssss..', '...sss...', '.s.....s.', '....s....'];
+const SKY_ICONS: Readonly<Record<'sun' | 'low' | 'moon', Sprite>> = Object.freeze({
+  sun: { rows: SUN_ROWS, colors: { s: '#f6c84a' } },
+  low: { rows: SUN_ROWS, colors: { s: '#f0905a' } },
+  moon: { rows: ['...mmmm..', '..mmm....', '.mmm.....', '.mm......', '.mm......', '.mm......', '.mmm.....', '..mmm....', '...mmmm..'], colors: { m: '#f0ecd8' } },
+});
+/**
+ * A keeper's state on their badge: at a job (the font has no dot: a 3 x 3 one), held by the player's hand (no ▼ either:
+ * a 3 x 2 one), away on a mission (an arrow up and away), or resting after one (a small z).
+ */
+const BUSY: Sprite = { rows: ['bbb', 'bbb', 'bbb'], colors: { b: '#e3b23e' } };
+const HELD: Sprite = { rows: ['www', '.w.'], colors: { w: TEXT } };
+const AWAY: Sprite = { rows: ['.aaa', '..aa', '.a.a', 'a...'], colors: { a: '#8ecaf0' } };
+const REST: Sprite = { rows: ['zzz', '.z.', 'zzz'], colors: { z: '#c8b8e8' } };
+/** What a keeper's badge says of them: free, at a job, or held by the player's hand. */
+export type BadgeState = 'free' | 'busy' | 'held';
+
+/** What the top bar shows. */
+export interface TopBar {
+  clock: ClockRead;
+  jobs: number;
+  /**
+   * Each keeper: free, at a job, or held by the player's hand (BASE_DESIGN 4.10); and on a mission's trip (`away`, from
+   * the muster to the landing) or resting after one (`rest`: BASE_DESIGN 5).
+   */
+  keepers: readonly { name: string; look: KeeperId; state: BadgeState; trip?: 'away' | 'rest' | null }[];
+  /** The coin the missions have brought home. */
+  coin?: number;
+  /** The Map Room's overlay is open (the MAP button shows it). */
+  map?: boolean;
+  /** World steps a frame: 0 paused, else the rate. */
+  speed: Speed;
+  /** The rate the speed button shows (and play resumes at). */
+  rate: Exclude<Speed, 0>;
+  /** NEW has been tapped once and waits for the second. */
+  armed: boolean;
+  /** The barn's dragons against its cap (life.ts barnCount, BARN_CAP: BASE_DESIGN 4.7), and whether it is full. */
+  barn: { count: number; cap: number; full: boolean };
+}
+
+const text = (ctx: CanvasRenderingContext2D, s: string, x: number, y: number, color = TEXT, align: 'left' | 'right' | 'center' = 'left') =>
+  drawText(ctx, s, x, y, { color, align, shadow: false });
+
+function button(ctx: CanvasRenderingContext2D, r: Rect, label: string, active: boolean): void {
+  ctx.fillStyle = INK; ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.fillStyle = active ? ACTIVE : FACE; ctx.fillRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+  text(ctx, label, r.x + r.w / 2, r.y + 3, TEXT, 'center');
+}
+
+/** The top bar (BASE_DESIGN 4.8): the sky icon and the clock, the jobs, the keepers' badges, the coin, the barn's count, and the buttons. */
+export function drawTopBar(ctx: CanvasRenderingContext2D, s: TopBar): void {
+  ctx.fillStyle = INK; ctx.fillRect(0, 0, ctx.canvas.width, BAR_H);
+  // (the sky's own phase, not the clock's: at 20:00 the sky is still the dusk's, and the moon comes with its stars)
+  drawSprite(ctx, SKY_ICONS[lightsOf(s.clock).icon], 7, 7);
+  const label = clockLabel(s.clock);
+  text(ctx, label, CLOCK_X, 4);
+  text(ctx, `JOBS ${s.jobs}`, jobsAt(label), 4);
+  s.keepers.forEach((k, i) => {
+    const x = BADGE_X0 + i * BADGE_DX;
+    ctx.fillStyle = INK; ctx.fillRect(x, BADGE_Y, BADGE_W, BADGE_H);
+    ctx.fillStyle = k.state === 'held' ? ACTIVE : FACE; ctx.fillRect(x + 1, BADGE_Y + 1, BADGE_W - 2, BADGE_H - 2);
+    // (a 5 x 7 chip in the keeper's own top colour: who it is at a glance, as the keeper is seen across the barn)
+    ctx.fillStyle = INK; ctx.fillRect(x + 2, 3, 7, 9);
+    ctx.fillStyle = KEEPER_PALETTES[k.look].primary; ctx.fillRect(x + 3, 4, 5, 7);
+    text(ctx, k.name, x + 10, 4);
+    // (held by hand first: a keeper on a trip can't be taken, and a take ends a rest)
+    if (k.state === 'held') drawSprite(ctx, HELD, x + 43, 8);
+    else if (k.trip === 'away') drawSprite(ctx, AWAY, x + 42, 7.5);
+    else if (k.trip === 'rest') drawSprite(ctx, REST, x + 42.5, 7.5);
+    else if (k.state === 'busy') drawSprite(ctx, BUSY, x + 43, 7.5);
+  });
+  const coin = s.coin != null ? `COIN ${s.coin}` : null;
+  if (coin != null) text(ctx, coin, COIN_X, 4, '#f2d36a');
+  text(ctx, `BARN ${s.barn.count}/${s.barn.cap}`, barnAt(coin), 4, s.barn.full ? BARN_FULL_TEXT : TEXT);
+  button(ctx, BUTTONS.new, 'NEW', s.armed);
+  button(ctx, BUTTONS.pause, 'II', s.speed === 0);
+  button(ctx, BUTTONS.speed, `>${s.rate}X`, s.speed > 1);
+  button(ctx, BUTTONS.map, 'MAP', !!s.map);
+}
+
+/** The button under a screen point, if any. */
+export function buttonAt(sx: number, sy: number): ButtonName | null {
+  for (const [name, r] of Object.entries(BUTTONS) as [ButtonName, Rect][]) if (sx >= r.x && sx < r.x + r.w && sy >= r.y && sy < r.y + r.h) return name;
+  return null;
+}
+
+/** The keeper badge under a screen point (its index), if any. */
+export function badgeAt(sx: number, sy: number, n: number): number | null {
+  if (sy < BADGE_Y || sy >= BADGE_Y + BADGE_H) return null;
+  for (let i = 0; i < n; i++) { const x = BADGE_X0 + i * BADGE_DX; if (sx >= x && sx < x + BADGE_W) return i; }
+  return null;
+}
+
+/** A toast: outlined text centred over the barn under the top bar. */
+export function drawToast(ctx: CanvasRenderingContext2D, s: string, y = 20): void {
+  drawTextOutlined(ctx, s, ctx.canvas.width / 2, y, { size: 1, color: TEXT, outline: INK, thickness: 1, align: 'center', shadow: false });
+}
+
+/** The two taps (Rush, and taking a keeper: BASE_DESIGN 4.10): the first hint, and the one shown when no other is given. */
+export const HINT_TAPS = 'TAP A BUBBLE: RUSH   TAP A KEEPER: TAKE';
+/**
+ * A hint (HINT_TAPS, or one of the others base.ts shows in turn), right-aligned at x 634 on an ink strip level with the
+ * job strip's chips (its text on theirs), so it reads over any wall -- unless the strip reaches it (`stripEnd`, screen
+ * x): the jobs come first.
+ */
+export function drawHint(ctx: CanvasRenderingContext2D, stripEnd: number, s: string = HINT_TAPS): void {
+  const w = measureText(s), x = ctx.canvas.width - 6, y = ctx.canvas.height - 21;
+  if (stripEnd + 8 > x - w - 4) return;
+  ctx.fillStyle = INK; ctx.fillRect(x - w - 4, y, w + 8, 17);
+  text(ctx, s, x, y + 5, HINT, 'right');
+}
+
+// ---------- the dragon card (BASE_DESIGN 4.8) ----------
+
+/**
+ * Where a dragon's card opens (screen px), on the far side of the screen from the dragon tapped, so it never covers its
+ * own dragon (nor, for a dragon tapped in the Hatchery, the nests: the start camera frames them at the left): for a
+ * dragon in the right half, under the top bar at the left, clear of the toasts (centred at x 320); for one in the left
+ * half, at the right under the TEAM OUT chip (maptable.ts CHIP: 394-508, y 19-34), clear of it and of the toasts.
+ */
+export const CARD: Readonly<Rect> = Object.freeze({ x: 8, y: 20, w: 160, h: 76 });
+export const CARD_RIGHT: Readonly<Rect> = Object.freeze({ x: 472, y: 38, w: 160, h: 76 });
+/** How far round a head's centre (its cranium) the card keeps clear, px: the head and its eye. */
+export const CARD_HEAD_R = 10;
+/**
+ * The card's place for a dragon tapped at screen x `sx`, given the heads on screen (their centres, screen px; the one
+ * tapped among them): the far side (CARD_RIGHT left of x 320, CARD from it on) -- unless a head is under it there and
+ * none is on the near side, where it opens instead, so it covers no dragon's eye when either place can (ART_BIBLE 1.4).
+ */
+export function cardAt(sx: number, heads: Iterable<{ x: number; y: number }> = []): Readonly<Rect> {
+  const far = sx < 320 ? CARD_RIGHT : CARD, near = far === CARD ? CARD_RIGHT : CARD, hs = [...heads], R = CARD_HEAD_R;
+  const covers = (r: Readonly<Rect>) => hs.some((h) => h.x > r.x - R && h.x < r.x + r.w + R && h.y > r.y - R && h.y < r.y + r.h + R);
+  return covers(far) && !covers(near) ? near : far;
+}
+/**
+ * What a dragon's card shows: its name, element and stage, its day of the stage (1..STAGE_DAYS), each need (null: one
+ * it hasn't got, or a garden resident's held full), whether it lives in the garden, and whether it is an elder staying
+ * on in the barn as its last flier (life.ts staysOn) -- its stage line says so.
+ */
+export interface CardInfo { name: string; element: string; stage: string; day: number; needs: Readonly<Record<NeedKind, number | null>>; garden?: boolean; stays?: boolean }
+/** A day of the stage's bar: a filled day, a day to come. A need's bar: full enough (over QUEUE), then by its tier (soon, now). */
+const DAY_ON = '#e3b23e', DAY_OFF = '#2e2428', NEED_OK = '#7bbf6a', NEED_TIER = ['#f2d36a', '#e3b23e', '#d8402e'];
+
+/**
+ * A dragon's card (160 x 76 at `at`: CARD or CARD_RIGHT, cardAt): its name (outlined) and element; its stage and `DAY d OF 30`; the stage's 30
+ * days as a bar of 4 x 5 segments a px apart, the days so far filled; and its needs, each its icon over a 20 x 4 bar
+ * (a need it hasn't got -- fire's bath -- left out, the rest centred). The stage's days are the art of the age readout: a player
+ * sees how far into its month a dragon is.
+ */
+export function drawCard(ctx: CanvasRenderingContext2D, c: CardInfo, at: Readonly<Rect> = CARD): void {
+  const { x, y, w, h } = at;
+  ctx.fillStyle = INK; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = FACE; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+  drawTextOutlined(ctx, c.name, x + 6, y + 5, { size: 1, color: TEXT, outline: INK, thickness: 1, shadow: false });
+  text(ctx, c.element.toUpperCase(), x + w - 6, y + 5, HINT, 'right');
+  // (a garden resident's month is done, and a last flier's: its bar full, its stage line where it lives, or why it stays)
+  const day = c.garden || c.stays ? STAGE_DAYS : Math.max(1, Math.min(STAGE_DAYS, c.day));
+  text(ctx, `${c.stage.toUpperCase()} - ${c.garden ? 'IN THE GARDEN' : c.stays ? 'THE LAST FLIER' : `DAY ${day} OF ${STAGE_DAYS}`}`, x + 6, y + 18);
+  // (the stage's 30 days: 4 x 5 segments, 1 px of ink between)
+  const bx = x + 5, by = y + 29;
+  ctx.fillStyle = INK; ctx.fillRect(bx, by, STAGE_DAYS * 5 + 1, 7);
+  for (let i = 0; i < STAGE_DAYS; i++) { ctx.fillStyle = i < day ? DAY_ON : DAY_OFF; ctx.fillRect(bx + 1 + i * 5, by + 1, 4, 5); }
+  // (the needs it has: columns of 30 px, centred -- fire has four, no bath -- each its icon over its bar)
+  const has = NEEDS.filter((k) => c.needs[k] != null), x0 = x + Math.round((w - has.length * 30) / 2);
+  has.forEach((k, i) => {
+    const v = c.needs[k]!;
+    const cx = x0 + i * 30;
+    drawSprite(ctx, ICONS[k], cx + 15, y + 50);
+    ctx.fillStyle = INK; ctx.fillRect(cx + 4, y + 60, 22, 6);
+    ctx.fillStyle = DAY_OFF; ctx.fillRect(cx + 5, y + 61, 20, 4);
+    ctx.fillStyle = v >= QUEUE ? NEED_OK : NEED_TIER[tierOf(v)];
+    ctx.fillRect(cx + 5, y + 61, Math.round(20 * Math.max(0, Math.min(1, v))), 4);
+  });
+}
+
+// ---------- the touch pad (BASE_DESIGN 4.10: shown while a keeper is held by hand) ----------
+
+/** The pad's buttons: the four directions, ACT (E) and LET GO. */
+export type PadButton = 'up' | 'left' | 'right' | 'down' | 'act' | 'letgo';
+/**
+ * Where they are (screen px, 640 x 360): one row at the bottom right, y 305-335, between the ground floor's slab and the
+ * job strip's row -- LET GO, ACT (E), then the arrows ← ↑ ↓ →, right-aligned at 634. That band lies under the feet of the
+ * floor the camera frames lowest (base.ts follow: a floor's feet at screen y 296-308 at most, its heads 12-52 px over
+ * them), so the pad never covers a dragon's head (ART_BIBLE 1.4; a cross of buttons from y 272 sat over the ground
+ * floor's heads). Clear of the smoke test's drag start (350, 200) and of the job strip (y 339).
+ */
+export const PAD: Readonly<Record<PadButton, Rect>> = Object.freeze({
+  letgo: { x: 404, y: 305, w: 48, h: 30 },
+  act: { x: 458, y: 305, w: 44, h: 30 },
+  left: { x: 508, y: 305, w: 30, h: 30 },
+  up: { x: 540, y: 305, w: 30, h: 30 },
+  down: { x: 572, y: 305, w: 30, h: 30 },
+  right: { x: 604, y: 305, w: 30, h: 30 },
+});
+/**
+ * The pad's whole area, a few px wider than its buttons each way: a touch in it that misses a button (a gap, an edge)
+ * goes to the nearest button -- never through to the world, where a tap on empty space would let go of the keeper.
+ */
+export const PAD_ZONE: Readonly<Rect> = Object.freeze({ x: 398, y: 299, w: 242, h: 42 });
+/** Each direction's dx, dy (dy -1 is up: the floor above). */
+export const PAD_DIR: Readonly<Partial<Record<PadButton, { dx: -1 | 0 | 1; dy: -1 | 0 | 1 }>>> = Object.freeze({
+  up: { dx: 0, dy: -1 }, left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 }, down: { dx: 0, dy: 1 },
+});
+const PAD_LABEL: Readonly<Record<PadButton, string>> = Object.freeze({ up: '↑', left: '←', right: '→', down: '↓', act: 'E', letgo: 'LET GO' });
+
+/** The pad button under a screen point -- or, inside PAD_ZONE, the nearest one -- if any. */
+export function padAt(sx: number, sy: number): PadButton | null {
+  const z = PAD_ZONE;
+  if (sx < z.x || sx >= z.x + z.w || sy < z.y || sy >= z.y + z.h) return null;
+  let best: PadButton | null = null, bd = Infinity;
+  for (const [name, r] of Object.entries(PAD) as [PadButton, Rect][]) {
+    const dx = Math.max(r.x - sx, 0, sx - (r.x + r.w - 1)), dy = Math.max(r.y - sy, 0, sy - (r.y + r.h - 1)), d = dx * dx + dy * dy;
+    if (d < bd) { bd = d; best = name; }
+  }
+  return best;
+}
+
+/** The pad: each button an ink box on the buttons' face (lit while pressed), its arrow, E or LET GO in the middle. */
+export function drawPad(ctx: CanvasRenderingContext2D, pressed: ReadonlySet<PadButton>): void {
+  for (const [name, r] of Object.entries(PAD) as [PadButton, Rect][]) {
+    ctx.fillStyle = INK; ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = pressed.has(name) ? ACTIVE : FACE; ctx.fillRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+    text(ctx, PAD_LABEL[name], r.x + r.w / 2, r.y + Math.round((r.h - 7) / 2), TEXT, 'center');
+  }
+}
+
+/**
+ * The line under the pad: who is held, what they carry and what E does ("BEA - BOWL - E: FEED WICK"), right-aligned at
+ * x 634 on an ink strip in the hint's place, level with the job strip (the hint is hidden while a keeper is held). If the
+ * strip reaches it (`stripEnd`, screen x), the line gives the action alone; the rect drawn, or null if nothing fits.
+ */
+export function drawActionLine(ctx: CanvasRenderingContext2D, full: string, short: string, stripEnd: number): Rect | null {
+  const x = ctx.canvas.width - 6, y = ctx.canvas.height - 21;
+  const s = [full, short].find((t) => t && stripEnd + 8 <= x - measureText(t) - 4);
+  if (!s) return null;
+  const w = measureText(s), r = { x: x - w - 4, y, w: w + 8, h: 17 };
+  ctx.fillStyle = INK; ctx.fillRect(r.x, r.y, r.w, r.h);
+  text(ctx, s, x, y + 5, TEXT, 'right');
+  return r;
+}
+
+/** In a portrait window while a keeper is held, a line left of the pad, on its row: the pad's buttons grow with a sideways screen. */
+export function drawPortraitHint(ctx: CanvasRenderingContext2D): void {
+  drawTextOutlined(ctx, 'TURN SIDEWAYS FOR BIGGER BUTTONS', 6, PAD.left.y + 12, { size: 1, color: HINT, outline: INK, thickness: 1, align: 'left', shadow: false });
+}

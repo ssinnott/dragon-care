@@ -15,6 +15,7 @@ import { bowlFor, drawBowl as drawBowlAt } from '../art/props.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
+import { TURN_W } from '../care/dragon.ts';
 
 export interface Pet {
   rig: DragonRig;
@@ -41,6 +42,11 @@ export interface Pet {
   /** Its bond (0..1, rock's crystal count: 3.4) and boredom charge (0..1, lightning's crackle: 3.5), drawn as given. */
   bond: number;
   charge: number;
+  /**
+   * Steps into a paper turn (0..5: the base's dragons turn in place, src/game/travel.ts), or -1. While it runs the body
+   * is drawn narrowed (care/dragon.ts's turn: TURN_W, the stretch just off 1); its owner flips the facing halfway.
+   */
+  turn: number;
 }
 
 export interface MakePetOpts {
@@ -76,7 +82,7 @@ export function makePet(el: DragonElement, stage: Stage, seed: number, anim: str
   if (pose) player.setStaticPose(pose);
   return {
     rig, player, x, y, facing: opts.facing ?? 1, scale: opts.scale ?? 1, mood: opts.mood ?? 0,
-    label: `${ELEMENTS[el].name} ${stage}`, anim, hold: 0, wx: 0, roam: null, wary: 0, waryOn: false, bond: 1, charge: 0,
+    label: `${ELEMENTS[el].name} ${stage}`, anim, hold: 0, wx: 0, roam: null, wary: 0, waryOn: false, bond: 1, charge: 0, turn: -1,
     bowl: anim === 'eat' && !pose ? bowlFor(rig, anims.eat ? anims.eat.frames : []) : null,
   };
 }
@@ -129,6 +135,8 @@ export function stepPet(p: Pet): void {
     p.hold = 0; p.player.play(p.anim, { restart: true, blend: 8 });
   }
   p.player.tick();
+  // (a paper turn: narrowed and stepped, a stretch just off 1 so the rig's volume-preserving 1 / |squash| doesn't grow it)
+  if (p.turn >= 0) { p.player.pose.squash = TURN_W; p.player.pose.stretch = 1.01; }
   const mv = p.player.move;
   p.wx += mv;
   if (p.roam && mv) {

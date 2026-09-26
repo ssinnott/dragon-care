@@ -22,10 +22,11 @@ except what the keepers need from them (four small read-only helpers in `src/car
 4. **The pace** (7): needs fill in 36 to 88 s, a feed takes 20 to 40 s from the kitchen and back, and the yard is
    never idle for long. The numbers are one table (`FILL_S`) if it should be calmer or busier.
 
-**Status. Built:** the four keepers (`src/art/keeper/`), the care acts and the agents they drive
+**Status. Built:** the four keepers (`src/art/keeper/`; beside them on the same rig one mission NPC, the grumpy
+miller: `cast.ts` `NPCS`, in `NPC_IDS` and never in `KEEPER_IDS`, drawn only by `src/game/npcs.ts`, ART_BIBLE 5.10), the care acts and the agents they drive
 (`src/care/acts.ts`, `keeper.ts`, `dragon.ts`), the planned walks (`src/care/path.ts`), the yard
 (`src/care/yard.ts`), and the gallery views `keepers`, `care`, `careaudit`, `yard` and `yardaudit`. `npm run check`
-runs the keeper palette gates (156 of 156 pass, counted apart from the dragons' 2255) and eight new smoke cases, the
+runs the keeper palette gates (233 of 233 pass, the mission road and the grumpy miller among them: counted apart from the dragons' 2492) and eight new smoke cases, the
 care audits among them (every act on all 28 looks: 112 runs; the same mirrored on two elements: 32; and every act
 the yard plays in two and a half minutes, walks included). `npm run shots` renders the keeper sheets. The
 yard also brings the game side of one care hook: **dusk's `tuckin` is played on a tuck-in** (the bible's status noted
@@ -33,8 +34,25 @@ that nothing did). **Also built:** **the base** (`view=base`, and the game's def
 draws its keepers as this cast too (`src/game/people.ts`), each in the anim closest to its job (walking, carrying,
 `watch`, `kneelIdle`, `pet`) while sim.ts's own care simulation walks it along the barn's routes and decides what job
 it is doing; the anim plays with its root motion pinned (`KeeperAgent.pinX`), since the base already moves the keeper
-itself. This is a plainer join than the yard's: it skips the plan (6.3), so a base keeper's stand and stroke are not
-proven eye-clear or on the mark the way the yard's and the two audits' are. **Not built:** a player-facing game loop
+itself, and a walk or carry plays at the keeper's pace over the look's own walk speed (`KeeperPlayer.setSpeed`: Bea's
+0.55 px a frame walk at 1.82x for the base's 1 px, 1.6x that on a Rush), so the feet no longer skate. A keeper who
+reaches the stand spot before the dragon stands in `watch` until it walks in, and one held at the Dragon Lift's bay
+stands in `idle`. On a mission (`docs/BASE_DESIGN.md` 5) a rider carries a saddle (the mission art kit's `SADDLE`: ART_BIBLE 5.10) from the Tack
+Room up to the Aerie and back, and the egg a team brings home down the left tower and up the centre ladder to its nest in the hayloft's Hatchery, in `carry`; takes the saddle down or
+hangs it back in `hold`; and rests in the Bunks in `idle`; away, a rider is not drawn in the barn (the watchable scene
+draws the team on its road, each rider with the saddle in the near hand: ART_BIBLE 5.11). This is a plainer join than
+the yard's: it skips the plan (6.3), so a base keeper's stand and stroke are not
+proven eye-clear or on the mark the way the yard's and the two audits' are. **The base now has a player loop** (#6;
+`docs/BASE_DESIGN.md` 4.10): the player may take any one keeper by hand -- walked with WASD, the arrows or a touch pad
+(`walk` or `carry` at the keeper's pace while moving, `idle` standing, `hold` picking a supply up), climbing the
+ladders, and doing a chore with E from the same stand spot a keeper sent there uses -- marked by a 7 x 5 arrow in the
+keeper's own top colour over the head (where the rush mark goes: a keeper held is never rushed). A rider on a
+mission's trip (mustering, away, landing) can't be taken (a toast says why), and a keeper held by hand is never picked
+to ride; a keeper held serves in any copy of a need's room, and E at any hearth, tub or ball box takes its supply (the
+need rooms repeat on the floors: `docs/BASE_DESIGN.md` 3). The cast has no climb anim, so a climb, by hand or not, shows `idle` (a stand-in: a
+follow-up). **The grumpy miller is a mission character:** he stands at the `miller` stop of a road that has one, grumpy
+(heavy flat brows, arms folded, turned a little away) until the Charm rider's wave talks him round, then tips his cap
+(`docs/BASE_DESIGN.md` 6, ART_BIBLE 5.10); he has no walk yet (a follow-up) and is never a keeper (`NPC_IDS`). **Not built:** a player-facing game loop
 for the yard itself (it still runs on its own: nothing lets a player send one of these keepers to a dragon from it),
 props for the keepers' stations, keepers in the habitat view, and night: Iris tucks in whoever is sleepy.
 A plan (6.3) is made the first time a keeper does a job for a look, in the tick the job starts (tens of ms; a game
@@ -56,7 +74,7 @@ would make them while it loads).
 | K8 | **The mark adapts** to the look, in order: the back of the crown, the same arc slid back, the top of the neck, lower down it, the back. A baby is patted on its **back or rump**; a tuck-in strokes the **back** of a dragon lying down. | The eye box is most of the side of a baby's head, and of a head laid on the floor: no arc of a baby's head kept a hand off its eye on any look. |
 | K9 | **Staging**: a feed is **front on** (the bowl goes in front of the dragon; the dragon walks up to it, eats, turns and trots off before the keeper takes the bowl away); a pet, a groom and a tuck-in are **from the side**, the way a person pets a pony: at the dragon's shoulder, a step nearer the camera (9 px in front of its floor line, just outside its footprint), facing the way it faces, kneeling on both knees for a small or a lying dragon. | Front on, a keeper kneeling at a bowl under a dragon's nose covered its face; from the side the keeper's body is over the dragon's body, away from its face. |
 | K10 | **No shared uniform.** A neckerchief in one colour on all four was measured against their skins (Bea's warm mid-brown, Tomas's light, Iris's deep, Pip's light) and no colour cleared all four by the ladder. | The palette check decides, not taste. |
-| K11 | **The yard**: needs rise and show (7.1); a director sends the keeper whose job it is to the neediest dragon (7.2); keepers wait at stations along the back of the yard, and every walk is **planned** round the dragons' bodies and off their eyes (6.2), along the floor and across it on the diagonal. | A living scene, with nothing in it the player has to run. A keeper walking straight across it passed over other dragons' faces. |
+| K11 | **The yard**: needs rise and show (7.1); a director sends the keeper whose job it is to the neediest dragon (7.2); keepers wait at stations along the back of the yard, and every walk is **planned** round the dragons' bodies and off their eyes (6.2), along the floor and across it on the diagonal. | A living scene, with nothing in it the player *must* run (in the base the player may take any one keeper by hand: `docs/BASE_DESIGN.md` 4.10). A keeper walking straight across it passed over other dragons' faces. |
 | K12 | **Deterministic**: everything is seeded and stepped at 60 Hz, so the gallery's frozen `t` is always the same frame (the tools/shot.ts contract). A plan is computed once per keeper, act and look and cached. | The pipeline's screenshots and audits depend on it. |
 
 ---
@@ -74,12 +92,19 @@ in light skin went grey-brown and read as a stain on the trousers.
 `src/art/keeper/cast.ts`. Tempo multiplies every anim's durations (the dragons' 4.1 stage timing, on people); speed is
 the walk's px per frame.
 
-| Keeper | Job | Build | Tells | Tempo, speed |
-|---|---|---|---|---|
-| **Bea**, the cook | feeds (she brings the bowl from her kitchen) | an elder: shorter and rounder | silver bun, terracotta blouse, cream apron, plum skirt | 1.2, 0.55 |
-| **Tomas**, the groomer | grooms the young and grown dragons (a pet, with his brush) | broad | straw hat with an oxblood band, dark beard, denim shirt, braces | 1, 0.7 |
-| **Iris**, the night keeper | tucks in the sleepy | slight | periwinkle nightcap with a cream pom-pom, a bob, a mauve cardigan, rose slippers | 1.1, 0.6 |
-| **Pip**, the apprentice | pets the babies, and cheers the others on | a child, about 58 px | ginger tufts, leaf-green tee, denim overalls, red sneakers | 0.8, 0.75 |
+| Keeper | Job | Rides as (missions) | Build | Tells | Tempo, speed |
+|---|---|---|---|---|---|
+| **Bea**, the cook | feeds (she brings the bowl from her kitchen) | CHARM: talks the grumpy miller round | an elder: shorter and rounder | silver bun, terracotta blouse, cream apron, plum skirt | 1.2, 0.55 |
+| **Tomas**, the groomer | grooms the young and grown dragons (a pet, with his brush) | MEDIC: bandages a hurt animal | broad | straw hat with an oxblood band, dark beard, denim shirt, braces | 1, 0.7 |
+| **Iris**, the night keeper | tucks in the sleepy | NAVIGATOR: finds the way through fog | slight | periwinkle nightcap with a cream pom-pom, a bob, a mauve cardigan, rose slippers | 1.1, 0.6 |
+| **Pip**, the apprentice | pets the babies, and cheers the others on | NIMBLE: slips through a narrow gap | a child, about 58 px | ginger tufts, leaf-green tee, denim overalls, red sneakers | 0.8, 0.75 |
+
+**Riders** (the base's missions, `docs/BASE_DESIGN.md` 5): the four keepers are the riders, each with the
+skill above (`src/game/regions.ts` `KEEPER_SKILL`). A dragon's **partner** is the keeper whose job is its element's own
+need -- Bea for fire (food), Tomas for spike, rock and slinkwing (love), Pip for lightning (play), Iris for dusk
+(sleep); water has none, as nobody has baths -- and a pair of partners goes 5 % better. Each dragon sent takes its
+partner if free, else a keeper whose skill meets a challenge nobody on the team does, else any free keeper; two
+keepers always stay home. The mockups' riders, Rosa and Tam (`docs/base/`), are superseded by these four.
 
 ## 3. Colour
 
@@ -96,7 +121,7 @@ dragons' maths:
   (`KEEPER_SKIN_SHADOW`) sits >= 25 % under its skin. The engine's `toneOf` shadow is cooler, which on skin is a
   mauve-grey that read as stubble or a smudge across the lower face; a warmer, redder step reads as a face's underside.
 - **(Kc, Ke) the far side**: the far arm and leg keep >= 25 % from the near side, and >= 25 % and 6 Oklab L from the ink.
-- **(Ki) the floor**: shoes and trousers keep >= 25 % from the straw (Iris's rose slippers are the one light shoe: 40 %).
+- **(Ki) the floor**: shoes and trousers keep >= 25 % from every floor they walk (the straw, the elder garden's path, and the mission road the riders walk in the watchable scene: Iris's rose slippers are the one light shoe, 40 % on all three).
 - **(Kf) told apart**: the four tops pass the dragons' RULE_B pairwise, as seen and under simulated deuteranopia and
   protanopia (a player tells the keepers apart across the yard by the top first).
 - **(Kg) at work**: the night keeper's trousers and cardigan pass the ladder against dusk's scale at every stage:
@@ -112,7 +137,10 @@ pair with its numbers, after the dragons' report):
 per keeper: 8 to 13 adjacency pairs, every slot's ramp and the skin shadow, 4 far-side colours, shoes and trousers on the floor
 the four tops: 6 pairs, each as seen, under deuteranopia and under protanopia
 the night keeper on dusk: trousers and cardigan, 4 stages each
-KEEPERS: PASS  156 of 156 gates passed
+the grumpy miller (cast.ts NPCS.miller, drawn by src/game/npcs.ts; measured in the same loop as the four): 19 adjacency pairs
+  (the sack, its twine, the flour among them), ramps and skin shadow, the far side, shoes, trousers and sack on every floor,
+  and his shirt against the four tops in the tops' table (10 pairs)
+KEEPERS: PASS  233 of 233 gates passed
 ```
 
 ## 4. The rig
@@ -253,7 +281,7 @@ station. Pip, waiting at his bench, cheers each happy that thanks a keeper.
 
 | Check | What fails |
 |---|---|
-| `npm run palette`, KEEPERS | any of the 156 keeper gates (3) |
+| `npm run palette`, KEEPERS | any of the 233 keeper gates, the grumpy miller's among them (3) |
 | `view=careaudit` (smoke) | every care act on all 28 looks, 112 runs (Bea feeds, Tomas grooms, Pip pets, Iris tucks in), and mirrored (`facing=-1`) on fire and dusk, 32 more: a keeper covering the dragon's eye box by one pixel at any frame, walking in and out too, a stroking hand more than 2.5 px off its mark, an act that never ends |
 | `view=yardaudit` (smoke) | the same for every act the yard plays in 9000 frames, each keeper checked against every dragon it stands level with or in front of |
 | `view=keepers`, `view=yard` (smoke) | a keeper not drawn (its top colour missing) or a page error |
