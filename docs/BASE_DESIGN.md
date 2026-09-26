@@ -57,7 +57,8 @@ elder). A new game therefore starts with seven dragons, one per element, each 0 
 - **Darkness hides the dark dragons.** Dusk's body sits at luminance 0.08 and slinkwing's at 0.05: a night sky or a
   mine swallows them whole. Dark places show the team **only inside a pool of light** (the mission tunnel, lit by
   dusk's lamp), and night outdoors stays mid-value (the blue hour of the mission mockup). The dragons are never tinted
-  to fake night: every palette gate is measured on their own colours.
+  to fake night: every palette gate is measured on their own colours. The walls may shift with the hour (7: the
+  moonlit night colours, each gated like a day wall), the dragons and the floors never.
 - **Each element already has exactly one need of its own** (3.8): fire's is food, spike's touch, rock's bond,
   lightning's play, water's baths, slinkwing's company, dusk's sleep. The barn's core rooms are that list.
 - **Loose ends the base picks up.** Nothing consumes the anims' `shriek`, `call` and `hush` events yet (5.4); `bond`,
@@ -540,7 +541,9 @@ stand spot <= 20 s, the bay's edge <= 60 s.
   (`hour=` starts one at another hour). The phases: **dawn** 05:00 to 07:00, **day** 07:00 to 18:00, **dusk** 18:00 to
   20:00, **night** 20:00 to 05:00. The sky turns into a phase over its first hour, in three stepped thirds (each a flat
   mix of the two phases' colours: no gradient, no alpha).
-- **Night lives in the sky and the lights; the dragons, floors and walls never change.**
+- **Night lives in the sky, the lights and the walls; the dragons and the floors never change.** (Plan S6c: before it,
+  night changed about 2 % of the opening frame -- the windows, the dorm lamp and the hearth's glow -- and a player
+  looking at the barn could not tell night from day.)
   - The sky is drawn behind the building, in screen space: three flat bands, far hills and clouds at half the camera's
     pace, and at night the moon and 24 stars at a fifth of it (the stars come out a third at a time as the night comes
     on, and go the same way at dawn). The barn's windows (2) show it.
@@ -550,15 +553,38 @@ stand spot <= 20 s, the bay's edge <= 60 s.
     rings on its wall, the inner one and then both (they go out the same way), never on the floor's band; while the
     stars are out the hearth throws one on the kitchen wall and the hayloft's skylight shows the sky and a star. The
     top bar's sun or moon is the one the sky mostly shows.
-  - Nothing tints a dragon, a floor or a wall. The night is a mid-value blue hour (its bands L 0.19 to 0.28), never
-    black, so a dark dragon on the Aerie still shows against it. Gate (w) in `tools/palette-check.ts` holds every sky
-    colour at every phase and every stepped mix between two, every wall and the lamps' light >= 25 % *lighter* than
-    every dark body (lightning, dusk and slinkwing, at every stage: so L >= 0.159, and a black night fails), the big
-    props right behind a slot (the hearth and its dark firebox, the tub, the dorm's pallets) >= 25 % from them either
-    way, and all 6 Oklab L from the ink: 1001 gates, all passing (ART_BIBLE 5.8).
+  - **The walls are moonlit.** With the lamps, in the same three steps (`lightsOf` `walls`: a third of the way from
+    18:20, two thirds from 18:40, all the way from 19:00 through the night, and back the same way from 05:00 to 06:00),
+    the building's shell -- every room's wall, the bare and lift-shaft walls, the towers' stone inside and out, the
+    barn's boards, posts, slabs, trusses and roof, the lift and ladder bays, the Aerie's gantry and headframe, the lift
+    car's rails, the ground -- and the garden's hedge, lawn, trees, bench, lanterns' posts, kerb and fence take their
+    **night colours**: each its day colour mixed half way to a mid blue (`src/game/surfaces.ts` `MOONLIGHT` `#5c6a9c`),
+    cooler and darker, never black (the walls L 0.20 to 0.31 at night against 0.26 to 0.54 by day). One table maps a
+    day colour to its night colour (`surfaces.ts` `NIGHT`, 40 entries); the building (`building.ts`) and the garden
+    (`gardenArt.ts`) are drawn through it, every fill and the cel tones made from it, onto one canvas per step, built
+    the first time the step is needed (about 6 ms) and kept: never a frame's work. The props behind the slots (the
+    hearth, the tub, the pallets, the gate's leaf, the Map Room's map) are moonlit too; the lights, the flames, the
+    flags, the bunting, the crocks, the flowers and the apples keep their colours, and so do the straw of the nests,
+    the garden's mounds and the dorm's mattresses (straw, like the floor) and the firebox's and the doorways' dark.
+    The room names on their plates keep theirs. Measured at the opening frame (`view=base&t=600`, noon against 22:00),
+    69.2 % of the pixels change, darker (mean L 0.560 to 0.481 over them) and cooler (blue less red -28.8 to +16.0),
+    and none of the 22 193 floor pixels does (`npm run smoke`, which asks for 35 % or more).
+  - **Nothing tints a dragon or a floor**: no `tint`, `tintAlpha` or `flash` by time of day, and every `FLOORS` colour
+    (the straw of every band, landing, car deck and the Aerie deck, the garden's path) and the seams drawn on them are
+    the same by night (gate w checks the table has no entry that changes one). The night is a mid-value blue hour (its
+    sky bands L 0.19 to 0.28, its walls as above), never black, so a dark dragon on the Aerie or in a room still shows
+    against it. Gate (w) in `tools/palette-check.ts` holds every sky colour at every phase and every stepped mix
+    between two, every wall -- by day, by night and at both stepped mixes between -- and the lamps' light >= 25 %
+    *lighter* than every dark body (lightning, dusk and slinkwing, at every stage: so L >= 0.159, and a black night
+    fails; the thinnest at night is the moonlit wood `#807277`, 33 % from lightning's elder), the big props right behind
+    a slot (the hearth and its dark firebox, the tub, the dorm's pallets) >= 25 % from them either way, day and night,
+    and all 6 Oklab L from the ink: 1771 gates, all passing (ART_BIBLE 5.8). It also fails any wall, backdrop or prop
+    colour (`WALLS`, each colour of `BACKDROPS`, `PROPS`) the night table has no entry for, so a structure a later
+    slice adds is drawn at night only once its colours are in the table and gated.
   - The barn's care never reads the day's phase: a barn started at noon and one started at ten at night, stepped alike,
-    are the same barn (`npm run sim` section 12), and `view=base&layers=world` (the world alone: the building, the car,
-    the cast, the bubbles and the plates) is the same picture at noon and at ten at night (`npm run smoke`). A garden
+    are the same barn (`npm run sim` section 12), and `view=base&layers=cast` (the cast alone -- the dragons, the
+    keepers and the bubbles -- on a flat colour) is the same picture at noon and at ten at night (`npm run smoke`).
+    (`layers=world`, the world without the sky, the lights and the HUD, now shows the moonlit walls.) A garden
     resident's naps read it (they only nap at night: `src/game/garden.ts`, the one simulation module that does; its
     state, the residents' rhythm, is left out of the barn's key), and the dawn's mission board will (S8).
 - **Growing up.** A stage lasts **30 game days** (a month: #8), baby, then young, then adult, then elder; the new game's
@@ -642,8 +668,11 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    **Time is built too** (7): the day and night (a day is 3 minutes at 1x: watch one whole, or in 23 s at 8x), the
    speed (the top bar's button, the keys 1 to 4, and p to pause), and the barn kept in the browser (a reload resumes
    it; NEW, tapped twice, starts another). The page also takes `hour=0..23` (the hour day 1 starts at; like a preset
-   page, a page given an hour never loads or saves, so it always starts at that hour) and `layers=world` (the world
-   drawn alone, for the no-tint check).
+   page, a page given an hour never loads or saves, so it always starts at that hour), `layers=world` (the world
+   drawn without the sky, the lights and the HUD) and `layers=cast` (the cast and the bubbles alone on a flat colour,
+   for the no-tint check). **Night you can see** (7, plan S6c): at night the walls, the building's shell and the
+   garden are moonlit (one day-to-night colour table, one building canvas per step of the dusk and the dawn), never a
+   dragon or a floor.
    **Growing up and eggs are built too** (7): a dragon grows into its next stage 30 game days into its stage, once it
    is settled with room to grow (the flash, `happy` held through, a toast), eggs in the Hatchery's nests hatch 2 days
    after they were laid into babies that grow up, the dawn's tip names who grows up soon, and a tap on a dragon opens
@@ -666,7 +695,7 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    | `src/game/pet.ts` | the pet code, moved out of `src/gallery.ts` unchanged (the gallery renders pixel for pixel as before), and the paper turn the base's dragons turn with |
    | `src/game/needs.ts` | the five needs, the drains, the tiers, mood and lightning's charge |
    | `src/game/layout.ts` | the grid; the rooms, each with its purpose (#11), and their dragon slots and stand spots; the Dragon Lift and the Aerie; the garden's plots and the world's width for a garden of so many; the keepers' net (the ladders) and a dragon net per stage (the lift), built for the garden's end; routes between any two spots on a net; the name plates' places |
-   | `src/game/surfaces.ts` | every floor anyone stands on (`FLOORS`: straw, the garden's path), and everything a dragon is seen against (the walls, the sky's colours at every phase, the big props behind a slot, the lamps' and lanterns' light, the garden's hedge, lawn, wood and fence), each gated by `tools/palette-check.ts` (i, Ki, w) |
+   | `src/game/surfaces.ts` | every floor anyone stands on (`FLOORS`: straw, the garden's path), and everything a dragon is seen against (the walls, the sky's colours at every phase, the big props behind a slot, the lamps' and lanterns' light, the garden's hedge, lawn, wood and fence), each gated by `tools/palette-check.ts` (i, Ki, w); the one night table (`NIGHT`: a day colour to its moonlit night colour, gated by w too, never a floor's) |
    | `src/game/clock.ts` | the day's length and phases, the speeds, reading the clock (the day, the time, the phase and the sky's stepped turn) |
    | `src/game/sky.ts` | the sky behind the building, in screen space: the bands, the far hills and clouds, the moon and the stars |
    | `src/game/hud.ts` | the top bar (the clock, the jobs, the keepers' badges, NEW, pause, the speed), the toasts and the hint |
@@ -678,7 +707,7 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    | `src/game/gait.ts` | each element's walk at each stage as a table of per-frame root motion, the pace the simulation walks a dragon at |
    | `src/game/save.ts` | the save format: the whole world as JSON, every reference an id, loaded back exactly (`CareSim.fromSave`); the digest two runs compare |
    | `src/game/rand.ts` | stateless draws (`rngAt(seed, tag, ...keys)`): no RNG state is ever kept or saved |
-   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building (its rooms, the lift's shaft, car and headframe, the ladder bay, the windows, the Aerie's deck and gantry, the Garden Gate's arches) and its lights by night, the keepers on the named cast's rig (`docs/KEEPERS.md`), their walks played at their pace, the bubbles and chips |
+   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building (its rooms, the lift's shaft, car and headframe, the ladder bay, the windows, the Aerie's deck and gantry, the Garden Gate's arches), drawn at each step of the night (its colours through `surfaces.ts` `NIGHT`), and its lights by night, the keepers on the named cast's rig (`docs/KEEPERS.md`), their walks played at their pace, the bubbles and chips |
    | `src/game/life.ts` | growing up (a stage-up 30 days into a stage, applied once the dragon is settled, exact; a baby first moving to a module slot) and hatching (an egg 2 days after it was laid, into a free baby sub-slot) |
    | `src/game/names.ts` | the hatchlings' names, six per element, the first free one taken |
    | `src/game/eggs.ts` | the eggs, drawn: the shell, its cracks and wobble, the hatch's shell bits |
@@ -754,8 +783,6 @@ stand spot <= 20 s, the bay's edge <= 60 s.
   colour and lamp's light >= 25 % lighter than every dark body, every big prop behind a slot >= 25 % from them either
   way, and all 6 Oklab L from the ink.
   A prop's cel shadow band and its 1 px lines are marks, not backdrops, and are not gated.
-- Night in the start frame is quiet: the barn's windows, the Lamp Dorm's lamp and the hearth's glow change (about 2 %
-  of the frame at 23:20 against noon); the sky, the stars and the moon show once the camera is on the roof or the
-  Aerie. A lantern in each named room, lit at dusk with its own stepped rings (gated by (w) like the dorm's), would say
-  more -- but a lamp is furniture (#11: a room's props are its purpose) and the Lamp Dorm's own mark, so it waits for
-  a design call rather than being added with the time slice (S4 review).
+- ~~Night in the start frame is quiet~~ (about 2 % of the frame changed at 23:20 against noon). Answered (S6c):
+  without new furniture (#11), the walls and the building's shell are moonlit at night, stepped with the lamps (7):
+  69.2 % of the opening frame changes, and no dragon or floor pixel does.

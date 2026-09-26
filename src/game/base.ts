@@ -7,8 +7,10 @@
 // their needs' rooms and rides them on the Dragon Lift (travel.ts); the view puts each pet where its dragon is, plays
 // its walk from the start of every walk bout at speed 1 (the sim moved it by that walk's own root motion, so the paws
 // stay planted), narrows it through a paper turn, and draws the lift's car where the car is.
-// Time (7): the sky behind the building turns with the clock and the lights come on at dusk -- night is drawn there
-// alone, never on a dragon, a floor or a wall (plan G8; layers=world draws the world without it) -- and the view runs
+// Time (7): the sky behind the building turns with the clock, the lights come on at dusk and the building's walls and
+// shell and the garden turn to their moonlit night colours with them, in the same three steps (plan S6c: one building
+// canvas per step) -- never on a dragon or a floor (plan G8; layers=cast draws the cast alone, the same by day and by
+// night) -- and the view runs
 // 0, 1, 2, 4 or 8 whole world steps a frame (the speed, the view's own: a save has none). The constructor never touches
 // storage: a live page that may save (opts.persist) loads the player's barn in attach() and saves it as it goes, every
 // 600 frames and when the page is hidden or left (storage.ts); a frozen page never calls attach(), so t= is always the
@@ -128,8 +130,12 @@ export interface BaseViewOpts {
   persist?: boolean;
   /** The hour of day 1 the world starts at, 0-23 (null: 07:00, the new game's). A loaded save keeps its own clock (the gallery never has a page given an hour load). */
   hour?: number | null;
-  /** 'world': only the building, the lift's car, the cast, the bubbles and the plates -- no sky, lights, HUD or toasts (the no-tint check). */
-  layers?: 'all' | 'world';
+  /**
+   * 'world': only the building (at the night's step), the lift's car, the cast, the bubbles and the plates -- no sky,
+   * lights, HUD or toasts; 'cast': only the cast and the bubbles, on the page's flat colour (plan S6c's no-tint check:
+   * every dragon pixel the same by day and by night).
+   */
+  layers?: Layers;
 }
 
 /**
@@ -147,6 +153,9 @@ export interface PetView {
   cheering: boolean;
 }
 
+/** Which layers a base view draws (BaseViewOpts.layers). */
+export type Layers = 'all' | 'world' | 'cast';
+
 export class BaseView {
   readonly w = VIEW_W;
   readonly h = VIEW_H;
@@ -157,7 +166,7 @@ export class BaseView {
   /** Whether this page may load and autosave (attach). */
   readonly persist: boolean;
   /** Which layers draw() draws. */
-  readonly layers: 'all' | 'world';
+  readonly layers: Layers;
   /** World steps a frame while playing (the keys 1-4, the speed button), and whether it is paused (p, the pause button). Never saved: 1x after a load. */
   private rate: Rate = 1;
   private paused = false;
@@ -171,7 +180,12 @@ export class BaseView {
    */
   private camAsked: { x: number; y: number } | null = null;
   private keeperAgents!: KeeperAgent[];
-  private building!: HTMLCanvasElement;
+  /**
+   * The building drawn at each of the night's steps (plan S6c: 0 the day's, 3 the night's, 1 and 2 the stepped mixes;
+   * drawBuilding): the day's built with the world, each other the first frame it is needed, then kept -- rebuilt only
+   * when the step changes, never a frame.
+   */
+  private buildings!: (HTMLCanvasElement | null)[];
   private plates!: HTMLCanvasElement;
   private readonly top = new TopPass(160);
   private readonly budget = new AmbientBudget();
@@ -200,7 +214,7 @@ export class BaseView {
 
   constructor(opts: BaseViewOpts) {
     this.persist = !!opts.persist;
-    this.layers = opts.layers === 'world' ? 'world' : 'all';
+    this.layers = opts.layers === 'world' || opts.layers === 'cast' ? opts.layers : 'all';
     this.use(buildSim(startSpec(opts.preset), opts.seed, opts.hour));
     if (opts.cam) { this.camAsked = { ...opts.cam }; this.setCam(opts.cam.x, opts.cam.y); }
   }
@@ -217,7 +231,7 @@ export class BaseView {
     this.sim = sim;
     this.cast.clear();
     for (const [id, v] of cast) this.cast.set(id, v);
-    this.keeperAgents = agents; this.building = building; this.plates = plates;
+    this.keeperAgents = agents; this.buildings = [building, null, null, null]; this.plates = plates;
     this.bubbles = []; this.chips = []; this.card = null; this.hatches = []; this.heads.clear(); this.news = [];
     // (a world with a smaller garden: the camera inside its end)
     this.setCam(this.camX, this.camY);
@@ -417,42 +431,47 @@ export class BaseView {
 
   // ---------- drawing ----------
 
+  /** The building at the night's step `step`, drawn the first time it is needed and kept. */
+  private building(step: number): HTMLCanvasElement {
+    return this.buildings[step] ??= drawBuilding(this.sim.rooms, step);
+  }
+
   /**
-   * The frame, back to front: the sky (screen space), the building, the lights, the plates, the lift's car, the cast,
-   * the top pass, the bubbles, then the HUD and a toast. layers=world leaves out the sky, the lights, the HUD and the
-   * toast: what is left is the same by day and by night (the no-tint check).
+   * The frame, back to front: the sky (screen space), the building (at the night's step: the walls and the shell by
+   * moonlight, plan S6c), the lights, the plates, the lift's car, the cast, the top pass, the bubbles, then the HUD and
+   * a toast. layers=world leaves out the sky, the lights, the HUD and the toast; layers=cast draws only the cast and the
+   * bubbles on the page's flat colour: the same by day and by night (the no-tint check).
    */
   draw(ctx: CanvasRenderingContext2D): void {
-    const cx = Math.round(this.camX), cy = Math.round(this.camY), all = this.layers === 'all';
-    const read = readClock(this.sim.clock, this.sim.dayLen);
+    const cx = Math.round(this.camX), cy = Math.round(this.camY), all = this.layers === 'all', world = this.layers !== 'cast';
+    const read = readClock(this.sim.clock, this.sim.dayLen), lit = lightsOf(read), step = lit.walls;
     const seen = (x0: number, x1: number, y0: number, y1: number) => x1 >= cx && x0 <= cx + VIEW_W && y1 >= cy && y0 <= cy + VIEW_H;
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = CLEAR; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     if (all) drawSky(ctx, read, this.camX, this.camY, this.sim.worldW);
     // (the building's canvas ends at WORLD_W: the garden lies past it)
     const bw = Math.min(VIEW_W, WORLD_W - cx), span = [cx, cx + VIEW_W] as const;
-    if (bw > 0) ctx.drawImage(this.building, cx, cy, bw, VIEW_H, 0, 0, bw, VIEW_H);
+    if (world && bw > 0) ctx.drawImage(this.building(step), cx, cy, bw, VIEW_H, 0, 0, bw, VIEW_H);
     ctx.save();
     ctx.translate(-cx, -cy);
     // the garden past the right tower (its plots on screen), then the lights -- the lanterns' rings with them
-    drawGarden(ctx, this.sim.garden.plots, this.sim.worldW, span);
-    if (all) { drawLights(ctx, this.sim.rooms, read); drawGardenLights(ctx, this.sim.garden.plots, lightsOf(read), span); }
+    if (world) drawGarden(ctx, this.sim.garden.plots, this.sim.worldW, span, step);
+    if (all) { drawLights(ctx, this.sim.rooms, read); drawGardenLights(ctx, this.sim.garden.plots, lit, span); }
     ctx.restore();
     // the names are on the walls: under the lift's car and the cast, so a name never covers a face (a keeper passing
     // under the Lamp Dorm's plate hides part of it for a moment instead)
-    if (bw > 0) ctx.drawImage(this.plates, cx, cy, bw, VIEW_H, 0, 0, bw, VIEW_H);
+    if (world && bw > 0) ctx.drawImage(this.plates, cx, cy, bw, VIEW_H, 0, 0, bw, VIEW_H);
     ctx.save();
     ctx.translate(-cx, -cy);
-    drawGardenPlate(ctx, span);
-    drawLiftCar(ctx, this.sim.lift.y);
+    if (world) { drawGardenPlate(ctx, span); drawLiftCar(ctx, this.sim.lift.y, step); }
     // the eggs in their nests (on the building, under the cast), and a hatch's shell bits bursting from behind the baby
     // standing up in the nest (under the cast too: never over a dragon, or an eye)
     const hatchery = this.sim.rooms.find((r) => r.kind === 'hatchery');
-    if (hatchery) for (const e of this.sim.eggs) {
+    if (hatchery && world) for (const e of this.sim.eggs) {
       const x = nestX(hatchery, e.nest), y = eggBottom(hatchery.floor);
       if (seen(x - 8, x + 8, y - 16, y + 2)) drawEgg(ctx, e.element, x, y, this.progress(e), this.sim.tick);
     }
-    for (const h of this.hatches) drawShellBits(ctx, h.el, h.x, h.y, h.age);
+    if (world) for (const h of this.hatches) drawShellBits(ctx, h.el, h.x, h.y, h.age);
     // the cast, y-sorted by the feet; keepers stand a step behind the dragons they work with, so a dragon's head is
     // never covered (ART_BIBLE 1.4: nothing covers the eye) -- and one on a ladder, behind the dragons of both floors it
     // climbs between (sorted a step behind the upper floor's), so a head at a landing beside the ladder stays clear
@@ -505,6 +524,7 @@ export class BaseView {
         digest: fnv1a(worldKey(this.sim)),
         barnDigest: fnv1a(barnKey(this.sim)),
         clock: { day: read.day, hour: read.hour, minute: read.minute, phase: read.phase },
+        night: step,
         speed: this.speed,
         persist: this.persist,
         buttons: { ...BUTTONS },

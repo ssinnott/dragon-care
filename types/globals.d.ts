@@ -54,7 +54,9 @@ interface Window {
      * element, its nest 0-2 and how far on it is, 0 laid to 1 due); and the name of the dragon whose card is open, or
      * null. The elder garden (S6): each dragon's `place` (`barn`, or retired, `garden`), and the garden's residents, its
      * plots (one a resident or a retiree, at least two) and the world's walkable width out to its end (world px: 1688
-     * with two plots, 176 more a plot). Gone once the base is detached (the page left it).
+     * with two plots, 176 more a plot). Night you can see (S6c): `night`, the night's step the building's walls and
+     * shell and the garden were drawn at (0 their day colours, 3 their moonlit night colours, 1 and 2 the stepped mixes
+     * of dusk and dawn: src/game/sky.ts lightsOf `walls`). Gone once the base is detached (the page left it).
      */
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
       chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[];
@@ -65,6 +67,7 @@ interface Window {
       walked: number;
       barnDigest: string;
       clock: { day: number; hour: number; minute: number; phase: 'dawn' | 'day' | 'dusk' | 'night' };
+      night: number;
       speed: number;
       persist: boolean;
       buttons: Record<string, { x: number; y: number; w: number; h: number }>;

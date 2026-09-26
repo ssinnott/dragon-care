@@ -57,12 +57,18 @@ const pairs: string[] = [
   'shots/base_ages.png=view=base&preset=ages&t=60',
   'shots/base_aerie.png=view=base&t=60&cam=0,0',
   // the time of day (7): the start frame at night, at dusk and at dawn (t=600 is an hour and twenty minutes on from the
-  // hour: 23:20, 19:20, 06:20) -- the dragons' pixels the same as base_t600's, night in the windows, the lamps and the
-  // sky alone -- and the night seen outside: the sky over the roof (the stars, the moon's blue hour, the skylight, the
-  // dorm lamp's rings) and the west tower's lit slits by the hearth's glow
+  // hour: 23:20, 19:20, 06:20) -- the dragons' pixels the same as base_t600's; night in the sky, the windows, the lamps
+  // and the moonlit walls and shell (plan S6c: the building's night colours, never a dragon's or a floor's), all the way
+  // at 19:20, gone again by 06:20 -- the dusk's and the dawn's turns a step at a time (18:20: the walls a third of the
+  // way to night, the lamps' inner ring; 05:20: two thirds), the cast alone at night on a flat colour (layers=cast: the
+  // no-tint check's picture), and the night seen outside: the sky over the roof (the stars, the moon's blue hour, the
+  // skylight, the dorm lamp's rings) and the west tower's lit slits by the hearth's glow
   'shots/base_night.png=view=base&t=600&hour=22',
   'shots/base_dusk.png=view=base&t=600&hour=18',
   'shots/base_dawn.png=view=base&t=600&hour=5',
+  'shots/base_dusk_turn.png=view=base&t=600&hour=17',
+  'shots/base_dawn_turn.png=view=base&t=600&hour=4',
+  'shots/base_night_cast.png=view=base&t=600&hour=22&layers=cast',
   'shots/base_night_roof.png=view=base&t=600&hour=22&cam=300,100',
   'shots/base_night_west.png=view=base&t=600&hour=22&cam=0,300',
   // growing up and eggs (7; plan S5): EMBER six steps into its grow-up (the new elder's silhouette flat in its glow's
@@ -77,7 +83,7 @@ const pairs: string[] = [
   'shots/base_hatchery_home.png=view=base&preset=eggs&t=2230&cam=872,376',
   // the elder garden (plan S6): the garden preset's three residents on their plots past the Garden Gate, by day (sitting
   // and napping by their nest mounds, the hedge, the apple trees, the lanterns, the pale path underfoot) and at night
-  // (napping, the lanterns' rings on the hedge); and the retire preset's first elder under the gate's arch, walking out
+  // (napping, the lanterns' rings on the hedge, the hedge, lawn, trees and fence moonlit, the path the same); and the retire preset's first elder under the gate's arch, walking out
   // (step 2564: npm run sim section 15)
   'shots/base_garden.png=view=base&preset=garden&cam=1304,376&t=600',
   'shots/base_garden_night.png=view=base&preset=garden&cam=1304,376&t=600&hour=22',

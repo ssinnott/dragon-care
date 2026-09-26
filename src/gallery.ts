@@ -35,7 +35,8 @@
 //                              (a preset page, like a frozen one, never loads or saves: it isn't the player's barn),
 //                              hour=0..23 starts day 1 at that hour (22: night; nor does a page given an hour load or
 //                              save, so it always starts there), layers=world draws the world alone (the
-//                              building, the lift's car, the cast, the bubbles and the plates: no sky, lights or HUD);
+//                              building, the lift's car, the cast, the bubbles and the plates: no sky, lights or HUD),
+//                              layers=cast the cast and the bubbles alone on a flat colour (the no-tint check);
 //                              live, the keys 1-4 pick 1x, 2x, 4x or 8x and p pauses
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
@@ -125,9 +126,9 @@ export interface GalleryParams {
   cam: { x: number; y: number } | null;
   preset: string | null;
   save: boolean;
-  /** view=base: hour=0..23, the hour of day 1 the world starts at (null: 07:00); layers=world, the world without the sky, lights or HUD. */
+  /** view=base: hour=0..23, the hour of day 1 the world starts at (null: 07:00); layers=world, the world without the sky, lights or HUD; layers=cast, the cast and bubbles alone. */
   hour: number | null;
-  layers: 'all' | 'world';
+  layers: 'all' | 'world' | 'cast';
 }
 
 export function parseParams(search: string): GalleryParams {
@@ -165,7 +166,7 @@ export function parseParams(search: string): GalleryParams {
     preset: q.get('preset') || null,
     save: q.get('save') !== '0',
     hour: hourParam(q.get('hour')),
-    layers: q.get('layers') === 'world' ? 'world' : 'all',
+    layers: q.get('layers') === 'world' ? 'world' : q.get('layers') === 'cast' ? 'cast' : 'all',
   };
 }
 

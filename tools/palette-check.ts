@@ -90,7 +90,7 @@ import type { KeeperPalette } from '../src/art/keeper/palettes.ts';
 import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
 import type { KeeperId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
-import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, stepped } from '../src/game/surfaces.ts';
+import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, STRAW_SEAM, PATH_EDGE, NIGHT, stepped, nightColour } from '../src/game/surfaces.ts';
 import { NEST_RX, NEST_RY, NEST_STRANDS, WALL_H, floorTop, nestBase, eggBottom } from '../src/game/layout.ts';
 import { SHELL, WOBBLE } from '../src/game/eggs.ts';
 import { PHASE_ORDER } from '../src/game/clock.ts';
@@ -836,8 +836,17 @@ function lighterBy(a: string, b: string): number {
   list.push(['garden hedge', BACKDROPS.hedge], ['garden lawn', BACKDROPS.lawn], ['garden trunk', BACKDROPS.trunk], ['garden fence', BACKDROPS.fence], ['garden mound', NEST],
     ['lantern ring inner', LANTERN_RINGS[0]], ['lantern ring outer', LANTERN_RINGS[1]]);
   const props: [string, string][] = Object.entries(PROPS).map(([k, hex]) => [`prop ${k}`, hex]);
+  // (night, plan S6c: every wall, the stone, the garden and every prop by moonlight -- surfaces.ts NIGHT -- and each of
+  // the two stepped mixes toward it, gated like the day's; the sky, hills, clouds and rings have their own phases)
+  const phased = (what: string) => /^(sky|hills|clouds|lamp ring|hearth ring|lantern ring) /.test(`${what} `);
+  const nights: [string, string, boolean][] = [];
+  const noNight: string[] = [];
+  for (const [what, hex, apart] of [...list.filter(([w]) => !phased(w)).map(([w, h]) => [w, h, false] as const), ...props.map(([w, h]) => [w, h, true] as const)]) {
+    if (NIGHT[hex] === undefined) { noNight.push(`${what} ${hex}`); continue; }
+    if (NIGHT[hex] !== hex) for (const k of [1, 2, 3]) nights.push([`${what} night ${k}/3`, nightColour(hex, k), apart]);
+  }
   head(`(w) BACKDROPS  (everything a dragon is seen against: the sky, hills, clouds, walls, stone and lamps' light each >= ${LUM_MIN * 100}% LIGHTER in luminance than every dark body (scale L < ${W_DARK}: ${dark.length} element-stages), so L >= ${floorL.toFixed(3)}, never black; a big prop behind a slot >= ${LUM_MIN * 100}% from them either way; all >= ${OKL_MIN} Oklab L from the ink ${INK})`);
-  for (const [what, hex, apart] of [...list.map(([w, h]) => [w, h, false] as const), ...props.map(([w, h]) => [w, h, true] as const)]) {
+  for (const [what, hex, apart] of [...list.map(([w, h]) => [w, h, false] as const), ...props.map(([w, h]) => [w, h, true] as const), ...nights]) {
     let least = Infinity, by = '';
     for (const b of dark) {
       const d = apart ? relDiff(hex, b.hex) : lighterBy(hex, b.hex);
@@ -847,6 +856,24 @@ function lighterBy(a: string, b: string): number {
     const ink = okDiff(hex, INK), inkOk = wcount(`(w) ${what} / ink`, ink >= OKL_MIN);
     out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${what.padEnd(28)} ${hex}  L ${lumOf(hex).toFixed(3)}  least ${pct(least)} ${apart ? 'apart  ' : 'lighter'} (${by})  ${okf(ink)} from ink`);
   }
+  // (the one night table, whole: every wall, backdrop and prop colour -- WALLS, each colour field of BACKDROPS, PROPS,
+  // and everything gated above -- has its night entry, so a structure a later slice adds fails here until it has one;
+  // no floor anyone stands on, nor the seams drawn on them, changes at night; the table's keys are the colours as drawn)
+  const needs: [string, string][] = [...Object.entries(WALLS).map(([k, h]) => [`WALLS.${k}`, h!] as [string, string]),
+    ...Object.entries(BACKDROPS).filter(([, v]) => typeof v === 'string').map(([k, h]) => [`BACKDROPS.${k}`, h as string] as [string, string]),
+    ...Object.entries(PROPS).map(([k, h]) => [`PROPS.${k}`, h] as [string, string])];
+  for (const [what, hex] of needs) if (NIGHT[hex] === undefined) noNight.push(`${what} ${hex}`);
+  const moonlit = Object.entries(NIGHT).filter(([d, n]) => d !== n).length;
+  head(`(w) NIGHT  (plan S6c: the one night table, a day colour to its night colour -- ${Object.keys(NIGHT).length} entries, ${moonlit} moonlit, ${Object.keys(NIGHT).length - moonlit} the same on purpose; each night colour and its two stepped mixes are gated above, "night k/3")`);
+  const miss = wcount('(w) every wall, backdrop and prop colour has a night colour', noNight.length === 0);
+  out.push(`${miss ? '  ok  ' : '  FAIL'} night entries: ${miss ? `every wall, backdrop and prop colour (${needs.length} fields, and every colour gated above) has one` : `none for ${[...new Set(noNight)].join(', ')} (add it to surfaces.ts NIGHT)`}`);
+  const floors: [string, string][] = [...Object.entries(FLOORS).map(([k, h]) => [`FLOORS.${k}`, h] as [string, string]), ['STRAW_SEAM', STRAW_SEAM], ['PATH_EDGE', PATH_EDGE]];
+  const moved = floors.filter(([, h]) => NIGHT[h] !== undefined && NIGHT[h] !== h);
+  const kept = wcount('(w) no floor changes at night', moved.length === 0);
+  out.push(`${kept ? '  ok  ' : '  FAIL'} floors: ${kept ? `${floors.map(([k]) => k).join(', ')} the same by night (a floor is never moonlit: plan S6c N2)` : `${moved.map(([k, h]) => `${k} ${h} -> ${NIGHT[h]}`).join(', ')} change at night`}`);
+  const odd = Object.keys(NIGHT).filter((k) => !/^#[0-9a-f]{6}$/.test(k) || !/^#[0-9a-f]{6}$/.test(NIGHT[k]));
+  const keyed = wcount('(w) the night table is keyed by #rrggbb', odd.length === 0);
+  out.push(`${keyed ? '  ok  ' : '  FAIL'} keys: ${keyed ? 'every entry #rrggbb in lower case, as the pens are given colours' : `not #rrggbb: ${odd.join(', ')}`}`);
 }
 
 // ---------- (egg) the Hatchery's eggs (src/game/eggs.ts) ----------

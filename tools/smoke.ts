@@ -27,9 +27,10 @@
 // its hook reports each dragon's move, room and slot, the lift, and the px walked; and between the frames at t=600 and
 // t=3600 at least three dragons stand somewhere else); live (never saving: save=0), a drag must pan the camera, a tap
 // on the first job chip must Rush that job, and the gallery's keys (E, the arrows, Space, the digits) must neither
-// rebuild the world nor leave it. Time (docs/BASE_DESIGN.md 7): hour=22 is night; the world drawn alone (layers=world)
-// is the same picture and the same barn at noon and at ten at night, while the whole frame is not (night is drawn, and
-// only in the sky and the lights); live, the speed button and the keys 1-4 and p run the world faster, and pause it;
+// rebuild the world nor leave it. Time (docs/BASE_DESIGN.md 7): hour=22 is night; the cast drawn alone (layers=cast)
+// is the same picture and the same barn at noon and at ten at night, while the whole frame is not: at least 35 % of
+// its pixels change, darker and cooler, and no floor pixel does (plan S6c: the sky, the lights and the moonlit walls,
+// never a dragon or a floor), and the walls step with the dusk and the dawn; live, the speed button and the keys 1-4 and p run the world faster, and pause it;
 // a frozen page with a save in storage neither loads nor writes it, and nor does a live page given hour=; a live page
 // that saves resumes its world after a reload, and one whose save doesn't fit -- another version, or one of this
 // version the view can't build or draw (an unknown element, keeper or need) -- starts a new barn without a page
@@ -50,6 +51,7 @@ import { CareSim } from '../src/game/sim.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts';
 import { serialize } from '../src/game/save.ts';
 import { SAVE_KEY, BACKUP_KEY } from '../src/game/storage.ts';
+import { FLOORS } from '../src/game/surfaces.ts';
 
 const require = createRequire(import.meta.url);
 function loadPlaywright(): any {
@@ -88,6 +90,8 @@ interface Case {
   init?: (page: any) => Promise<void>;
   /** Hash the frame (an in-page FNV-1a over the canvas's pixels) for TINT: the whole frame, and the world between the HUD's bars (rows 16-338). */
   hash?: boolean;
+  /** Keep the frame's pixels (0xRRGGBB each) for TINT's day-and-night comparison (plan S6c N1). */
+  pixels?: boolean;
 }
 
 type BaseHook = NonNullable<NonNullable<Window['__dragonCare']>['base']>;
@@ -124,16 +128,20 @@ function walkedOver(px: number) {
 const PAIRS: { a: string; b: string; n: number }[] = [{ a: 'view=base&t=600', b: 'view=base&t=3600', n: 3 }];
 
 /**
- * Day against night (plan S4): each pair is one world at noon and at ten at night. `same`: the world layer alone
- * (layers=world) must be the same picture and the same barn (barnDigest); otherwise the frames must differ, in the
- * world between the HUD's bars too (the sky and the lights, not only the clock).
+ * Day against night (plans S4, S6c): each pair is one world at noon and at ten at night. `same`: the cast alone
+ * (layers=cast: the dragons, the keepers and the bubbles on a flat colour) must be the same picture and the same barn
+ * (barnDigest) -- night never tints a dragon (plan G8). Otherwise the frames must differ, in the world between the HUD's
+ * bars too; with `differ`, in at least that share of the frame's pixels, the changed pixels darker and cooler by night
+ * than by day (it reads as night: plan S6c N1), and every floor pixel of the day's frame (FLOORS) the same by night.
  */
-const TINT: { a: string; b: string; same: boolean }[] = [
-  { a: 'view=base&t=600&hour=12&layers=world', b: 'view=base&t=600&hour=22&layers=world', same: true },
-  { a: 'view=base&t=600&hour=12', b: 'view=base&t=600&hour=22', same: false },
+const TINT: { a: string; b: string; same: boolean; differ?: number }[] = [
+  { a: 'view=base&t=600&hour=12&layers=cast', b: 'view=base&t=600&hour=22&layers=cast', same: true },
+  { a: 'view=base&t=600&hour=12', b: 'view=base&t=600&hour=22', same: false, differ: 0.35 },
 ];
 /** The in-page hashes of each hashed case's frame, by query. */
 const frames = new Map<string, { all: string; world: string }>();
+/** The kept pixels of each case that keeps them (0xRRGGBB, row by row), and the frame's width, by query. */
+const pixels = new Map<string, { w: number; px: number[] }>();
 
 /** A real save, built in Node: the new game stepped 5000 (the planted-save cases put it in the page's storage). */
 const PLANTED = JSON.stringify((() => { const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1 }); for (let i = 0; i < 5000; i++) w.step(); return serialize(w); })());
@@ -142,9 +150,11 @@ const plant = (blob: string) => async (page: any) => { await page.addInitScript(
 const stored = (page: any, key: string): Promise<string | null> => page.evaluate((k: string) => localStorage.getItem(k), key);
 
 /** The hook's time and saving fields (S4). */
-function timeFields(phase: string | null, persist: boolean) {
+function timeFields(phase: string | null, persist: boolean, night?: number) {
   return (b: BaseHook): string[] => {
     const out: string[] = [];
+    // (plan S6c: the building's walls and shell drawn at the night's step, 0 by day to 3 at night)
+    if (night !== undefined && b.night !== night) out.push(`the building is drawn at night step ${b.night}, not ${night}`);
     if (!b.clock || typeof b.clock.day !== 'number' || typeof b.clock.hour !== 'number') out.push(`the hook's clock is ${JSON.stringify(b.clock)}`);
     else if (phase && b.clock.phase !== phase) out.push(`it is ${b.clock.phase} at ${b.clock.hour}:${b.clock.minute}, not ${phase}`);
     if (b.speed !== 1) out.push(`a frozen page runs at speed ${b.speed}, not 1`);
@@ -502,10 +512,13 @@ const CASES: Case[] = [
   // a frozen page ignores the one in storage, and so does a live page given hour=; a live page resumes its own after a
   // reload, and sets aside one that doesn't fit, of another version or broken (the only live cases without save=0,
   // each in its own page and storage)
-  { query: 'view=base&t=600&hour=22', minColours: 150, allScales: false, hash: true, check: (b) => [...castIs(7, 'adult')(b), ...timeFields('night', false)(b)] },
-  { query: 'view=base&t=600&hour=12', minColours: 150, allScales: false, hash: true, check: timeFields('day', false) },
-  { query: 'view=base&t=600&hour=12&layers=world', minColours: 150, allScales: false, hash: true, check: timeFields('day', false) },
-  { query: 'view=base&t=600&hour=22&layers=world', minColours: 150, allScales: false, hash: true, check: timeFields('night', false) },
+  { query: 'view=base&t=600&hour=22', minColours: 150, allScales: false, hash: true, pixels: true, check: (b) => [...castIs(7, 'adult')(b), ...timeFields('night', false, 3)(b)] },
+  { query: 'view=base&t=600&hour=12', minColours: 150, allScales: false, hash: true, pixels: true, check: timeFields('day', false, 0) },
+  { query: 'view=base&t=600&hour=12&layers=cast', minColours: 150, allScales: false, hash: true, check: timeFields('day', false, 0) },
+  { query: 'view=base&t=600&hour=22&layers=cast', minColours: 150, allScales: false, hash: true, check: timeFields('night', false, 3) },
+  // (the dusk's and the dawn's turn: the walls a third and two thirds of the way, 18:20 and 05:20)
+  { query: 'view=base&t=600&hour=17', minColours: 150, allScales: false, check: timeFields('dusk', false, 1) },
+  { query: 'view=base&t=600&hour=4', minColours: 150, allScales: false, check: timeFields('dawn', false, 2) },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseSpeed },
   { query: 'view=base&t=600', minColours: 150, allScales: false, init: plant(PLANTED), act: plantedFrozen },
   { query: 'view=base', minColours: 150, allScales: false, act: livePersist, timeout: 45000 },
@@ -521,7 +534,7 @@ const CASES: Case[] = [
   // the elder garden (plan S6): the garden preset's three residents on their plots, past the Garden Gate, by day and at
   // night (napping, the lanterns lit)
   { query: 'view=base&preset=garden&cam=1304,376&t=600', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...travels(b)] },
-  { query: 'view=base&preset=garden&cam=1304,376&t=600&hour=22', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...timeFields('night', false)(b)] },
+  { query: 'view=base&preset=garden&cam=1304,376&t=600&hour=22', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...timeFields('night', false, 3)(b)] },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -603,6 +616,14 @@ for (const c of CASES) {
       frames.set(c.query, h);
       if (b && !hooks.has(c.query)) hooks.set(c.query, b);
     }
+    if (c.pixels) {
+      pixels.set(c.query, await page.evaluate(() => {
+        const cv = document.getElementById('stage') as HTMLCanvasElement, d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
+        const px: number[] = [];
+        for (let i = 0; i < d.length; i += 4) px.push((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
+        return { w: cv.width, px };
+      }));
+    }
     if (c.act) errors.push(...await c.act(page));
     const colours: number[] = await page.evaluate(() => {
       const cv = document.getElementById('stage') as HTMLCanvasElement;
@@ -631,6 +652,25 @@ for (const c of CASES) {
   await page.close();
 }
 
+/**
+ * Day against night, pixel by pixel (plan S6c N1, N2): the share of the frame's pixels that differ; over those, the
+ * mean luminance and the mean blue less red (warmth) by day and by night; and the day's floor pixels (a FLOORS colour,
+ * in the world between the HUD's bars) and how many of them differ by night.
+ */
+function nightDiff(w: number, day: number[], night: number[]) {
+  const floors = new Set(Object.values(FLOORS).map(hexToInt));
+  const lum = (c: number) => (0.2126 * ((c >> 16) & 255) + 0.7152 * ((c >> 8) & 255) + 0.0722 * (c & 255)) / 255;
+  const cool = (c: number) => (c & 255) - ((c >> 16) & 255);
+  let changed = 0, lumDay = 0, lumNight = 0, coolDay = 0, coolNight = 0, floor = 0, floorMoved = 0;
+  for (let i = 0; i < day.length; i++) {
+    const a = day[i], b = night[i], y = Math.floor(i / w);
+    if (a !== b) { changed++; lumDay += lum(a); lumNight += lum(b); coolDay += cool(a); coolNight += cool(b); }
+    if (y >= 16 && y < 339 && floors.has(a)) { floor++; if (a !== b) floorMoved++; }
+  }
+  const k = Math.max(1, changed);
+  return { share: changed / day.length, lumDay: lumDay / k, lumNight: lumNight / k, coolDay: coolDay / k, coolNight: coolNight / k, floor, floorMoved };
+}
+
 // the frozen pairs: the same world at two moments, its dragons moved between them
 for (const p of PAIRS) {
   const a = hooks.get(p.a), b = hooks.get(p.b), errors: string[] = [];
@@ -651,12 +691,25 @@ for (const p of TINT) {
     if (a.all !== b.all) errors.push(`the world layer differs by night (${a.all} / ${b.all}): night tints the world`);
     if (ha.barnDigest !== hb.barnDigest) errors.push(`the barn differs by night (${ha.barnDigest} / ${hb.barnDigest}): the simulation reads the hour`);
   } else if (a.all === b.all || a.world === b.world) errors.push(`noon and night draw ${a.all === b.all ? 'the same frame' : 'the same world under the HUD'}: night is not drawn`);
+  let seen = '';
+  if (p.differ !== undefined && a && b) {
+    const pa = pixels.get(p.a), pb = pixels.get(p.b);
+    if (!pa || !pb || pa.px.length !== pb.px.length) errors.push('no pixels kept for the day-and-night comparison');
+    else {
+      const n = nightDiff(pa.w, pa.px, pb.px);
+      if (n.share < p.differ) errors.push(`night changes ${(n.share * 100).toFixed(1)} % of the frame's pixels, under ${p.differ * 100} %: night can't be told from day at a glance`);
+      if (!(n.lumNight < n.lumDay)) errors.push(`the changed pixels are no darker by night (L ${n.lumDay.toFixed(3)} by day, ${n.lumNight.toFixed(3)} by night)`);
+      if (!(n.coolNight > n.coolDay)) errors.push(`the changed pixels are no cooler by night (blue less red ${n.coolDay.toFixed(1)} by day, ${n.coolNight.toFixed(1)} by night)`);
+      if (n.floorMoved > 0) errors.push(`${n.floorMoved} of the day's ${n.floor} floor pixels change by night: a floor is moonlit`);
+      seen = `; ${(n.share * 100).toFixed(1)} % of the pixels changed, darker (L ${n.lumDay.toFixed(3)} -> ${n.lumNight.toFixed(3)}) and cooler (blue less red ${n.coolDay.toFixed(1)} -> ${n.coolNight.toFixed(1)}); all ${n.floor} floor pixels the same`;
+    }
+  }
   if (errors.length) { bad++; console.log(`  FAIL: ${p.a} / ${p.b} -> ${errors.join(' | ')}`); }
-  else console.log(`  ok:   ${p.a} / ${p.b}  (${p.same ? `the same frame ${a!.all} and barn ${ha!.barnDigest}` : `frames ${a!.all} / ${b!.all}, world ${a!.world} / ${b!.world}`})`);
+  else console.log(`  ok:   ${p.a} / ${p.b}  (${p.same ? `the same frame ${a!.all} and barn ${ha!.barnDigest}` : `frames ${a!.all} / ${b!.all}, world ${a!.world} / ${b!.world}${seen}`})`);
 }
 
 await browser.close();
 server.close();
 const total = CASES.length + PAIRS.length + TINT.length;
-console.log(bad ? `SMOKE: ${bad} of ${total} views and pairs failed` : `SMOKE: all ${CASES.length} views drew dragons (and keepers), no page errors; ${PAIRS.length} pair${PAIRS.length === 1 ? '' : 's'} moved; day and night: the world alike, the frame not`);
+console.log(bad ? `SMOKE: ${bad} of ${total} views and pairs failed` : `SMOKE: all ${CASES.length} views drew dragons (and keepers), no page errors; ${PAIRS.length} pair${PAIRS.length === 1 ? '' : 's'} moved; day and night: the cast alike, the frame not`);
 process.exit(bad ? 1 : 0);

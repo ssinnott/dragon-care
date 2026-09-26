@@ -44,8 +44,9 @@
 //    worker thread beside the other sections, and is printed at the end: the suite keeps to 30 s.)
 // 11. The clock (docs/BASE_DESIGN.md 7) on a real day and a 600-step test day: the day, the hour and the phase at each
 //    phase's start, the sky's three stepped thirds over a phase's first hour, day 2 at midnight, a whole day read step
-//    by step (the phases in order, the turn never going back; the lights and the HUD's sun or moon in step with the
-//    sky, never switching on a phase's first step), the label (and the top bar's room for it to day 99 999), and a
+//    by step (the phases in order, the turn never going back; the lights, the HUD's sun or moon and the walls' night
+//    step (plan S6c: 0 under the day's sky, 3 under the night's, with the lamps' rings, every step 0-3 over a day) in
+//    step with the sky, never switching on a phase's first step), the label (and the top bar's room for it to day 99 999), and a
 //    world's start hour.
 // 12. Night is not the barn's (plan G8): a world started at 07:00 and one started at 19:00, the same seed, are the same
 //    barn (save.ts barnKey: every absolute clock left out) every 1000 steps for 20000 -- so view=base's no-tint check,
@@ -1011,6 +1012,7 @@ if (MAIN) {
     // a whole day, step by step: the phases in the day's order, each turning in once (blend 0, 1, 2, 3, never back),
     // the hour and the minute never going back within the day
     let last = readClock(0, dayLen), turns = 0;
+    const walls = new Set<number>();
     for (let c = 1; c < dayLen; c++) {
       const r = readClock(c, dayLen);
       if (r.phase !== last.phase) {
@@ -1030,9 +1032,17 @@ if (MAIN) {
       if (nightness(r) > 0 && !(lit.slits && lit.rings > 0 && lit.hearth && lit.skylight)) fail(`clock: at ${what} the stars are out but the lights are ${JSON.stringify(lit)}`);
       if (bands.join() === BACKDROPS.sky.day.join() && (lit.slits || lit.rings || lit.hearth || lit.skylight || lit.icon !== 'sun')) fail(`clock: at ${what} the sky is the day's but the lights are ${JSON.stringify(lit)}`);
       if ((lit.icon === 'moon') !== (nightness(r) >= 2)) fail(`clock: at ${what} the icon is the ${lit.icon} with the night ${nightness(r)}/3 in the sky`);
+      // (plan S6c: the walls' night step turns with the lamps -- the dorm's rings -- in the same thirds: none under the
+      // day's own sky, all the way under the night's own, never behind the stars)
+      if (lit.walls < lit.rings || (lit.rings < 2 && lit.walls !== lit.rings)) fail(`clock: at ${what} the walls are at night step ${lit.walls} with the lamps' rings at ${lit.rings}`);
+      if (bands.join() === BACKDROPS.sky.day.join() && lit.walls !== 0) fail(`clock: at ${what} the sky is the day's but the walls are at night step ${lit.walls}`);
+      if (bands.join() === BACKDROPS.sky.night.join() && lit.walls !== 3) fail(`clock: at ${what} the sky is the night's but the walls are at night step ${lit.walls}`);
+      if (lit.walls < nightness(r)) fail(`clock: at ${what} the stars are out ${nightness(r)}/3 but the walls only ${lit.walls}/3`);
+      walls.add(lit.walls);
       last = r;
     }
     if (turns !== 4) fail(`clock (${dayLen}): the phase turned ${turns} times from midnight to midnight, not 4 (night to dawn, day, dusk, and night again at 20:00)`);
+    if ([...walls].sort().join() !== '0,1,2,3') fail(`clock (${dayLen}): the walls were drawn at night steps ${[...walls].sort().join(', ')} over a day, not 0 to 3`);
     lines.push(`${dayLen}-step day (an hour ${hs} steps): ${[0, 5 * hs, 5 * hs + third, 7 * hs, 18 * hs, 20 * hs, 24 * hs].map((c) => { const r = readClock(c, dayLen); return `${c} ${clockLabel(r)} ${r.phase}${r.blend < 3 ? ` ${r.blend}/3` : ''}`; }).join(', ')}`);
   }
   if (clockLabel(readClock(2 * DAY_STEPS + 14 * 450 + 278, DAY_STEPS)) !== 'DAY 3 14:30') fail(`clock: 14:37 on day 3 reads ${clockLabel(readClock(2 * DAY_STEPS + 14 * 450 + 278))}, not DAY 3 14:30`);
@@ -1047,7 +1057,7 @@ if (MAIN) {
   const at = (hour?: number, dayLen?: number) => new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { hour, dayLen });
   if (at().clock !== 7 * 450 || at(22).clock !== 22 * 450 || at(22, 600).clock !== 22 * 25 || readClock(at(22).clock).phase !== 'night') fail(`clock: worlds start at ${at().clock}, ${at(22).clock}, ${at(22, 600).clock}, not 07:00 and 22:00`);
   for (const bad of [-1, 24, 7.5]) { try { at(bad); fail(`clock: a world started at hour ${bad}`); } catch { /* as it should */ } }
-  console.log(`  11 clock: ${lines.join('; ')}; a whole day read step by step turns night, dawn, day, dusk, night, each sky in three stepped thirds, the lights and the icon with it; the top bar ${bar.join(', ')}; hour= starts a world at 22:00`);
+  console.log(`  11 clock: ${lines.join('; ')}; a whole day read step by step turns night, dawn, day, dusk, night, each sky in three stepped thirds, the lights, the icon and the walls' night steps (0 to 3) with it; the top bar ${bar.join(', ')}; hour= starts a world at 22:00`);
 }
 
 // ---------- 12. night is not the barn's ----------

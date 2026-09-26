@@ -9,11 +9,12 @@
 // the feet (the band, y 688-702): the path, FLOORS.path (gates i and Ki: pale, S 0.13, no green underfoot), then a
 // stone kerb, and below the ground the earth and its 5 px grass strip: the only green below the feet. A picket fence
 // stands 40 px in from the world's end, and moves out as the garden grows. At dusk and night each lantern throws two
-// stepped rings on the hedge (never on the path: gate w, surfaces.ts LANTERN_RINGS). Nothing here is sad: no graves,
+// stepped rings on the hedge (never on the path: gate w, surfaces.ts LANTERN_RINGS), and by night the hedge, lawn,
+// trees, fence, kerb and ground are moonlit (plan S6c: surfaces.ts NIGHT; a tile cached per step). Nothing here is sad: no graves,
 // no wilting, no autumn -- the garden is the elder's reward (B8, ART_BIBLE D21), always in leaf, apples on the trees.
 import { makeTones } from '../lib/art/shading.ts';
 import { GARDEN_X0, GARDEN_PLOT, GARDEN_END, GROUND, WORLD_H, BAND, SLAB, GARDEN_PLATE, floorTop, plotMid } from './layout.ts';
-import { FLOORS, INK, BACKDROPS, NEST, LIGHTS, LANTERN_RINGS, PATH_EDGE } from './surfaces.ts';
+import { FLOORS, INK, BACKDROPS, NEST, LIGHTS, LANTERN_RINGS, PATH_EDGE, nightColour } from './surfaces.ts';
 import type { Lights } from './sky.ts';
 import { plate } from './building.ts';
 import { measureText } from '../lib/engine/text.ts';
@@ -31,19 +32,32 @@ const FLOWERS: readonly (readonly [number, number, string])[] = [[14, 670, '#f3e
 /** A tree's apples on its crown (dx, dy from the crown's middle). */
 const APPLES: readonly (readonly [number, number])[] = [[-14, -6], [-4, 4], [9, -10], [15, 3], [2, -18], [-18, 6]];
 
-function rect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string): void { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
-function disc(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, c: string): void { g.fillStyle = c; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill(); }
+/**
+ * The night's step the pen draws at (plan S6c; 0 by day), as building.ts's: every colour through the one night table
+ * (surfaces.ts NIGHT) -- the hedge, lawn, trees, fence, kerb and ground moonlit; the path (a floor), the flowers, the
+ * apples and the lanterns' light as they are.
+ */
+let night = 0;
+const nc = (c: string): string => nightColour(c, night);
+const tones = (c: string) => makeTones(nc(c));
+function atStep<T>(step: number, draw: () => T): T {
+  const was = night;
+  night = step;
+  try { return draw(); } finally { night = was; }
+}
+function rect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string): void { g.fillStyle = nc(c); g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+function disc(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, c: string): void { g.fillStyle = nc(c); g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill(); }
 /**
  * A lawn flower: a round 4 x 4 blossom (its corners cut) on a 2 x 2 stalk in the lawn's shade -- every mark 2 px or
  * more, so it reads as a plant, never as a twinkle (a 1 px plus did).
  */
 function flower(g: CanvasRenderingContext2D, x: number, y: number, c: string): void {
   rect(g, x - 1, y - 2, 2, 4, c); rect(g, x - 2, y - 1, 4, 2, c);
-  rect(g, x - 1, y + 2, 2, 2, makeTones(BACKDROPS.lawn).sh);
+  rect(g, x - 1, y + 2, 2, 2, tones(BACKDROPS.lawn).sh);
 }
 /** An inked box with a lit top row (top-left light). */
 function box(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string): void {
-  rect(g, x, y, w, h, INK); rect(g, x + 1, y + 1, w - 2, h - 2, c); rect(g, x + 1, y + 1, w - 2, 1, makeTones(c).hi);
+  rect(g, x, y, w, h, INK); rect(g, x + 1, y + 1, w - 2, h - 2, c); rect(g, x + 1, y + 1, w - 2, 1, tones(c).hi);
 }
 
 /** The middle of the hedge's k-th blob from a tile's left edge (k may run past the tile: the pattern repeats each tile). */
@@ -52,7 +66,7 @@ function blob(k: number): [number, number] { return [HEDGE_DX / 2 + k * HEDGE_DX
 function hedge(g: CanvasRenderingContext2D): void {
   const blobs: [number, number][] = [];
   for (let k = -1; k <= GARDEN_PLOT / HEDGE_DX; k++) blobs.push(blob(k));
-  const tn = makeTones(BACKDROPS.hedge);
+  const tn = tones(BACKDROPS.hedge);
   for (const [x, y] of blobs) disc(g, x, y, HEDGE_R + 1, INK);
   for (const [x, y] of blobs) disc(g, x, y, HEDGE_R, BACKDROPS.hedge);
   rect(g, 0, HEDGE_Y, GARDEN_PLOT, LAWN_Y - HEDGE_Y + 2, BACKDROPS.hedge);
@@ -64,11 +78,11 @@ function hedge(g: CanvasRenderingContext2D): void {
 /** An apple tree behind the hedge: its trunk, a crown of hedge-green discs, and its apples (2 x 2). */
 function tree(g: CanvasRenderingContext2D, x: number): void {
   const cy = 556;
-  rect(g, x - 4, cy + 8, 8, HEDGE_Y - cy, INK); rect(g, x - 3, cy + 8, 6, HEDGE_Y - cy, BACKDROPS.trunk); rect(g, x - 3, cy + 8, 2, HEDGE_Y - cy, makeTones(BACKDROPS.trunk).hi);
+  rect(g, x - 4, cy + 8, 8, HEDGE_Y - cy, INK); rect(g, x - 3, cy + 8, 6, HEDGE_Y - cy, BACKDROPS.trunk); rect(g, x - 3, cy + 8, 2, HEDGE_Y - cy, tones(BACKDROPS.trunk).hi);
   const crown: [number, number, number][] = [[x - 12, cy + 2, 14], [x + 11, cy + 1, 13], [x, cy - 10, 15], [x, cy + 6, 13]];
   for (const [a, b, r] of crown) disc(g, a, b, r + 1, INK);
   for (const [a, b, r] of crown) disc(g, a, b, r, BACKDROPS.hedge);
-  const tn = makeTones(BACKDROPS.hedge);
+  const tn = tones(BACKDROPS.hedge);
   rect(g, x - 16, cy - 16, 8, 2, tn.hi); rect(g, x - 6, cy - 22, 7, 2, tn.hi);
   for (const [dx, dy] of APPLES) rect(g, x + dx, cy + dy, 2, 2, '#e0664a');
 }
@@ -91,7 +105,7 @@ function signPosts(g: CanvasRenderingContext2D): void {
 function mound(g: CanvasRenderingContext2D, cx: number): void {
   const base = BAND_Y + 3, rx = 34, ry = 11;
   g.fillStyle = INK; g.beginPath(); g.ellipse(cx, base, rx + 1, ry + 1, 0, Math.PI, Math.PI * 2); g.closePath(); g.fill();
-  g.fillStyle = NEST; g.beginPath(); g.ellipse(cx, base, rx, ry, 0, Math.PI, Math.PI * 2); g.closePath(); g.fill();
+  g.fillStyle = nc(NEST); g.beginPath(); g.ellipse(cx, base, rx, ry, 0, Math.PI, Math.PI * 2); g.closePath(); g.fill();
   for (const [dx, dy] of [[-26, 4], [-14, 8], [6, 9], [19, 6], [-3, 4]] as const) rect(g, cx + dx, base - dy, 4, 2, '#c8b68c');
 }
 
@@ -113,11 +127,16 @@ function ground(g: CanvasRenderingContext2D, w: number): void {
 
 /** The kinds of tile: plot 0 (the bench and the sign's posts, a tree), an even plot (a tree), an odd one, and the end strip. */
 type Tile = 'first' | 'tree' | 'plain' | 'end';
-const TILES = new Map<Tile, HTMLCanvasElement>();
-/** One kind of tile, drawn once: 176 px wide, from the trees' crowns (y 520) to the world's foot. */
-function tile(kind: Tile): HTMLCanvasElement {
-  const had = TILES.get(kind);
+const TILES = new Map<string, HTMLCanvasElement>();
+/** One kind of tile at a night's step, drawn once: 176 px wide, from the trees' crowns (y 520) to the world's foot. */
+function tile(kind: Tile, step: number): HTMLCanvasElement {
+  const key = `${kind} ${step}`, had = TILES.get(key);
   if (had) return had;
+  const c = atStep(step, () => tileAt(kind));
+  TILES.set(key, c);
+  return c;
+}
+function tileAt(kind: Tile): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = GARDEN_PLOT; c.height = WORLD_H - TILE_Y;
   const g = c.getContext('2d')!;
@@ -127,7 +146,7 @@ function tile(kind: Tile): HTMLCanvasElement {
   if (kind === 'first' || kind === 'tree') tree(g, TREE_X);
   hedge(g);
   rect(g, 0, LAWN_Y, GARDEN_PLOT, BAND_Y - LAWN_Y, BACKDROPS.lawn);
-  rect(g, 0, LAWN_Y, GARDEN_PLOT, 1, makeTones(BACKDROPS.lawn).sh);
+  rect(g, 0, LAWN_Y, GARDEN_PLOT, 1, tones(BACKDROPS.lawn).sh);
   for (const [x, y, col] of FLOWERS) { if (kind === 'end' && x > GARDEN_END - 2) continue; flower(g, x, y, col); }
   if (kind !== 'end') {
     if (kind === 'first') bench(g, 16);
@@ -135,13 +154,12 @@ function tile(kind: Tile): HTMLCanvasElement {
     lantern(g, LANTERN_X);
   }
   ground(g, GARDEN_PLOT);
-  TILES.set(kind, c);
   return c;
 }
 
 /** The picket fence 40 px in from the world's end: 3 px pickets with pointed tops on two rails, standing on the path's back edge. */
 function fence(g: CanvasRenderingContext2D, worldW: number): void {
-  const x0 = worldW - GARDEN_END - 8, top = BAND_Y - 26, c = BACKDROPS.fence;
+  const x0 = worldW - GARDEN_END - 8, top = BAND_Y - 26, c = nc(BACKDROPS.fence);
   for (const ry of [top + 8, top + 18]) { rect(g, x0 - 2, ry - 1, worldW - x0 + 2, 4, INK); rect(g, x0 - 1, ry, worldW - x0, 2, c); }
   for (let x = x0; x < worldW - 2; x += 7) {
     g.fillStyle = INK; g.beginPath(); g.moveTo(x - 1, BAND_Y + 1); g.lineTo(x - 1, top + 2); g.lineTo(x + 1.5, top - 2); g.lineTo(x + 4, top + 2); g.lineTo(x + 4, BAND_Y + 1); g.closePath(); g.fill();
@@ -154,17 +172,17 @@ function fence(g: CanvasRenderingContext2D, worldW: number): void {
 /**
  * The garden, in world space (the caller translates by the camera), after the building and before the lights: each
  * plot on screen from its cached tile, the strip past the last plot, and the fence at the world's end. `view`: the
- * world x the screen spans.
+ * world x the screen spans; `step`: the night's step (plan S6c: sky.ts lightsOf `walls`; a tile is cached per step).
  */
-export function drawGarden(g: CanvasRenderingContext2D, plots: number, worldW: number, view: readonly [number, number]): void {
+export function drawGarden(g: CanvasRenderingContext2D, plots: number, worldW: number, view: readonly [number, number], step = 0): void {
   for (let i = 0; i <= plots; i++) {
     const x = GARDEN_X0 + i * GARDEN_PLOT;
     if (x > view[1] || x + GARDEN_PLOT < view[0]) continue;
     const kind: Tile = i === plots ? 'end' : i === 0 ? 'first' : i % 2 === 0 ? 'tree' : 'plain';
     const w = Math.min(GARDEN_PLOT, worldW - x);
-    if (w > 0) g.drawImage(tile(kind), 0, 0, w, WORLD_H - TILE_Y, x, TILE_Y, w, WORLD_H - TILE_Y);
+    if (w > 0) g.drawImage(tile(kind, step), 0, 0, w, WORLD_H - TILE_Y, x, TILE_Y, w, WORLD_H - TILE_Y);
   }
-  if (worldW - 48 <= view[1]) fence(g, worldW);
+  if (worldW - 48 <= view[1]) atStep(step, () => fence(g, worldW));
 }
 
 /**
@@ -189,7 +207,7 @@ export function drawGardenLights(g: CanvasRenderingContext2D, plots: number, lit
     if (lit.rings > 1) disc(g, x, cy, 16, LANTERN_RINGS[1]);
     disc(g, x, cy, 10, LANTERN_RINGS[0]);
     g.restore();
-    lantern(g, x);
+    atStep(lit.walls, () => lantern(g, x));
   }
 }
 

@@ -10,10 +10,13 @@
 // lift car's deck -- is a FLOORS colour (surfaces.ts; gated by tools/palette-check.ts, gates i and Ki). A room's
 // identity is its wall colour and its props; a slot no room fills is bare (an empty wall, no props, no name, #11). The
 // names go on a separate layer the view draws over the building and under the lift's car and the cast (so a name never
-// covers a face); the car is drawn in the world layer (drawLiftCar). Night (7) is the sky and the lights alone: the lit
-// window slits, the dorm lamps' and the hearth's light on their walls, the skylight's night (drawLights, drawn over the
-// building and under the plates); nothing on a floor, a wall or a dragon changes colour, and every colour a dragon is
-// seen against -- the walls, the props behind the slots, the light on the walls -- is a surfaces.ts backdrop, gate (w).
+// covers a face); the car is drawn in the world layer (drawLiftCar). Night (7) is the sky, the lights -- the lit window
+// slits, the dorm lamps' and the hearth's light on their walls, the skylight's night (drawLights, drawn over the
+// building and under the plates) -- and the building's own night (plan S6c): the whole building is drawn again at each
+// of the night's steps, every colour through the one night table (surfaces.ts NIGHT), so its walls, stone, boards,
+// timber, roof and ground are moonlit, cooler and darker, never black; nothing on a floor or a dragon changes colour,
+// and every colour a dragon is seen against -- the walls, the props behind the slots, the light on the walls, by day and
+// by night -- is a surfaces.ts backdrop, gate (w).
 import { makeTones } from '../lib/art/shading.ts';
 import { drawText, measureText } from '../lib/engine/text.ts';
 import {
@@ -22,7 +25,7 @@ import {
   LADDER_BAY_X1, AERIE_F, DECK_X0, DECK_X1, HEAD_Y, PULLEY_Y, LADDERS, NESTS, GATE_X0, GATE_X1, GATE_ARCH, NEST_RX, NEST_RY, NEST_STRANDS, floorTop, feetY, modX, nestX, nestBase, platesOf,
 } from './layout.ts';
 import type { Room, Link } from './layout.ts';
-import { FLOORS, INK, EMPTY_WALL, LIFT_WALL, STONE, STRAW_SEAM, WALLS, PROPS, NEST, LIGHTS, LAMP_RINGS, HEARTH_RING, BACKDROPS, skyBands } from './surfaces.ts';
+import { FLOORS, INK, EMPTY_WALL, LIFT_WALL, STONE, STRAW_SEAM, WALLS, PROPS, NEST, LIGHTS, LAMP_RINGS, HEARTH_RING, BACKDROPS, skyBands, nightColour } from './surfaces.ts';
 import type { ClockRead } from './clock.ts';
 import { lightsOf } from './sky.ts';
 
@@ -34,22 +37,39 @@ const RAIL_H = 40, CABLE = '#5a4a40', CABLE_X = [CAR_X0 + 1, CAR_X1 - 2] as cons
 
 // ---------- the pen ----------
 
+/**
+ * The night's step the pen draws at (plan S6c; 0 by day): drawBuilding and drawLiftCar set it while they draw, and
+ * every colour the pen is given goes through the one night table (surfaces.ts NIGHT) at it -- a wall, a board, the
+ * roof take their night colours; a floor, the ink or a light are drawn as they are.
+ */
+let night = 0;
+/** A colour as the pen draws it now. */
+const nc = (c: string): string => nightColour(c, night);
+/** A colour's cel tones as the pen draws them now (made from its night colour). */
+const tones = (c: string) => makeTones(nc(c));
+/** Draw with the pen at the night's step `step`, then back to the day's. */
+function atStep<T>(step: number, draw: () => T): T {
+  const was = night;
+  night = step;
+  try { return draw(); } finally { night = was; }
+}
+
 function rect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string): void {
-  g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+  g.fillStyle = nc(c); g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
 }
 /** An inked box with a cel band: a lit top row and a shadow at the bottom (top-left light). */
 function box(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string, cel = true): void {
   rect(g, x, y, w, h, INK);
   rect(g, x + 1, y + 1, w - 2, h - 2, c);
   if (cel && w > 4 && h > 4) {
-    const t = makeTones(c), s = Math.max(1, Math.round((h - 2) * 0.28));
+    const t = tones(c), s = Math.max(1, Math.round((h - 2) * 0.28));
     rect(g, x + 1, y + 1, w - 2, 1, t.hi);
     rect(g, x + 1, y + h - 1 - s, w - 2, s, t.sh);
   }
 }
 function disc(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, c: string, ink = true): void {
   if (ink) { g.fillStyle = INK; g.beginPath(); g.arc(cx, cy, r + 1, 0, Math.PI * 2); g.fill(); }
-  g.fillStyle = c; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+  g.fillStyle = nc(c); g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
 }
 function path(g: CanvasRenderingContext2D, pts: readonly number[]): void {
   g.beginPath(); g.moveTo(pts[0], pts[1]);
@@ -57,11 +77,11 @@ function path(g: CanvasRenderingContext2D, pts: readonly number[]): void {
   g.closePath();
 }
 function poly(g: CanvasRenderingContext2D, pts: readonly number[], c: string, ink = true): void {
-  path(g, pts); g.fillStyle = c; g.fill();
+  path(g, pts); g.fillStyle = nc(c); g.fill();
   if (ink) { g.strokeStyle = INK; g.lineWidth = 1; g.stroke(); }
 }
 function line(g: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, c: string, w = 1): void {
-  g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.strokeStyle = c; g.lineWidth = w; g.stroke();
+  g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.strokeStyle = nc(c); g.lineWidth = w; g.stroke();
 }
 /** A timber member w px thick with a 1 px ink outline, end to end (a strut, a brace, a truss diagonal). */
 function member(g: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, w: number, c = TIMBER): void {
@@ -103,7 +123,7 @@ function roofAt(x: number): number {
 
 /** A barn slot's back wall (planks), straw band and slab, from `top` down (the hayloft's walls run up into the roof). */
 function barnWall(g: CanvasRenderingContext2D, x0: number, x1: number, f: number, wall: string, top = floorTop(f)): void {
-  const t = floorTop(f), w = x1 - x0, tn = makeTones(wall);
+  const t = floorTop(f), w = x1 - x0, tn = tones(wall);
   rect(g, x0, top, w, t + WALL_H - top, wall);
   for (let x = x0 + 12; x < x1 - 4; x += 16) rect(g, x, top, 1, t + WALL_H - top, tn.sh);
   rect(g, x0, t + WALL_H - 3, w, 3, tn.sh);
@@ -115,7 +135,7 @@ function barnWall(g: CanvasRenderingContext2D, x0: number, x1: number, f: number
  * each floor's height of it (floor boxes, ceiling to band), so the shaft reads the same in the barn and above the roof.
  */
 function shaftWall(g: CanvasRenderingContext2D, y0: number, y1: number): void {
-  const tn = makeTones(LIFT_WALL), w = LIFT_X1 - LIFT_X0;
+  const tn = tones(LIFT_WALL), w = LIFT_X1 - LIFT_X0;
   g.save(); g.beginPath(); g.rect(LIFT_X0, y0, w, y1 - y0); g.clip();
   rect(g, LIFT_X0, y0, w, y1 - y0, LIFT_WALL);
   for (let f = 0; f <= AERIE_F; f++) {
@@ -132,7 +152,7 @@ function shaftWall(g: CanvasRenderingContext2D, y0: number, y1: number): void {
 function liftBay(g: CanvasRenderingContext2D, f: number, top = floorTop(f)): void {
   const t = floorTop(f);
   shaftWall(g, top, t + WALL_H);
-  rect(g, LIFT_X0, t + WALL_H - 3, LIFT_X1 - LIFT_X0, 3, makeTones(LIFT_WALL).sh);
+  rect(g, LIFT_X0, t + WALL_H - 3, LIFT_X1 - LIFT_X0, 3, tones(LIFT_WALL).sh);
   floor(g, LIFT_X0, LIFT_X1, t + WALL_H);
 }
 
@@ -167,7 +187,7 @@ function bunk(g: CanvasRenderingContext2D, x: number, fl: number, a: string, b: 
 function nest(g: CanvasRenderingContext2D, cx: number, base: number): void {
   const rx = NEST_RX, ry = NEST_RY;
   g.fillStyle = INK; g.beginPath(); g.ellipse(cx, base, rx + 1, ry + 1, 0, Math.PI, Math.PI * 2); g.closePath(); g.fill();
-  g.fillStyle = NEST; g.beginPath(); g.ellipse(cx, base, rx, ry, 0, Math.PI, Math.PI * 2); g.closePath(); g.fill();
+  g.fillStyle = nc(NEST); g.beginPath(); g.ellipse(cx, base, rx, ry, 0, Math.PI, Math.PI * 2); g.closePath(); g.fill();
   // (the straw's strands, 2 px, on the heap's flanks: an egg's place, its middle, is left plain)
   for (const [dx, dy] of NEST_STRANDS) rect(g, cx + dx, base - dy, 4, 2, '#c8b68c');
 }
@@ -344,8 +364,15 @@ function gateArches(g: CanvasRenderingContext2D): void {
 
 // ---------- the whole building ----------
 
-/** The building, drawn once onto its own WORLD_W x WORLD_H canvas. */
-export function drawBuilding(rooms: readonly Room[]): HTMLCanvasElement {
+/**
+ * The building, drawn onto its own WORLD_W x WORLD_H canvas at the night's step `step` (plan S6c: 0 by day, 3 at night,
+ * 1 and 2 the stepped mixes: sky.ts lightsOf `walls`): every colour through the one night table (surfaces.ts NIGHT), so
+ * the walls and the shell are their night colours and the floors are not. The view keeps one canvas per step.
+ */
+export function drawBuilding(rooms: readonly Room[], step = 0): HTMLCanvasElement {
+  return atStep(step, () => buildingAt(rooms));
+}
+function buildingAt(rooms: readonly Room[]): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = WORLD_W; c.height = WORLD_H;
   const g = c.getContext('2d')!;
@@ -479,9 +506,13 @@ export function drawPlates(rooms: readonly Room[]): HTMLCanvasElement {
 /**
  * The Dragon Lift's car, its rider's feet at y (a room's feet: the deck's straw band tops at y - 8), drawn in the world
  * layer after the building and before the cast: an inked straw deck across x 492-644 on a timber underframe, a 40 px
- * side rail at each end, and a cable from each rail up to its pulley on the headframe.
+ * side rail at each end, and a cable from each rail up to its pulley on the headframe; its timber at the night's step
+ * `step` (its deck is straw: a floor, the same by night).
  */
-export function drawLiftCar(g: CanvasRenderingContext2D, y: number): void {
+export function drawLiftCar(g: CanvasRenderingContext2D, y: number, step = 0): void {
+  atStep(step, () => liftCarAt(g, y));
+}
+function liftCarAt(g: CanvasRenderingContext2D, y: number): void {
   const top = Math.round(y) - 8, w = CAR_X1 - CAR_X0, railTop = top - RAIL_H;
   // (the cables pass through each landing over the car, unseen: never drawn over a floor)
   let y1 = railTop;

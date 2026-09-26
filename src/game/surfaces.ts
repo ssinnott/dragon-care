@@ -9,8 +9,9 @@
 // lamps throw on the walls at night -- is here too, and gate (w) holds each >= 25 % LIGHTER than every dark body (a
 // scale under L 0.15 at any stage: lightning, dusk, slinkwing; so L >= 0.159, never black) -- a big prop behind a slot
 // >= 25 % from them either way (the firebox is a dark mouth) -- and >= 6 Oklab L from the ink. Night is these
-// colours and the lights, never a tint on a dragon, a floor or a wall (plan G8). Plain data: no drawing, safe to import
-// from Node.
+// colours and the lights, never a tint on a dragon or a floor (plan G8): by night the walls and the building's shell
+// take their NIGHT colours (plan S6c: a day colour to its night colour, one table, each gated by (w) too), stepped in
+// thirds with the lights. Plain data: no drawing, safe to import from Node.
 import { mix } from '../lib/art/palettes.ts';
 import type { RoomKind } from './layout.ts';
 import type { ClockRead, DayPhase } from './clock.ts';
@@ -108,6 +109,65 @@ export const LAMP_RINGS: readonly [string, string] = Object.freeze([mix(WALLS.do
 export const HEARTH_RING = mix(WALLS.kitchen!, LIGHTS.fire, 0.25);
 /** The two stepped rings each garden lantern throws on the hedge at dusk and night (never on the path): inner and outer, flat. Gate (w). */
 export const LANTERN_RINGS: readonly [string, string] = Object.freeze([mix(BACKDROPS.hedge, LIGHTS.lantern, 0.5), mix(BACKDROPS.hedge, LIGHTS.lantern, 0.25)] as [string, string]);
+
+// ---------- night (plan S6c: night you can see) ----------
+
+/**
+ * The moonlight: at night every colour of the building's shell and the garden (the walls, the towers' stone, the barn's
+ * boards, timber and roof, the lift and ladder bays, the Aerie's gantry, the ground, the hedge, lawn, trees and fence,
+ * and the props behind the slots) is its day colour mixed half way to this mid blue -- cooler and darker, never black:
+ * every night wall and backdrop, and each stepped mix toward it, still passes gate (w) (tools/palette-check.ts), so a
+ * dark dragon stays readable against it (the art bible's darkness rule). Never a dragon, never a floor (FLOORS, the
+ * straw's seam, the path's edge), never a light (plan G8).
+ */
+export const MOONLIGHT = '#5c6a9c';
+/** A day colour by moonlight: half way to MOONLIGHT. */
+export function moonlit(day: string): string { return mix(day, MOONLIGHT, 0.5); }
+
+/**
+ * The day colours the night moonlights (NIGHT), by what they are. A slice that adds a structure, a wall or a backdrop
+ * adds its day colours here (or to NIGHT_KEEPS, with the reason it stays): gate (w) fails any WALLS / BACKDROPS / PROPS
+ * colour -- and anything else it gates -- that has no NIGHT entry, and fails a floor that has one that changes it.
+ */
+const NIGHT_MOONLIT: readonly string[] = [
+  // the walls (gate w): every room's, the bare and lift-shaft walls, the towers' dressed stone
+  ...Object.values(WALLS) as string[], EMPTY_WALL, LIFT_WALL, STONE,
+  // the barn's boards and timber: posts, frames, rails and trusses, the slabs under the straw and their seams, the
+  // ladders, the lines on the tub and the wheel, the lift's cables; the lighter wood of the tub, pallets, wheel, trunks,
+  // bench, gate leaf and window frames (gate w as props and the garden's trunks)
+  '#8a6242', '#6b4a34', '#86603f', '#4e3424', '#7a5838', '#6e4a30', '#a47a52', '#5a4a40',
+  // the towers' outer stone and its courses, the stone's mortar, the hearth's face (gate w) and mortar and its hood, the
+  // headframe's pulleys, the Garden Gate's keystones and the garden's kerb
+  '#a49c90', '#857d72', '#aaa396', PROPS.hearth, '#7c746c', '#8c847a',
+  // the roof and its courses, the right tower's cone
+  '#8e3b30', '#6e2a24', '#4f5f7f',
+  // the elder garden behind its residents (gate w): the hedge and the trees' crowns, the lawn, the fence
+  BACKDROPS.hedge, BACKDROPS.lawn, BACKDROPS.fence,
+  // the ground: the earth, its grass strip and its stones
+  '#7a5a40', '#86a860', '#5e7a44', '#654834',
+  // the bathhouse's tile lines, the Map Room's map and its lines, the tack room's saddles
+  '#a0adb6', '#e8d8a8', '#8a6a4a', '#9a5a3a',
+];
+/**
+ * Day colours that are the same at night, on purpose (so they are in NIGHT, mapped to themselves): the nests' and the
+ * garden's mounds' straw (and the dorm's mattresses: the same colour), which is straw like the floor and keeps the egg
+ * gate's contrast; the hearth's firebox and the doorways' dark, already the dark of a mouth.
+ */
+const NIGHT_KEEPS: readonly string[] = [NEST, PROPS.mattress, PROPS.firebox, '#3a2a26'];
+/**
+ * The ONE night table: a day colour to its night colour (plan S6c N4). The building (building.ts) and the garden
+ * (gardenArt.ts) are drawn through it -- every fill, and the cel tones made from it -- at the night's step (sky.ts
+ * lightsOf: walls), a canvas cached per step; a colour not in it (a floor, the ink, a light, a flag) is drawn as it is.
+ */
+export const NIGHT: Readonly<Record<string, string>> = Object.freeze(Object.fromEntries([
+  ...NIGHT_MOONLIT.map((c) => [c, moonlit(c)] as const),
+  ...NIGHT_KEEPS.map((c) => [c, c] as const),
+]));
+/** A colour at the night's step (0: the day's, 3: its NIGHT colour, 1 and 2: the stepped mixes); unchanged if NIGHT has no entry. */
+export function nightColour(day: string, step: number): string {
+  const n = step > 0 ? NIGHT[day] : undefined;
+  return n === undefined ? day : stepped(day, n, step);
+}
 
 /** A colour stepped from `a` toward `b` by blend thirds (0: a, 3: b): the sky's three stepped mixes, never a gradient. */
 export function stepped(a: string, b: string, blend: number): string {

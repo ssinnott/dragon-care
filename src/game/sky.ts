@@ -2,8 +2,9 @@
 // transparent above the ground and around its walls (building.ts): so no canvas grows with the world (plan P11), and
 // the day turns without a redraw of anything else. Three flat bands fixed to world y, far hills and clouds at half
 // the camera's pace, and at night the moon and the stars at a fifth of it. The phases change in three stepped mixes over
-// a phase's first hour (surfaces.ts skyBands): no gradient, no alpha. Night is only this and the lights (building.ts
-// drawLights): it never tints a dragon, a floor or a wall (plan G8).
+// a phase's first hour (surfaces.ts skyBands): no gradient, no alpha. Night is this, the lights (building.ts
+// drawLights) and the walls' own night colours (surfaces.ts NIGHT, at lightsOf's `walls` step): it never tints a dragon
+// or a floor (plan G8).
 import type { ClockRead, DayPhase } from './clock.ts';
 import { BACKDROPS, LIGHTS, INK, skyBands, phaseColour } from './surfaces.ts';
 import { GROUND } from './layout.ts';
@@ -58,15 +59,20 @@ export interface Lights {
   skylight: boolean;
   /** The top bar's icon: the sun, the low sun of dawn and dusk, the moon. */
   icon: 'sun' | 'low' | 'moon';
+  /**
+   * The night's step the building's shell and the garden are drawn at (surfaces.ts NIGHT: 0 their day colours, 3 their
+   * night colours, 1 and 2 the stepped mixes), with the dimness: they turn with the sky and the lamps, never apart.
+   */
+  walls: 0 | 1 | 2 | 3;
 }
 /**
  * The lights as the sky stands, so the two never disagree: the slits and the dorm lamps' rings with the dimness (the
  * inner ring from its first third, both from its second), the hearth's ring and the skylight's night with the stars
- * (nightness), and the icon with the phase the sky mostly shows.
+ * (nightness), the icon with the phase the sky mostly shows, and the walls' night step with the dimness.
  */
 export function lightsOf(c: ClockRead): Lights {
   const dim = dimness(c), stars = nightness(c) > 0, sky = skyPhase(c);
-  return { slits: dim > 0, rings: Math.min(2, dim) as 0 | 1 | 2, hearth: stars, skylight: stars, icon: sky === 'night' ? 'moon' : sky === 'day' ? 'sun' : 'low' };
+  return { slits: dim > 0, rings: Math.min(2, dim) as 0 | 1 | 2, hearth: stars, skylight: stars, icon: sky === 'night' ? 'moon' : sky === 'day' ? 'sun' : 'low', walls: dim as 0 | 1 | 2 | 3 };
 }
 
 /** Each copy of a repeating layer that can reach the screen: its offset, screen x, for a layer at `pace`. */
