@@ -37,7 +37,10 @@
 //                              save, so it always starts there), layers=world draws the world alone (the
 //                              building, the lift's car, the cast, the bubbles and the plates: no sky, lights or HUD),
 //                              layers=cast the cast and the bubbles alone on a flat colour (the no-tint check);
-//                              live, the keys 1-4 pick 1x, 2x, 4x or 8x and p pauses
+//                              live, the keys 1-4 pick 1x, 2x, 4x or 8x and p pauses; take=<keeper> (bea, tomas, iris,
+//                              pip) takes that keeper by hand at the first step (frozen too: the pad, the mark and the
+//                              line show); live, a tap on a keeper or their badge takes them, WASD or the arrows walk
+//                              them, E or Space does the chore in reach, Esc lets go
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
 //   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
@@ -129,6 +132,8 @@ export interface GalleryParams {
   /** view=base: hour=0..23, the hour of day 1 the world starts at (null: 07:00); layers=world, the world without the sky, lights or HUD; layers=cast, the cast and bubbles alone. */
   hour: number | null;
   layers: 'all' | 'world' | 'cast';
+  /** view=base: take=<keeper name>, a keeper taken by hand at the first step (null: none). */
+  take: string | null;
 }
 
 export function parseParams(search: string): GalleryParams {
@@ -167,6 +172,7 @@ export function parseParams(search: string): GalleryParams {
     save: q.get('save') !== '0',
     hour: hourParam(q.get('hour')),
     layers: q.get('layers') === 'world' ? 'world' : q.get('layers') === 'cast' ? 'cast' : 'all',
+    take: q.get('take') || null,
   };
 }
 
@@ -1348,7 +1354,7 @@ function makeScene(P: GalleryParams): Scene {
     case 'yardaudit': return yardAuditScene(P);
     // (a frozen view never loads or saves (G4), and nor does a preset or a start hour: loading would hide it, autosaving
     // would put it in place of the player's barn)
-    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset && P.hour == null, hour: P.hour, layers: P.layers });
+    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset && P.hour == null, hour: P.hour, layers: P.layers, take: P.take });
     default: return lineupScene(P);
   }
 }

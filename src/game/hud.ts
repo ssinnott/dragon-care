@@ -27,8 +27,8 @@ export const BUTTONS: Readonly<Record<ButtonName, Rect>> = Object.freeze({
   pause: { x: 558, y: 1, w: 16, h: 13 },
   speed: { x: 578, y: 1, w: 28, h: 13 },
 });
-/** The keepers' badges: 46 x 13 each from x 138, 48 apart (display only; S7 makes them tappable). */
-export const BADGE_X0 = 138, BADGE_DX = 48, BADGE_W = 46;
+/** The keepers' badges: 46 x 13 each from x 138, 48 apart; a tap on one takes that keeper, or lets go of the one held (S7). */
+export const BADGE_X0 = 138, BADGE_DX = 48, BADGE_W = 46, BADGE_Y = 1, BADGE_H = 13;
 /** The clock's x, and JOBS's while the clock is short (to day 9). */
 export const CLOCK_X = 16, JOBS_X = 90;
 /**
@@ -47,14 +47,17 @@ const SKY_ICONS: Readonly<Record<'sun' | 'low' | 'moon', Sprite>> = Object.freez
   low: { rows: SUN_ROWS, colors: { s: '#f0905a' } },
   moon: { rows: ['...mmmm..', '..mmm....', '.mmm.....', '.mm......', '.mm......', '.mm......', '.mmm.....', '..mmm....', '...mmmm..'], colors: { m: '#f0ecd8' } },
 });
-/** A keeper's state on their badge: at a job (the font has no dot: a 3 x 3 one). */
+/** A keeper's state on their badge: at a job (the font has no dot: a 3 x 3 one), or held by the player's hand (no ▼ either: a 3 x 2 one). */
 const BUSY: Sprite = { rows: ['bbb', 'bbb', 'bbb'], colors: { b: '#e3b23e' } };
+const HELD: Sprite = { rows: ['www', '.w.'], colors: { w: TEXT } };
+/** What a keeper's badge says of them: free, at a job, or held by the player's hand. */
+export type BadgeState = 'free' | 'busy' | 'held';
 
 /** What the top bar shows. */
 export interface TopBar {
   clock: ClockRead;
   jobs: number;
-  keepers: readonly { name: string; look: KeeperId; busy: boolean }[];
+  keepers: readonly { name: string; look: KeeperId; state: BadgeState }[];
   /** World steps a frame: 0 paused, else the rate. */
   speed: Speed;
   /** The rate the speed button shows (and play resumes at). */
@@ -82,13 +85,14 @@ export function drawTopBar(ctx: CanvasRenderingContext2D, s: TopBar): void {
   text(ctx, `JOBS ${s.jobs}`, jobsAt(label), 4);
   s.keepers.forEach((k, i) => {
     const x = BADGE_X0 + i * BADGE_DX;
-    ctx.fillStyle = INK; ctx.fillRect(x, 1, BADGE_W, 13);
-    ctx.fillStyle = FACE; ctx.fillRect(x + 1, 2, BADGE_W - 2, 11);
+    ctx.fillStyle = INK; ctx.fillRect(x, BADGE_Y, BADGE_W, BADGE_H);
+    ctx.fillStyle = k.state === 'held' ? ACTIVE : FACE; ctx.fillRect(x + 1, BADGE_Y + 1, BADGE_W - 2, BADGE_H - 2);
     // (a 5 x 7 chip in the keeper's own top colour: who it is at a glance, as the keeper is seen across the barn)
     ctx.fillStyle = INK; ctx.fillRect(x + 2, 3, 7, 9);
     ctx.fillStyle = KEEPER_PALETTES[k.look].primary; ctx.fillRect(x + 3, 4, 5, 7);
     text(ctx, k.name, x + 10, 4);
-    if (k.busy) drawSprite(ctx, BUSY, x + 43, 7.5);
+    if (k.state === 'busy') drawSprite(ctx, BUSY, x + 43, 7.5);
+    else if (k.state === 'held') drawSprite(ctx, HELD, x + 43, 8);
   });
   button(ctx, BUTTONS.new, 'NEW', s.armed);
   button(ctx, BUTTONS.pause, 'II', s.speed === 0);
@@ -101,17 +105,24 @@ export function buttonAt(sx: number, sy: number): ButtonName | null {
   return null;
 }
 
+/** The keeper badge under a screen point (its index), if any. */
+export function badgeAt(sx: number, sy: number, n: number): number | null {
+  if (sy < BADGE_Y || sy >= BADGE_Y + BADGE_H) return null;
+  for (let i = 0; i < n; i++) { const x = BADGE_X0 + i * BADGE_DX; if (sx >= x && sx < x + BADGE_W) return i; }
+  return null;
+}
+
 /** A toast: outlined text centred over the barn under the top bar. */
 export function drawToast(ctx: CanvasRenderingContext2D, s: string): void {
   drawTextOutlined(ctx, s, ctx.canvas.width / 2, 20, { size: 1, color: TEXT, outline: INK, thickness: 1, align: 'center', shadow: false });
 }
 
 /**
- * The two gestures, right-aligned at x 634 on an ink strip level with the job strip's chips (its text on theirs), so it reads over
+ * The two taps (Rush, and taking a keeper: S7), right-aligned at x 634 on an ink strip level with the job strip's chips (its text on theirs), so it reads over
  * any wall -- unless the strip reaches it (`stripEnd`, screen x): the jobs come first.
  */
 export function drawHint(ctx: CanvasRenderingContext2D, stripEnd: number): void {
-  const s = 'DRAG: LOOK AROUND   TAP A BUBBLE: RUSH', w = measureText(s), x = ctx.canvas.width - 6, y = ctx.canvas.height - 21;
+  const s = 'TAP A BUBBLE: RUSH   TAP A KEEPER: TAKE', w = measureText(s), x = ctx.canvas.width - 6, y = ctx.canvas.height - 21;
   if (stripEnd + 8 > x - w - 4) return;
   ctx.fillStyle = INK; ctx.fillRect(x - w - 4, y, w + 8, 17);
   text(ctx, s, x, y + 5, HINT, 'right');
@@ -159,4 +170,75 @@ export function drawCard(ctx: CanvasRenderingContext2D, c: CardInfo): void {
     ctx.fillStyle = v >= QUEUE ? NEED_OK : NEED_TIER[tierOf(v)];
     ctx.fillRect(cx + 5, y + 61, Math.round(20 * Math.max(0, Math.min(1, v))), 4);
   });
+}
+
+// ---------- the touch pad (plan S7: shown while a keeper is held by hand) ----------
+
+/** The pad's buttons: the four directions, ACT (E) and LET GO. */
+export type PadButton = 'up' | 'left' | 'right' | 'down' | 'act' | 'letgo';
+/**
+ * Where they are (screen px, 640 x 360): one row at the bottom right, y 305-335, between the ground floor's slab and the
+ * job strip's row -- LET GO, ACT (E), then the arrows ← ↑ ↓ →, right-aligned at 634. That band lies under the feet of the
+ * floor the camera frames lowest (base.ts follow: a floor's feet at screen y 296-308 at most, its heads 12-52 px over
+ * them), so the pad never covers a dragon's head (G6; S7 review: plan 3.11's cross, from y 272, sat over the ground
+ * floor's heads). Clear of the smoke drag's start (350, 200) and of the job strip (y 339).
+ */
+export const PAD: Readonly<Record<PadButton, Rect>> = Object.freeze({
+  letgo: { x: 404, y: 305, w: 48, h: 30 },
+  act: { x: 458, y: 305, w: 44, h: 30 },
+  left: { x: 508, y: 305, w: 30, h: 30 },
+  up: { x: 540, y: 305, w: 30, h: 30 },
+  down: { x: 572, y: 305, w: 30, h: 30 },
+  right: { x: 604, y: 305, w: 30, h: 30 },
+});
+/**
+ * The pad's whole area, a few px wider than its buttons each way: a touch in it that misses a button (a gap, an edge)
+ * goes to the nearest button -- never through to the world, where a tap on empty space would let go of the keeper.
+ */
+export const PAD_ZONE: Readonly<Rect> = Object.freeze({ x: 398, y: 299, w: 242, h: 42 });
+/** Each direction's dx, dy (dy -1 is up: the floor above). */
+export const PAD_DIR: Readonly<Partial<Record<PadButton, { dx: -1 | 0 | 1; dy: -1 | 0 | 1 }>>> = Object.freeze({
+  up: { dx: 0, dy: -1 }, left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 }, down: { dx: 0, dy: 1 },
+});
+const PAD_LABEL: Readonly<Record<PadButton, string>> = Object.freeze({ up: '↑', left: '←', right: '→', down: '↓', act: 'E', letgo: 'LET GO' });
+
+/** The pad button under a screen point -- or, inside PAD_ZONE, the nearest one -- if any. */
+export function padAt(sx: number, sy: number): PadButton | null {
+  const z = PAD_ZONE;
+  if (sx < z.x || sx >= z.x + z.w || sy < z.y || sy >= z.y + z.h) return null;
+  let best: PadButton | null = null, bd = Infinity;
+  for (const [name, r] of Object.entries(PAD) as [PadButton, Rect][]) {
+    const dx = Math.max(r.x - sx, 0, sx - (r.x + r.w - 1)), dy = Math.max(r.y - sy, 0, sy - (r.y + r.h - 1)), d = dx * dx + dy * dy;
+    if (d < bd) { bd = d; best = name; }
+  }
+  return best;
+}
+
+/** The pad: each button an ink box on the buttons' face (lit while pressed), its arrow, E or LET GO in the middle. */
+export function drawPad(ctx: CanvasRenderingContext2D, pressed: ReadonlySet<PadButton>): void {
+  for (const [name, r] of Object.entries(PAD) as [PadButton, Rect][]) {
+    ctx.fillStyle = INK; ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = pressed.has(name) ? ACTIVE : FACE; ctx.fillRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+    text(ctx, PAD_LABEL[name], r.x + r.w / 2, r.y + Math.round((r.h - 7) / 2), TEXT, 'center');
+  }
+}
+
+/**
+ * The line under the pad: who is held, what they carry and what E does ("BEA - BOWL - E: FEED WICK"), right-aligned at
+ * x 634 on an ink strip in the hint's place, level with the job strip (the hint is hidden while a keeper is held). If the
+ * strip reaches it (`stripEnd`, screen x), the line gives the action alone; the rect drawn, or null if nothing fits.
+ */
+export function drawActionLine(ctx: CanvasRenderingContext2D, full: string, short: string, stripEnd: number): Rect | null {
+  const x = ctx.canvas.width - 6, y = ctx.canvas.height - 21;
+  const s = [full, short].find((t) => t && stripEnd + 8 <= x - measureText(t) - 4);
+  if (!s) return null;
+  const w = measureText(s), r = { x: x - w - 4, y, w: w + 8, h: 17 };
+  ctx.fillStyle = INK; ctx.fillRect(r.x, r.y, r.w, r.h);
+  text(ctx, s, x, y + 5, TEXT, 'right');
+  return r;
+}
+
+/** In a portrait window while a keeper is held, a line left of the pad, on its row: the pad's buttons grow with a sideways screen. */
+export function drawPortraitHint(ctx: CanvasRenderingContext2D): void {
+  drawTextOutlined(ctx, 'TURN SIDEWAYS FOR BIGGER BUTTONS', 6, PAD.left.y + 12, { size: 1, color: HINT, outline: INK, thickness: 1, align: 'left', shadow: false });
 }

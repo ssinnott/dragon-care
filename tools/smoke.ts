@@ -109,6 +109,28 @@ function castIs(n: number, stage: string | null) {
     return out;
   };
 }
+/**
+ * While a keeper is held, the pad and the line under it cover no dragon's eye (G6; S7 review): no dragon's head
+ * (its cranium, 6 px either way for the eye) inside a pad button or the line's strip.
+ */
+function hudClear(b: BaseHook): string[] {
+  if (!b.action) return [];
+  const rects = [...Object.entries(b.pad), ...(b.line ? [['line', b.line] as const] : [])];
+  const out: string[] = [];
+  for (const d of b.dragons) {
+    if (!d.head) continue;
+    for (const [name, r] of rects) if (d.head.x + 6 > r.x && d.head.x - 6 < r.x + r.w && d.head.y + 6 > r.y && d.head.y - 6 < r.y + r.h) out.push(`${d.name}'s head (${d.head.x.toFixed(0)}, ${d.head.y.toFixed(0)}) under the ${name} (t ${b.tick}, cam ${b.camX.toFixed(0)},${b.camY.toFixed(0)})`);
+  }
+  return out;
+}
+/** The keeper held by hand (by name) shows whole under the top bar: their mark (17 px over the head, 5 tall) and the "?" (30 over) at y 16 or more. */
+function markShown(name: string) {
+  return (b: BaseHook): string[] => {
+    const k = b.keepers.find((q) => q.name === name);
+    if (!k || b.controlled !== name) return [`${name} is not held (controlled ${b.controlled})`];
+    return k.box.y - 30 - 5 >= 16 ? [] : [`${name}'s mark and "?" are under the top bar (head at screen y ${k.box.y.toFixed(0)}, cam ${b.camX.toFixed(0)},${b.camY.toFixed(0)})`];
+  };
+}
 /** The hook reports the dragons on the move (#7): each one's move, room and slot, the lift's car, and the px walked. */
 function travels(b: BaseHook): string[] {
   const out: string[] = [];
@@ -428,6 +450,82 @@ async function baseInput(page: any): Promise<string[]> {
   if (d.rushes !== b.rushes + 1) out.push(`tapping ${c.dragon}'s ${c.need} chip Rushed ${d.rushes - b.rushes} jobs, not 1`);
   return out;
 }
+/**
+ * view=base, live (save=0): taking a keeper (plan S7, #6). A tap on BEA's badge takes her (the hook's `controlled`);
+ * holding d walks her right; Esc lets go; a tap on her body (low in her box: a bubble over a dragon's head may stand
+ * over its top) takes her again; holding the pad's right arrow walks her right; a tap on LET GO lets go. The pad and the
+ * line over it are there while she is held (the hook's `action`), and gone after.
+ */
+async function baseControl(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  const bea = (b: BaseHook) => b.keepers.find((k) => k.name === 'BEA')!;
+  const held = (name: string | null) => page.waitForFunction((n: string | null) => (window as any).__dragonCare?.base?.controlled === n, name, { timeout: 5000 }).then(() => true, () => false);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (x: number, y: number) => page.mouse.click(box.x + x * k, box.y + y * k);
+  const b0 = await st(), badge = b0.badges.BEA;
+  if (!badge || badge.y + badge.h > 15) return [`BEA's badge is ${JSON.stringify(badge)}, not in the top bar`];
+  // 1. her badge
+  await click(badge.x + badge.w / 2, badge.y + badge.h / 2);
+  if (!(await held('BEA'))) out.push(`a tap on BEA's badge: controlled is ${(await st()).controlled}`);
+  const b1 = await st();
+  if (!b1.action || !b1.action.startsWith('BEA')) out.push(`BEA held, the line over the pad is ${JSON.stringify(b1.action)}`);
+  // 2. d held 600 ms
+  await page.waitForTimeout(200);
+  const x1 = bea(await st()).x;
+  await page.keyboard.down('d');
+  for (let i = 0; i < 6; i++) { await page.waitForTimeout(100); out.push(...hudClear(await st())); }
+  await page.keyboard.up('d');
+  await page.waitForTimeout(100);
+  const x2 = bea(await st()).x;
+  if (!(x2 > x1 + 5)) out.push(`holding d walked BEA from x ${x1.toFixed(1)} to ${x2.toFixed(1)}`);
+  // 3. Esc
+  await page.keyboard.press('Escape');
+  if (!(await held(null))) out.push(`Esc left ${(await st()).controlled} held`);
+  if ((await st()).action !== null) out.push('let go, the line over the pad is still there');
+  // 4. her body
+  await page.waitForTimeout(150);
+  const kb = bea(await st()).box;
+  await click(kb.x + kb.w / 2, kb.y + kb.h * 0.75);
+  if (!(await held('BEA'))) out.push(`a tap on BEA's body (${JSON.stringify(kb)}): controlled is ${(await st()).controlled}`);
+  // 5. the pad's right arrow held 500 ms
+  await page.waitForTimeout(200);
+  const b5 = await st(), right = b5.pad.right, x5 = bea(b5).x;
+  await page.mouse.move(box.x + (right.x + right.w / 2) * k, box.y + (right.y + right.h / 2) * k);
+  await page.mouse.down(); await page.waitForTimeout(500); await page.mouse.up();
+  await page.waitForTimeout(100);
+  const b6 = await st(), x6 = bea(b6).x;
+  if (!(x6 > x5 + 5)) out.push(`the pad's right arrow held walked BEA from x ${x5.toFixed(1)} to ${x6.toFixed(1)}`);
+  if (b6.controlled !== 'BEA') out.push(`holding the pad let go of BEA (controlled ${b6.controlled})`);
+  out.push(...hudClear(b6));
+  // (a tap in the pad's gaps goes to the nearest button, never through to the world: that would let go)
+  await click(b6.pad.up.x - 1, b6.pad.up.y + b6.pad.up.h / 2);
+  await click(b6.pad.act.x + b6.pad.act.w / 2, b6.pad.act.y - 3);
+  await page.waitForTimeout(150);
+  if ((await st()).controlled !== 'BEA') out.push(`a tap between the pad's buttons let go of BEA (controlled ${(await st()).controlled})`);
+  // 6. LET GO
+  const lg = b6.pad.letgo;
+  await click(lg.x + lg.w / 2, lg.y + lg.h / 2);
+  if (!(await held(null))) out.push(`a tap on LET GO left ${(await st()).controlled} held`);
+  // 7. paused (p): a badge takes TOMAS at once as far as the screen goes (his line), a second tap lets go again, and
+  // played on, nobody is held
+  await page.keyboard.press('p');
+  const tb = b6.badges.TOMAS;
+  await click(tb.x + tb.w / 2, tb.y + tb.h / 2);
+  await page.waitForTimeout(100);
+  const p1 = await st();
+  if (p1.speed !== 0 || !p1.action?.startsWith('TOMAS')) out.push(`paused, a tap on TOMAS's badge: speed ${p1.speed}, the line ${JSON.stringify(p1.action)}`);
+  await click(tb.x + tb.w / 2, tb.y + tb.h / 2);
+  await page.waitForTimeout(100);
+  if ((await st()).action !== null) out.push(`paused, a second tap on TOMAS's badge left the line ${JSON.stringify((await st()).action)}`);
+  await page.keyboard.press('p');
+  await page.waitForTimeout(200);
+  if ((await st()).controlled !== null) out.push(`paused, TOMAS taken and let go: played on, ${(await st()).controlled} is held`);
+  if (!out.length) console.log(`        control: BEA taken by her badge, walked by d (x ${x1.toFixed(0)} -> ${x2.toFixed(0)}), let go by Esc, taken by a tap on her, walked by the pad (x ${x5.toFixed(0)} -> ${x6.toFixed(0)}), held through taps in the pad's gaps, let go by LET GO; paused, TOMAS taken and let go by his badge; no dragon's head under the pad or the line`);
+  return out;
+}
+
 const CASES: Case[] = [
   { query: 'view=lineup&t=0', minColours: 150, allScales: true },
   { query: 'view=lineup&t=45&mood=-1', minColours: 150, allScales: true },
@@ -531,6 +629,13 @@ const CASES: Case[] = [
   { query: 'view=base&preset=eggs&t=600&cam=872,376', minColours: 150, allScales: false, check: (b) => [...eggsIn(b), ...travels(b)] },
   { query: 'view=base&preset=hatch&t=120&cam=872,376', minColours: 150, allScales: false, check: (b) => [...hatchedOne(b), ...travels(b)] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseCard },
+  // taking a keeper (plan S7): frozen, BEA held from the first step (the pad, her mark, the line); live, taken and let
+  // go by her badge, the keys, a tap on her and the pad
+  { query: 'view=base&t=120&take=bea', minColours: 150, allScales: false, check: (b) => [...castIs(7, 'adult')(b), ...(b.controlled === 'BEA' && b.action?.startsWith('BEA') && b.keepers.find((k) => k.name === 'BEA')?.phase === 'manual' ? [] : [`take=bea: controlled ${b.controlled}, the line ${JSON.stringify(b.action)}`]), ...markShown('BEA')(b), ...hudClear(b)] },
+  // (held in the hayloft, at night: the camera frames her floor, so her mark shows under the top bar, and the ground
+  // floor's heads are off the screen, not under the pad)
+  { query: 'view=base&t=200&hour=22&take=iris', minColours: 120, allScales: false, check: (b) => [...markShown('IRIS')(b), ...hudClear(b), ...(b.keepers.find((k) => k.name === 'IRIS')?.f === 2 ? [] : ['take=iris: IRIS is not in the hayloft'])] },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseControl },
   // the elder garden (plan S6): the garden preset's three residents on their plots, past the Garden Gate, by day and at
   // night (napping, the lanterns lit)
   { query: 'view=base&preset=garden&cam=1304,376&t=600', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...travels(b)] },

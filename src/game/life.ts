@@ -59,11 +59,14 @@ export function settled(sim: CareSim, d: Dragon): boolean {
 /**
  * The keeper standing where a dragon's body will be at `stage` -- its new body, the way it faces, on its floor, a
  * keeper's half-width either side -- or null: room to grow. (The keeper who has just served it is still at the old
- * stage's stand spot for a moment as they turn for home; the new body may reach over it.)
+ * stage's stand spot for a moment as they turn for home; the new body may reach over it.) A keeper held by hand never
+ * counts: they may stand there as long as the player likes.
  */
 export function inTheWayOfGrowing(sim: CareSim, d: Dragon, stage: Stage): string | null {
   const [a, b] = bodySpan(stage, d.facing, d.x);
-  const k = sim.keepers.find((q) => !q.climbing && q.f === d.f && q.x + KEEPER_HALF > a && q.x - KEEPER_HALF < b);
+  // (a keeper held by hand is left out: the player may park them anywhere, for as long as they like, and a dragon due
+  // to grow must not wait on that -- it grows beside them, drawn in front as always: plan S7 review)
+  const k = sim.keepers.find((q) => !q.manual && !q.climbing && q.f === d.f && q.x + KEEPER_HALF > a && q.x - KEEPER_HALF < b);
   return k ? k.name : null;
 }
 

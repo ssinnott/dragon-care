@@ -30,6 +30,8 @@ import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
 import { DAY_STEPS, START_HOUR, hourSteps } from './clock.ts';
+import { applyCommands, stepManual, becomeManual } from './control.ts';
+import type { Command } from './control.ts';
 
 // ---------- tuning (4.9: first numbers, not law) ----------
 
@@ -156,8 +158,12 @@ export interface Dragon {
   garden: GardenState | null;
 }
 
-/** A keeper's phase: free; fetching a supply, picking it up; going to the dragon's stand spot, waiting there for it; at work; going back. */
-export type Phase = 'idle' | 'fetch' | 'pickup' | 'go' | 'wait' | 'work' | 'home';
+/**
+ * A keeper's phase: free; fetching a supply, picking it up; going to the dragon's stand spot, waiting there for it; at
+ * work; going back; or held by the player's hand, free to be walked (control.ts: a keeper held by hand picks up and
+ * works in 'pickup' and 'work' too).
+ */
+export type Phase = 'idle' | 'fetch' | 'pickup' | 'go' | 'wait' | 'work' | 'home' | 'manual';
 export interface Keeper {
   id: number;
   name: string;
@@ -184,6 +190,15 @@ export interface Keeper {
   walked: number;
   /** Steps held at the lift bay's edge while the car moves (the bay rule, R1); 0 when not held. */
   bayWait: number;
+  /**
+   * Held by the player's hand (control.ts, plan S7): auto-assignment and Rush leave them be. The direction the player
+   * holds (dx -1 left, 1 right; dy -1 up, 1 down), kept until it changes; the steps left of the "?" a keeper shows when
+   * E does nothing; and taken while at work: the player's once that job is done.
+   */
+  manual: boolean;
+  held: { dx: -1 | 0 | 1; dy: -1 | 0 | 1 };
+  cue: number;
+  pendingTake: boolean;
 }
 
 export interface Job {
@@ -251,6 +266,13 @@ export interface SimStats {
   growDelayMax: number;
   /** The longest a retirement waited, steps, from falling due (30 days into the elder stage) to the elder setting off (garden.ts). */
   retireDelayMax: number;
+  /**
+   * Keepers taken by the player's hand (control.ts); keepers sent for a job who handed it over to the one taken; and
+   * the jobs each keeper did while held by hand, by name.
+   */
+  taken: number;
+  handovers: number;
+  doneBy: Record<string, number>;
 }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -269,7 +291,8 @@ export class CareSim {
   readonly keepers: Keeper[] = [];
   jobs: Job[] = [];
   readonly stats: SimStats = { opened: 0, done: 0, closed: 0, waitSum: 0, started: 0, waitMax: 0, queueMax: 0, rushes: 0, preempted: 0, emptySteps: 0,
-    dragonWalked: 0, liftRides: 0, liftWaitMax: 0, keeperWaitSum: 0, keeperWaits: 0, waitTimeouts: 0, evictions: 0, slotBumps: 0, used: {}, growDelayMax: 0, retireDelayMax: 0 };
+    dragonWalked: 0, liftRides: 0, liftWaitMax: 0, keeperWaitSum: 0, keeperWaits: 0, waitTimeouts: 0, evictions: 0, slotBumps: 0, used: {}, growDelayMax: 0, retireDelayMax: 0,
+    taken: 0, handovers: 0, doneBy: {} };
   /** The Dragon Lift: its car starts parked at the ground floor. */
   lift: LiftState = { y: feetY(0), f: 0, target: null, rider: null, moving: false, closing: false, blockedSince: -1, calls: [] };
   /** What the last step did (cleared at the start of every step). */
@@ -284,6 +307,8 @@ export class CareSim {
   readonly garden: { plots: number } = { plots: GARDEN_MIN_PLOTS };
   /** Who can go where: the keepers' net and a dragon net per stage, out to the garden's end (layout.ts makeNets; rebuilt as it grows, never saved). */
   nets: Nets = makeNets(worldWOf(GARDEN_MIN_PLOTS));
+  /** The player's commands for the next step (control.ts: applied at its start, in this order, then cleared; never saved: input, not the world). */
+  commands: Command[] = [];
 
   constructor(rooms: readonly RoomPlace[], dragons: readonly DragonPlace[], keepers: readonly KeeperPlace[], opts: SimOptions = {}) {
     this.seed = opts.seed ?? 1;
@@ -331,12 +356,19 @@ export class CareSim {
       const mates = keepers.filter((q) => q.station === p.station), i = mates.indexOf(p);
       const stationX = clampToFloor(station.floor, Math.round(waitX(station) + (i - (mates.length - 1) / 2) * 22), this.nets.keeper);
       this.keepers.push({ id, name: p.name, look: p.look, specialty: p.specialty, station, stationX, f: station.floor, x: stationX, y: feetY(station.floor),
-        climbing: false, legs: [], phase: 'idle', t: 0, job: null, carrying: null, rushing: false, facing: 1, walked: 0, bayWait: 0 });
+        climbing: false, legs: [], phase: 'idle', t: 0, job: null, carrying: null, rushing: false, facing: 1, walked: 0, bayWait: 0,
+        manual: false, held: { dx: 0, dy: 0 }, cue: 0, pendingTake: false });
     });
   }
 
   /** Game time: steps since day 1's midnight. */
   get clock(): number { return this.clock0 + this.tick; }
+
+  /** The keeper the player holds by hand (by id; also one taken at work, finishing that job first), or null (control.ts). */
+  get controlled(): number | null { return this.keepers.find((k) => k.manual || k.pendingTake)?.id ?? null; }
+
+  /** The player's input (control.ts Command): applied at the start of the next step, after any given before it. */
+  command(c: Command): void { this.commands.push(c); }
 
   /** The world's walkable width: out to the garden's end (1688 with its first two plots, 2568 with seven: layout.ts worldWOf). */
   get worldW(): number { return worldWOf(this.garden.plots); }
@@ -401,11 +433,16 @@ export class CareSim {
     }
     const jobs: Job[] = s.jobs.map((j) => ({ ...j, dragon: byId(sim.dragons, j.dragon, 'dragon'), keeper: null }));
     for (const k of s.keepers) {
-      sim.keepers.push({ ...k, station: byId(sim.rooms, k.station, 'room'), job: k.job == null ? null : byId(jobs, k.job, 'job'), legs: k.legs.map((l) => ({ ...l })) });
+      // (a save never holds a keeper by hand: save.ts stores them released)
+      const h = k.held, dir = (v: unknown) => v === -1 || v === 0 || v === 1;
+      if (k.manual !== false || k.pendingTake !== false || k.phase === 'manual' || !h || typeof h !== 'object' || !dir(h.dx) || !dir(h.dy) || !whole(k.cue, 0)) {
+        throw new Error(`save: ${k.name} is held by hand: ${JSON.stringify({ manual: k.manual, pendingTake: k.pendingTake, phase: k.phase, held: k.held, cue: k.cue })}`);
+      }
+      sim.keepers.push({ ...k, held: { ...h }, station: byId(sim.rooms, k.station, 'room'), job: k.job == null ? null : byId(jobs, k.job, 'job'), legs: k.legs.map((l) => ({ ...l })) });
     }
     s.jobs.forEach((j, i) => { jobs[i].keeper = j.keeper == null ? null : byId(sim.keepers, j.keeper, 'keeper'); });
     sim.jobs = jobs;
-    Object.assign(sim.stats, s.stats, { used: { ...s.stats.used } });
+    Object.assign(sim.stats, s.stats, { used: { ...s.stats.used }, doneBy: { ...s.stats.doneBy } });
     sim.lift = { ...s.lift, calls: s.lift.calls.map((c) => ({ ...c })) };
     return sim;
   }
@@ -428,7 +465,7 @@ export class CareSim {
   // ---------- a step ----------
 
   /**
-   * One step (plan S3, S5, S6): the needs drain and the acts under way refill theirs (an act done ends here); then life --
+   * One step (plan S3, S5, S6, S7): the player's commands are applied (control.ts); the needs drain and the acts under way refill theirs (an act done ends here); then life --
    * a hold counts down, a dragon due, settled and with room grows up, an egg due hatches (life.ts) -- after the acts, so a dragon
    * whose nap or job ended this step is caught settled before it can set off; then jobs open under QUEUE (and close only
    * by being done: a need rises through a keeper's act alone), so a hatchling's food job opens the step it hatches; the
@@ -439,6 +476,8 @@ export class CareSim {
   step(): void {
     this.events = [];
     this.tick++;
+    // (the player's commands first: a take, a steer or E given before this step acts in it -- control.ts)
+    applyCommands(this);
     for (const d of this.dragons) {
       // (a garden resident, or an elder on its way there, drains only food and love, slowly: needs.ts gardenDrain)
       const out = d.place === 'garden' || d.goal === 'retire';
@@ -478,16 +517,19 @@ export class CareSim {
       if (j.keeper || !this.servable(j)) continue;
       // (a rushed job, its dragon near now: a keeper runs to it, off another job if none is free: 4.5)
       if (j.rushed) { this.sendRushed(j); continue; }
-      if (!this.keepers.some((k) => !k.job)) return;
+      if (!this.keepers.some((k) => this.free(k))) return;
       let best: Keeper | null = null, bestCost = Infinity;
       for (const k of this.keepers) {
-        if (k.job) continue;
+        if (!this.free(k)) continue;
         const c = this.tripCost(k, j) - (k.specialty === j.need ? SPECIALIST_PX : 0);
         if (c < bestCost) { bestCost = c; best = k; }
       }
       if (best) this.claim(best, j);
     }
   }
+
+  /** A keeper free for a job: none in hand, and not held by the player's hand (control.ts: auto-assignment skips them). */
+  private free(k: Keeper): boolean { return !k.job && !k.manual && !k.pendingTake; }
 
   /**
    * A job a keeper can go to (plan S3): its dragon is going for it, to a slot in the need's own room, and is there, or
@@ -516,11 +558,12 @@ export class CareSim {
     if (!this.jobs.includes(j)) return;
     this.stats.rushes++;
     j.rushed = true;
-    if (j.keeper) { j.keeper.rushing = true; return; }
+    // (a keeper held by hand is never rushed: the player walks them)
+    if (j.keeper) { if (!j.keeper.manual) j.keeper.rushing = true; return; }
     const d = j.dragon;
     // someone is already with the dragon for another job: they hurry, and this one is next for it
     const other = this.jobs.find((o) => o !== j && o.dragon === d && o.keeper);
-    if (other) { other.keeper!.rushing = true; return; }
+    if (other) { if (!other.keeper!.manual) other.keeper!.rushing = true; return; }
     // (a garden resident waits where it is: its keeper comes out to it)
     if (d.goalJob !== j.id && !d.act && d.place === 'barn') retarget(this, d, j);
     raiseCall(this, d);
@@ -532,13 +575,14 @@ export class CareSim {
     const d = j.dragon;
     // (a keeper who can't reach the job is never chosen for it)
     let best: Keeper | null = null, bestCost = Infinity;
-    for (const k of this.keepers) if (!k.job) { const c = this.tripCost(k, j); if (c < bestCost) { bestCost = c; best = k; } }
+    for (const k of this.keepers) if (this.free(k)) { const c = this.tripCost(k, j); if (c < bestCost) { bestCost = c; best = k; } }
     if (!best) {
       let low: Job | null = null;
       for (const k of this.keepers) {
         const kj = k.job;
         // (never a keeper mid-tuck-in: a dragon half put to bed would be left lying awake)
-        if (!kj || kj.rushed || kj.dragon === d || (k.phase === 'work' && kj.need === 'sleep') || this.tripCost(k, j) === Infinity) continue;
+        // (nor one held by the player's hand, or finishing a job before they are: control.ts)
+        if (!kj || kj.rushed || kj.dragon === d || k.manual || k.pendingTake || (k.phase === 'work' && kj.need === 'sleep') || this.tripCost(k, j) === Infinity) continue;
         if (!low || this.compare(kj, low) > 0 || (this.compare(kj, low) === 0 && this.tripCost(k, j) < this.tripCost(low.keeper!, j))) low = kj;
       }
       if (low) { best = low.keeper!; this.release(best); }
@@ -572,11 +616,15 @@ export class CareSim {
     const j = k.job;
     if (j) j.keeper = null;
     k.job = null; k.rushing = false; k.t = 0;
+    // (one held by hand stays where they are, the player's)
+    if (k.manual) { k.phase = 'manual'; return; }
     this.walkTo(k, { f: k.station.floor, x: k.stationX });
     k.phase = 'home';
   }
 
   private stepKeeper(k: Keeper): void {
+    // (held by the player's hand: walked, climbing and picking up by control.ts; at work like anyone)
+    if (k.manual && k.phase !== 'work') { stepManual(this, k); return; }
     // (a job its dragon has stopped going for -- it was moved out of the slot -- is given back)
     const j = k.job;
     if (j && k.phase !== 'work' && j.dragon.goalJob !== j.id) { this.drop(k); return; }
@@ -647,8 +695,8 @@ export class CareSim {
     if (d.slot) k.facing = d.slot.x >= k.x ? 1 : -1;
   }
 
-  /** The job starts, and the dragon's anim with it (the bowl set down, the ball out, the bucket). */
-  private startWork(k: Keeper): void {
+  /** The job starts, and the dragon's anim with it (the bowl set down, the ball out, the bucket). A keeper held by hand starts it with E (control.ts). */
+  startWork(k: Keeper): void {
     const j = k.job!, d = j.dragon, len = this.workLen(k, j.need);
     this.stats.keeperWaits++;
     if (k.phase === 'wait') this.stats.keeperWaitSum += k.t;
@@ -673,6 +721,9 @@ export class CareSim {
     // (the dragon lingers in its slot until it leaves for another need)
     if (d.goalJob === j.id) { d.goal = null; d.goalJob = null; }
     k.job = null; k.rushing = false; k.t = 0;
+    // (held by hand, or taken while at it: the player's again where they stand -- control.ts)
+    if (k.manual) { this.stats.doneBy[k.name] = (this.stats.doneBy[k.name] ?? 0) + 1; k.phase = 'manual'; k.legs = []; return; }
+    if (k.pendingTake) { becomeManual(k); return; }
     this.walkTo(k, { f: k.station.floor, x: k.stationX });
     k.phase = 'home';
   }
