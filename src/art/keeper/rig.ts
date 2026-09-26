@@ -12,8 +12,8 @@ import { buildRig, computeJoints, drawRig, jointScreen } from '../../lib/art/rig
 import type { DrawRigOpts, FullPose, Rig, RigBuild } from '../../lib/art/rig.ts';
 import { getChain, stepChain, resetChain } from '../../lib/art/secondary.ts';
 import { makeTones } from '../../lib/art/shading.ts';
-import { KEEPERS } from './cast.ts';
-import type { KeeperId, KeeperSpec } from './cast.ts';
+import { CAST } from './cast.ts';
+import type { CastId, KeeperSpec } from './cast.ts';
 import { KEEPER_PALETTES, KEEPER_FAR, KEEPER_SHARED, KEEPER_SKIN_SHADOW } from './palettes.ts';
 import type { KeeperPalette } from './palettes.ts';
 import { keeperParts, TOOL_BRUSH, HELD_BOWL } from './parts.ts';
@@ -35,11 +35,15 @@ export interface KeeperRig extends Rig {
   bowl: HeldBowl | null;
   /** The near hand is open and flat (stroking a dragon: parts.ts drawKeeperHand); set each step by the care agent. */
   open: boolean;
+  /** (The miller) the flour sack is hugged in his arms (parts.ts drawKeeperHips draws it under the near arm). */
+  sack: boolean;
+  /** (The miller) arms folded, both fists tucked out of sight (parts.ts drawKeeperHand); set by the scene. */
+  fold: boolean;
 }
 
 /** Build a keeper. Allocates: once per keeper. */
-export function buildKeeper(id: KeeperId, scale = 1): KeeperRig {
-  const spec = KEEPERS[id], pal = KEEPER_PALETTES[id];
+export function buildKeeper(id: CastId, scale = 1): KeeperRig {
+  const spec = CAST[id], pal = KEEPER_PALETTES[id];
   const build: KeeperBuild = {
     keeper: spec, proportions: spec.proportions, basePalette: { ...pal }, scale,
     farShade: KEEPER_FAR.shade, farDesat: KEEPER_FAR.desat, outline: KEEPER_SHARED.outline,
@@ -48,7 +52,7 @@ export function buildKeeper(id: KeeperId, scale = 1): KeeperRig {
     face: { big: false },
   };
   const k = buildRig(build) as KeeperRig;
-  k.spec = spec; k.kpal = pal; k.blink = 0; k.bowl = null; k.open = false;
+  k.spec = spec; k.kpal = pal; k.blink = 0; k.bowl = null; k.open = false; k.sack = spec.tool === 'sack'; k.fold = false;
   // the skin's tone ramp, seeded with its warm hand-set shadow (palettes.ts KEEPER_SKIN_SHADOW): every part drawn in
   // skin (the face, the neck, a forearm, the hands) reads it from the rig's tone cache
   k.tones.set(pal.skin, { ...makeTones(pal.skin, k.ramp), sh: KEEPER_SKIN_SHADOW[id] });

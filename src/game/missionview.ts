@@ -20,15 +20,15 @@ import type { Gait } from './gait.ts';
 import { readClock, hourSteps } from './clock.ts';
 import { skyPhase } from './sky.ts';
 import { FLOORS, INK, ROAD_SCENE } from './surfaces.ts';
-import { drawClimate, drawSetPiece, drawBaddie, drawMiller } from './artseams.ts';
+import { drawClimate, drawSetPiece, drawBaddie, drawMiller, SADDLE } from './artseams.ts';
 import { climateOf } from './tripdemo.ts';
 import { drawSprite, ICONS } from './icons.ts';
-import type { Sprite } from './icons.ts';
 import { drawEgg } from './eggs.ts';
 import { makePet, petOpts, stepPet } from './pet.ts';
 import type { Pet } from './pet.ts';
 import { makeKeeperAgent } from './people.ts';
 import { stepKeeperAgent, drawKeeperAgent } from '../care/keeper.ts';
+import { keeperJoint } from '../art/keeper/rig.ts';
 import type { KeeperAgent } from '../care/keeper.ts';
 import { KEEPERS } from '../art/keeper/cast.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
@@ -125,7 +125,12 @@ export function frameAt(g: Gait, tau: number): number {
 export interface Act { key: string; anim: string; start: number; speed: number; phase: number }
 /** A stop's set piece on the road, where it stands and how it looks now. */
 export interface Piece { stop: number; x: number; state: StopState }
-/** The baddie on the road: where, which way it faces, its face and pose, its marks (the calmed one's "z"s, the driven-off one's dust), and its beat's time. */
+/**
+ * The baddie on the road: where, which way it faces, its face and pose, its marks (the calmed one's "z"s, the driven-off
+ * one's dust: the art kit's drawBaddie draws them for a sleepy sit and a leave, baddies.ts), and its beat's time. The
+ * outwitted one wanders off at a walk (the kit's exitLook: a plain walk, neutral; 'leave' is the driven-off shuffle,
+ * with its dust and grumble cloud).
+ */
 export interface BaddieAt { id: BaddieId; x: number; face: BaddieFace; pose: BaddiePose; facing: 1 | -1; fx: 'z' | 'dust' | null; t: number }
 
 /**
@@ -148,11 +153,14 @@ export interface SceneFrame {
 }
 
 // (the type guards of plan S9 and D4: a baddie on the road has no hurt, health or defeat, and a baddie leaves the road
-// only calmed, outwitted or driven off)
+// only calmed, outwitted or driven off. Beside them, the art kit's own over its Baddie record (S9a, baddies.ts: the
+// drawn baddie has no hurt, health or defeat field either, and the same three exits), re-exported here so the scene's
+// guards and the art's are read, and compiled, together)
 type Assert<T extends true> = T;
 export type _NoHurt = Assert<Extract<keyof BaddieAt | keyof SceneFrame, 'hurt' | 'hp' | 'health' | 'defeated' | 'damage'> extends never ? true : false>;
 export type _Exits = Assert<[BaddieExit] extends ['calmed' | 'outwitted' | 'drivenOff'] ? (['calmed' | 'outwitted' | 'drivenOff'] extends [BaddieExit] ? true : false) : false>;
 export type _Faces = Assert<[BaddieFace] extends ['neutral' | 'grumpy' | 'surprised' | 'sleepy'] ? true : false>;
+export type { _NoHurt as _BaddieNoHurt, _Exits as _BaddieExits } from './baddies.ts';
 
 /** Each element's moment when it meets a challenge (plan S9's table): the breath, rock's happy heave, slinkwing's call. */
 export const DRAGON_MOMENT: Readonly<Record<DragonElement, string>> = Object.freeze({
@@ -234,7 +242,7 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
       if (!trip.success || !trip.exit) baddie = { id, x: x0, face: 'grumpy', pose: 'stand', facing: -1, fx: null, t: bt };
       else if (trip.exit === 'calmed') baddie = { id, x: x0, face: et < turn ? 'surprised' : 'sleepy', pose: 'sit', facing: -1, fx: et < turn ? null : 'z', t: bt };
       else if (trip.exit === 'outwitted') baddie = et < turn ? { id, x: x0, face: 'surprised', pose: 'turn', facing: -1, fx: null, t: bt }
-        : { id, x: x0 - WANDER * (et - turn), face: 'neutral', pose: 'leave', facing: -1, fx: null, t: bt };
+        : { id, x: x0 - WANDER * (et - turn), face: 'neutral', pose: 'walk', facing: -1, fx: null, t: bt };
       else baddie = et < turn ? { id, x: x0, face: 'grumpy', pose: 'turn', facing: 1, fx: null, t: bt }
         : { id, x: x0 + SHUFFLE * (et - turn), face: 'grumpy', pose: 'leave', facing: 1, fx: 'dust', t: bt };
     }
@@ -273,6 +281,7 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
 // ---------- the view: the team's pets and riders, and drawing ----------
 
 /** One of the team on screen: its pet or rider character, the act it is playing, and the clock it was last stepped at. */
+const HAND = { x: 0, y: 0 };
 interface Actor { pet: Pet | null; agent: KeeperAgent | null; key: string | null; clock: number; momentDone: boolean; age: number }
 
 /**
@@ -355,7 +364,7 @@ export class ScenePets {
   /** The walk frame each dragon is playing now (sim-check 24: the view's paws keep to the road). */
   dragonFrames(): number[] { return this.actors.map((a) => a.d.pet!.player.frameIndex); }
 
-  /** Draw the team (already synced): the riders a step behind their dragons, then the dragons, then the top pass. */
+  /** Draw the team (already synced): the riders a step behind their dragons, each with its saddle in the near hand (the art kit's SADDLE, as a rider carries it in the barn's muster), then the dragons, then the top pass. */
   draw(ctx: CanvasRenderingContext2D): void {
     const cast: { y: number; pet?: Pet; agent?: KeeperAgent }[] = [];
     for (const a of this.actors) {
@@ -367,17 +376,16 @@ export class ScenePets {
     let slot = 0;
     for (const c of cast) {
       if (c.pet) drawDragon(ctx, c.pet.rig, c.pet.player.pose, petOpts(c.pet, { still: true, top: this.top, budget: this.budget, slot: slot++ }));
-      else if (c.agent) drawKeeperAgent(ctx, c.agent);
+      else if (c.agent) {
+        drawKeeperAgent(ctx, c.agent);
+        keeperJoint(c.agent.rig, 'handN', HAND);
+        drawSprite(ctx, SADDLE, HAND.x + c.agent.facing * 3, HAND.y - 2);
+      }
     }
     this.top.flush(ctx);
   }
 }
 
-/** A "z" over the dozing baddie (2 px strokes; drawSprite rings it in ink: G6), and a puff of the driven-off one's dust (2 px and up: floor dust fades by shrinking). */
-const ZED: Sprite = { rows: ['zzzzz', 'zzzzz', '..zz.', '.zz..', 'zzzzz', 'zzzzz'], colors: { z: '#f3e6c8' } };
-const DUST = '#e8e0cc';
-/** How tall each baddie stands (its "z"s start over its head). */
-const BADDIE_H: Readonly<Record<BaddieId, number>> = Object.freeze({ moleking: 88, stormroc: 100, frostgiant: 140 });
 
 /**
  * The road (screen space, from the road's band down): the road's pale band (FLOORS.road, a seam along its top), its
@@ -416,19 +424,10 @@ export function drawMissionScene(ctx: CanvasRenderingContext2D, sim: CareSim, tr
   }
   const bd = f.baddie;
   if (bd) {
+    // (its marks -- the calmed one's "z"s stepping up over its head, the driven-off one's dust at its heels and its
+    // grumble cloud, the outwitted one's "!" as it turns -- are the art kit's, drawn by drawBaddie from the pose and
+    // face: bd.fx says which the frame shows)
     drawBaddie(ctx, bd.id, bd.x, BACK_Y, bd.facing, bd.face, bd.pose, bd.t);
-    if (bd.fx === 'z') {
-      // three "z"s stepping up over its head, one more every half second, then again
-      const n = 1 + (Math.floor(bd.t / 30) % 3), top = BACK_Y - BADDIE_H[bd.id];
-      for (let k = 0; k < n; k++) drawSprite(ctx, ZED, bd.x + 20 + 9 * k, top - 6 - 11 * k);
-    } else if (bd.fx === 'dust') {
-      // puffs kicked up behind its feet, each shrinking as it goes
-      for (let k = 0; k < 3; k++) {
-        const age = (bd.t + k * 10) % 30, s = 4 - Math.floor(age / 10), px = Math.round(bd.x - bd.facing * (30 + age)), py = BACK_Y - 2 - Math.floor(age / 6);
-        ctx.fillStyle = INK; ctx.fillRect(px - 1, py - 1, s + 2, s + 2);
-        ctx.fillStyle = DUST; ctx.fillRect(px, py, s, s);
-      }
-    }
   }
   cast.draw(ctx);
   ctx.restore();

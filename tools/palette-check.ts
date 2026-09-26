@@ -67,6 +67,14 @@
 //                   (The garden's green is the hedge and the lawn behind the path, the grass strip below it: never a
 //                   floor. Its path is FLOORS.path, gated by (i) and (Ki) with the straw.) The mission scene's ground
 //                   (surfaces.ts ROAD_SCENE) is gated as it is drawn, at every hour: never through the night table.
+//                   The mission regions' climates (plan S9a; surfaces.ts CLIMATE_BACKDROPS, drawn by backdrops.ts) are
+//                   backdrops too: every layer of each climate at each phase (sky bands, far ridge, near forms, weather
+//                   marks, the caves' lamp pool) is held lighter than every dark body; the cave mouth is a prop. They
+//                   are phased (each climate has its own night) and drawn only in the mission screens, never into the
+//                   building's or garden's canvases: they are not in the night table (surfaces.ts NIGHT).
+// The grumpy miller (src/art/keeper NPCS.miller, drawn by src/game/npcs.ts) takes the keeper gates with the four keepers
+// in the KEEPERS section: his own pairs (the sack, its twine and the flour), the ramps, the far side, the floors, and his
+// shirt against the four keepers' tops in (Kf).
 // EGGS (counted apart, its own RESULT line: EGGS):
 //   (egg) eggs    : every element's egg (src/game/eggs.ts: its shell is the element's BABY scale colour, inked round)
 //                   keeps >= 25 % luminance from the Hatchery's nest straw it lies in (src/game/surfaces.ts NEST), so a
@@ -75,10 +83,13 @@
 //                   the nest heap's plain straw (src/game/layout.ts NEST_RX, NEST_RY, eggBottom: a px in from the
 //                   heap's inked edge, over the floor's band, off the strands), never the Hatchery's wall.
 // BADDIES (counted apart, its own RESULT line: BADDIES):
-//   (x) baddies   : every fill a big baddie is drawn in (src/game/artseams.ts BADDIE_FILLS: the mission art kit's) keeps
-//                   >= 25 % luminance from the road the team walks in the watchable scene (FLOORS.road), the ground under
-//                   and below it (surfaces.ts ROAD_SCENE), and its region's backdrop bands at every phase (artseams.ts
-//                   climateBands; none while the kit's stand-ins are in), and >= OKL_MIN Oklab L from the ink (plan S9).
+//   (x) baddies   : (S9a) each fill on a big baddie's silhouette edge (src/game/baddies.ts BADDIE_EDGE) keeps >= 25 %
+//                   luminance from the mission road (FLOORS.road) and from every band of its home climate at every
+//                   phase; every fill >= OKL_MIN Oklab L from the ink; the colours that touch inside it pass the ladder.
+//                   (S9) every fill the scene sees a baddie by (src/game/artseams.ts BADDIE_FILLS: the kit's edge fills)
+//                   keeps >= 25 % luminance from the road the team walks in the watchable scene (FLOORS.road), the ground
+//                   under and below it (surfaces.ts ROAD_SCENE), and its region's backdrop bands at every phase
+//                   (artseams.ts climateBands: the kit's BACKDROPS.climate bands), and >= OKL_MIN Oklab L from the ink.
 // REPORTED, NOT GATED:
 //   (g) any scale pair that passes (b) on hue alone at the same stage (it would merge in greyscale); any body pair
 //       that passes (f) on simulated value alone under the dark-pair floor (they are told apart by zone); glow colours
@@ -93,12 +104,16 @@ import type { DragonElement, DragonPalette, DragonSlot, AgeStage } from '../src/
 import { makeTones } from '../src/lib/art/shading.ts';
 import { KEEPER_PALETTES, KEEPER_SHARED, KEEPER_SKIN_SHADOW, KEEPER_FAR } from '../src/art/keeper/palettes.ts';
 import type { KeeperPalette } from '../src/art/keeper/palettes.ts';
-import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
-import type { KeeperId } from '../src/art/keeper/cast.ts';
+import { KEEPER_IDS, NPC_IDS } from '../src/art/keeper/cast.ts';
+import type { CastId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
-import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, STRAW_SEAM, PATH_EDGE, ROAD_SCENE, NIGHT, stepped, nightColour } from '../src/game/surfaces.ts';
+import { SETPIECE_COLOURS } from '../src/game/setpieces.ts';
+import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, STRAW_SEAM, PATH_EDGE, ROAD_SCENE, CAVE, NIGHT, stepped, nightColour } from '../src/game/surfaces.ts';
+import { lampPool } from '../src/game/backdrops.ts';
+import { BADDIE_ART, BADDIE_HOME, BADDIE_EDGE, BADDIE_PAIRS, BADDIE_WHITE } from '../src/game/baddies.ts';
 import { BADDIE_FILLS, climateBands } from '../src/game/artseams.ts';
 import { BADDIE_DATA, REGION_DATA, REGION_IDS } from '../src/game/tripdemo.ts';
+import { CLIMATES, BADDIE_IDS } from '../src/game/missiondata.ts';
 import type { BaddieId } from '../src/game/missiondata.ts';
 import { NEST_RX, NEST_RY, NEST_STRANDS, WALL_H, floorTop, nestBase, eggBottom } from '../src/game/layout.ts';
 import { SHELL, WOBBLE } from '../src/game/eggs.ts';
@@ -718,6 +733,9 @@ if (!glowClose) out.push('   none');
 //                    protanopia (a player tells the keepers apart across the yard by the top first);
 //   (Kg) at work   : the night keeper's trousers and cardigan pass the ladder against dusk's scale at every stage
 //                    (kneeling at its side for its own tuck-in, her legs lie over its body: slate, they merged).
+// (the mission NPCs on the keeper rig -- the grumpy miller -- are measured with the keepers: his own pairs, and his
+// top against the four keepers' in (Kf), since he stands beside Bea in the scene that meets him)
+const K_CAST: readonly CastId[] = [...KEEPER_IDS, ...NPC_IDS];
 let kGates = 0, kFailures = 0;
 const kFailed: string[] = [];
 function kcount(label: string, ok: boolean): boolean {
@@ -726,11 +744,11 @@ function kcount(label: string, ok: boolean): boolean {
   return ok;
 }
 type KSlot = keyof KeeperPalette | 'white' | 'bowl';
-const kcol = (id: KeeperId, slot: KSlot): string | undefined =>
+const kcol = (id: CastId, slot: KSlot): string | undefined =>
   slot === 'white' ? KEEPER_SHARED.white : slot === 'bowl' ? BOWL : (KEEPER_PALETTES[id] as Record<string, string | undefined>)[slot];
 /** The pairs that touch on a keeper, and where. A pair a keeper lacks a slot for is skipped (only Bea wears an apron). */
-interface KPair { a: KSlot; b: KSlot; where: string; only?: readonly KeeperId[] }
-const kp = (a: KSlot, b: KSlot, where: string, only?: readonly KeeperId[]): KPair => ({ a, b, where, only });
+interface KPair { a: KSlot; b: KSlot; where: string; only?: readonly CastId[] }
+const kp = (a: KSlot, b: KSlot, where: string, only?: readonly CastId[]): KPair => ({ a, b, where, only });
 const K_PAIRS: readonly KPair[] = [
   kp('skin', 'hair', 'hairline, brows on the face'), kp('skin', 'primary', 'the neck on the collar, a forearm over the top'),
   kp('hair', 'primary', 'the hair at the nape on the collar'), kp('primary', 'secondary', 'the top on the trousers at the waist'),
@@ -743,10 +761,12 @@ const K_PAIRS: readonly KPair[] = [
   kp('tool', 'skin', 'the hand on the brush'), kp('tool', 'primary', 'the brush held over the shirt'),
   kp('bristle', 'tool', 'the bristles under the brush\'s back', ['tomas']),
   kp('bowl', 'skin', 'the hands on the bowl', ['bea']), kp('bowl', 'primary', 'the bowl held over the blouse', ['bea']), kp('bowl', 'apron', 'the bowl held over the apron', ['bea']),
+  kp('tool', 'apron', 'the sack hugged over the apron', ['miller']), kp('accent', 'tool', 'the twine on the sack', ['miller']),
+  kp('flour', 'apron', 'the flour on the apron', ['miller']), kp('flour', 'hat', 'the flour on the cap', ['miller']), kp('flour', 'tool', 'the flour on the sack', ['miller']),
 ];
 
 head(`KEEPERS (src/art/keeper/palettes.ts: the house ladder, >= ${LUM_MIN * 100}% luminance or >= ${HUE_MIN}deg hue; far side at ${KEEPER_FAR.shade} / ${KEEPER_FAR.desat})`);
-for (const id of KEEPER_IDS) {
+for (const id of K_CAST) {
   const P = KEEPER_PALETTES[id];
   out.push(` ${id}`);
   // (Ka)
@@ -779,12 +799,17 @@ for (const id of KEEPER_IDS) {
     const d = relDiff(P[slot], floorHex), ok = kcount(`(Ki) ${id} ${slot} / ${floorName} floor`, d >= LUM_MIN);
     out.push(`${ok ? '  ok  ' : '  FAIL'} (Ki) ${(slot === 'dark' ? 'shoes' : 'trousers') + ' / floor'}${' '.repeat(slot === 'dark' ? 5 : 2)} ${pct(d)}  ${P[slot]} on ${floorName} ${floorHex}`);
   }
+  // (the miller's flour sack is set down at his feet: on every floor)
+  if (id === 'miller' && P.tool) for (const [floorName, floorHex] of FLOOR_LIST) {
+    const d = relDiff(P.tool, floorHex), ok = kcount(`(Ki) ${id} sack / ${floorName} floor`, d >= LUM_MIN);
+    out.push(`${ok ? '  ok  ' : '  FAIL'} (Ki) sack / floor      ${pct(d)}  ${P.tool} on ${floorName} ${floorHex}`);
+  }
 }
 // (Kf)
-out.push(' the four tops (RULE_B: as seen, deutan, protan)');
-for (let i = 0; i < KEEPER_IDS.length; i++) {
-  for (let j = i + 1; j < KEEPER_IDS.length; j++) {
-    const a = KEEPER_IDS[i], b = KEEPER_IDS[j], cells: string[] = [];
+out.push(' the tops, the keepers and the mission NPCs (RULE_B: as seen, deutan, protan)');
+for (let i = 0; i < K_CAST.length; i++) {
+  for (let j = i + 1; j < K_CAST.length; j++) {
+    const a = K_CAST[i], b = K_CAST[j], cells: string[] = [];
     let allOk = true;
     for (const [k, f] of [['as seen', (h: string) => h], ['deutan', (h: string) => simulate(h, 'deutan')], ['protan', (h: string) => simulate(h, 'protan')]] as const) {
       const m = ruleB(f(KEEPER_PALETTES[a].primary), f(KEEPER_PALETTES[b].primary));
@@ -872,6 +897,42 @@ function lighterBy(a: string, b: string): number {
     const ink = okDiff(hex, INK), inkOk = wcount(`(w) ${what} / ink`, ink >= OKL_MIN);
     out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${what.padEnd(28)} ${hex}  L ${lumOf(hex).toFixed(3)}  least ${pct(least)} ${apart ? 'apart  ' : 'lighter'} (${by})  ${okf(ink)} from ink`);
   }
+  // (the mission regions' climates, plan S9a: every layer of each climate's picture at each phase -- the three sky
+  // bands, the far ridge, the near forms and their second colour, the weather marks, and the caves' lamp pool -- each
+  // lighter than every dark body; the cave mouth is a dark mouth, a prop, either way. One line per climate and phase.)
+  out.push(' the mission climates (src/game/surfaces.ts CLIMATE_BACKDROPS; backdrops.ts drawClimate): sky top / middle / low, ridge, near, detail, marks');
+  for (const c of CLIMATES) for (const ph of PHASE_ORDER) {
+    const P = BACKDROPS.climate[c][ph];
+    const cols: [string, string][] = [['sky top', P.sky[0]], ['sky middle', P.sky[1]], ['sky low', P.sky[2]], ['ridge', P.ridge], ['near', P.near], ['detail', P.detail], ['marks', P.mark]];
+    if (c === 'caves') { const [i, o] = lampPool(P.near); cols.push(['lamp pool inner', i], ['lamp pool outer', o], ['lamp', CAVE.lamp]); }
+    let least = Infinity, by = '', inkLeast = Infinity, allOk = true;
+    for (const [what, hex] of cols) {
+      for (const b of dark) {
+        const d = lighterBy(hex, b.hex);
+        if (!wcount(`(w) climate ${c} ${ph} ${what} / ${b.who}`, d >= LUM_MIN)) allOk = false;
+        if (d < least) { least = d; by = `${what} ${hex} on ${b.who}`; }
+      }
+      const ink = okDiff(hex, INK);
+      if (!wcount(`(w) climate ${c} ${ph} ${what} / ink`, ink >= OKL_MIN)) allOk = false;
+      inkLeast = Math.min(inkLeast, ink);
+    }
+    out.push(`${allOk ? '  ok  ' : '  FAIL'} climate ${(c + ' ' + ph).padEnd(13)} ${cols.length} colours, least ${pct(least)} lighter (${by}), ${okf(inkLeast)} from ink at least`);
+  }
+  {
+    let least = Infinity, by = '';
+    for (const b of dark) { const d = relDiff(CAVE.mouth, b.hex); wcount(`(w) cave mouth / ${b.who}`, d >= LUM_MIN); if (d < least) { least = d; by = b.who; } }
+    const ink = okDiff(CAVE.mouth, INK), inkOk = wcount('(w) cave mouth / ink', ink >= OKL_MIN);
+    out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${'prop cave mouth'.padEnd(28)} ${CAVE.mouth}  L ${lumOf(CAVE.mouth).toFixed(3)}  least ${pct(least)} apart   (${by})  ${okf(ink)} from ink`);
+  }
+  // (the fog bank's bands, setpieces.ts SETPIECE_COLOURS.fog: the one set piece drawn as a backdrop BEHIND the team, so
+  // gated like one -- each band lighter than every dark body, and off the ink. S9a review.)
+  SETPIECE_COLOURS.fog.forEach((hex, i) => {
+    const what = `set piece fog band ${i}`;
+    let least = Infinity, by = '';
+    for (const b of dark) { const d = lighterBy(hex, b.hex); wcount(`(w) ${what} / ${b.who}`, d >= LUM_MIN); if (d < least) { least = d; by = b.who; } }
+    const ink = okDiff(hex, INK), inkOk = wcount(`(w) ${what} / ink`, ink >= OKL_MIN);
+    out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${what.padEnd(28)} ${hex}  L ${lumOf(hex).toFixed(3)}  least ${pct(least)} lighter (${by})  ${okf(ink)} from ink`);
+  });
   // (the one night table, whole: every wall, backdrop and prop colour -- WALLS, each colour field of BACKDROPS, PROPS,
   // and everything gated above -- has its night entry, so a structure a later slice adds fails here until it has one;
   // no floor anyone stands on, nor the seams drawn on them, changes at night; the table's keys are the colours as drawn)
@@ -928,18 +989,46 @@ for (const e of DRAGON_ELEMENTS) {
   out.push(`${bad ? '  FAIL' : '  ok  '} egg-lie    every egg lies against the nest's straw alone: the ${seen} pixels round its ink ring over its ${new Set(WOBBLE).size} wobbles, all in the heap (${NEST_RX} x ${NEST_RY} px), over the band, off the strands${bad ? ` -- ${bad}` : ''}`);
 }
 
-// ---------- (x) the big baddies (the watchable scene: src/game/missionview.ts; plan S9) ----------
-// Every fill a baddie is drawn in (artseams.ts BADDIE_FILLS: S9a's BADDIE_ART palettes at the merge) keeps >= 25 %
-// luminance from what it stands on and in front of: the road (FLOORS.road), the scene's ground under and below it
-// (ROAD_SCENE: its slab, the grass strip, the earth), and its region's backdrop bands at every phase of the day
-// (artseams.ts climateBands: S9a's BACKDROPS.climate; none on a base without the art kit, which is said), and >= 6
-// Oklab L from the ink. A baddie's face comes only from BaddieFace (neutral, grumpy, surprised, sleepy: no angry one),
-// which the type holds (missiondata.ts; missionview.ts _Faces).
+// ---------- (x) the big baddies (src/game/baddies.ts, plan S9/S9a; the watchable scene: src/game/missionview.ts) ----------
+// (S9a) Every fill on a baddie's silhouette edge (BADDIE_EDGE) keeps >= 25 % luminance from the mission road
+// (FLOORS.road) and from every band of its home climate (the three sky bands, the far ridge, the near forms and their
+// second colour) at every phase, so it reads on the road and against its region at any hour; every fill keeps >= 6
+// Oklab L from the ink; and the colours that touch inside it (BADDIE_PAIRS) pass the house ladder.
+// (S9) Every fill the scene sees a baddie by (artseams.ts BADDIE_FILLS: the kit's edge fills) keeps >= 25 % luminance
+// from what it stands on and in front of: the road (FLOORS.road), the scene's ground under and below it (ROAD_SCENE: its
+// slab, the grass strip, the earth), and its region's backdrop bands at every phase of the day (artseams.ts
+// climateBands: the kit's BACKDROPS.climate bands), and >= 6 Oklab L from the ink. A baddie's face comes only from
+// BaddieFace (neutral, grumpy, surprised, sleepy: no angry one), which the types hold (missiondata.ts; baddies.ts
+// _NoHurt/_Exits; missionview.ts _Faces).
 let xGates = 0, xFailures = 0;
 const xFailed: string[] = [];
+function xcount(label: string, ok: boolean): boolean { xGates++; if (!ok) { xFailures++; xFailed.push(label); } return ok; }
+head(`(x) BADDIES  (each fill on a baddie's silhouette edge >= ${LUM_MIN * 100}% luminance from the road ${FLOORS.road} and from every band of its home climate at every phase; every fill >= ${OKL_MIN} Oklab L from the ink; touching colours by the ladder)`);
+for (const id of BADDIE_IDS) {
+  const B = BADDIE_ART[id], home = BADDIE_HOME[id];
+  out.push(` ${B.name} (${B.w} x ${B.h}; home ${home})`);
+  const bands: [string, string][] = [['road', FLOORS.road]];
+  for (const ph of PHASE_ORDER) { const P = BACKDROPS.climate[home][ph]; bands.push([`${ph} sky top`, P.sky[0]], [`${ph} sky middle`, P.sky[1]], [`${ph} sky low`, P.sky[2]], [`${ph} ridge`, P.ridge], [`${ph} near`, P.near], [`${ph} detail`, P.detail]); }
+  for (const key of BADDIE_EDGE[id]) {
+    const hex = B.palette[key];
+    let least = Infinity, by = '';
+    for (const [what, b] of bands) { const d = relDiff(hex, b); xcount(`(x) ${id} ${key} / ${what}`, d >= LUM_MIN); if (d < least) { least = d; by = `${what} ${b}`; } }
+    out.push(`${least >= LUM_MIN ? '  ok  ' : '  FAIL'} edge ${key.padEnd(8)} ${hex}  L ${lumOf(hex).toFixed(3)}  least ${pct(least)} (${by}), ${bands.length} bands`);
+  }
+  for (const [key, hex] of Object.entries(B.palette)) {
+    const ink = okDiff(hex, INK), ok = xcount(`(x) ${id} ${key} / ink`, ink >= OKL_MIN);
+    if (!ok) out.push(`  FAIL ${key} ${hex} only ${okf(ink)} from ink`);
+  }
+  for (const [a, b, where] of BADDIE_PAIRS[id]) {
+    const ca = a === 'white' ? BADDIE_WHITE : B.palette[a], cb = b === 'white' ? BADDIE_WHITE : B.palette[b];
+    const m = ladder(ca, cb);
+    xcount(`(x) ${id} ${a}/${b}`, m.pass);
+    out.push(`${m.pass ? '  ok  ' : '  FAIL'} ${(a + '/' + b).padEnd(16)} lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by.padEnd(8)} ${ca} ${cb}  (${where})`);
+  }
+}
 {
   const ground: [string, string][] = [['road', FLOORS.road], ['road slab', ROAD_SCENE.slab], ['road grass', ROAD_SCENE.grass], ['road earth', ROAD_SCENE.earth]];
-  head(`(x) BADDIES  (every baddie fill >= ${LUM_MIN * 100}% in luminance from the road ${FLOORS.road}, the scene's ground and its region's backdrop bands at every phase; >= ${OKL_MIN} Oklab L from the ink ${INK})`);
+  out.push(` in the watchable scene (plan S9: every fill of artseams.ts BADDIE_FILLS >= ${LUM_MIN * 100}% in luminance from the road ${FLOORS.road}, the scene's ground and its region's backdrop bands at every phase (artseams.ts climateBands); >= ${OKL_MIN} Oklab L from the ink ${INK})`);
   for (const id of Object.keys(BADDIE_FILLS) as BaddieId[]) {
     const region = REGION_IDS.find((r) => REGION_DATA[r].baddie === id)!, climate = REGION_DATA[region].climate;
     const against: [string, string][] = [...ground];
@@ -949,13 +1038,11 @@ const xFailed: string[] = [];
       let least = Infinity, by = '';
       for (const [what, hex] of against) {
         const d = relDiff(fill, hex);
-        xGates++;
-        if (d < LUM_MIN) { xFailures++; xFailed.push(`(x) ${id} ${fill} / ${what}`); }
+        xcount(`(x) scene ${id} ${fill} / ${what}`, d >= LUM_MIN);
         if (d < least) { least = d; by = what; }
       }
       const ink = okDiff(fill, INK);
-      xGates++;
-      if (ink < OKL_MIN) { xFailures++; xFailed.push(`(x) ${id} ${fill} / ink`); }
+      xcount(`(x) scene ${id} ${fill} / ink`, ink >= OKL_MIN);
       out.push(`${least >= LUM_MIN && ink >= OKL_MIN ? '  ok  ' : '  FAIL'} ${BADDIE_DATA[id].name.padEnd(16)} ${fill}  L ${lumOf(fill).toFixed(3)}  least ${pct(least)} (${by})  ${okf(ink)} from ink`);
     }
     out.push(`       ${BADDIE_DATA[id].name}: ${bandsSeen ? `${bandsSeen} ${climate} backdrop bands gated` : `no ${climate} band palette on this base (artseams.ts climateBands: the art kit's, S9a) -- the road and its ground gated`}`);

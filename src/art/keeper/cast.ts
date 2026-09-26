@@ -11,22 +11,33 @@ export const KEEPER_IDS = ['bea', 'tomas', 'iris', 'pip'] as const;
 export type KeeperId = typeof KEEPER_IDS[number];
 
 /**
+ * The people a mission meets (docs/BASE_DESIGN.md 5.3, 6), drawn on the keepers' rig in their house style but not
+ * keepers: no care job, never in the yard or the barn, never in KEEPER_IDS (which drives the four keepers everywhere): only
+ * src/game/npcs.ts draws them. So far the grumpy miller alone (the `miller` challenge, met by CHARM).
+ */
+export const NPC_IDS = ['miller'] as const;
+export type NpcId = typeof NPC_IDS[number];
+/** Everyone drawn on the keeper rig. */
+export type CastId = KeeperId | NpcId;
+
+/**
  * A care job: what a keeper does for a dragon (src/care/acts.ts). `feed` answers a begging dragon with a bowl, `groom`
  * pets and brushes (the dragon's pet anim), `tuck` puts a sleepy dragon to bed, `help` is the apprentice's: it pets the
  * babies and cheers the others on.
  */
 export type CareJob = 'feed' | 'groom' | 'tuck' | 'help';
 
-export type HairStyle = 'bun' | 'cropped' | 'bob' | 'tufts';
-export type HatStyle = 'straw' | 'nightcap';
-export type ToolKind = 'bowl' | 'brush';
+export type HairStyle = 'bun' | 'cropped' | 'bob' | 'tufts' | 'rim';
+export type HatStyle = 'straw' | 'nightcap' | 'flatcap';
+export type ToolKind = 'bowl' | 'brush' | 'sack';
 
 export interface KeeperSpec {
-  id: KeeperId;
+  id: CastId;
   /** First name, and the job title the gallery labels them with. */
   name: string;
   title: string;
-  job: CareJob;
+  /** The care job (null: a mission NPC, who does none). */
+  job: CareJob | null;
   /** 'elder' keeps the elder dragons' rule (bible D21): slower, steadier, never frail -- no stoop, no cane, no tremor. */
   age: 'child' | 'adult' | 'elder';
   /** Overrides of the engine's DEFAULT_PROPORTIONS (an adult ~78 px; the child ~58). */
@@ -34,9 +45,18 @@ export interface KeeperSpec {
   hair: HairStyle;
   hat: HatStyle | null;
   beard: boolean;
+  /** A bushy moustache over the mouth (the miller); drawn by the beard hook. */
+  moustache?: boolean;
+  /** Bushy brows: 3 px deep and a pixel longer each end than the keepers' 2 px bars (the miller). */
+  bushyBrows?: boolean;
   apron: boolean;
-  /** Long sleeves colour the forearm in the top's colour; short (or rolled) ones leave it skin. */
-  sleeves: 'long' | 'short';
+  /** What the apron is worn over: a skirt (Bea, the default) or trousers (the miller). */
+  apronOver?: 'skirt' | 'trousers';
+  /**
+   * Long sleeves colour the forearm in the top's colour; short ones leave it skin; rolled ones leave it skin under an
+   * inked cuff at the elbow (the miller).
+   */
+  sleeves: 'long' | 'short' | 'rolled';
   /** What the keeper wears over the top: Tomas's braces, Iris's open cardigan, Pip's overall bib. */
   over: 'braces' | 'cardigan' | 'overalls' | null;
   /** The tool the keeper's job hands them (a bowl is picked up per feed; the brush is always carried). */
@@ -83,3 +103,20 @@ export const KEEPERS: Readonly<Record<KeeperId, Readonly<KeeperSpec>>> = Object.
     tempo: 0.8, speed: 0.75, stride: 26,
   }),
 });
+
+/**
+ * The mission NPCs: the grumpy miller (the `miller` challenge: a CHARM rider, Bea, talks him round). Stocky and older
+ * (the elder's rule, D21: never frail, no stoop, no cane): a torso as broad as Tomas's on short legs, thick arms. Told
+ * apart at the ÷ 3 size by a flat miller's cap (a slab with a peak out over the brow) and the flour sack in his arms.
+ */
+export const NPCS: Readonly<Record<NpcId, Readonly<KeeperSpec>>> = Object.freeze({
+  miller: Object.freeze({
+    id: 'miller', name: 'Hob', title: 'the miller', job: null, age: 'elder',
+    proportions: { headR: 10, torsoW: 26, torsoH: 26, hip: 21, upperLeg: 13, lowerLeg: 13, upperArm: 12, lowerArm: 14, legR: 6, armR: 5, handR: 4.5, neck: 2 },
+    hair: 'rim', hat: 'flatcap', beard: false, moustache: true, bushyBrows: true, apron: true, apronOver: 'trousers',
+    sleeves: 'rolled', over: null, tool: 'sack', tempo: 1.2, speed: 0.55, stride: 26,
+  }),
+});
+
+/** Every spec by id, keepers and NPCs. */
+export const CAST: Readonly<Record<CastId, Readonly<KeeperSpec>>> = Object.freeze({ ...KEEPERS, ...NPCS });

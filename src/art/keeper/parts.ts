@@ -15,8 +15,8 @@
 //     silhouette being what tells the keepers apart at the ÷ 3 size (cast.ts).
 // Everything draws through rig.col(), so the engine's white flash and tint (DrawRigOpts) reach every keeper part.
 import { rad } from '../../lib/engine/math.ts';
-import { celPath, celPoly, celBall, celRect, tones } from '../../lib/art/shading.ts';
-import { drawLimbSegs, brow, drawFist } from '../../lib/art/rigParts.ts';
+import { celPath, celPoly, celBall, celRect, celTaper, tones } from '../../lib/art/shading.ts';
+import { drawLimbSegs, limbRadii, brow, drawFist } from '../../lib/art/rigParts.ts';
 import { pathTaperedCapsule } from '../../lib/art/shapes.ts';
 import { setLight } from '../../lib/art/rig.ts';
 import type { Rig, RigAccessory, RigParts, RigWeapon } from '../../lib/art/rig.ts';
@@ -40,7 +40,11 @@ const K = (rig: Rig): KeeperRig => rig as KeeperRig;
  * fizzle), `shh` the finger at the lips after a tuck-in, `hush` its face without the finger (the tiptoe away after
  * it), `closed` a keeper humming or content.
  */
-export const KFACE = Object.freeze({ neutral: 0, smile: 1, happy: 2, closed: 3, oh: 4, aww: 5, shh: 6, hush: 7 });
+export const KFACE = Object.freeze({ neutral: 0, smile: 1, happy: 2, closed: 3, oh: 4, aww: 5, shh: 6, hush: 7, grumpy: 8, glad: 9 });
+// `grumpy` and `glad` are the grumpy miller's two mission states (cast.ts NPCS). Grumpy is never angry (D18):
+// the brows stay FLAT, never a V; they are pulled down onto the eyes, which a lid line halves, the pupils glancing back
+// sideways, the moustache droops over a pout, and a `hmph` puffs from his nose. Glad is the miller talked round: the
+// brows up, smiling eyes (the happy arcs), a blush and a small smile, the moustache's ends turned up.
 export type KFaceName = keyof typeof KFACE;
 
 /**
@@ -53,12 +57,20 @@ function drawKeeperFace(ctx: CanvasRenderingContext2D, rig: Rig, pose: Pose, inf
   const ink = k.col(k.outline), white = k.col(KEEPER_SHARED.white), pupil = k.col(KEEPER_SHARED.pupil);
   const ey = R(-r * 0.15), ex = R(r * 0.45), fx = R(-r * 0.12);
   const ew = 4, fw = 3, eh = 3, bt = 2;
-  const arcs = face === KFACE.happy || face === KFACE.aww;
+  const grumpy = face === KFACE.grumpy, glad = face === KFACE.glad, bushy = !!k.spec.bushyBrows;
+  // (glad smiles with its eyes: open whites under raised brows read as surprise at 1x, the arcs as pleased)
+  const arcs = face === KFACE.happy || face === KFACE.aww || glad;
   const hush = face === KFACE.shh || face === KFACE.hush;
   const shut = !arcs && (face === KFACE.closed || hush || k.blink > 0);
   const wide = face === KFACE.oh;
   // eyes
-  if (arcs) {
+  if (grumpy && !shut) {
+    // half-lidded: the whites' lower 2 rows under a 1 px lid line, the pupils glancing back into the rear corners (a
+    // side-eye at whoever is behind him), the heavy brow pressed down on the lid (below)
+    ctx.fillStyle = white; ctx.fillRect(ex - 1, ey + 1, ew + 1, 2); ctx.fillRect(fx - 1, ey + 1, fw + 1, 2);
+    ctx.fillStyle = pupil; ctx.fillRect(ex - 1, ey + 1, 2, 2); ctx.fillRect(fx - 1, ey + 1, 2, 2);
+    ctx.fillStyle = ink; ctx.fillRect(ex - 1, ey, ew + 1, 1); ctx.fillRect(fx - 1, ey, fw + 1, 1);
+  } else if (arcs) {
     // the engine's happy "^": 1 px feet at both ends, the bar a row higher between them (2 px thick everywhere)
     ctx.fillStyle = ink;
     ctx.fillRect(ex - 1, ey, 1, bt); ctx.fillRect(ex, ey - 1, ew - 2, bt); ctx.fillRect(ex + ew - 2, ey, 1, bt);
@@ -78,16 +90,38 @@ function drawKeeperFace(ctx: CanvasRenderingContext2D, rig: Rig, pose: Pose, inf
   // worried). (A row higher they ran into the hairlines and the nightcap's cuff.)
   ctx.fillStyle = k.col(pal.hair);
   const by = ey - 3;
-  if (face === KFACE.aww) { brow(ctx, ex - 2, by + 1, ex + ew - 2, by, bt); brow(ctx, fx - 1, by + 1, fx + fw - 1, by, bt); }
+  if (bushy) {
+    // bushy brows (the miller): 3 px deep and longer than the eye each way; FLAT at every face (never a V: D18). Grumpy
+    // pulls them down onto the lid line; glad lifts them two rows, a skin row showing between brow and eye
+    const bb = grumpy ? ey - 3 : glad ? by - 2 : by - 1;
+    ctx.fillRect(ex - 3, bb, ew + 3, 3); ctx.fillRect(fx - 2, bb, fw + 1, 3);
+  } else if (face === KFACE.aww) { brow(ctx, ex - 2, by + 1, ex + ew - 2, by, bt); brow(ctx, fx - 1, by + 1, fx + fw - 1, by, bt); }
   else {
     const lift = face === KFACE.happy || wide ? 1 : 0;
     ctx.fillRect(ex - 2, by - lift, ew, bt); ctx.fillRect(fx - 1, by - lift, fw, bt);
   }
   // blush (flat, 3 x 2 under the near eye) on the warm faces
-  if (arcs) { ctx.fillStyle = k.col(pal.glow); ctx.fillRect(ex - 1, ey + 3, 3, 2); }
-  // mouth
-  const mx = R(r * 0.45), my = R(r * 0.5) + 1;
+  // (under a moustache, on the far cheek: under the near eye the moustache covered it)
+  if (arcs) { ctx.fillStyle = k.col(pal.glow); ctx.fillRect(k.spec.moustache ? fx - 2 : ex - 1, ey + 3, 3, 2); }
+  // mouth (under a moustache it sits a row lower, clear of it)
+  const mx = R(r * 0.45), my = R(r * 0.5) + (k.spec.moustache ? 2 : 1);
   ctx.fillStyle = ink;
+  if (grumpy) {
+    // the pout: a short mouth turned down at both corners, and the `hmph`: two small puffs snorted from the nose (flat
+    // discs with an ink ring, as the dragons' steam puffs)
+    // (a row up, under the moustache's own ink: a skin row between the two framed an open, shouting mouth)
+    ctx.fillRect(mx, my - 1, 3, 1); ctx.fillRect(mx - 1, my, 1, 1); ctx.fillRect(mx + 3, my, 1, 1);
+    if (!k.override) for (const [px, py, pr] of [[r * 1.5, r * 0.52, 1.6], [r * 1.86, r * 0.78, 1.25]]) {
+      ctx.beginPath(); ctx.arc(R(px) + 0.5, R(py) + 0.5, pr, 0, Math.PI * 2);
+      ctx.strokeStyle = ink; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = white; ctx.fill();
+    }
+    return;
+  }
+  if (glad && k.spec.moustache) {
+    // a small smile under the moustache: the corners up a row
+    ctx.fillRect(mx - 1, my, 1, 1); ctx.fillRect(mx, my + 1, 3, 1); ctx.fillRect(mx + 3, my, 1, 1);
+    return;
+  }
   if (face === KFACE.neutral) ctx.fillRect(mx, my, 3, 1);
   else if (wide) ctx.fillRect(mx, my - 1, 2, 3);
   else if (hush) ctx.fillRect(mx + 1, my - 1, 2, 2);
@@ -145,6 +179,15 @@ function pathHair(ctx: CanvasRenderingContext2D, style: string, r: number): void
     ctx.closePath();
     return;
   }
+  if (style === 'rim') {
+    // (the miller, under his flat cap): grey only round the back of the head, from the cap's back edge to the
+    // nape, and a sideburn in front of the ear; the forehead bare, so the bushy brows sit on skin (a hairline across
+    // the forehead merged with them into one grey band)
+    ctx.moveTo(-r * 0.4, -r * 0.72); ctx.lineTo(-r * 1.06, -r * 0.42); ctx.lineTo(-r * 1.08, r * 0.12); ctx.lineTo(-r * 0.9, r * 0.52);
+    ctx.lineTo(-r * 0.66, r * 0.42); ctx.lineTo(-r * 0.62, r * 0.38); ctx.lineTo(-r * 0.4, r * 0.36); ctx.lineTo(-r * 0.4, -r * 0.72);
+    ctx.closePath();
+    return;
+  }
   if (style === 'bob') {
     // a bob to the jaw at the back and a fringe that stops a row above the brow (the nightcap covers the crown)
     ctx.moveTo(r * 0.62, -r * 0.64);
@@ -186,8 +229,9 @@ function drawKeeperHair(ctx: CanvasRenderingContext2D, rig: Rig, _pose: Pose, in
  * A short full beard along the jaw (Tomas): from the sideburn down the cheek, under the jaw line and a little proud
  * of the chin, its top edge a row under the mouth, so the mouth stays on skin and every face still reads.
  */
-function drawKeeperBeard(ctx: CanvasRenderingContext2D, rig: Rig, _pose: Pose, info: Info): void {
+function drawKeeperBeard(ctx: CanvasRenderingContext2D, rig: Rig, pose: Pose, info: Info): void {
   const k = K(rig), r = info.r;
+  if (k.spec.moustache) { drawMoustache(ctx, k, pose.face | 0, r, info.color); return; }
   if (!k.spec.beard) return;
   ctx.beginPath();
   ctx.moveTo(-r * 0.44, -r * 0.2); ctx.lineTo(-r * 0.52, r * 0.42); ctx.lineTo(-r * 0.42, r * 1.02); ctx.lineTo(r * 0.3, r * 1.14);
@@ -195,6 +239,21 @@ function drawKeeperBeard(ctx: CanvasRenderingContext2D, rig: Rig, _pose: Pose, i
   ctx.lineTo(-r * 0.08, r * 0.6); ctx.lineTo(-r * 0.2, r * 0.22); ctx.lineTo(-r * 0.22, -r * 0.2);
   ctx.closePath();
   celPath(ctx, k, info.color, 0, r * 0.5, r * 0.8, 0.4, 0);
+}
+
+/**
+ * The miller's bushy moustache (head space, by head radius), inked like the beard (hair is its own object),
+ * under the nose and over the upper lip: it carries the mouth's mood as much as the mouth does. Neutral, it droops a
+ * little at the front; grumpy, both ends droop to the jaw (a walrus over a pout); glad, the ends turn up.
+ */
+const MOUSTACHE: Readonly<Record<'neutral' | 'grumpy' | 'glad', readonly number[]>> = {
+  neutral: [0.26, 0.38, 0.55, 0.26, 1.1, 0.3, 1.24, 0.46, 1.16, 0.6, 0.9, 0.52, 0.62, 0.5, 0.36, 0.56],
+  grumpy: [0.2, 0.86, 0.24, 0.4, 0.55, 0.26, 1.08, 0.28, 1.24, 0.46, 1.22, 0.9, 1.06, 0.86, 0.94, 0.5, 0.62, 0.48, 0.4, 0.54, 0.36, 0.86],
+  glad: [0.24, 0.38, 0.55, 0.26, 1.04, 0.28, 1.3, 0.1, 1.32, 0.36, 1.12, 0.52, 0.62, 0.52, 0.36, 0.5],
+};
+function drawMoustache(ctx: CanvasRenderingContext2D, k: KeeperRig, face: number, r: number, hex: string): void {
+  const pts = MOUSTACHE[face === KFACE.grumpy ? 'grumpy' : face === KFACE.glad ? 'glad' : 'neutral'];
+  celPoly(ctx, k, pts.map((v) => v * r), hex, 0.4, 0);
 }
 
 // ---------- hats ----------
@@ -211,6 +270,7 @@ const CAP_R = [4.5, 3.6, 2.7, 1.8];
 function drawKeeperHat(ctx: CanvasRenderingContext2D, rig: Rig, _pose: Pose, info: Info): void {
   const k = K(rig), r = info.r, pal = k.kpal, hat = k.spec.hat;
   if (!hat || !pal.hat) return;
+  if (hat === 'flatcap') { drawFlatCap(ctx, k, r, pal); return; }
   if (hat === 'straw') {
     const by = -R(r * 0.8), cx0 = -R(r * 0.82), cx1 = R(r * 0.7), top = -R(r * 1.62);
     ctx.beginPath();
@@ -252,6 +312,49 @@ function drawKeeperHat(ctx: CanvasRenderingContext2D, rig: Rig, _pose: Pose, inf
   celBall(ctx, k, x + Math.cos(rad(a)) * 1.5, y + Math.sin(rad(a)) * 1.5, 2.6, pal.trim ?? pal.accent, false);
 }
 
+/**
+ * The miller's flat cap (head space): a slab over the crown, puffed a little over the back of the head, whose
+ * front slopes down into a stiff peak out over the brow, 5 px past the forehead: at ÷ 3 a flat-topped wedge pointing
+ * forward, no other head's shape (a brim both ways, a cone off the back, a bun, tufts). Its edge sits two rows over the
+ * bushy brows so they show at every face. Tipped (the near hand at the peak, as the miller talked round tips it to
+ * the cook), the cap turns up about its back edge, 5 deg. A flour mark on the crown.
+ */
+function drawFlatCap(ctx: CanvasRenderingContext2D, k: KeeperRig, r: number, pal: Readonly<KeeperPalette>): void {
+  const tip = capTip(k, r), hex = pal.hat ?? pal.dark;
+  ctx.save();
+  if (tip > 0) {
+    const px = -r * 1.05, py = -r * 0.45;
+    ctx.translate(px, py); ctx.rotate(rad(-5 * tip)); ctx.translate(-px, -py);
+  }
+  ctx.beginPath();
+  ctx.moveTo(-r * 1.14, -r * 0.4);
+  ctx.lineTo(-r * 1.3, -r * 0.86); ctx.quadraticCurveTo(-r * 1.2, -r * 1.3, -r * 0.5, -r * 1.32);
+  ctx.lineTo(r * 0.45, -r * 1.26); ctx.quadraticCurveTo(r * 1.0, -r * 1.18, r * 1.24, -r * 0.94);
+  // the peak: out and a little down over the brow, its underside back to the forehead
+  ctx.lineTo(r * 1.9, -r * 0.74); ctx.lineTo(r * 1.84, -r * 0.62); ctx.lineTo(r * 0.8, -r * 0.74);
+  ctx.lineTo(-r * 0.5, -r * 0.8);
+  ctx.closePath();
+  celPath(ctx, k, hex, -r * 0.2, -r * 0.9, r * 1.3, 0.34, 0.3);
+  if (!k.override) {
+    // the peak's seam: the crown's edge over the peak, in the cap's shadow (without it the cap read as one lump)
+    ctx.fillStyle = tones(k, hex).sh; ctx.fillRect(R(r * 0.55), R(-r * 0.88), R(r * 0.7), 1);
+    if (pal.flour) { ctx.fillStyle = k.col(pal.flour); ctx.fillRect(R(-r * 0.3), R(-r * 1.14), 3, 2); }
+  }
+  ctx.restore();
+}
+
+/**
+ * How far the cap is tipped, 0..1: the near hand's closeness to the peak (head space), so the anim that raises the hand
+ * to the peak tips it, with no channel of its own.
+ */
+function capTip(k: KeeperRig, r: number): number {
+  const J = k.joints, a = rad(-J.headAngle), dx = J.handN.x - J.head.x, dy = J.handN.y - J.head.y;
+  const hx = dx * Math.cos(a) - dy * Math.sin(a), hy = dx * Math.sin(a) + dy * Math.cos(a);
+  const d = Math.hypot(hx - r * 1.6, hy + r * 0.62);
+  return clamp01(1 - (d - 5) / 5);
+}
+const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
+
 // ---------- the torso, hips and feet ----------
 
 /**
@@ -270,6 +373,8 @@ function drawKeeperTorso(ctx: CanvasRenderingContext2D, rig: Rig, _pose: Pose, i
   if (k.override) return;
   if (s.apron && pal.apron) {
     celPoly(ctx, k, [2, -H + 7, hw + 1, -H + 6, hw + 1, mid, hh + 1, 2, 2, 2], pal.apron, 0.3, 0);
+    // the miller's flour: two flat marks on the bib (dust, not an object: un-inked)
+    if (pal.flour) { ctx.fillStyle = k.col(pal.flour); ctx.fillRect(hw - 4, -H + 9, 3, 2); ctx.fillRect(5, R(mid) - 2, 2, 2); }
   }
   if (s.over === 'braces') {
     // one brace (the near one), 3 px, from the waist at the front up over the shoulder
@@ -298,9 +403,49 @@ function drawKeeperHips(ctx: CanvasRenderingContext2D, rig: Rig, _pose: Pose, in
   const J = k.joints, y0 = k.joints.hipN.y;
   const front = Math.max(J.kneeN.x, J.kneeF.x, hw) + 3, back = Math.min(J.kneeN.x, J.kneeF.x, -hw) - 2;
   const hem = Math.max(J.kneeN.y, J.kneeF.y) - y0 - 1;
-  celPoly(ctx, k, [-hw - 1, -5, hw + 1, -5, front, hem, back, hem], pal.secondary, 0.36, 0.2);
-  if (k.override || !pal.apron) return;
-  celPoly(ctx, k, [1, -5, hw + 1, -5, front, hem - 2, R((front + 1) * 0.45), hem - 2], pal.apron, 0.3, 0);
+  const trousers = s.apronOver === 'trousers';
+  if (trousers) celRect(ctx, k, -hw, -5, hip, 10, 3, pal.secondary, 0.4, 0.2);
+  else celPoly(ctx, k, [-hw - 1, -5, hw + 1, -5, front, hem, back, hem], pal.secondary, 0.36, 0.2);
+  if (!pal.apron) return;
+  // (the miller's apron hangs free of his legs, so it is drawn in the silhouette too; Bea's lies on her skirt)
+  if (!k.override || trousers) celPoly(ctx, k, [1, -5, hw + 1, -5, front, hem - 2, R((front + 1) * 0.45), hem - 2], pal.apron, 0.3, 0);
+  if (!k.override && pal.flour && trousers) { ctx.fillStyle = k.col(pal.flour); ctx.fillRect(hw - 1, R(hem * 0.55), 2, 2); }
+  // the miller's hugged flour sack, drawn here, the last part before the head and the near arm, so the near arm
+  // folds over it (the engine's draw order has no other slot between the body and the near arm)
+  if (k.sack) {
+    ctx.save(); ctx.translate(J.torso.x, J.torso.y - y0); ctx.rotate(rad(J.torsoAngle)); setLight(k, J.torsoAngle);
+    drawSack(ctx, k, R(k.p.torsoW / 2) + 3, 3, SACK.w, SACK.h);
+    ctx.restore(); setLight(k, 0);
+  }
+}
+
+/** The flour sack's size (px): the one sack, hugged or set down on the floor. */
+export const SACK = Object.freeze({ w: 15, h: 17 });
+
+/**
+ * A flour sack (its own space: (x, y) the middle of its bottom, y up negative): a full hessian body, slumped
+ * wider at the bottom and square in the shoulders, gathered hard at the neck under a twine tie, the cloth over the tie
+ * standing up in two ears (a rounded pot-shaped body and a level ruff read as a jar); a flour mark on its shoulder.
+ * Drawn level: the one sack the miller hugs, and sets down on the floor.
+ */
+export function drawSack(ctx: CanvasRenderingContext2D, k: KeeperRig, x: number, y: number, w: number, h: number): void {
+  const pal = k.kpal, cloth = pal.tool ?? pal.apron ?? pal.primary, hw = w / 2, neck = y - h + 5;
+  ctx.beginPath();
+  ctx.moveTo(x - hw + 2, y); ctx.lineTo(x + hw - 2, y);
+  ctx.quadraticCurveTo(x + hw + 1, y, x + hw + 1, y - 3);
+  ctx.lineTo(x + hw, neck + 4); ctx.quadraticCurveTo(x + hw - 1, neck + 1, x + 2, neck);
+  ctx.lineTo(x - 2, neck);
+  ctx.quadraticCurveTo(x - hw + 1, neck + 1, x - hw, neck + 4); ctx.lineTo(x - hw - 1, y - 3);
+  ctx.quadraticCurveTo(x - hw - 1, y, x - hw + 2, y);
+  ctx.closePath();
+  // the ears over the tie, one path with the body
+  ctx.moveTo(x - 2, neck); ctx.lineTo(x - 6, neck - 4); ctx.lineTo(x - 1, neck - 2); ctx.lineTo(x + 1, neck - 3); ctx.lineTo(x + 6, neck - 5);
+  ctx.lineTo(x + 2, neck); ctx.closePath();
+  celPath(ctx, k, cloth, x, y - h / 2, Math.max(hw, h / 2), 0.36, 0.3);
+  if (k.override) return;
+  // the twine tie (an object: inked), and a flour mark on the sack's shoulder
+  celRect(ctx, k, R(x - 3), R(neck - 1), 6, 2, 0, pal.accent, 0.3, 0);
+  if (pal.flour) { ctx.fillStyle = k.col(pal.flour); ctx.fillRect(R(x - hw + 2), R(neck + 5), 3, 2); }
 }
 
 /** A soft shoe (ankle space: +x toward the toe, y down): a rounded toe, the sole's bottom on the floor row. */
@@ -323,6 +468,17 @@ function drawLongSleeve(ctx: CanvasRenderingContext2D, rig: Rig, pose: Pose, inf
   drawLimbSegs(ctx, rig, a, b, c, p.armR, p.armR + 0.5, info.color, info.color, true, p.bulge);
 }
 function noop(): void { /* drawn by drawLongSleeve */ }
+
+/**
+ * A rolled sleeve (the miller): the forearm in skin, as the engine's generic lower half (the same radius profile, so
+ * it meets the upper arm without a step), and the rolled cuff over the elbow, an inked band in the shirt's colour (a
+ * fold of cloth: its own object). Limb space, origin at the elbow, +y down the forearm.
+ */
+function drawRolledForearm(ctx: CanvasRenderingContext2D, rig: Rig, _pose: Pose, info: Info): void {
+  const p = rig.p, [, rB, rC] = limbRadii(p.armR, p.armR + 0.5, p.bulge);
+  celTaper(ctx, rig, 0, 0, 0, p.lowerArm, rB, rC, info.color);
+  celRect(ctx, rig, -R(rB) - 1, -2, 2 * R(rB) + 2, 4, 1, info.pal.primary, 0.4, 0);
+}
 
 // ---------- what a keeper holds ----------
 
@@ -405,6 +561,8 @@ export const FINGER = 4;
  */
 function drawKeeperHand(ctx: CanvasRenderingContext2D, rig: Rig, pose: Pose, info: Info): void {
   const k = K(rig), r = info.r;
+  // arms folded (the grumpy miller), both fists are tucked out of sight, each under the other arm
+  if (k.fold) return;
   if (!info.far && k.open) {
     const b = palmBlock(r);
     celRect(ctx, k, b.x0, b.y0, b.w, b.h, b.cr, info.color, 0.3, 0.25);
@@ -415,11 +573,12 @@ function drawKeeperHand(ctx: CanvasRenderingContext2D, rig: Rig, pose: Pose, inf
 }
 
 /** A keeper's part table for buildRig: the engine's defaults kept for the limbs and the skull. */
-export function keeperParts(sleeves: 'long' | 'short'): RigParts {
+export function keeperParts(sleeves: 'long' | 'short' | 'rolled'): RigParts {
   const parts: RigParts = {
     head: drawKeeperHead, face: drawKeeperFace, hair: drawKeeperHair, beard: drawKeeperBeard, hat: drawKeeperHat,
     torso: drawKeeperTorso, hips: drawKeeperHips, foot: drawKeeperShoe, hand: drawKeeperHand,
   };
   if (sleeves === 'long') { parts.armUpper = drawLongSleeve; parts.armLower = noop; }
+  if (sleeves === 'rolled') parts.armLower = drawRolledForearm;
   return parts;
 }

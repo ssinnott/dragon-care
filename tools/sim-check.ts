@@ -1790,7 +1790,8 @@ if (MAIN) {
   const runs: [RegionId, Difficulty, boolean][] = [['millbrook', 'easy', true], ['millbrook', 'easy', false], ['bramblewood', 'normal', true], ['bramblewood', 'normal', false],
     ['oldmine', 'hard', true], ['oldmine', 'hard', false], ['highfold', 'hard', true], ['frostmere', 'hard', true]];
   const EXITS: readonly string[] = ['calmed', 'outwitted', 'drivenOff'];
-  const EXIT_LOOK: Readonly<Record<string, { pose: string; face: string }>> = { calmed: { pose: 'sit', face: 'sleepy' }, outwitted: { pose: 'leave', face: 'neutral' }, drivenOff: { pose: 'leave', face: 'grumpy' } };
+  // (the outwitted one wanders off at a plain walk: the art kit's exitLook, S9a; 'leave' is the driven-off shuffle)
+  const EXIT_LOOK: Readonly<Record<string, { pose: string; face: string }>> = { calmed: { pose: 'sit', face: 'sleepy' }, outwitted: { pose: 'walk', face: 'neutral' }, drivenOff: { pose: 'leave', face: 'grumpy' } };
   let travelSteps = 0, inFrame = 0, frames = 0;
   const lines: string[] = [];
   for (const [region, diff, success] of runs) {

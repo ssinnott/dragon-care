@@ -47,6 +47,8 @@ export interface KPose {
   torsoX?: number;
   torsoY?: number;
   head?: number;
+  /** The head sunk into the shoulders, px (+ down): the grumpy miller's tucked chin (a turned head blurs the face). */
+  headY?: number;
   /** Arms by angle: [upper, lower], upper relative to the torso's lean, lower relative to the upper (engine keys). */
   armN?: readonly [number, number];
   armF?: readonly [number, number];
@@ -102,7 +104,7 @@ export function resolveKPose(p: Proportions, kp: KPose): PartialPose {
   };
   const n = leg(true), f = leg(false);
   return {
-    root: { x: rx, y: ry, rot: 0 }, torso: { rot: torso, x: tx, y: ty }, head: { rot: kp.head ?? 0, x: 0, y: 0 },
+    root: { x: rx, y: ry, rot: 0 }, torso: { rot: torso, x: tx, y: ty }, head: { rot: kp.head ?? 0, x: 0, y: kp.headY ?? 0 },
     armR: arm(true), armL: arm(false), handR: { rot: kp.handN ?? 0 }, handL: { rot: kp.handF ?? 0 },
     legR: n.leg, legL: f.leg, footR: n.foot, footL: f.foot,
     weapon: { rot: kp.weapon ?? 0 }, grip: kp.grip ?? 0, squash: kp.squash ?? 1, face: kp.face ?? KFACE.smile,
@@ -481,3 +483,69 @@ export function keeperAnims(sp: Readonly<KeeperSpec>): AnimSet {
 export const KEEPER_ANIM_NAMES: readonly string[] = ['idle', 'walk', 'carry', 'hold', 'watch', 'kneel', 'kneelIdle', 'rise', 'pet', 'petLow', 'shh', 'tiptoe', 'cheer', 'wave'];
 /** The one-shots among them (the gallery replays a one-shot after a pause). */
 export const KEEPER_ONE_SHOTS: readonly string[] = ['kneel', 'rise', 'shh', 'cheer', 'wave', 'setDown', 'pickUp'];
+
+// ---------- the grumpy miller (cast.ts NPCS; drawn by src/game/npcs.ts): his sack, and his two mission states ----------
+
+/**
+ * CARRY SACK (loop, 150 f x tempo), the miller's own idle and his silhouette's tell: the flour sack hugged against his
+ * belly (KeeperRig.sack: parts.ts drawKeeperHips draws it under the near arm), the near arm round its front, the fist
+ * at its far edge; a breath; the neutral face under the bushy brows.
+ */
+function carrySackKP(p: Proportions, t: number, L: number): KPose {
+  const u = t / L, breath = key([[0, 0], [0.47, -1], [1, 0]], u);
+  return {
+    torso: -2, torsoY: breath, head: 2, footN: { x: 2, lift: 0, tilt: 0 }, footF: { x: -2, lift: 0, tilt: 0 },
+    armN: [22, 64], armF: [26, 60], face: KFACE.neutral,
+  };
+}
+
+/**
+ * GRUMPY (loop, 150 f x tempo), the miller before he is talked round: the arms folded high across the chest (the near
+ * forearm level across it, its fist tucked under the far arm: KeeperRig.fold), weight back on his heels (the torso
+ * leaned back, the feet planted wide), chin tucked, a slow breath; the `grumpy` face (flat brows pulled down onto
+ * half-lidded eyes glancing back, a pout under a drooping moustache, a `hmph` puff at the nose). Played facing AWAY
+ * from whoever talks to him: he has turned his back on them, beside his sack, and glances back.
+ */
+function grumpyKP(p: Proportions, t: number, L: number): KPose {
+  const u = t / L, breath = key([[0, 0], [0.47, -1], [1, 0]], u);
+  return {
+    // (the head kept level, its angle cancelling the lean, and sunk 2 px into the shoulders for the tucked chin: a head
+    // turned 9 deg smeared every face mark across two pixels)
+    rootX: -1, torso: -7, torsoY: breath, head: 7, headY: 2,
+    footN: { x: 4, lift: 0, tilt: 0 }, footF: { x: -4, lift: 0, tilt: 0 },
+    // the near elbow out at the front of the chest, the forearm level back across it (its fist tucked under the far
+    // arm: KeeperRig.fold); the far forearm crosses the other way behind the body, its fist tucked too (peeking out
+    // under the near elbow, a dark far-side fist read as something held)
+    armN: [64, -145], armF: [2, 95],
+    face: KFACE.grumpy,
+  };
+}
+
+/**
+ * TALKED ROUND (loop, 150 f x tempo): turned to the one who charmed him, a small nod (chin down) and the near hand up at
+ * his cap's peak, tipping it (parts.ts capTip: the cap follows the hand), the elbow out in front so the forearm passes
+ * clear of the eyes and the smile; the far arm easy; the `glad` face (brows up, eyes open, a small smile, a blush).
+ */
+function talkedKP(p: Proportions, t: number, L: number): KPose {
+  const u = t / L, breath = key([[0, 0], [0.47, -1], [1, 0]], u), torso = 3, head = -3;
+  // (the upper arm level at the shoulder and the forearm up: a straight arm to the peak, the one reach IK finds, lay
+  // across his mouth; the forearm 66 deg up from it, not 76: at 76 the fist sat over the front of his face, at 66 it is
+  // out at the peak, clear of the eyes, the moustache and the smile. The head is kept level: turned, every face mark
+  // smeared)
+  return {
+    torso, torsoY: breath, head, headY: -1, footN: { x: 2, lift: 0, tilt: 0 }, footF: { x: -2, lift: 0, tilt: 0 },
+    armN: [89, 66], armF: [...ARM_REST_F],
+    face: KFACE.glad,
+  };
+}
+
+/** The miller's anims: the keepers' set (a walk, the idle), his sack carry and his two mission states. */
+export function millerAnims(sp: Readonly<KeeperSpec>): AnimSet {
+  const p = propsOf(sp), IL = Math.round(150 * sp.tempo);
+  return {
+    ...keeperAnims(sp),
+    carrySack: bake(p, (t) => carrySackKP(p, t, IL), { len: IL, loop: true }),
+    grumpy: bake(p, (t) => grumpyKP(p, t, IL), { len: IL, loop: true }),
+    talked: bake(p, (t) => talkedKP(p, t, IL), { len: IL, loop: true }),
+  };
+}

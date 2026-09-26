@@ -18,7 +18,7 @@
 //   dark      shoes
 //   glow      the blush on a happy face (drawn flat, 3 x 2 under the near eye)
 import type { Palette } from '../../lib/art/palettes.ts';
-import type { KeeperId } from './cast.ts';
+import type { CastId } from './cast.ts';
 
 /** A keeper's colours: the engine's eight slots plus the keeper-only parts (absent where a keeper has none). */
 export interface KeeperPalette extends Palette {
@@ -32,6 +32,8 @@ export interface KeeperPalette extends Palette {
   tool?: string;
   /** The brush's bristles, a dark row under its back. */
   bristle?: string;
+  /** The miller's flour: a few flat 2 px marks on his apron and cap, un-inked (dust is pigment, not an object: D13). */
+  flour?: string;
 }
 
 /** Shared keeper colours, the dragons' shared ones where the two meet (DRAGON_SHARED: the ink, the eye whites). */
@@ -51,7 +53,7 @@ export const KEEPER_SHARED = Object.freeze({
  * mauve, leaf green), their skin tones span light to deep, and the three things a care act puts in contact read
  * apart: a hand on its tool, a forearm over the shirt, and the shoes on the straw.
  */
-export const KEEPER_PALETTES: Readonly<Record<KeeperId, Readonly<KeeperPalette>>> = Object.freeze({
+export const KEEPER_PALETTES: Readonly<Record<CastId, Readonly<KeeperPalette>>> = Object.freeze({
   // Bea, the cook (an elder): silver hair in a bun, a terracotta blouse under a cream apron, plum skirt, brown shoes.
   // Her skin is a warm mid-brown, so her silver hair clears it by value (58 %) and her hands clear the clay bowl. Her
   // blush is a raspberry rose: a coral one sat 8 % and 25 deg from her skin, and vanished.
@@ -78,6 +80,16 @@ export const KEEPER_PALETTES: Readonly<Record<KeeperId, Readonly<KeeperPalette>>
     skin: '#eab488', hair: '#c9602c', primary: '#78b84a', secondary: '#4f71ab', accent: '#e8c46a',
     metal: '#c8c4bc', dark: '#c23b3b', glow: '#f07a7a', trim: '#4f71ab',
   }),
+  // Hob, the grumpy miller (a mission NPC): iron-grey hair, bushy brows and moustache on a ruddy face, a dusty
+  // tweed flat cap, a miller's cream shirt with the sleeves rolled, a dark canvas apron dusted with flour, slate trousers,
+  // brown boots, and a hessian flour sack tied with dark twine. The apron is dark so the flour on it reads (on a pale
+  // apron it was noise). The sack sits between his skin, his shirt and the road by value: a cream sack was 8 % from
+  // the road it is set down on. The grey is darker than an elder's silver: lighter, it met his skin. (A mustard shirt merged with Pip's green
+  // tee under deuteranopia, and darker, with Bea's and Iris's tops: gate Kf.)
+  miller: Object.freeze({
+    skin: '#e4a882', hair: '#7a7774', primary: '#e9dfc6', secondary: '#6a7080', accent: '#3e2a1e',
+    metal: '#c8c4bc', dark: '#5c4032', glow: '#e8687a', apron: '#5e4a3a', hat: '#6e5a40', tool: '#94744a', flour: '#f6f1e6',
+  }),
 });
 
 /**
@@ -86,8 +98,8 @@ export const KEEPER_PALETTES: Readonly<Record<KeeperId, Readonly<KeeperPalette>>
  * a smudge. A warm, redder step reads as the underside of a face. rig.ts seeds the skin's tone ramp with it; the
  * palette check holds it >= 25 % under its base (gate d).
  */
-export const KEEPER_SKIN_SHADOW: Readonly<Record<KeeperId, string>> = Object.freeze({
-  bea: '#9c6444', tomas: '#d4946c', iris: '#583424', pip: '#cc8a62',
+export const KEEPER_SKIN_SHADOW: Readonly<Record<CastId, string>> = Object.freeze({
+  bea: '#9c6444', tomas: '#d4946c', iris: '#583424', pip: '#cc8a62', miller: '#c4825e',
 });
 
 /**
