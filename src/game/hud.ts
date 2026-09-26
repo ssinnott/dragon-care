@@ -1,5 +1,6 @@
 // The base's screen furniture (docs/BASE_DESIGN.md 4.8, 7): the top bar -- the time of day (a sun or a moon and
-// `DAY 3 14:00`), the open jobs, a badge per keeper and the buttons (NEW, pause, speed) with their hit rects -- the
+// `DAY 3 14:00`), the open jobs, a badge per keeper, the barn's dragons against its cap (`BARN 9/12`) and the buttons
+// (NEW, pause, speed) with their hit rects -- the
 // toasts over the barn, the hint at the bottom right, and a dragon's card (its name, element, stage, its day of the
 // stage's 30 and its needs: a tap on a dragon with nothing waiting opens it). House style: every box a 1 px #1a1018 outline, flat fills,
 // the engine's 5 x 7 font (it has no dot or arrow glyphs, so those are little inked sprites: icons.ts drawSprite).
@@ -29,6 +30,12 @@ export const BUTTONS: Readonly<Record<ButtonName, Rect>> = Object.freeze({
 });
 /** The keepers' badges: 46 x 13 each from x 138, 48 apart (display only; S7 makes them tappable). */
 export const BADGE_X0 = 138, BADGE_DX = 48, BADGE_W = 46;
+/**
+ * `BARN n/12`, the barn's dragons against its cap (plan S6b), at x 392: clear of COIN (S8, x 334), of NEW (x 528) and of
+ * the TEAM OUT chip under the bar (S8, 520, 19); up to `BARN 99/12` ends by x 457. Full, it turns amber.
+ */
+export const BARN_COUNT_X = 392;
+const BARN_FULL_TEXT = '#f2c14e';
 /** The clock's x, and JOBS's while the clock is short (to day 9). */
 export const CLOCK_X = 16, JOBS_X = 90;
 /**
@@ -61,6 +68,8 @@ export interface TopBar {
   rate: Exclude<Speed, 0>;
   /** NEW has been tapped once and waits for the second. */
   armed: boolean;
+  /** The barn's dragons against its cap (plan S6b: life.ts barnCount, BARN_CAP), and whether it is full. */
+  barn: { count: number; cap: number; full: boolean };
 }
 
 const text = (ctx: CanvasRenderingContext2D, s: string, x: number, y: number, color = TEXT, align: 'left' | 'right' | 'center' = 'left') =>
@@ -90,6 +99,7 @@ export function drawTopBar(ctx: CanvasRenderingContext2D, s: TopBar): void {
     text(ctx, k.name, x + 10, 4);
     if (k.busy) drawSprite(ctx, BUSY, x + 43, 7.5);
   });
+  text(ctx, `BARN ${s.barn.count}/${s.barn.cap}`, BARN_COUNT_X, 4, s.barn.full ? BARN_FULL_TEXT : TEXT);
   button(ctx, BUTTONS.new, 'NEW', s.armed);
   button(ctx, BUTTONS.pause, 'II', s.speed === 0);
   button(ctx, BUTTONS.speed, `>${s.rate}X`, s.speed > 1);

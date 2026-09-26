@@ -1,8 +1,11 @@
-// Dragons on the move (docs/BASE_DESIGN.md 2 "Moving around", 3 "Slots"; plan 3.3, 3.4): a dragon with an open need
-// takes a slot in that need's room and walks there, riding the Dragon Lift between floors, and its keeper meets it at
+// Dragons on the move (docs/BASE_DESIGN.md 2 "Moving around", 3 "Slots"; plan 3.3, 3.4, S6b): a dragon with an open
+// need takes a slot in a room that meets it -- a need's rooms repeat on the floors, and it takes one on its own floor
+// if the floor has one (roomsFor) -- and walks there, riding the Dragon Lift between floors, and its keeper meets it at
 // the slot (sim.ts). This file is the dragons' half of a step: each free dragon chooses where to go (and moves a
 // lingerer out of a full room), every dragon walks or turns, and the lift runs. A walk moves the body by the walk
-// anim's own root motion (gait.ts), so the view's paws stay planted; a reversal is a paper turn in place. The lift bay
+// anim's own root motion (gait.ts), so the view's paws stay planted -- at the anim's speed 1, but for the lively step:
+// on and off the car and across the lift bay a dragon walks at LIVELY, its body moved by that factor too and the view
+// playing its walk at that speed (Dragon.gaitS; plan G13) -- and a reversal is a paper turn in place. The lift bay
 // has one rule for everyone who walks across it (the bay rule): nobody steps into the bay while the car moves past
 // their floor, the car never moves while anyone stands in its bay on a floor it passes, and a departure blocked too
 // long closes the bay until it goes -- and its shaft shows one dragon at a time (R5): the car serves one rider from its
@@ -11,7 +14,7 @@
 // (ART_BIBLE 1.4). An elder retired to the garden walks by these same rules (garden.ts routes it there), and a garden
 // resident strolls by its gait too, but chooses nothing here: the garden runs it. DOM-free and deterministic: every
 // loop in id order, every tie by id.
-import { tierOf, GARDEN_NEEDS } from './needs.ts';
+import { tierOf, GARDEN_NEEDS, NEEDS, hasNeed } from './needs.ts';
 import type { NeedKind } from './needs.ts';
 import { ROOM_INFO, ROOM_KINDS, LIFT_X0, LIFT_X1, LIFT_CX, DRAGON_PAD, DRAGON_BODY, CLIMB_COST, TOWER_R, GARDEN_MIN_PLOTS, GATE_MID, route, feetY, fitsSlot, spanOf, bayFloors, makeNets, worldWOf } from './layout.ts';
 import type { Room, RoomKind, Slot, Spot } from './layout.ts';
@@ -43,8 +46,26 @@ export const RIDE_PX = 600;
 export const LANDING_CLEAR = 2;
 /** A dragon held at the bay's edge this long in all (40 s, over its whole approach) crosses before the car's next rider on its floor boards. */
 export const CROSS_MAX = 2400;
+/**
+ * Which of a need's rooms a dragon goes to (plan S6b, "fewer floor changes"; docs/BASE_DESIGN.md 3, 4.7): each room
+ * meets one need, and a need's rooms are repeated on the floors (start.ts: the ground and upper floors have all five,
+ * the hayloft three), so a dragon's needs are met on the floor it stands on and the one car carries few. Among a need's
+ * rooms (roomsFor) the cheapest by its route there, a ride counted RIDE_PX more and a room with no slot free for it
+ * EVICT_PX more (a lingerer must be moved on first); and a job goes only to a room on the dragon's own floor when the
+ * floor has one of its kind, unless it is rushed (it waits for its own floor's room to come free rather than ride to
+ * another floor's; a Rush may ride). Measured with tools/capacity.ts: the start's seven ride 1.6 times in 30 minutes,
+ * not 107, and the benchmark's twelve are served (4.7).
+ */
+export const EVICT_PX = 200;
 /** A keeper's half-width for the bay rule (layout.ts's PAD: how close to a wall their feet come). */
 export const KEEPER_HALF = 10;
+/**
+ * The lively step (plan S6b): the speed a dragon's walk plays at while it steps on to the car (`board`) and off it until
+ * clear of the bay (`alight`), and wherever its body is in the lift bay or steps into it on a served floor (a crosser, a
+ * follower); 1 anywhere else. G13: its body moves by exactly this factor (gaitT advances LIVELY a step, the body LIVELY x
+ * the frame's move), and the view plays the walk at the same speed (Dragon.gaitS), so the planted paws stay planted.
+ */
+export const LIVELY = 2;
 
 const BAY_FLOORS: ReadonlySet<number> = new Set(bayFloors());
 /** The nets with the garden's first two plots: the barn's spans (and its landings) are the same whatever the garden's size. */
@@ -200,6 +221,24 @@ export function inTheBay(sim: CareSim, lo: number, hi: number): string | null {
 export function needRoom(sim: CareSim, need: NeedKind): Room | null { return sim.rooms.find((r) => r.kind === NEED_ROOM[need]) ?? null; }
 
 /**
+ * The rooms that meet a need, for dragon d, best first: by the route from where it stands to the room's first slot of
+ * its size on its own net, a ride counted RIDE_PX more and a room with no slot free for it EVICT_PX more; ties by room
+ * id. A room it cannot reach, or with no slot of its size, is left out.
+ */
+export function roomsFor(sim: CareSim, d: Dragon, need: NeedKind): Room[] {
+  const kind = NEED_ROOM[need], net = sim.nets.dragon[d.stage], out: { r: Room; c: number }[] = [];
+  for (const r of sim.rooms) {
+    if (r.kind !== kind) continue;
+    const s = r.slots.find((q) => fitsSlot(q, d.stage));
+    if (!s) continue;
+    const rt = route({ f: d.f, x: d.x }, { f: s.f, x: s.x }, net);
+    if (!rt) continue;
+    out.push({ r, c: rt.cost + (s.f !== d.f ? RIDE_PX : 0) + (freeSlot(sim, d, r) ? 0 : EVICT_PX) });
+  }
+  return out.sort((a, b) => a.c - b.c || a.r.id - b.r.id).map((o) => o.r);
+}
+
+/**
  * Who stands in the way of dragon `d` taking slot s: its holder, or anyone holding or heading for a slot in the same
  * module that can't share it (a module holds one grown dragon, or up to two babies: 3.3).
  */
@@ -239,12 +278,13 @@ export function nearestFree(sim: CareSim, d: Dragon, stage: Stage = d.stage, not
 
 /**
  * A dragon standing still in its slot with nowhere to be, no act, no keeper coming and not holding still to grow up
- * (evictable, 3.3), for room `room`.
+ * (evictable, 3.3), for room `room` -- never a baby with a job open: it walks at a third of an adult's pace, so a move
+ * would cost it most of a need (plan S6b).
  */
 function lingerer(sim: CareSim, o: Dragon, room: Room): boolean {
   const g = o.goalJob == null ? null : sim.jobs.find((j) => j.id === o.goalJob) ?? null;
   return (!g || NEED_ROOM[g.need] !== room.kind) && !o.act && o.asleep === 0 && o.hold === 0 && !o.legs.length && o.move === 'still'
-    && !sim.jobs.some((j) => j.dragon === o && j.keeper);
+    && !sim.jobs.some((j) => j.dragon === o && (j.keeper || o.stage === 'baby'));
 }
 
 /** A holder a Rush may move on: no keeper at work with it, not holding still to grow up, and not in the lift's hands or in its bay. */
@@ -254,7 +294,7 @@ function bumpable(sim: CareSim, o: Dragon): boolean {
 
 /**
  * A slot in `room` for dragon d: a free one; else one whose holders are all lingerers (the lowest id among them), each
- * moved to the nearest free slot elsewhere -- never the Hatchery's, which are hatchlings' first places, so a baby moved
+ * moved on to a free slot elsewhere (movedTo) -- never the Hatchery's, which are hatchlings' first places, so a baby moved
  * on never comes to rest in front of the nests -- (an eviction); else, for a Rush (`bump`), one whose holders' keepers
  * have not started work, the lowest-ranked of them moved on (a slot bump). Null: the room is full and nobody can move,
  * or nowhere is free for them to go.
@@ -278,7 +318,7 @@ function takeSlot(sim: CareSim, d: Dragon, room: Room, bump: boolean): Slot | nu
   d.slot = pick.s;
   const moved: { o: Dragon; slot: Slot | null }[] = [];
   for (const o of pick.who) {
-    const to = nearestFree(sim, o, o.stage, ['hatchery']);
+    const to = movedTo(sim, o);
     if (!to) { d.slot = was; for (const m of moved) m.o.slot = m.slot; return null; }
     moved.push({ o, slot: o.slot });
     o.slot = to;
@@ -296,6 +336,37 @@ function takeSlot(sim: CareSim, d: Dragon, room: Room, bump: boolean): Slot | nu
   }
   d.slot = was;
   return pick.s;
+}
+
+/**
+ * Where a lingerer moved on goes (plan S6b): a free slot on its own floor in a room meeting its lowest need that has one
+ * there (its next job, most likely: then met where it stands; its needs in level order, then NEEDS order); else the
+ * cheapest free slot on any floor in a room meeting its lowest need that has one free; else the nearest free slot
+ * (nearestFree) -- never the Hatchery's (S5: a baby moved on never rests in front of the nests).
+ */
+function movedTo(sim: CareSim, o: Dragon): Slot | null {
+  const order = needsByLevel(o), net = sim.nets.dragon[o.stage];
+  for (const need of order) {
+    for (const r of sim.rooms) {
+      if (r.kind !== NEED_ROOM[need] || r.floor !== o.f) continue;
+      const s = freeSlot(sim, o, r);
+      if (s && route({ f: o.f, x: o.x }, { f: s.f, x: s.x }, net)) return s;
+    }
+  }
+  for (const need of order) {
+    let best: Slot | null = null, bestCost = Infinity;
+    for (const r of sim.rooms) {
+      if (r.kind !== NEED_ROOM[need]) continue;
+      const s = freeSlot(sim, o, r), rt = s && route({ f: o.f, x: o.x }, { f: s.f, x: s.x }, net);
+      if (s && rt && rt.cost < bestCost) { bestCost = rt.cost; best = s; }
+    }
+    if (best) return best;
+  }
+  return nearestFree(sim, o, o.stage, ['hatchery']);
+}
+/** A dragon's needs, lowest first (ties by NEEDS order), the ones it has. */
+function needsByLevel(o: Dragon): NeedKind[] {
+  return NEEDS.filter((k) => hasNeed(o.element, k)).sort((a, b) => o.needs[a] - o.needs[b] || NEEDS.indexOf(a) - NEEDS.indexOf(b));
 }
 
 /**
@@ -333,18 +404,23 @@ export function routeTo(sim: CareSim, d: Dragon, to: Spot): void {
  * until it is served: life.ts.)
  */
 export function goFor(sim: CareSim, d: Dragon, j: Job, bump: boolean): boolean {
-  const room = needRoom(sim, j.need);
-  if (!room) return false;
-  if (d.slot && d.slot.room === room.id && fitsSlot(d.slot, d.stage)) { d.goal = 'need'; d.goalJob = j.id; return true; }
-  const slot = takeSlot(sim, d, room, bump);
-  if (!slot) return false;
-  d.goal = 'need'; d.goalJob = j.id;
-  sendTo(sim, d, slot);
-  return true;
+  // (a slot it holds in a room meeting the need, if it fits; else the need's rooms, best first: roomsFor)
+  if (d.slot && sim.rooms[d.slot.room].kind === NEED_ROOM[j.need] && fitsSlot(d.slot, d.stage)) { d.goal = 'need'; d.goalJob = j.id; return true; }
+  // (a job waits for its own floor's room, if the floor has one, however pressing -- unless it is rushed)
+  let rooms = roomsFor(sim, d, j.need);
+  if (!j.rushed && rooms.some((r) => r.floor === d.f)) rooms = rooms.filter((r) => r.floor === d.f);
+  for (const room of rooms) {
+    const slot = takeSlot(sim, d, room, bump);
+    if (!slot) continue;
+    d.goal = 'need'; d.goalJob = j.id;
+    sendTo(sim, d, slot);
+    return true;
+  }
+  return false;
 }
 
-/** The floor of the room that meets a need (-1: the base has none). */
-function roomFloor(sim: CareSim, need: NeedKind): number { return needRoom(sim, need)?.floor ?? -1; }
+/** The floor of the room dragon d would go to for a need (roomsFor's first; -1: the base has none). */
+function roomFloor(sim: CareSim, d: Dragon, need: NeedKind): number { return roomsFor(sim, d, need)[0]?.floor ?? -1; }
 
 /** A dragon's most pressing open job (queue order), or null. */
 function topJob(sim: CareSim, d: Dragon): Job | null {
@@ -389,11 +465,11 @@ function choose(sim: CareSim, d: Dragon): void {
     for (const j of sim.jobs) if (j.dragon === d && NEED_ROOM[j.need] === here.kind && tierOf(d.needs[j.need]) === tier && (!alt || sim.compare(j, alt) < 0)) alt = j;
     if (alt) pick = alt;
   }
-  if (!pick.rushed && roomFloor(sim, pick.need) !== d.f) {
+  if (!pick.rushed && roomFloor(sim, d, pick.need) !== d.f) {
     // (and one met on its own floor before one a ride away, in the same tier: the one car is the barn's bottleneck)
     const tier = tierOf(d.needs[pick.need]);
     let alt: Job | null = null;
-    for (const j of sim.jobs) if (j.dragon === d && roomFloor(sim, j.need) === d.f && tierOf(d.needs[j.need]) === tier && (!alt || sim.compare(j, alt) < 0)) alt = j;
+    for (const j of sim.jobs) if (j.dragon === d && roomFloor(sim, d, j.need) === d.f && tierOf(d.needs[j.need]) === tier && (!alt || sim.compare(j, alt) < 0)) alt = j;
     if (alt) pick = alt;
   }
   if (cur === pick && d.slot && sim.rooms[d.slot.room].kind === NEED_ROOM[pick.need]) return;
@@ -423,6 +499,40 @@ export function retarget(sim: CareSim, d: Dragon, j: Job): void {
 
 /** Whether a dragon's move plays its walk (a caller stepping up its landing's queue too, while its gait runs). */
 export function walking(d: Dragon): boolean { return d.move === 'walk' || d.move === 'board' || d.move === 'alight' || (d.move === 'call' && d.gaitT > 0); }
+
+/**
+ * The speed a dragon's walk plays at this step (LIVELY; G13: its body moves by the same factor): stepping on to the car and
+ * off it until clear of the bay, and wherever its body is in the bay or steps into it this step on a served floor; 1
+ * anywhere else.
+ */
+function pace(d: Dragon, dir: 1 | -1): number {
+  if (d.move === 'board' || d.move === 'alight') return LIVELY;
+  if (!BAY_FLOORS.has(d.f)) return 1;
+  const [a, b] = bodySpan(d.stage, dir, d.x + dir);
+  return dragonInBay(d) || (b > LIFT_X0 && a < LIFT_X1) ? LIVELY : 1;
+}
+
+/**
+ * The shaft guard (plan S6b): whether dragon d, stepping `m` px its way `dir` this step, would newly lie over another
+ * dragon's body in the lift bay on its floor -- its body in the bay after the step, over the body of one in the bay (or
+ * the car's rider standing in the car here), where the two do not already lie over each other in the bay. The car's
+ * rider is never held by it (the lift's own rules clear its way).
+ */
+function shaftBlocked(sim: CareSim, d: Dragon, dir: 1 | -1, m: number): boolean {
+  if (!BAY_FLOORS.has(d.f) || sim.lift.rider === d.id || m <= 0) return false;
+  const [n0, n1] = bodySpan(d.stage, dir, d.x + dir * m);
+  if (!(n1 > LIFT_X0 && n0 < LIFT_X1)) return false;
+  const [c0, c1] = dragonSpan(d), inNow = c1 > LIFT_X0 && c0 < LIFT_X1, L = sim.lift;
+  for (const o of sim.dragons) {
+    if (o === d || o.f !== d.f && !(o.move === 'ride' && !L.moving && L.f === d.f)) continue;
+    const [o0, o1] = o.move === 'ride' ? (L.moving || L.f !== d.f ? [0, 0] : dragonSpan({ ...o, x: LIFT_CX })) : dragonSpan(o);
+    if (!(o1 > LIFT_X0 && o0 < LIFT_X1)) continue;
+    if (Math.min(o1, n1) - Math.max(o0, n0) <= 0.5) continue;
+    if (inNow && Math.min(o1, c1) - Math.max(o0, c0) > 0.5) continue;
+    return true;
+  }
+  return false;
+}
 
 function startTurn(d: Dragon): void { d.move = 'turn'; d.turn = 0; d.gaitT = 0; }
 /** Held at the bay's edge (the bay rule), standing (its wait, `waited`, counts on until it walks on, into the bay if it crosses). */
@@ -660,9 +770,10 @@ function legDone(sim: CareSim, d: Dragon): void {
 
 /**
  * One step of a dragon's body (plan 3.4): a paper turn goes on, a wait goes on, or it walks. A walk step is the gait's
- * next frame (`gaitT += 1; x += facing * moveAt(gaitT)`: what the view's walk anim, restarted at the bout's start at
- * speed 1, moves on this same step), clamped on the leg's last step; a walk the other way starts with a turn; and R1
- * holds it at the bay's edge while the car moves past its floor.
+ * next frame at the step's pace s (`gaitS = s; gaitT += s; x += facing * s * moveAt(gaitT)`: what the view's walk anim,
+ * restarted at the bout's start and played at speed s, moves on this same step; s is 1, or LIVELY on and off the car
+ * and in the bay: pace), clamped on the leg's last step; a walk the other way starts with a turn; and R1 holds it at
+ * the bay's edge while the car moves past its floor.
  */
 function stepDragon(sim: CareSim, d: Dragon): void {
   switch (d.move) {
@@ -673,7 +784,7 @@ function stepDragon(sim: CareSim, d: Dragon): void {
       const at = landingPlace(sim, d).x, rest = (at - d.x) * d.facing;
       if (rest <= 0 || d.facing !== -sideOf(d)) { d.gaitT = 0; return; }
       if (d.gaitT === 0) d.walkSeq++;
-      d.gaitT++;
+      d.gaitS = 1; d.gaitT++;
       const m = moveAt(gaitOf(d.element, d.stage), d.gaitT);
       if (m >= rest) { d.x = at; sim.stats.dragonWalked += rest; } else { d.x += d.facing * m; sim.stats.dragonWalked += m; }
       return;
@@ -711,7 +822,10 @@ function stepDragon(sim: CareSim, d: Dragon): void {
     // ones waiting ahead of it there, its snout clear of their eyes -- or, come too close already, where it is)
     const edge = edgeSpot(d.stage, side), place = landingPlace(sim, d, side).x;
     if ((place - d.x) * way >= 0 || !(d.facing === way && d.move === 'walk')) aim = place;
-    else if ((sim.lift.moving && bayShut(sim, d.f)) || (bayBusy(sim, d.f) && riderAtWork(sim)) || yields(sim, d, way) || sim.dragons.some((o) => o !== d && o.f === d.f && dragonInBay(o) && o.facing !== way)) {
+    // (or one held at the bay's edge ahead of it, facing the same way: stepping in past it, the two would share the
+    // shaft once that one is let go -- it waits behind it, held too, and follows it in)
+    else if ((sim.lift.moving && bayShut(sim, d.f)) || (bayBusy(sim, d.f) && riderAtWork(sim)) || yields(sim, d, way) || sim.dragons.some((o) => o !== d && o.f === d.f && dragonInBay(o) && o.facing !== way)
+      || sim.dragons.some((o) => o !== d && o.f === d.f && o.move === 'bay' && o.facing === way && (o.x - d.x) * way > 0)) {
       aim = edge;
       for (const w of landingLine(sim, d.f, side)) {
         if (w.d === d || (w.x - d.x) * way < 0) continue;
@@ -736,6 +850,9 @@ function stepDragon(sim: CareSim, d: Dragon): void {
   const toward = d.move === 'walk' && sim.lift.rider !== d.id && BAY_FLOORS.has(d.f) && (dir > 0 ? d.x < LIFT_X0 : d.x > LIFT_X1);
   for (const o of sim.dragons) {
     if (o === d || o.f !== d.f || o.facing !== dir || !walking(o)) continue;
+    // (not one standing under it out of the bay, its bout ended: the two pass through each other there, and that one
+    // steps into the bay only once this one's body is clear of it -- the shaft guard)
+    if (o.gaitT === 0 && !dragonInBay(o)) { const [u0, u1] = dragonSpan(o), [v0, v1] = dragonSpan(d); if (Math.min(u1, v1) - Math.max(u0, v0) > 0.5) continue; }
     const near = toward && (dir > 0 ? o.x <= LIFT_X1 && LIFT_X0 - o.x < APPROACH : o.x >= LIFT_X0 && o.x - LIFT_X1 < APPROACH);
     if (!(entering || near || dragonInBay(o))) continue;
     const [o0, o1] = bodySpan(o.stage, o.facing, o.x);
@@ -744,15 +861,31 @@ function stepDragon(sim: CareSim, d: Dragon): void {
   }
   // (held a moment: it stands -- the walk bout ends, so the view idles and no paw slides -- and walks on in a new one)
   if (stop === d.x) { d.gaitT = 0; return; }
+  // (the walk-start rule, plan S6b: walking up to the bay, a walk bout does not start under one walking its way over
+  // it, a step on in its own bout -- that one passes first; with need rooms on both sides of the bay on every floor, one
+  // passing through a dragon standing in a slot beside the bay, which then set off the same way under it, was held there
+  // by the follow rule above, the two over each other at the bay's edge. A walker held a moment, its bout ended, is not
+  // waited for: it waits for this one, and neither would go)
+  if (d.gaitT === 0 && (d.move === 'still' || d.move === 'walk') && BAY_FLOORS.has(d.f) && (dir > 0 ? d.x < LIFT_X0 && LIFT_X0 - d.x < APPROACH : d.x > LIFT_X1 && d.x - LIFT_X1 < APPROACH)) {
+    const [a0, a1] = bodySpan(d.stage, dir, d.x);
+    if (sim.dragons.some((o) => o !== d && o.f === d.f && o.facing === dir && o.move === 'walk' && o.gaitT > 0 && sim.lift.rider !== o.id && dragonSpan(o)[1] > a0 && dragonSpan(o)[0] < a1)) return;
+  }
+  // (the walk's speed this step, and the body moved by the same factor: the lively step, LIVELY; 1 anywhere else)
+  const s = pace(d, dir);
+  // (the shaft guard: the lift bay holds no two bodies over each other on a floor -- a walker, not the car's, does not
+  // step to where its body, in the bay, would lie over another dragon's in the bay (one standing there, held behind a
+  // slow crosser or turned at its edge, or the car's rider) unless the two lie over each other there already; it stands
+  // this step instead, and walks on in a new bout once the other has gone)
+  if (shaftBlocked(sim, d, dir, Math.min(s * moveAt(gaitOf(d.element, d.stage), d.gaitT + s), Math.abs(stop - d.x)))) { d.gaitT = 0; return; }
   if (d.gaitT === 0) d.walkSeq++;
   if (d.move !== 'board' && d.move !== 'alight') d.move = 'walk';
-  d.gaitT++;
+  d.gaitS = s; d.gaitT += s;
   // (a crosser's wait at the bay's edge counts on over the whole approach -- let go a moment, held again -- until it is in)
   if (d.move === 'walk' && side == null) d.waited = 0;
-  const m = moveAt(gaitOf(d.element, d.stage), d.gaitT), rest = Math.abs(stop - d.x), x0 = d.x;
+  const m = s * moveAt(gaitOf(d.element, d.stage), d.gaitT), rest = Math.abs(stop - d.x), x0 = d.x;
   if (m >= rest) { d.x = stop; sim.stats.dragonWalked += rest; } else { d.x += dir * m; sim.stats.dragonWalked += m; }
   // (#11: a pass through the Garden Gate, counted as it crosses the arches' middle)
-  if (d.f === 0 && (x0 < GATE_MID) !== (d.x < GATE_MID)) sim.use('gate');
+  if (d.f === 0 && (x0 < GATE_MID) !== (d.x < GATE_MID)) sim.use('gate', sim.gateRoom());
   // (off the car and clear of the bay: the car is free for its next call)
   if (d.move === 'alight' && !dragonInBay(d)) { d.move = 'walk'; if (sim.lift.rider === d.id) sim.lift.rider = null; }
   if (d.x === target) legDone(sim, d);

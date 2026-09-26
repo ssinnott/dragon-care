@@ -5,8 +5,9 @@
 // The world is built from a start (src/game/presets.ts: the new game, or a preset); its dragons are drawn by a cast
 // keyed by dragon id, which follows the simulation as dragons come, go and grow. The simulation walks the dragons to
 // their needs' rooms and rides them on the Dragon Lift (travel.ts); the view puts each pet where its dragon is, plays
-// its walk from the start of every walk bout at speed 1 (the sim moved it by that walk's own root motion, so the paws
-// stay planted), narrows it through a paper turn, and draws the lift's car where the car is.
+// its walk from the start of every walk bout at the speed the sim walked it -- 1, or the lively step's 2 on and off the
+// car and across its bay (Dragon.gaitS: the sim moved it by that walk's own root motion times that speed, so the paws
+// stay planted) -- narrows it through a paper turn, and draws the lift's car where the car is.
 // Time (7): the sky behind the building turns with the clock and the lights come on at dusk -- night is drawn there
 // alone, never on a dragon, a floor or a wall (plan G8; layers=world draws the world without it) -- and the view runs
 // 0, 1, 2, 4 or 8 whole world steps a frame (the speed, the view's own: a save has none). The constructor never touches
@@ -26,6 +27,8 @@
 // garden's end, which moves east as elders retire to it; a resident naps (`sleep`, then `wake`), sits (`idle`, the
 // elder's variants), strolls (its walk, restarted each bout like any walk) and waits for its keeper (`idle`, or its
 // tells); an elder arriving there is news: "ASH MOVED TO THE GARDEN".
+// Barn capacity (plan S6b): the top bar counts the barn's dragons against its cap (`BARN 9/12`, life.ts BARN_CAP); an
+// egg falling due in a full barn is news ("THE BARN IS FULL"), and a due egg still in its nest shows three dots over it.
 import { drawDragon, rootToScreen } from '../art/dragon/rig.ts';
 import { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
 import { ELEMENT_ANIM_FALLBACK } from '../art/dragon/anims.ts';
@@ -46,11 +49,11 @@ import type { ButtonName } from './hud.ts';
 import { loadSave, writeSave, clearSave, backupSave } from './storage.ts';
 import { freshSeed } from '../lib/engine/rng.ts';
 import type { Stage } from '../art/dragon/stages.ts';
-import { WORLD_W, WORLD_H, feetY, nestX, eggBottom } from './layout.ts';
+import { WORLD_W, WORLD_H, NESTS, feetY, nestX, eggBottom } from './layout.ts';
 import { drawGarden, drawGardenLights, drawGardenPlate } from './gardenArt.ts';
 import { lightsOf } from './sky.ts';
-import { drawEgg, drawShellBits, BITS_FRAMES } from './eggs.ts';
-import { stageDue } from './life.ts';
+import { drawEgg, drawShellBits, drawWaiting, BITS_FRAMES } from './eggs.ts';
+import { stageDue, barnCount, barnFull, BARN_CAP } from './life.ts';
 import { walking, feetOf } from './travel.ts';
 import { gaitOf, wrapT } from './gait.ts';
 import { NEEDS, GARDEN_NEEDS, SOON, tierOf, chargeOf, hasNeed } from './needs.ts';
@@ -66,16 +69,16 @@ export const VIEW_W = 640, VIEW_H = 360;
 /** Behind everything (the page's own colour: index.html). */
 const CLEAR = '#16141c';
 /**
- * Where the camera starts: the barn's three floors, the kitchen and the romp room (EMBER and ZAP), the Dragon Lift
- * (its car starts at the ground floor), the ladder bay, and the first slots of the bathhouse, the grooming parlour and
- * the lamp dorm (RIPPLE, BRAMBLE and WICK), framed on the start: the dragons walk off to their needs from there. The
- * new game's seven young adults start in their need rooms' slots and span world
- * x 188-1177 (measured over their idles), wider than one screen; the five in the west rooms and the first slots east
- * of the ladder bay span x 188-841, 14 px more than a screen, so the frame starts at 204: all five faces whole, EMBER's
- * and ZAP's tail tips (at most 16 px) cut at the left edge, and every plate in it whole (the kitchen's and the romp
- * room's sit 44 px in from the barn's west wall: layout.ts platesOf). A drag shows COBBLE and ECHO.
+ * Where the camera starts: the barn's three floors and its west half -- the Hatchery and the hayloft's kitchen, each
+ * floor's Hearth Kitchen, the ground floor's Grooming Parlour, the Romp Room, the Dragon Lift (its car starts at the
+ * ground floor), the ladder bay and the first module east of it (the Bathhouse, the upper and the hayloft's Grooming
+ * Parlours) -- framed on the start (plan S6b's rooms): six of the seven young adults, EMBER facing its hearth, BRAMBLE,
+ * ZAP, RIPPLE, COBBLE and ECHO, span world x 199.5-842.8 (measured over their idles), 3 px more than a screen, so the
+ * frame starts at 201: every face whole, the tips of EMBER's and COBBLE's snouts (under 2 px) at the edges, and every
+ * plate in it whole (the kitchens' sit 44 px in from the barn's west wall: layout.ts platesOf). WICK, in the ground
+ * floor's Lamp Dorm, is a drag away.
  */
-const START_CAM = { x: 204, y: 376 };
+const START_CAM = { x: 201, y: 376 };
 /** Chips in the job strip (4.8). */
 const STRIP = 5;
 /** What a job has the dragon do (4.4, the rig's anims: ART_BIBLE 4.2); dusk's bedtime is its own tuck-in (3.8). */
@@ -90,6 +93,8 @@ const NEW_FRAMES = 120;
 const RATES = [1, 2, 4, 8] as const;
 type Rate = typeof RATES[number];
 const DIDNT_FIT = 'NEW BARN: THE OLD SAVE DIDN\'T FIT';
+/** The news when an egg falls due with the barn at its cap (life.ts BARN_CAP): it waits in its nest. */
+const BARN_FULL = 'THE BARN IS FULL';
 /**
  * A dragon that has just grown up is drawn flat (its glow's highlight, inside its ink) this many frames shown (ART_BIBLE
  * 4.2: the new silhouette's 12 f flash) -- frames, not world steps, so it lasts as long at 8x (paused, it holds).
@@ -322,11 +327,14 @@ export class BaseView {
    * What the step's life events look like (plan S5): a dragon grown up -- already rebuilt at its new stage (syncCast) --
    * flashes flat for GROW_FLASH frames and plays `happy` once (the simulation holds it for that: its hold), and a
    * toast says so (in turn; the step's grow-ups into one stage share one); a hatch throws its egg's shell bits from the
-   * nest the baby stands up in. And at 05:00 (the dawn), a tip: the dragons whose stage-up falls due within TIP_DAYS days.
+   * nest the baby stands up in; an egg falling due with the barn full (plan S6b: life.ts BARN_CAP) is news too, "THE
+   * BARN IS FULL" (once, however many fall due together). And at 05:00 (the dawn), a tip: the dragons whose stage-up
+   * falls due within TIP_DAYS days.
    */
   private lifeEvents(): void {
     const sim = this.sim;
     for (const e of sim.events) {
+      if (e.kind === 'full') { if (!this.news.some((n) => 'text' in n && n.text === BARN_FULL)) this.news.push({ text: BARN_FULL }); continue; }
       const d = sim.dragons.find((q) => q.id === e.dragon), v = this.cast.get(e.dragon);
       if (!d || !v) continue;
       if (e.kind === 'grow') {
@@ -337,8 +345,13 @@ export class BaseView {
         const same = this.news.find((n): n is { stage: Stage; names: string[] } => 'stage' in n && n.stage === e.stage);
         if (same) same.names.push(d.name); else this.news.push({ stage: e.stage, names: [d.name] });
       } else if (e.kind === 'hatch') {
+        // (from the nest nearest where the baby stands up)
         const room = sim.rooms.find((r) => r.kind === 'hatchery');
-        if (room) this.hatches.push({ id: d.id, el: d.element, x: nestX(room, Math.max(0, Math.min(2, Math.round((d.x - nestX(room, 0)) / 50)))), y: eggBottom(room.floor), age: 0 });
+        if (room) {
+          let nest = 0;
+          for (let i = 1; i < NESTS; i++) if (Math.abs(nestX(room, i) - d.x) < Math.abs(nestX(room, nest) - d.x)) nest = i;
+          this.hatches.push({ id: d.id, el: d.element, x: nestX(room, nest), y: eggBottom(room.floor), age: 0 });
+        }
       } else if (e.kind === 'garden') {
         // (an elder arrived at its plot, a resident now: the garden's news, shared by those who arrive together)
         const same = this.news.find((n): n is { garden: true; names: string[] } => 'garden' in n);
@@ -382,10 +395,14 @@ export class BaseView {
         p.player.play('walk', { restart: true, speed: 1, blend: 8 });
         // (a view that meets a bout already under way -- a world loaded mid-walk -- catches the anim up to it: its
         // tick this step then lands on the bout's own frame, wrapped as the walk loops, back to its loop start: gait.ts moveAt)
-        const n = wrapT(gaitOf(d.element, d.stage), d.gaitT - 1);
-        for (let i = 0; i < n; i++) p.player.tick();
+        const pre = wrapT(gaitOf(d.element, d.stage), d.gaitT - d.gaitS), whole = Math.floor(pre);
+        for (let i = 0; i < whole; i++) p.player.tick();
+        if (pre > whole) { p.player.speed = pre - whole; p.player.tick(); }
         p.anim = 'walk'; v.walkSeq = d.walkSeq; v.waking = false; p.hold = 0;
       }
+      // (the walk plays at the speed the simulation moved the body by this step: 1, or LIVELY on and off the car and
+      // across the bay -- G13, the body moved by the same factor, so the planted paws stay planted)
+      p.player.speed = d.gaitS;
     } else {
       // (a grow-up's happy plays through: the simulation holds the dragon where it stands meanwhile -- its hold, as long
       // as this happy: life.ts -- so it neither walks nor turns; an act that starts once the hold is done takes over)
@@ -450,7 +467,11 @@ export class BaseView {
     const hatchery = this.sim.rooms.find((r) => r.kind === 'hatchery');
     if (hatchery) for (const e of this.sim.eggs) {
       const x = nestX(hatchery, e.nest), y = eggBottom(hatchery.floor);
-      if (seen(x - 8, x + 8, y - 16, y + 2)) drawEgg(ctx, e.element, x, y, this.progress(e), this.sim.tick);
+      if (!seen(x - 8, x + 8, y - 26, y + 2)) continue;
+      drawEgg(ctx, e.element, x, y, this.progress(e), this.sim.tick);
+      // (a due egg still in its nest is waiting for room -- the barn at its cap, or no baby sub-slot free: life.ts --
+      // and says so with three ink dots over it, in the eggs' layer: under the cast, so never over an eye)
+      if (this.sim.clock - e.laid >= HATCH_DAYS * this.sim.dayLen) drawWaiting(ctx, x, y);
     }
     for (const h of this.hatches) drawShellBits(ctx, h.el, h.x, h.y, h.age);
     // the cast, y-sorted by the feet; keepers stand a step behind the dragons they work with, so a dragon's head is
@@ -516,7 +537,8 @@ export class BaseView {
         walked: st.dragonWalked,
         eggs: this.sim.eggs.map((e) => ({ element: e.element, nest: e.nest, progress: this.progress(e) })),
         card: this.cardDragon()?.name ?? null,
-        garden: { residents: this.sim.dragons.filter((d) => d.place === 'garden').length, plots: this.sim.garden.plots, worldW: this.sim.worldW } };
+        garden: { residents: this.sim.dragons.filter((d) => d.place === 'garden').length, plots: this.sim.garden.plots, worldW: this.sim.worldW },
+        barn: { count: barnCount(this.sim), cap: BARN_CAP } };
     }
   }
 
@@ -533,7 +555,7 @@ export class BaseView {
   private hud(ctx: CanvasRenderingContext2D, read: ClockRead): void {
     const text = (s: string, x: number, y: number, color: string) => drawText(ctx, s, x, y, { color, shadow: false });
     drawTopBar(ctx, { clock: read, jobs: this.sim.jobs.length, keepers: this.sim.keepers.map((k) => ({ name: k.name, look: k.look, busy: !!k.job })),
-      speed: this.speed, rate: this.rate, armed: this.newArmed > 0 });
+      speed: this.speed, rate: this.rate, armed: this.newArmed > 0, barn: { count: barnCount(this.sim), cap: BARN_CAP, full: barnFull(this.sim) } });
     const q = this.sim.queue(), y = VIEW_H - 21;
     let x = 6;
     q.slice(0, STRIP).forEach((j, i) => {

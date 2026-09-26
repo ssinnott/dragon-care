@@ -9,7 +9,8 @@
 // every time). It lies nestled in the front of its nest's straw heap, against the straw alone (layout.ts NEST_RY,
 // eggBottom). When it hatches, six 2 x 2 bits of its shell jump outward and up over three stepped places across 20
 // frames, from behind the baby standing up where the egg lay (drawn under the cast: never over it or an eye) and out
-// wide of it, then are gone: no alpha, no gradient.
+// wide of it, then are gone: no alpha, no gradient. A due egg still waiting in its nest (the barn at its cap, plan S6b)
+// shows three ink dots over it.
 import { makeTones } from '../lib/art/shading.ts';
 import { agedPalette } from '../art/dragon/palettes.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
@@ -108,4 +109,15 @@ export function drawShellBits(ctx: CanvasRenderingContext2D, el: DragonElement, 
     ctx.fillStyle = INK; ctx.fillRect(bx - 1, by - 1, 4, 4);
     ctx.fillStyle = shell; ctx.fillRect(bx, by, 2, 2);
   }
+}
+
+/**
+ * A due egg still waiting in its nest for room (plan S6b: the barn at its cap -- life.ts BARN_CAP -- or no baby sub-slot
+ * free): three 2 x 2 ink dots, 3 px apart, their bottom 6 px over the egg's ink ring (x, y: the egg's own, as drawEgg),
+ * steady while the egg wobbles. The view draws them in the eggs' layer, under the cast: never over a dragon or an eye.
+ */
+export function drawWaiting(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const cx = Math.round(x), top = Math.round(y) - EGG_H - 1 - 6 - 2;
+  ctx.fillStyle = INK;
+  for (const dx of [-6, -1, 4]) ctx.fillRect(cx + dx, top, 2, 2);
 }

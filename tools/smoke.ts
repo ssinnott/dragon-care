@@ -38,6 +38,8 @@
 // hatched into a baby by t=120; live, a tap on the head of a dragon with nothing waiting opens its card, and a tap on
 // the card closes it. The elder garden (plan S6): the new game's garden has its two empty plots; the garden preset's
 // three residents live on three plots, by day and by night (each dragon says where it lives: the barn or the garden).
+// Barn capacity (plan S6b): the hook counts the barn's dragons against its cap (7 of 12 in the new game, the twelve
+// preset at the cap, the full preset forced over it with its due egg waiting in its nest).
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -360,6 +362,21 @@ function gardenIs(residents: number, plots: number) {
   };
 }
 
+/**
+ * Barn capacity (plan S6b): the hook's count of the barn's dragons against its cap (life.ts BARN_CAP, 12) -- every
+ * dragon not living in the garden -- as the top bar's `BARN n/12` shows it.
+ */
+function barnIs(count: number) {
+  return (b: BaseHook): string[] => {
+    const inBarn = b.dragons.filter((d) => d.place !== 'garden').length;
+    return b.barn && b.barn.count === count && b.barn.cap === 12 && inBarn === count ? [] : [`the barn is ${JSON.stringify(b.barn)} with ${inBarn} dragons out of the garden, not ${count} of 12`];
+  };
+}
+/** view=base&preset=full: the due egg still in its nest (the barn over its cap: it waits, and its nest shows it). */
+function eggWaits(b: BaseHook): string[] {
+  return b.eggs?.length === 1 && b.eggs[0].progress === 1 ? [] : [`the eggs are ${JSON.stringify(b.eggs)}, not one due and waiting`];
+}
+
 /** The base's dragons include every stage. */
 function everyStage(b: BaseHook): string[] {
   const st = new Set(b.dragons.map((d) => d.stage)), missing = AGE_STAGES.filter((s) => !st.has(s));
@@ -493,7 +510,7 @@ const CASES: Case[] = [
   { query: 'view=yardaudit&t=0', minColours: 2, allScales: false, timeout: 300000, care: 14 },
   // the base: its first seconds (a young adult of every element, #9), every stage (the ages preset), a minute of care
   // (jobs got done), and live input, never saving (a drag pans, a chip tap Rushes, the gallery's keys do nothing)
-  { query: 'view=base&t=600', minColours: 150, allScales: false, check: (b) => [...castIs(7, 'adult')(b), ...travels(b), ...gardenIs(0, 2)(b)] },
+  { query: 'view=base&t=600', minColours: 150, allScales: false, check: (b) => [...castIs(7, 'adult')(b), ...travels(b), ...gardenIs(0, 2)(b), ...barnIs(7)(b)] },
   { query: 'view=base&preset=ages&t=60', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...everyStage(b), ...travels(b)] },
   { query: 'view=base&t=3600', minColours: 150, allScales: false, base: true, check: walkedOver(100) },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseInput },
@@ -515,13 +532,17 @@ const CASES: Case[] = [
   // growing up and eggs (plan S5): EMBER grown an elder, three eggs in the Hatchery's nests, an egg hatched into a baby;
   // live, a dragon's card
   { query: 'view=base&preset=growup&t=60', minColours: 150, allScales: false, check: (b) => [...grownUp(b), ...travels(b)] },
-  { query: 'view=base&preset=eggs&t=600&cam=872,376', minColours: 150, allScales: false, check: (b) => [...eggsIn(b), ...travels(b)] },
-  { query: 'view=base&preset=hatch&t=120&cam=872,376', minColours: 150, allScales: false, check: (b) => [...hatchedOne(b), ...travels(b)] },
+  { query: 'view=base&preset=eggs&t=600&cam=168,280', minColours: 150, allScales: false, check: (b) => [...eggsIn(b), ...travels(b)] },
+  { query: 'view=base&preset=hatch&t=120&cam=168,280', minColours: 150, allScales: false, check: (b) => [...hatchedOne(b), ...travels(b)] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseCard },
   // the elder garden (plan S6): the garden preset's three residents on their plots, past the Garden Gate, by day and at
   // night (napping, the lanterns lit)
   { query: 'view=base&preset=garden&cam=1304,376&t=600', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...travels(b)] },
   { query: 'view=base&preset=garden&cam=1304,376&t=600&hour=22', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...timeFields('night', false)(b)] },
+  // barn capacity (plan S6b): the capacity benchmark's twelve, the barn at its cap (BARN 12/12), every element among
+  // them; and the full preset, forced 9 over it (BARN 21/12), its due egg waiting in its nest in the hayloft's corner
+  { query: 'view=base&preset=twelve&t=600', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...travels(b), ...barnIs(12)(b)] },
+  { query: 'view=base&preset=full&t=60&cam=168,280', minColours: 150, allScales: false, check: (b) => [...castIs(21, null)(b), ...barnIs(21)(b), ...eggWaits(b)] },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);

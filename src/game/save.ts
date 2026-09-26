@@ -17,8 +17,10 @@ import type { RoomPlace } from './layout.ts';
  * 6 (S6): the elder garden: its plots; a dragon's place (the barn or the garden), its plot (`home`) and a resident's
  * rhythm (`garden`: its mode, when a nap or a sit ends, its resting place), the `retire` goal; the longest retirement
  * delay (stats.retireDelayMax).
+ * 7 (S6b, barn capacity): a dragon's `gaitS` (the speed its walk played at on its last step: 1, or the lively step's on
+ * and off the car and across the lift bay); each room's own uses (stats.usedRoom, by room id: a need's rooms repeat).
  */
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }
@@ -67,7 +69,7 @@ export class SaveVersionError extends Error {
  * The world as JSON-safe data, in the simulation's own order (dragons, keepers and jobs as they sit in its arrays).
  * Every field of every dragon, keeper and job is kept -- the top level of each is copied whole, so a field a later
  * slice adds is saved with it -- and the plain objects they hold (needs, the act, the routes' legs, a garden resident's
- * rhythm, the lift's calls, the eggs, the garden, the rooms' uses) are copied, so the save never changes as the world
+ * rhythm, the lift's calls, the eggs, the garden, the rooms' uses by kind and by room) are copied, so the save never changes as the world
  * steps on.
  */
 export function serialize(sim: CareSim): SaveV {
@@ -81,7 +83,7 @@ export function serialize(sim: CareSim): SaveV {
     lift: { ...sim.lift, calls: sim.lift.calls.map((c) => ({ ...c })) },
     eggs: sim.eggs.map((e) => ({ ...e })),
     garden: { plots: sim.garden.plots },
-    stats: { ...sim.stats, used: { ...sim.stats.used } },
+    stats: { ...sim.stats, used: { ...sim.stats.used }, usedRoom: [...sim.stats.usedRoom] },
   };
 }
 

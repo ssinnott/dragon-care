@@ -46,14 +46,16 @@ const pairs: string[] = [
   ...STAGES.map((st) => `shots/cast_${st}.png=view=cast&stage=${st}&t=0&scale=1`),
   // the elders' wing wear (2.9): the hole at full spread and at home (the airing), the tears in the preen
   'shots/wings_elder.png=view=wings&t=0',
-  // the base (docs/BASE_DESIGN.md): its first seconds (the start camera: the barn's west half, the lift, ZAP boarding
-  // the car at the upper floor; and the east half), a minute of care (the dragons walked to their needs' rooms), a
-  // ride (EMBER on the Dragon Lift's car between the upper floor and the hayloft, on its way to the Lamp Dorm), every
-  // stage at once (the ages preset), and the roof: the Aerie deck, its gantry, the lift's shaft and headframe
+  // the base (docs/BASE_DESIGN.md): its first seconds (the start camera: the barn's west half under the Hatchery, the
+  // lift, EMBER crossing its bay for the ground floor's Lamp Dorm; and the east half), a minute of care (the dragons
+  // walked to their needs' rooms: every room repeats, so most never leave their floor), a ride (ECHO on the Dragon
+  // Lift's car on its way down from the hayloft, which has no Bathhouse, to the ground floor's: plan S6b), every stage
+  // at once (the ages preset: the barn at its cap, BARN 12/12), and the roof: the Aerie deck, its gantry, the lift's
+  // shaft and headframe
   'shots/base_t600.png=view=base&t=600',
   'shots/base_t600_east.png=view=base&t=600&cam=560,376',
   'shots/base_t3600.png=view=base&t=3600',
-  'shots/base_lift.png=view=base&t=1100&cam=328,300',
+  'shots/base_lift.png=view=base&t=3010&cam=328,300',
   'shots/base_ages.png=view=base&preset=ages&t=60',
   'shots/base_aerie.png=view=base&t=60&cam=0,0',
   // the time of day (7): the start frame at night, at dusk and at dawn (t=600 is an hour and twenty minutes on from the
@@ -68,20 +70,28 @@ const pairs: string[] = [
   // growing up and eggs (7; plan S5): EMBER six steps into its grow-up (the new elder's silhouette flat in its glow's
   // highlight inside its own ink, the toast), the Hatchery's three eggs (a rock egg just laid, a dusk one with its first
   // crack, a water one with two and its wobble), and a hatch (CINDER standing up in the first nest, its shell's bits
-  // flying)
+  // flying) -- the Hatchery in the hayloft's west corner, under the roof's slope (plan S6b)
   'shots/base_growup.png=view=base&preset=growup&t=36',
-  'shots/base_hatchery.png=view=base&preset=eggs&t=600&cam=872,376',
-  'shots/base_hatch.png=view=base&preset=hatch&t=70&cam=872,376',
-  // the Hatchery with a hatchling at home: the eggs preset's water egg hatched (step 2160) into SPLASH, standing in front
-  // of its own nest, now empty, with the rock and dusk eggs still in view in theirs
-  'shots/base_hatchery_home.png=view=base&preset=eggs&t=2230&cam=872,376',
+  'shots/base_hatchery.png=view=base&preset=eggs&t=600&cam=168,280',
+  'shots/base_hatch.png=view=base&preset=hatch&t=70&cam=168,280',
+  // the Hatchery with a hatchling just out: the eggs preset's water egg hatched (step 2160) into SPLASH, which walked next
+  // door into the hayloft's Hearth Kitchen (the Hatchery's second sub-slot stands in front of the dusk egg's nest too:
+  // a hatchling never hides another's egg while a sub-slot is free elsewhere), the rock and dusk eggs in view in theirs
+  'shots/base_hatchery_home.png=view=base&preset=eggs&t=2230&cam=168,280',
   // the elder garden (plan S6): the garden preset's three residents on their plots past the Garden Gate, by day (sitting
   // and napping by their nest mounds, the hedge, the apple trees, the lanterns, the pale path underfoot) and at night
   // (napping, the lanterns' rings on the hedge); and the retire preset's first elder under the gate's arch, walking out
-  // (step 2564: npm run sim section 15)
+  // (step 1950: WICK, from the ground floor's Lamp Dorm, npm run sim section 15)
   'shots/base_garden.png=view=base&preset=garden&cam=1304,376&t=600',
   'shots/base_garden_night.png=view=base&preset=garden&cam=1304,376&t=600&hour=22',
-  'shots/base_gate.png=view=base&preset=retire&cam=1060,376&t=2564',
+  'shots/base_gate.png=view=base&preset=retire&cam=1060,376&t=1950',
+  // barn capacity (plan S6b): the capacity benchmark's twelve -- the barn at its cap, BARN 12/12 -- a minute and a half
+  // in, west and east (a need's rooms repeat on every floor: the herd is met on its own floors, the lift nearly idle);
+  // and the full preset, 21 dragons forced over the cap (BARN 21/12, amber): its egg fell due on the first step (the
+  // toast THE BARN IS FULL) and waits in its nest, three dots over it (partly behind the baby resting in front of it)
+  'shots/base_twelve.png=view=base&preset=twelve&t=5400',
+  'shots/base_twelve_east.png=view=base&preset=twelve&t=5400&cam=560,376',
+  'shots/base_full.png=view=base&preset=full&t=60&cam=168,280',
 ];
 for (const el of ['fire', 'rock', 'slinkwing']) {
   for (const stage of ['elder', 'adult', 'young', 'baby']) {

@@ -54,7 +54,9 @@ interface Window {
      * element, its nest 0-2 and how far on it is, 0 laid to 1 due); and the name of the dragon whose card is open, or
      * null. The elder garden (S6): each dragon's `place` (`barn`, or retired, `garden`), and the garden's residents, its
      * plots (one a resident or a retiree, at least two) and the world's walkable width out to its end (world px: 1688
-     * with two plots, 176 more a plot). Gone once the base is detached (the page left it).
+     * with two plots, 176 more a plot). Barn capacity (S6b): the barn's dragons against its cap (`count`: every dragon
+     * not living in the garden -- life.ts barnCount -- and `cap`, life.ts BARN_CAP; a preset may hold more than the cap).
+     * Gone once the base is detached (the page left it).
      */
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
       chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[];
@@ -70,7 +72,8 @@ interface Window {
       buttons: Record<string, { x: number; y: number; w: number; h: number }>;
       eggs: { element: string; nest: number; progress: number }[];
       card: string | null;
-      garden: { residents: number; plots: number; worldW: number } };
+      garden: { residents: number; plots: number; worldW: number };
+      barn: { count: number; cap: number } };
     /**
      * view=base, live and saving (src/game/base.ts attach, only when the page loads and saves the player's barn): save
      * the barn now, and return the step it was saved at. Gone once the base is detached.

@@ -19,7 +19,7 @@ import { drawText, measureText } from '../lib/engine/text.ts';
 import {
   WORLD_W, WORLD_H, GROUND, PITCH, MOD, TOWER_W, WALL, WALL_H, BAND, SLAB, TOWER_L, TOWER_R, BARN_X, RIDGE_X, RIDGE_Y,
   KNEE_DX, KNEE_Y, BARN_FLOORS, TOWER_FLOORS, BARN_MODS, LIFT_MOD, LIFT_X0, LIFT_X1, LIFT_STOPS, CAR_X0, CAR_X1, LADDER_BAY_X0,
-  LADDER_BAY_X1, AERIE_F, DECK_X0, DECK_X1, HEAD_Y, PULLEY_Y, LADDERS, NESTS, GATE_X0, GATE_X1, GATE_ARCH, NEST_RX, NEST_RY, NEST_STRANDS, floorTop, feetY, modX, nestX, nestBase, platesOf,
+  LADDER_BAY_X1, AERIE_F, DECK_X0, DECK_X1, HEAD_Y, PULLEY_Y, LADDERS, NESTS, GATE_X0, underSlope, roomMods, GATE_X1, GATE_ARCH, NEST_RX, NEST_RY, NEST_STRANDS, floorTop, feetY, modX, nestX, nestBase, platesOf,
 } from './layout.ts';
 import type { Room, Link } from './layout.ts';
 import { FLOORS, INK, EMPTY_WALL, LIFT_WALL, STONE, STRAW_SEAM, WALLS, PROPS, NEST, LIGHTS, LAMP_RINGS, HEARTH_RING, BACKDROPS, skyBands } from './surfaces.ts';
@@ -183,7 +183,7 @@ interface Lamp { x: number; y: number; cord: number }
 /** The dorm's two lamps, hanging from the rafters in the hayloft (under the room's plate, which hangs at t + 20 there). */
 function lampsOf(r: Room): Lamp[] {
   const t = floorTop(r.floor), y = t + (r.floor === 2 ? 32 : 16), cord = r.floor === 2 ? RIDGE_Y - 20 : t;
-  return [r.x0 + 40, r.x0 + 280].map((x) => ({ x, y, cord }));
+  return [r.x0 + 40, r.x1 - 40].map((x) => ({ x, y, cord }));
 }
 /** A lamp on its cord (the cord a flat 1 px ink column). */
 function lamp(g: CanvasRenderingContext2D, l: Lamp): void { rect(g, l.x, l.cord, 1, l.y - l.cord, INK); box(g, l.x - 4, l.y, 8, 10, LIGHTS.lamp); }
@@ -226,9 +226,9 @@ function windowIn(g: CanvasRenderingContext2D, p: Pane): void {
 /** The hayloft's skylight, on the roof's right slope over the lamp dorm. */
 const SKYLIGHT: readonly number[] = [930, 318, 884, 310, 886, 298, 932, 306];
 
-/** Each room kind's props, over its wall. */
+/** Each room kind's props, over its wall (a one-module room -- a need room repeated on another floor -- fits them in its one module). */
 function props(g: CanvasRenderingContext2D, r: Room): void {
-  const t = floorTop(r.floor), fl = t + WALL_H + 4, x = r.x0;
+  const t = floorTop(r.floor), fl = t + WALL_H + 4, x = r.x0, one = r.part === 'barn' && roomMods(r) === 1;
   switch (r.kind) {
     case 'kitchen': {
       // the hearth (the kitchen's post: keepers take the bowls from here) and a shelf of crocks
@@ -240,19 +240,21 @@ function props(g: CanvasRenderingContext2D, r: Room): void {
       poly(g, [hx + 24, hf, hx + 28, hf - 10, hx + 34, hf - 14, hx + 38, hf], '#ffd86a', false);
       box(g, hx + 18, hf - 22, 24, 14, '#4a4450');
       box(g, hx + 4, hf - 88, 52, 26, '#8c847a');
-      shelf(g, x + 150, t + 34, 60, ['#d08a5a', '#e8d8b0', '#8a9a6a', '#c86a4a', '#e8d8b0']);
+      shelf(g, one ? x + 88 : x + 150, t + 34, 60, ['#d08a5a', '#e8d8b0', '#8a9a6a', '#c86a4a', '#e8d8b0']);
       break;
     }
-    case 'hatchery':
-      // the heat lamp on its cord, and the three nests the eggs lie in (layout.ts nestX)
-      rect(g, x + 40, t, 1, 30, INK); poly(g, [x + 30, t + 30, x + 50, t + 30, x + 46, t + 38, x + 34, t + 38], '#f2c14e');
+    case 'hatchery': {
+      // the heat lamp on its cord (under the hayloft's slope, clear of it), and the three nests the eggs lie in (layout.ts nestX)
+      const lx = x + (underSlope(r) ? 100 : 40);
+      rect(g, lx, t, 1, 30, INK); poly(g, [lx - 10, t + 30, lx + 10, t + 30, lx + 6, t + 38, lx - 6, t + 38], '#f2c14e');
       for (let i = 0; i < NESTS; i++) nest(g, nestX(r, i), nestBase(r.floor));
       break;
+    }
     case 'bath': {
       for (let y = t + 18; y < t + WALL_H; y += 10) rect(g, x, y, r.x1 - x, 1, '#a0adb6');
       // the tub (the bathhouse's post: the buckets are filled here), standing on the band's back edge like the hearth,
       // so a dragon in the slot in front of it has straw under its paws, not the tub
-      const bx = x + 150, w = 150, bf = t + WALL_H;
+      const bx = one ? x + 8 : x + 150, w = one ? 144 : 150, bf = t + WALL_H;
       box(g, bx, bf - 34, w, 34, PROPS.tub);
       for (let i = 1; i < 4; i++) rect(g, bx + 1, bf - 34 + i * 8, w - 2, 1, '#6e4a30');
       rect(g, bx + 3, bf - 38, w - 6, 5, INK); rect(g, bx + 4, bf - 37, w - 8, 3, '#bfe3e0');
@@ -282,7 +284,7 @@ function props(g: CanvasRenderingContext2D, r: Room): void {
       // a low pallet behind each module slot (the pillow at the head's end), the middle post, and the two lamps
       // hanging from the rafters (under the room's plate, which hangs at t + 20 in the hayloft)
       for (const s of r.slots) if (!s.baby) pallet(g, s.x, t, s.facing);
-      box(g, x + 157, t + 50, 6, WALL_H - 50, TIMBER, false);
+      if (!one) box(g, x + 157, t + 50, 6, WALL_H - 50, TIMBER, false);
       // (each cord a flat 1 px ink column)
       for (const l of lampsOf(r)) lamp(g, l);
       break;
