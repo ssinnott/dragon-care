@@ -25,6 +25,8 @@ export const FLOORS = Object.freeze({
   straw: '#e0d6b8',
   /** The elder garden's path, pale gravel (plan S6: no green underfoot, D3): L 0.671, S 0.13. */
   path: '#dcd6c0',
+  /** The mission road the team walks in the watchable scene (plan S9): pale packed earth, L 0.673, S 0.11. */
+  road: '#dcd6c4',
 });
 export type FloorName = keyof typeof FLOORS;
 
@@ -32,6 +34,13 @@ export type FloorName = keyof typeof FLOORS;
 export const STRAW_SEAM = '#c9bd9c';
 /** The garden path's back edge (a 1 px line, not a surface). */
 export const PATH_EDGE = '#c2baa2';
+
+/**
+ * The mission scene's ground under and below its road (plan S9, missionview.ts): the road band's back edge (a 1 px
+ * line), the road's slab, the strip of grass below the slab in the green climates (never underfoot: D3), and the
+ * earth down to the screen's bottom. Gate (w), as backdrops: a dragon walking the road is seen against them.
+ */
+export const ROAD_SCENE = Object.freeze({ edge: '#c4bca8', slab: '#b8ab90', grass: '#8fae76', earth: '#a88e6e' });
 
 /** The back wall of a barn slot no room fills, and of the keepers' ladder bay (L 0.26). */
 export const EMPTY_WALL = '#9a8a76';
@@ -153,9 +162,14 @@ const NIGHT_MOONLIT: readonly string[] = [
 /**
  * Day colours that are the same at night, on purpose (so they are in NIGHT, mapped to themselves): the nests' and the
  * garden's mounds' straw (and the dorm's mattresses: the same colour), which is straw like the floor and keeps the egg
- * gate's contrast; the hearth's firebox and the doorways' dark, already the dark of a mouth.
+ * gate's contrast; the hearth's firebox and the doorways' dark, already the dark of a mouth; and the mission scene's
+ * ground (ROAD_SCENE: the road's edge line, its slab, the earth), which is not the barn -- the watch overlay draws it
+ * (missionview.ts) the same at every hour, never into the building's or the garden's canvases, and its night is its
+ * region's climate picture's, drawn per phase (artseams.ts drawClimate; the art kit's, S9a); its edge line lies along
+ * the road, a floor, like the straw's seam. (The scene's grass strip is the garden lawn's hex, BACKDROPS.lawn: its
+ * entry is the lawn's, moonlit, and stays so -- a keep here would stop the lawn turning at night.)
  */
-const NIGHT_KEEPS: readonly string[] = [NEST, PROPS.mattress, PROPS.firebox, '#3a2a26'];
+const NIGHT_KEEPS: readonly string[] = [NEST, PROPS.mattress, PROPS.firebox, '#3a2a26', ROAD_SCENE.edge, ROAD_SCENE.slab, ROAD_SCENE.earth];
 /**
  * The ONE night table: a day colour to its night colour (plan S6c N4). The building (building.ts) and the garden
  * (gardenArt.ts) are drawn through it -- every fill, and the cel tones made from it -- at the night's step (sky.ts

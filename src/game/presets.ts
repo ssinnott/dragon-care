@@ -10,6 +10,9 @@ import { STAGE_DAYS, HATCH_DAYS, RETIRE_DAYS } from './clock.ts';
 import { NEEDS, hasNeed, moodOf } from './needs.ts';
 import { NAMES } from './names.ts';
 import { settleInGarden } from './garden.ts';
+import { setPreviewTrip } from './seams.ts';
+import { demoTrip, parseTripParam } from './tripdemo.ts';
+import type { TripParam } from './tripdemo.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from './start.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
@@ -74,6 +77,27 @@ export const GARDEN_RESIDENTS: readonly string[] = Object.freeze(['BRAMBLE', 'CO
 /** How far into its elder stage each of the `retire` preset's elders is: RETIRE_DAYS less a tenth of a day (18 s at 1x, 60 steps on a 600-step day). */
 export const RETIRE_AT = RETIRE_DAYS - 0.1;
 
+/** The `trip` preset's trip when no `trip=` is given (or one that doesn't parse): half way along the Old Mine Road. */
+export const TRIP_DEFAULT: TripParam = Object.freeze({ region: 'oldmine', progress: 0.5, fail: false });
+
+/**
+ * The new game with a team away on a hard mission (plan S9: view=base&preset=trip&trip=<region>:<progress>[:fail]):
+ * the region's hard mission (its baddie at the end of the road, if it has one), the best two pairs of the seven with
+ * their auto riders (tripdemo.ts demoTrip), the outcome as asked -- a success unless `:fail` -- and the team `away`,
+ * left so long ago that at step `at` (the frozen t=; 0 live) exactly `progress` of the trip's length has gone by. It is
+ * a preview beside the world (seams.ts setPreviewTrip): the world itself is the new game's, the team still in the barn.
+ */
+export function tripStart(param: TripParam | string | null | undefined, at = 0): StartSpec {
+  const p = typeof param === 'string' || param == null ? parseTripParam(param) ?? TRIP_DEFAULT : param;
+  return { ...newGame(), after: (sim) => {
+    const trip = demoTrip(sim, p.region, 'hard', !p.fail);
+    const L = trip.mission.days * sim.dayLen;
+    trip.departAt = sim.clock + at - Math.round(p.progress * L);
+    trip.returnAt = trip.departAt + L;
+    setPreviewTrip(sim, trip);
+  } };
+}
+
 /** The presets by name (view=base&preset=<name>). */
 export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze({
   /** Every stage at once: the base's first twelve-dragon cast. */
@@ -112,6 +136,8 @@ export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze(
    * somewhere new (travel.ts redirectable), and walks out to the garden.
    */
   retire: () => ({ ...newGame(), dragons: START_DRAGONS.map((p): DragonPlace => ({ ...p, stage: 'elder', days: RETIRE_AT })) }),
+  /** A team away (tripStart): half way along the Old Mine Road, here; the view passes its own `trip=` and frozen t. */
+  trip: () => tripStart(TRIP_DEFAULT),
 });
 
 /** A preset's start by name; no name, or one no preset has, is the new game. */

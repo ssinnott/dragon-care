@@ -34,6 +34,10 @@
 // follows them, a mark in their colour hangs over their head, a line over the pad says what E does, and a touch pad
 // (the four directions, ACT and LET GO) sits at the bottom right; every input goes to the simulation as a command,
 // applied at the start of its next step.
+// Watching a mission (docs/BASE_DESIGN.md 6; plan S9, #5): while a team is out, a TEAM OUT chip under the top bar opens
+// the watch overlay -- the team on its road (missionview.ts), the world stepping on underneath -- and BACK TO BARN (or
+// Esc) closes it. The overlay takes every tap under the top bar before the barn's pad and world; a keeper held by hand
+// stays held but stands still under it, and a badge (or Tab) goes back to the barn to take that keeper.
 import { drawDragon, rootToScreen } from '../art/dragon/rig.ts';
 import { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
 import { ELEMENT_ANIM_FALLBACK } from '../art/dragon/anims.ts';
@@ -43,7 +47,11 @@ import { makePet, petOpts, stepPet, stepWary, extentX, bowlFor, drawBowl } from 
 import type { Pet } from './pet.ts';
 import { CareSim } from './sim.ts';
 import type { Dragon, Job, Keeper } from './sim.ts';
-import { startSpec, buildSim } from './presets.ts';
+import { startSpec, buildSim, tripStart } from './presets.ts';
+import { currentTrip } from './seams.ts';
+import type { Trip } from './trip.ts';
+import { sceneAt, drawMissionScene, drawBackButton, drawResultCard, drawTeamChip, ScenePets, BACK_BUTTON, RESULT_CARD, TEAM_CHIP } from './missionview.ts';
+import type { SceneFrame } from './missionview.ts';
 import { worldKey, barnKey, fnv1a, serialize } from './save.ts';
 import type { SaveV } from './save.ts';
 import { readClock, hourSteps, PHASE_HOURS, HATCH_DAYS } from './clock.ts';
@@ -164,6 +172,11 @@ export interface BaseViewOpts {
    * every dragon pixel the same by day and by night).
    */
   layers?: Layers;
+  /** An overlay open from the start (panel=watch: the team out, watched on its road; plan S9). */
+  panel?: string | null;
+  /** preset=trip's trip (trip=<region>:<progress>[:fail]) and the step it is to be at that progress (the frozen t=, else 0). */
+  trip?: string | null;
+  at?: number;
 }
 
 /**
@@ -253,14 +266,24 @@ export class BaseView {
   private portrait = false;
   /** Last frame's action line (screen px; null: none drawn), for the hook. */
   private lineRect: Rect | null = null;
+  /**
+   * The overlay on screen (plan S9): none (the barn), or `watch` -- the team out on its mission, watched on its road
+   * (missionview.ts), the world stepping on underneath at the chosen speed; the team's characters for the trip watched;
+   * whether its result card was tapped away; and the last scene drawn (for the hook).
+   */
+  private screen: 'none' | 'watch' = 'none';
+  private watching: ScenePets | null = null;
+  private resultClosed = false;
+  private scene: { trip: Trip; f: SceneFrame } | null = null;
 
   constructor(opts: BaseViewOpts) {
     this.persist = !!opts.persist;
     this.layers = opts.layers === 'world' || opts.layers === 'cast' ? opts.layers : 'all';
-    this.use(buildSim(startSpec(opts.preset), opts.seed, opts.hour));
+    this.use(buildSim(opts.preset === 'trip' ? tripStart(opts.trip, opts.at ?? 0) : startSpec(opts.preset), opts.seed, opts.hour));
     if (opts.cam) { this.camAsked = { ...opts.cam }; this.setCam(opts.cam.x, opts.cam.y); }
     this.takeAsked = opts.take ?? null;
     if (this.takeAsked) this.takeByName(this.takeAsked);
+    if (opts.panel === 'watch') this.openWatch();
   }
 
   /**
@@ -278,6 +301,7 @@ export class BaseView {
     this.keeperAgents = agents; this.buildings = [building, null, null, null]; this.plates = plates;
     this.bubbles = []; this.chips = []; this.card = null; this.hatches = []; this.heads.clear(); this.news = [];
     this.walkedWas = sim.keepers.map((k) => k.walked); this.sent = { dx: 0, dy: 0 };
+    this.screen = 'none'; this.watching = null; this.resultClosed = false; this.scene = null;
     // (a world with a smaller garden: the camera inside its end)
     this.setCam(this.camX, this.camY);
   }
@@ -491,6 +515,11 @@ export class BaseView {
   draw(ctx: CanvasRenderingContext2D): void {
     const cx = Math.round(this.camX), cy = Math.round(this.camY), all = this.layers === 'all', world = this.layers !== 'cast';
     const read = readClock(this.sim.clock, this.sim.dayLen), lit = lightsOf(read), step = lit.walls;
+    const trip = currentTrip(this.sim);
+    this.scene = trip ? { trip, f: sceneAt(this.sim, trip) } : null;
+    // (the team watched on its road: the overlay over the barn, the top bar kept; once the trip is over, the barn again)
+    if (this.screen === 'watch' && !trip) this.closeWatch();
+    if (this.screen === 'watch' && all && this.scene) { this.drawWatch(ctx, read, this.scene.trip, this.scene.f); this.publish(read); return; }
     const seen = (x0: number, x1: number, y0: number, y1: number) => x1 >= cx && x0 <= cx + VIEW_W && y1 >= cy && y0 <= cy + VIEW_H;
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = CLEAR; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
@@ -563,14 +592,58 @@ export class BaseView {
       this.hud(ctx, read);
       if (this.toast) drawToast(ctx, this.toast.text);
     }
+    this.publish(read);
+  }
+
+  /**
+   * The team out, watched (plan S9): the scene over the barn (missionview.ts: the road, its stops, the baddie, the team,
+   * the banner), the result card once the trip's time is up (until tapped away), the way back to the barn, and the top
+   * bar over it all -- the world steps on underneath (the barn's own frame is not drawn meanwhile).
+   */
+  private drawWatch(ctx: CanvasRenderingContext2D, read: ClockRead, trip: Trip, f: SceneFrame): void {
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = CLEAR; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    if (!this.watching || this.watching.trip !== trip) this.watching = new ScenePets(this.sim, trip);
+    drawMissionScene(ctx, this.sim, trip, this.watching, f);
+    if (f.done && !this.resultClosed) drawResultCard(ctx, trip, this.sim.tick);
+    drawBackButton(ctx);
+    // (the top bar as over the barn: the keepers' badges live -- a tap takes that keeper, back in the barn -- the one held
+    // lit; the pad and the line are the barn's, not drawn over the scene)
+    const held = this.held();
+    drawTopBar(ctx, { clock: read, jobs: this.sim.jobs.length, keepers: this.sim.keepers.map((k) => ({ name: k.name, look: k.look, state: this.badgeState(k, held) })),
+      speed: this.speed, rate: this.rate, armed: this.newArmed > 0 });
+    this.bubbles = []; this.chips = []; this.heads.clear(); this.lineRect = null;
+  }
+
+  /**
+   * Open the watch overlay on the trip that is out (none out: nothing happens). A keeper held by hand stays held but
+   * stands still while it is open (steer: no direction reaches them, E does nothing), walking on as the keys still down
+   * say once it closes.
+   */
+  private openWatch(): void {
+    const trip = currentTrip(this.sim);
+    if (!trip) return;
+    this.screen = 'watch'; this.card = null;
+    if (!this.watching || this.watching.trip !== trip) { this.watching = null; this.resultClosed = false; }
+    this.steer();
+  }
+
+  /** Close the watch overlay (BACK TO BARN, Esc, a badge, Tab, the trip over): the barn again, the keeper held steered as the keys and pad say. */
+  private closeWatch(): void {
+    this.screen = 'none';
+    this.steer();
+  }
+
+  /** The hook (window.__dragonCare.base): the world as of this frame, and the overlay and the scene (plan S9). */
+  private publish(read: ClockRead): void {
     if (typeof window !== 'undefined' && window.__dragonCare) {
-      const st = this.sim.stats;
+      const st = this.sim.stats, cx = Math.round(this.camX), cy = Math.round(this.camY), all = this.layers === 'all' && this.screen !== 'watch';
       window.__dragonCare.base = { tick: this.sim.tick, camX: this.camX, camY: this.camY, jobs: this.sim.jobs.length, done: st.done, rushes: st.rushes, preempted: st.preempted,
         chips: this.chips.map((c) => ({ ...c.r, dragon: c.job.dragon.name, need: c.job.need, rushed: c.job.rushed })),
         digest: fnv1a(worldKey(this.sim)),
         barnDigest: fnv1a(barnKey(this.sim)),
         clock: { day: read.day, hour: read.hour, minute: read.minute, phase: read.phase },
-        night: step,
+        night: lightsOf(read).walls,
         speed: this.speed,
         persist: this.persist,
         buttons: { ...BUTTONS },
@@ -587,10 +660,22 @@ export class BaseView {
         controlled: controlledKeeper(this.sim)?.name ?? null,
         badges: Object.fromEntries(this.sim.keepers.map((k, i) => [k.name, { x: BADGE_X0 + i * BADGE_DX, y: BADGE_Y, w: BADGE_W, h: BADGE_H }])),
         pad: { ...PAD },
+        // (the line is the barn's: none over the watch overlay)
         action: (() => { const k = this.held(); return k && all ? this.actionLine(k) : null; })(),
         line: this.lineRect ? { ...this.lineRect } : null,
-        doneBy: { ...st.doneBy } };
+        doneBy: { ...st.doneBy },
+        ui: { screen: this.screen, chip: this.scene && this.screen === 'none' && this.layers === 'all' ? { ...TEAM_CHIP } : null, back: this.screen === 'watch' ? { ...BACK_BUTTON } : null },
+        scene: this.sceneHook() };
     }
+  }
+
+  /** The scene as the hook reports it (plan S9): the last stop reached, its banner, the baddie on the road, its exit, which way the team faces, how far along it is. */
+  private sceneHook(): NonNullable<NonNullable<Window['__dragonCare']>['base']>['scene'] {
+    if (!this.scene) return null;
+    const { trip, f } = this.scene, s = f.last == null ? null : trip.stops[f.last];
+    return { stop: s ? (s.kind === 'baddie' ? 'baddie' : s.challenge) : null, covered: s ? s.covered : null, beat: f.stop != null, banner: f.banner,
+      baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, exit: s?.kind === 'baddie' ? trip.exit : null, facing: f.facing,
+      progress: f.L ? f.E / f.L : 0, done: f.done, result: f.done ? (trip.success ? 'HOME SAFE!' : 'HOME EARLY') : null };
   }
 
   /** How far on an egg is: 0 laid, 1 due (its HATCH_DAYS in the nest; one past it waits for a sub-slot at 1). */
@@ -623,6 +708,8 @@ export class BaseView {
     }
     // (the hint gives way to the pad while a keeper is held)
     if (!held) drawHint(ctx, x);
+    // (a team out: its chip under the top bar, which opens the scene)
+    if (this.scene) drawTeamChip(ctx, this.sim, this.scene.trip);
     const d = this.cardDragon();
     if (d) {
       // (a garden resident has only food and love: GARDEN_NEEDS)
@@ -710,7 +797,10 @@ export class BaseView {
    * pad while a keeper is held (ACT, LET GO); an open dragon card closes (it covers the world there too); a job chip
    * rushes its job and brings its dragon into view; a bubble rushes its job; a keeper is taken; a tap on a dragon opens
    * its card -- and rushes its job, if one is waiting (plan S5); a tap on empty space lets go of the keeper held. Any
-   * tap but a button's closes the card (the buttons leave it open: the game can be paused to read it).
+   * tap but a button's closes the card (the buttons leave it open: the game can be paused to read it). A team out
+   * (plan S9): the TEAM OUT chip, after the pad, opens the watch overlay; while it is open the buttons still work, a
+   * badge goes back to the barn and takes (or lets go of) that keeper, and every tap under the bar is the overlay's --
+   * BACK TO BARN, the result card tapped away, anything else swallowed -- before the pad or the world could take it.
    */
   tap(sx: number, sy: number): void {
     if (this.layers === 'all') {
@@ -719,17 +809,28 @@ export class BaseView {
       const i = badgeAt(sx, sy, this.sim.keepers.length);
       if (i != null) {
         const k = this.sim.keepers[i];
+        // (over the watch overlay too: back to the barn, where that keeper is)
+        if (this.screen === 'watch') this.closeWatch();
         if (this.held() === k) this.send({ kind: 'release' });
         else { this.take(k.id); this.focusKeeper(k); }
         return;
       }
       if (sy < BAR_H) return;
+      // (the scene takes every tap under the bar, before the barn's pad and world: back to the barn, or the result card
+      // tapped away; anything else is swallowed)
+      if (this.screen === 'watch') {
+        if (hit(BACK_BUTTON, sx, sy)) this.closeWatch();
+        else if (this.scene?.f.done && !this.resultClosed && hit(RESULT_CARD, sx, sy)) this.resultClosed = true;
+        return;
+      }
       if (this.held()) {
         const pb = padAt(sx, sy);
         if (pb === 'act') { this.send({ kind: 'act' }); return; }
         if (pb === 'letgo') { this.send({ kind: 'release' }); return; }
         if (pb) return;
       }
+      // (a team out: the TEAM OUT chip under the top bar opens the scene)
+      if (this.scene && hit(TEAM_CHIP, sx, sy)) { this.openWatch(); return; }
       if (this.cardDragon() && hit(CARD, sx, sy)) { this.card = null; return; }
     }
     this.card = null;
@@ -774,7 +875,8 @@ export class BaseView {
 
   /** The direction held now -- the keys and the pad's buttons held down -- sent to the simulation when it changes. */
   private steer(): void {
-    const on = (d: 'up' | 'down' | 'left' | 'right') => this.keysHeld.has(d) || [...this.padHeld.values()].includes(d);
+    // (over the watch overlay the keeper held stands still: the barn, where they walk, is not on screen)
+    const on = (d: 'up' | 'down' | 'left' | 'right') => this.screen !== 'watch' && (this.keysHeld.has(d) || [...this.padHeld.values()].includes(d));
     const dx = (+on('right') - +on('left')) as -1 | 0 | 1, dy = (+on('down') - +on('up')) as -1 | 0 | 1;
     if (dx === this.sent.dx && dy === this.sent.dy) return;
     this.sent = { dx, dy };
@@ -841,16 +943,19 @@ export class BaseView {
     // (take= asks for a keeper: taken again in a world a load swapped in)
     if (this.takeAsked && !this.sim.commands.some((c) => c.kind === 'take')) this.takeByName(this.takeAsked);
     // the keys: 1-4 the speed, p pause; WASD or the arrows walk the keeper held, E or Space acts (not on a key's
-    // repeats), Esc lets go, Tab takes the next keeper
+    // repeats), Esc lets go, Tab takes the next keeper. Over the watch overlay (plan S9) the speed keys work as ever,
+    // the keeper held stands still (steer) and E does nothing, Esc goes back to the barn (the keeper still held), and
+    // Tab goes back to the barn and takes the next keeper, as a badge does
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const i = ['1', '2', '3', '4'].indexOf(e.key), dir = DIR_KEYS[e.key];
+      const i = ['1', '2', '3', '4'].indexOf(e.key), dir = DIR_KEYS[e.key], watching = this.screen === 'watch';
       if (i >= 0) this.setRate(RATES[i]);
       else if (e.key === 'p' || e.key === 'P') this.togglePause();
       else if (dir) { this.keysHeld.add(dir); this.steer(); }
-      else if (e.key === 'e' || e.key === 'E' || e.key === ' ') { if (!e.repeat) this.send({ kind: 'act' }); }
-      else if (e.key === 'Escape') this.send({ kind: 'release' });
+      else if (e.key === 'e' || e.key === 'E' || e.key === ' ') { if (!e.repeat && !watching) this.send({ kind: 'act' }); }
+      else if (e.key === 'Escape') { if (watching) this.closeWatch(); else this.send({ kind: 'release' }); }
       else if (e.key === 'Tab') {
+        if (watching) this.closeWatch();
         const ks = this.sim.keepers, h = this.held(), at = h ? ks.indexOf(h) : -1;
         this.take(ks[(at + 1) % ks.length].id);
       } else return;
@@ -886,18 +991,20 @@ export class BaseView {
       return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height };
     };
     const onDown = (e: PointerEvent) => {
-      const p = at(e), pad = this.held() && this.layers === 'all' ? padAt(p.x, p.y) : null;
+      // (the pad is the barn's: not over the watch overlay)
+      const p = at(e), pad = this.held() && this.layers === 'all' && this.screen !== 'watch' ? padAt(p.x, p.y) : null;
       down.set(e.pointerId, { ...p, camX: this.camX, camY: this.camY, drag: false, pad });
       try { canvas.setPointerCapture(e.pointerId); } catch { /* a synthetic pointer */ }
       if (pad) { this.padHeld.set(e.pointerId, pad); if (PAD_DIR[pad]) this.steer(); return; }
-      if (dragger == null) { dragger = e.pointerId; this.camTo = null; this.camAsked = null; }
+      // (over the watch overlay the barn's camera stays where the player left it: taps only)
+      if (dragger == null && this.screen !== 'watch') { dragger = e.pointerId; this.camTo = null; this.camAsked = null; }
     };
     const onMove = (e: PointerEvent) => {
       const d = down.get(e.pointerId);
       if (!d || (d.pad && PAD_DIR[d.pad])) return;
       const p = at(e);
       if (!d.drag && Math.hypot(p.x - d.x, p.y - d.y) > DRAG_PX) d.drag = true;
-      if (d.drag && dragger === e.pointerId) { this.setCam(d.camX - (p.x - d.x), d.camY - (p.y - d.y)); this.followPause = FOLLOW_PAUSE; }
+      if (d.drag && dragger === e.pointerId && this.screen !== 'watch') { this.setCam(d.camX - (p.x - d.x), d.camY - (p.y - d.y)); this.followPause = FOLLOW_PAUSE; }
     };
     const end = (e: PointerEvent, tap: boolean) => {
       const d = down.get(e.pointerId);

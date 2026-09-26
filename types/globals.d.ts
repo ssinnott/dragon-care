@@ -64,8 +64,14 @@ interface Window {
      * `right`, `down`, `act`, `letgo`; drawn and live only while a keeper is held), the line under the pad (who is held,
      * what they carry and what E does) or null and its ink strip (canvas px) or null, and the jobs done by hand so far,
      * by keeper name. The keeper held counts takes and releases still waiting for the next world step in the line and
-     * the badges, but not in `controlled` (the simulation's). Gone once the base is
-     * detached (the page left it).
+     * the badges, but not in `controlled` (the simulation's).
+     * The watchable scene (S9): `ui` -- the overlay on screen (`none`, the barn, or
+     * `watch`, the team out watched on its road), the TEAM OUT chip's rect while it shows (a trip out, the barn on
+     * screen) and the BACK TO BARN button's while watching (canvas px); and `scene`, while a trip is out (null
+     * otherwise): the last stop the team reached (`baddie` or its challenge; null before the first), whether it was met,
+     * whether its beat is playing, the banner, the baddie on the road (its id, face and pose; null when none is in view),
+     * its exit (on a success), the way the team faces (-1 after turning back), how far along the trip is (0..1), and
+     * once its time is up, the result card's title. Gone once the base is detached (the page left it).
      */
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
       chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[];
@@ -89,7 +95,11 @@ interface Window {
       pad: Record<string, { x: number; y: number; w: number; h: number }>;
       action: string | null;
       line: { x: number; y: number; w: number; h: number } | null;
-      doneBy: Record<string, number> };
+      doneBy: Record<string, number>;
+      ui: { screen: 'none' | 'watch'; chip: { x: number; y: number; w: number; h: number } | null; back: { x: number; y: number; w: number; h: number } | null };
+      scene: { stop: string | null; covered: boolean | null; beat: boolean; banner: string | null; baddie: 'moleking' | 'stormroc' | 'frostgiant' | null;
+        face: 'neutral' | 'grumpy' | 'surprised' | 'sleepy' | null; pose: 'walk' | 'stand' | 'sit' | 'turn' | 'leave' | null;
+        exit: 'calmed' | 'outwitted' | 'drivenOff' | null; facing: 1 | -1; progress: number; done: boolean; result: string | null } | null };
     /**
      * view=base, live and saving (src/game/base.ts attach, only when the page loads and saves the player's barn): save
      * the barn now, and return the step it was saved at. Gone once the base is detached.

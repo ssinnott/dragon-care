@@ -40,7 +40,9 @@
 //                              live, the keys 1-4 pick 1x, 2x, 4x or 8x and p pauses; take=<keeper> (bea, tomas, iris,
 //                              pip) takes that keeper by hand at the first step (frozen too: the pad, the mark and the
 //                              line show); live, a tap on a keeper or their badge takes them, WASD or the arrows walk
-//                              them, E or Space does the chore in reach, Esc lets go
+//                              them, E or Space does the chore in reach, Esc lets go; preset=trip&trip=<region>:
+//                              <progress>[:fail] has a team away on the region's hard mission, that far along its road
+//                              at the frozen t (plan S9), and panel=watch opens the watchable scene over the barn
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
 //   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
@@ -134,6 +136,9 @@ export interface GalleryParams {
   layers: 'all' | 'world' | 'cast';
   /** view=base: take=<keeper name>, a keeper taken by hand at the first step (null: none). */
   take: string | null;
+  /** view=base: panel=watch opens the watchable scene (plan S9); trip=<region>:<progress>[:fail], preset=trip's team away. */
+  panel: string | null;
+  trip: string | null;
 }
 
 export function parseParams(search: string): GalleryParams {
@@ -173,6 +178,8 @@ export function parseParams(search: string): GalleryParams {
     hour: hourParam(q.get('hour')),
     layers: q.get('layers') === 'world' ? 'world' : q.get('layers') === 'cast' ? 'cast' : 'all',
     take: q.get('take') || null,
+    panel: q.get('panel') || null,
+    trip: q.get('trip') || null,
   };
 }
 
@@ -1354,7 +1361,7 @@ function makeScene(P: GalleryParams): Scene {
     case 'yardaudit': return yardAuditScene(P);
     // (a frozen view never loads or saves (G4), and nor does a preset or a start hour: loading would hide it, autosaving
     // would put it in place of the player's barn)
-    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset && P.hour == null, hour: P.hour, layers: P.layers, take: P.take });
+    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset && P.hour == null, hour: P.hour, layers: P.layers, take: P.take, panel: P.panel, trip: P.trip, at: P.t ?? 0 });
     default: return lineupScene(P);
   }
 }
