@@ -12,3 +12,9 @@ Shared, read-only inputs for the parallel sessions finishing issues #5-#11 on `c
   "PARALLEL CONTRACT" block at the top of the S8 and S9 sections of `plan.md`.
 
 Nothing on this branch is ever merged into the work branch.
+- `miller_mock.png`, `miller_mock_zoom.png`, `miller_mock.patch`: the grumpy miller mockup ("Hob the miller"), drawn
+  through the real keeper rig (keeper palette gates pass: 212/212). S9a builds the game's miller from this patch: keep
+  its src/art/keeper/* changes (drop the MOCKUP labels and the throwaway `view=millermock` / src/mock/), expose him
+  through `npcs.ts` with `drawMiller(ctx, mood: 'grumpy' | 'talkedRound', x, feetY, facing, t)` as artseams.ts
+  (contract af25650) spells it. The user asked for him to READ grumpy: keep the folded arms, turned-away stance,
+  flat low brows, pout and hmph.
