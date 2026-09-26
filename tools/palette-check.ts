@@ -73,6 +73,11 @@
 //                   straw is all it is seen against: every pixel just outside its ink ring, at every wobble, lies in
 //                   the nest heap's plain straw (src/game/layout.ts NEST_RX, NEST_RY, eggBottom: a px in from the
 //                   heap's inked edge, over the floor's band, off the strands), never the Hatchery's wall.
+// BADDIES (counted apart, its own RESULT line: BADDIES):
+//   (x) baddies   : every fill a big baddie is drawn in (src/game/artseams.ts BADDIE_FILLS: the mission art kit's) keeps
+//                   >= 25 % luminance from the road the team walks in the watchable scene (FLOORS.road), the ground under
+//                   and below it (surfaces.ts ROAD_SCENE), and its region's backdrop bands at every phase (artseams.ts
+//                   climateBands; none while the kit's stand-ins are in), and >= OKL_MIN Oklab L from the ink (plan S9).
 // REPORTED, NOT GATED:
 //   (g) any scale pair that passes (b) on hue alone at the same stage (it would merge in greyscale); any body pair
 //       that passes (f) on simulated value alone under the dark-pair floor (they are told apart by zone); glow colours
@@ -90,7 +95,10 @@ import type { KeeperPalette } from '../src/art/keeper/palettes.ts';
 import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
 import type { KeeperId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
-import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, stepped } from '../src/game/surfaces.ts';
+import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, ROAD_SCENE, stepped } from '../src/game/surfaces.ts';
+import { BADDIE_FILLS, climateBands } from '../src/game/artseams.ts';
+import { BADDIE_DATA, REGION_DATA, REGION_IDS } from '../src/game/tripdemo.ts';
+import type { BaddieId } from '../src/game/missiondata.ts';
 import { NEST_RX, NEST_RY, NEST_STRANDS, WALL_H, floorTop, nestBase, eggBottom } from '../src/game/layout.ts';
 import { SHELL, WOBBLE } from '../src/game/eggs.ts';
 import { PHASE_ORDER } from '../src/game/clock.ts';
@@ -835,6 +843,9 @@ function lighterBy(a: string, b: string): number {
   // the fence, the nest mounds' straw, and the lanterns' rings on the hedge at night)
   list.push(['garden hedge', BACKDROPS.hedge], ['garden lawn', BACKDROPS.lawn], ['garden trunk', BACKDROPS.trunk], ['garden fence', BACKDROPS.fence], ['garden mound', NEST],
     ['lantern ring inner', LANTERN_RINGS[0]], ['lantern ring outer', LANTERN_RINGS[1]]);
+  // (the mission scene's ground, under and below the road the team walks: the road's edge line, its slab, the grass
+  // strip below it in the green climates, the earth; plan S9)
+  list.push(['road edge', ROAD_SCENE.edge], ['road slab', ROAD_SCENE.slab], ['road grass', ROAD_SCENE.grass], ['road earth', ROAD_SCENE.earth]);
   const props: [string, string][] = Object.entries(PROPS).map(([k, hex]) => [`prop ${k}`, hex]);
   head(`(w) BACKDROPS  (everything a dragon is seen against: the sky, hills, clouds, walls, stone and lamps' light each >= ${LUM_MIN * 100}% LIGHTER in luminance than every dark body (scale L < ${W_DARK}: ${dark.length} element-stages), so L >= ${floorL.toFixed(3)}, never black; a big prop behind a slot >= ${LUM_MIN * 100}% from them either way; all >= ${OKL_MIN} Oklab L from the ink ${INK})`);
   for (const [what, hex, apart] of [...list.map(([w, h]) => [w, h, false] as const), ...props.map(([w, h]) => [w, h, true] as const)]) {
@@ -885,11 +896,46 @@ for (const e of DRAGON_ELEMENTS) {
   out.push(`${bad ? '  FAIL' : '  ok  '} egg-lie    every egg lies against the nest's straw alone: the ${seen} pixels round its ink ring over its ${new Set(WOBBLE).size} wobbles, all in the heap (${NEST_RX} x ${NEST_RY} px), over the band, off the strands${bad ? ` -- ${bad}` : ''}`);
 }
 
+// ---------- (x) the big baddies (the watchable scene: src/game/missionview.ts; plan S9) ----------
+// Every fill a baddie is drawn in (artseams.ts BADDIE_FILLS: S9a's BADDIE_ART palettes at the merge) keeps >= 25 %
+// luminance from what it stands on and in front of: the road (FLOORS.road), the scene's ground under and below it
+// (ROAD_SCENE: its slab, the grass strip, the earth), and its region's backdrop bands at every phase of the day
+// (artseams.ts climateBands: S9a's BACKDROPS.climate; none on a base without the art kit, which is said), and >= 6
+// Oklab L from the ink. A baddie's face comes only from BaddieFace (neutral, grumpy, surprised, sleepy: no angry one),
+// which the type holds (missiondata.ts; missionview.ts _Faces).
+let xGates = 0, xFailures = 0;
+const xFailed: string[] = [];
+{
+  const ground: [string, string][] = [['road', FLOORS.road], ['road slab', ROAD_SCENE.slab], ['road grass', ROAD_SCENE.grass], ['road earth', ROAD_SCENE.earth]];
+  head(`(x) BADDIES  (every baddie fill >= ${LUM_MIN * 100}% in luminance from the road ${FLOORS.road}, the scene's ground and its region's backdrop bands at every phase; >= ${OKL_MIN} Oklab L from the ink ${INK})`);
+  for (const id of Object.keys(BADDIE_FILLS) as BaddieId[]) {
+    const region = REGION_IDS.find((r) => REGION_DATA[r].baddie === id)!, climate = REGION_DATA[region].climate;
+    const against: [string, string][] = [...ground];
+    let bandsSeen = 0;
+    for (const ph of PHASE_ORDER) { const bands = climateBands(climate, ph); if (bands) bands.forEach((hex, i) => { against.push([`${climate} ${ph} band ${i}`, hex]); bandsSeen++; }); }
+    for (const fill of BADDIE_FILLS[id]) {
+      let least = Infinity, by = '';
+      for (const [what, hex] of against) {
+        const d = relDiff(fill, hex);
+        xGates++;
+        if (d < LUM_MIN) { xFailures++; xFailed.push(`(x) ${id} ${fill} / ${what}`); }
+        if (d < least) { least = d; by = what; }
+      }
+      const ink = okDiff(fill, INK);
+      xGates++;
+      if (ink < OKL_MIN) { xFailures++; xFailed.push(`(x) ${id} ${fill} / ink`); }
+      out.push(`${least >= LUM_MIN && ink >= OKL_MIN ? '  ok  ' : '  FAIL'} ${BADDIE_DATA[id].name.padEnd(16)} ${fill}  L ${lumOf(fill).toFixed(3)}  least ${pct(least)} (${by})  ${okf(ink)} from ink`);
+    }
+    out.push(`       ${BADDIE_DATA[id].name}: ${bandsSeen ? `${bandsSeen} ${climate} backdrop bands gated` : `no ${climate} band palette on this base (artseams.ts climateBands: the art kit's, S9a) -- the road and its ground gated`}`);
+  }
+}
+
 // ---------- verdict ----------
 out.push('');
 out.push(failures ? `RESULT: FAIL  ${failures} of ${gates} gates failed: ${failed.join('; ')}` : `RESULT: PASS  ${gates} of ${gates} gates passed`);
 out.push(kFailures ? `KEEPERS: FAIL  ${kFailures} of ${kGates} gates failed: ${kFailed.join('; ')}` : `KEEPERS: PASS  ${kGates} of ${kGates} gates passed`);
 out.push(wFailures ? `BACKDROPS: FAIL  ${wFailures} of ${wGates} gates failed: ${wFailed.join('; ')}` : `BACKDROPS: PASS  ${wGates} of ${wGates} gates passed`);
 out.push(eFailures ? `EGGS: FAIL  ${eFailures} of ${eGates} gates failed: ${eFailed.join('; ')}` : `EGGS: PASS  ${eGates} of ${eGates} gates passed`);
+out.push(xFailures ? `BADDIES: FAIL  ${xFailures} of ${xGates} gates failed: ${xFailed.join('; ')}` : `BADDIES: PASS  ${xGates} of ${xGates} gates passed`);
 console.log(out.join('\n'));
-if (failures || kFailures || wFailures || eFailures) process.exitCode = 1;
+if (failures || kFailures || wFailures || eFailures || xFailures) process.exitCode = 1;

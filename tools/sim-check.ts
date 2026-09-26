@@ -83,6 +83,14 @@
 //    met where it rests by a keeper come out of the barn at its snout (the garden used); no resident at rest with its eye
 //    under another's body, nor two at rest lying one over the other (bodies overlapping REST_OVERLAP px at most); the
 //    barn beside them keeps its service; the keeper visits per resident are printed.
+// 24. The watchable scene (#5.3 on the road, #5.5 the big baddie; plan S9): an easy, a normal and a hard mission (Old
+//    Mine Road's, Highfold's and Frostmere's, each with its baddie), each way it can end, read from the scene's pure
+//    function at every step of the trip: the team at its places as it leaves and done when its time is up, its travel
+//    time never falling, its dragons never walking back before they turn back nor on after, standing still through
+//    every stop's beat, turning back at the end of the first uncovered stop's beat on a failure (never on a success),
+//    each travel step moving each dragon by exactly its walk's distance over that step at its speed (no skate: s times
+//    the frame's move, within 1e-9), a baddie's face only one of the four, and its exit (calmed, outwitted, driven off)
+//    shown on a success; the trip preset puts a team exactly that far along at the frozen step.
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
@@ -125,6 +133,12 @@ import { DRAGON_ELEMENTS } from '../src/art/dragon/palettes.ts';
 import type { DragonElement } from '../src/art/dragon/palettes.ts';
 import type { Stage } from '../src/art/dragon/stages.ts';
 import { STAGES } from '../src/art/dragon/stages.ts';
+import { sceneAt, beatLen, baddieBeatLen, walkDist, frameAt, PAIR_BACK } from '../src/game/missionview.ts';
+import type { SceneFrame } from '../src/game/missionview.ts';
+import { demoTrip } from '../src/game/tripdemo.ts';
+import { tripStart } from '../src/game/presets.ts';
+import { currentTrip } from '../src/game/seams.ts';
+import type { RegionId, Difficulty } from '../src/game/missiondata.ts';
 
 /**
  * Section 10 (one car's capacity: 30 minutes of eight adults, and the crowded casts, about 9 s) runs in a worker thread
@@ -1477,6 +1491,79 @@ if (MAIN) {
   noteUse(w);
   const perHour = (n: number) => (n * 60 / MIN).toFixed(0);
   console.log(`  16 residents (the garden preset, ${MIN} min of the real day): ${R.map((d) => { const p = per.get(d)!; return `${d.name} napped ${(p.nap / steps * 100).toFixed(0)} % (every one of ${p.night} night steps), strolled ${p.strolls} times, ${p.visits.length} keeper visits (${p.visits.join(', ') || 'none'}; ${perHour(p.visits.length)} an hour)`; }).join('; ')}; jobs for food and love only, draining at a quarter of an elder's (per step x 1e6: ${drains.join(', ')}; within ${(worstDrain * 100).toFixed(3)} %); two at rest overlapping at most ${restMax.toFixed(1)} px (gate ${REST_OVERLAP}); the barn beside them: ${st.done} jobs done, wait avg ${avg.toFixed(1)} s, max ${max.toFixed(1)} s, ${st.emptySteps} steps with a need at 0, the Garden Gate passed ${st.used.gate ?? 0} times`);
+}
+
+// ---------- 24. the watchable scene (plan S9: #5.3 on the road, #5.5 the big baddie) ----------
+if (MAIN) {
+  // an easy, a normal and a hard mission with its baddie (each of the three), each with both outcomes where it matters:
+  // every step of the trip's time read from the scene's pure function, and checked against the last step's
+  const runs: [RegionId, Difficulty, boolean][] = [['millbrook', 'easy', true], ['millbrook', 'easy', false], ['bramblewood', 'normal', true], ['bramblewood', 'normal', false],
+    ['oldmine', 'hard', true], ['oldmine', 'hard', false], ['highfold', 'hard', true], ['frostmere', 'hard', true]];
+  const EXITS: readonly string[] = ['calmed', 'outwitted', 'drivenOff'];
+  const EXIT_LOOK: Readonly<Record<string, { pose: string; face: string }>> = { calmed: { pose: 'sit', face: 'sleepy' }, outwitted: { pose: 'leave', face: 'neutral' }, drivenOff: { pose: 'leave', face: 'grumpy' } };
+  let travelSteps = 0, inFrame = 0, frames = 0;
+  const lines: string[] = [];
+  for (const [region, diff, success] of runs) {
+    const sim = newSim(1), trip = demoTrip(sim, region, diff, success), L = trip.mission.days * sim.dayLen, what = `scene: ${region} ${diff} (${success ? 'success' : 'failure'})`;
+    trip.departAt = sim.clock; trip.returnAt = sim.clock + L;
+    const team = trip.pairs.map((p) => sim.dragons.find((d) => d.id === p.dragon)!), gaits = team.map((d) => gaitOf(d.element, d.stage));
+    const first = trip.stops.findIndex((q) => !q.covered), b = success ? null : first >= 0 ? first : trip.stops.length - 1;
+    if (trip.turnBack !== b) fail(`${what}: turns back at stop ${trip.turnBack}, not the first uncovered (${b})`);
+    const starts = trip.stops.map((q) => Math.round(q.at * L)), lens = trip.stops.map((q) => (q.kind === 'baddie' ? baddieBeatLen(L) : beatLen(L)));
+    let prev: SceneFrame | null = null, nb: number | null = null, turnAt: number | null = null, exitSeen: string | null = null;
+    const z = sceneAt(sim, trip, trip.departAt);
+    if (z.xs.some((x, i) => x !== -PAIR_BACK * i) || z.n !== 0 || z.done) fail(`${what}: at E = 0 the team is at ${z.xs.join(', ')} (n ${z.n}, done ${z.done}), not at its places`);
+    if (!isDeepStrictEqual(sceneAt(sim, trip, trip.departAt + 12345), sceneAt(sim, trip, trip.departAt + 12345))) fail(`${what}: two reads of one clock differ`);
+    for (let c = trip.departAt - 3; c <= trip.returnAt + 3; c++) {
+      const f = sceneAt(sim, trip, c), E = c - trip.departAt;
+      frames++;
+      if (f.done !== (E >= L)) fail(`${what}: done is ${f.done} at E ${E} of ${L}`);
+      if (f.facing === -1 && turnAt == null) { turnAt = E; nb = f.n; }
+      if (f.baddie) inFrame++;
+      if (f.baddie && trip.exit && f.baddie.pose === EXIT_LOOK[trip.exit].pose && f.baddie.face === EXIT_LOOK[trip.exit].face) exitSeen = trip.exit;
+      if (f.baddie && ((f.baddie.face as string) === 'angry' || !['neutral', 'grumpy', 'surprised', 'sleepy'].includes(f.baddie.face))) fail(`${what}: the baddie's face is ${f.baddie.face}`);
+      if (prev) {
+        if (f.n < prev.n) fail(`${what}: n fell from ${prev.n} to ${f.n} at E ${E}`);
+        for (let i = 0; i < f.xs.length; i++) {
+          const dx = f.xs[i] - prev.xs[i];
+          if (f.facing === 1 && dx < -1e-9) fail(`${what}: pair ${i} went back ${dx} before turning back, at E ${E}`);
+          if (f.facing === -1 && prev.facing === -1 && dx > 1e-9) fail(`${what}: pair ${i} went on ${dx} after turning back, at E ${E}`);
+          if (f.stop != null && prev.stop === f.stop && dx !== 0) fail(`${what}: pair ${i} moved ${dx} in stop ${f.stop}'s beat, at E ${E}`);
+        }
+        // (no skate: a travel step moves each dragon by its walk's distance over that step at its speed -- s times the
+        // move of the frame it is in, when the step stays in one frame)
+        if (f.stop == null && prev.stop == null && !f.done && f.facing === prev.facing && f.n === prev.n + 1) {
+          travelSteps++;
+          for (let i = 0; i < f.xs.length; i++) {
+            const g = gaits[i], s = f.speeds[i], t0 = s * (prev.n - (f.facing < 0 ? nb! : 0)), t1 = s * (f.n - (f.facing < 0 ? nb! : 0));
+            const want = f.facing * (walkDist(g, t1) - walkDist(g, t0)), dx = f.xs[i] - prev.xs[i];
+            if (Math.abs(dx - want) > 1e-9) fail(`${what}: pair ${i} moved ${dx} at E ${E}, its walk says ${want}`);
+            const fr = frameAt(g, t0);
+            if (fr === frameAt(g, t1 - 1e-9) && Math.abs(Math.abs(dx) - s * g.frames[fr].move) > 1e-9) fail(`${what}: pair ${i} skated at E ${E}: moved ${dx}, its frame's move x speed is ${s * g.frames[fr].move}`);
+          }
+        }
+      }
+      prev = f;
+    }
+    if (b != null) {
+      const want = starts[b] + lens[b];
+      if (turnAt !== want) fail(`${what}: turned back at E ${turnAt}, not at the end of stop ${b}'s beat (${want})`);
+    } else if (turnAt != null) fail(`${what}: turned back at E ${turnAt} on a success`);
+    if (success && trip.mission.baddie) {
+      if (!trip.exit || !EXITS.includes(trip.exit)) fail(`${what}: the baddie's exit is ${trip.exit}`);
+      if (exitSeen !== trip.exit) fail(`${what}: the baddie's exit (${trip.exit}) was never shown`);
+    }
+    if (!success && trip.exit != null) fail(`${what}: a failure has an exit (${trip.exit})`);
+    lines.push(`${region} ${diff} ${success ? 'home safe' : `home early (turned at stop ${b}, E ${turnAt})`}${trip.mission.baddie ? `, ${trip.mission.baddie} ${trip.exit ?? 'keeps the road'}` : ''}`);
+  }
+  // (the preset puts the trip exactly that far along at the frozen step)
+  for (const [q, p] of [['oldmine:0.95', 0.95], ['millbrook:0.3', 0.3]] as const) {
+    const w = buildSim(tripStart(q, 60), 1);
+    for (let i = 0; i < 60; i++) w.step();
+    const t = currentTrip(w), f = t && sceneAt(w, t);
+    if (!f || f.E !== Math.round(p * f.L)) fail(`scene: trip=${q} at t=60 is at E ${f?.E} of ${f?.L}, not ${p}`);
+  }
+  console.log(`  24 scene: ${lines.join('; ')}; ${frames} steps read, ${travelSteps} travel steps without a skate, the baddie in view ${inFrame} of them; the scene's types have no hurt state, and exits only calmed, outwitted or driven off`);
 }
 
 // ---------- 10 (its worker's result) ----------

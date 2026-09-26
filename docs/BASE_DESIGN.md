@@ -30,7 +30,7 @@ shows it.*
 | B2 | **Care is managerial.** Dragons have needs that drain over time; keepers (the humans) walk over and meet them. The player's one per-dragon action is **Rush**. | Tapping every dragon every few minutes is a chore, not a game (the user's words: "that doesn't sound very fun"). The hands-on care of the art bible (spike's chin, dusk's tuck-in) becomes what keepers *do*, animated. |
 | B3 | **Needs show as thought bubbles** over the dragons and as a **prioritised job queue** along the bottom of the screen. | The bubble says *which* dragon wants *what* at a glance; the queue says *what's next*. |
 | B4 | **Missions are set and forget,** a mission table in the style of World of Warcraft: pick a team, the dragons' elements and the riders' skills counter the mission's challenges, a success chance, a reward. | Simple at this stage, by the user's choice; no choices mid-mission. |
-| B5 | **Missions are watchable:** an animated side-scrolling scene of the team completing it. **The scene is the timer.** | The user wants to see the team at work; the side-view walk the rig already has makes it cheap. |
+| B5 | **Missions are watchable:** an animated side-scrolling scene of the team completing it. **The scene is the timer.** (Built: 6.) | The user wants to see the team at work; the side-view walk the rig already has makes it cheap. |
 | B6 | **Everything runs only while the game is open.** One clock drives care, missions and hatching; closing the game pauses the world. | No coming back to a barn of red bubbles; no offline catch-up to build. Missions therefore last minutes of play, not hours. |
 | B7 | **Humans are assigned automatically:** keepers to jobs, riders to the dragons you send. | Fewer clicks; the player's choices are *which dragons* and *what to build*. |
 | B8 | **Cozy:** no combat. Missions have hazards, not enemies; nobody is hurt; old age is never decline (D21): retiring to the garden is the elder's reward (D21), a place and never a farewell (3, The Garden). | The game's face set has no angry face (D18) and the elder is a reward. |
@@ -507,27 +507,52 @@ stand spot <= 20 s, the bay's edge <= 60 s.
 
 ![The mission scene: dusk's lamp lights the tunnel, the team waits out the flood, the result](base/mission_scene.png)
 
-- **The scene is the timer.** From the table, the team walks out into a side-scrolling scene that lasts exactly as
-  long as the mission.
-- **The trip is a road with the challenges as stops.**
-  - **Covered:** at a covered stop, whoever counters it has their moment. Dusk's lamp flares and lights the tunnel,
-    the rock hauls the cart, the rider talks the miller round.
-  - **Uncovered:** an uncovered stop is where the tension sits, and the team struggles (they wait out the flood). On a
-    successful mission they get through, late; on a failed one, this is where they turn back.
-- **What you see.** The team's food and sleep drain on screen. A banner names each challenge and who met it. The end
-  is a result card.
-- **Leaving.** "Back to barn" leaves the scene without stopping it, and a "team out" chip in the barn's HUD returns to
-  it.
-- **Built from data, not animated per mission.** A region is:
-  - a backdrop in parallax layers;
-  - a few set pieces (a tunnel, a ford, a mill);
-  - one reusable *beat* per challenge type.
+*The picture is the first mockup. As built (plan S9, `src/game/missionview.ts`), the scene reads as follows.*
 
-  The dragons walk their own walk, each played at the speed that keeps the team together without a skating paw (a
-  walk's `move` is its world speed: 4.1). New work: a human walk cycle (the engine rig has none authored here) and the
-  beat library.
+- **The scene is the timer (B5, confirmed).** The scene lasts exactly as long as the trip, and it is a pure function
+  of the trip and the world's clock (`sceneAt(sim, trip)`): E, the time since the team left the Aerie, runs 0..L (L =
+  the trip's return less its departure: 1, 2 or 3 game days). Nothing in it is stepped or saved, and the simulation
+  never reads it, so a frozen view (`t=`) and a view opened half way along show the same road.
+- **The trip is a road with the challenges as stops** (trip.ts: challenge i of n at (i+1)/(n+1) x 0.85 of the length,
+  the baddie at 0.9). At each stop the team stands for its **beat**: min(600, 0.08 L) steps (10 s at 1x), a baddie's
+  min(900, 0.12 L). The travel time n is E less the beats' time so far, so the walk pauses while a beat plays.
+  - **Covered:** its counter has its moment 15 % into the beat, the others stand: dusk, fire, lightning, water and spike
+    breathe, rock heaves (`happy`), slinkwing calls; a rider waves (Charm), kneels to pet (Medic), hushes (Navigator)
+    or cheers (Nimble). Half way through, the set piece shows the challenge met (the miller, grumpy until then, is
+    talked round).
+  - **Uncovered:** on a success they wait it out ("SPRING FLOOD - NOBODY COULD HELP: THEY WAIT IT OUT"); on a failure
+    the first uncovered stop (or the last, if all were covered) is where they turn back: after its beat the team faces
+    home and walks back the way it came ("... THEY TURN BACK FOR HOME").
+- **The pace** (G13: no skating paw). The team walks at the slowest dragon's mean pace V. Each dragon's walk plays at
+  speed s = V / its own mean (1 or less), and its body moves by D(s n), the distance its walk carries it by anim time
+  s n (the frames' moves summed, the last one's in part): each step exactly s times the move of the frame it is in.
+  Pair 1's dragon walks 170 px behind pair 0's; each rider 56 px ahead of their dragon's root, a step behind it in
+  depth, walking at V. The camera keeps the team's middle 260 px from the left edge. The road's feet are at y 300.
+- **The big baddie** (a hard mission in Old Mine Road, Highfold or Frostmere): its beat is split 25 / 35 / 40 %. It
+  walks in from the right to 200 px ahead of the lead, grumpy; turns surprised as its two counters have their moments
+  in turn (the dragon's, then the rider's); then, on a success, it takes its exit -- the Mole King **calmed** (sits and
+  dozes off, "z"s stepping up), the Storm Roc **outwitted** (turns and wanders off the wrong way) or the Frost Giant
+  **driven off** (shuffles off to colder hills, grumbling, dust at its feet). On a failure it keeps the road, grumpy:
+  "THE MOLE KING KEEPS THE ROAD. HOME FOR TEA. NOBODY IS HURT." -- and the team turns back. No knockback, no hurt pose,
+  nothing flung (B8, D4).
+- **What you see.** A banner at the top names the stop as it is reached, then how it went (with a check mark when it
+  was met), and stays up until the next stop. When the trip's time is up, a **result card**: HOME SAFE! or HOME EARLY,
+  the coin (half on a failure) and the egg if one was won, and "NOBODY IS HURT."; a tap puts it away.
+- **Leaving.** The scene is an overlay over the barn (under the top bar, which stays); the world keeps stepping under
+  it at the chosen speed. "← BACK TO BARN" closes it, and the TEAM OUT chip under the top bar (a trip out: "TEAM OUT -
+  14H", game hours to go) opens it again.
+- **Built from data, not animated per mission.** A region is its climate's backdrop in parallax layers, and a set
+  piece per challenge (a cave mouth, a boulder cart, a snowdrift, a storm cloud, a ford, a bramble arch, a signpost,
+  the mill, a bandaged bird, a fog bank behind the team, two rocks); the beats are the rig's own anims.
 - **The dark** follows section 1: in the tunnel only the lamp's pool of light is open, stepped in flat rings (no
   gradients).
+- **Status (S9, built beside S8).** The scene is built against the missions' shared contract (`trip.ts`,
+  `missiondata.ts`, `seams.ts`): it watches the trip `currentTrip(sim)` returns. The Map Room's missions (S8) are not on
+  this branch yet, so the only trip out is a preview: `view=base&preset=trip&trip=<region>:<progress>[:fail]` puts a
+  team of two pairs on the region's hard mission that far along its road at the frozen step (`src/game/tripdemo.ts`,
+  a copy of S8's regions table), beside the world and never in it (the team's dragons are still drawn in the barn);
+  `panel=watch` opens the scene. The climates, set pieces, baddies and the miller are the mission art kit's greybox
+  stand-ins (`src/game/artseams.ts`) until the kit lands (S9a); the dragons and riders are the real rigs.
 
 ---
 
@@ -658,6 +683,11 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    two presets show it: `preset=garden` (three residents on their plots -- BRAMBLE, COBBLE and ECHO -- and four adults in
    the barn) and `preset=retire` (the seven starters, elders a tenth of a day from retiring: they walk out one by one,
    and the garden widens to seven plots).
+   **Watching a mission is built too** (6; plan S9): the scene of a team out on its road -- the stops and their beats,
+   the banners, the big baddie's beat and its cozy exit, the result card, the TEAM OUT chip and BACK TO BARN. Until the
+   Map Room sends a team (S8), `preset=trip&trip=<region>:<progress>[:fail]` puts one on a hard mission that far along
+   (`trip=oldmine:0.906&panel=watch&t=60`: the Mole King in its beat; `oldmine:0.921` dozing off; `highfold`,
+   `frostmere` the Storm Roc and the Frost Giant; `bramblewood:0.7:fail` turned back; `oldmine:1` the result card).
 
    ![The built slice, 49 s in, in the start frame: RIPPLE walks off the Dragon Lift's car at the upper floor to the Romp Room, and Pip, sent for it now it is past its ride, goes for a ball at the box by the wheel; ZAP waits at the ground floor's east landing for the car up to the Lamp Dorm, back to back with COBBLE walking into the Bathhouse's first slot (Tomas brings the bucket, out of frame); WICK waits at the hayloft's east landing for the car down to the Romp Room; ECHO walks past BRAMBLE in the Grooming Parlour on its way down to the Bathhouse; Bea waits in the Hearth Kitchen; the job strip](base/base_live.png)
 
@@ -666,7 +696,7 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    | `src/game/pet.ts` | the pet code, moved out of `src/gallery.ts` unchanged (the gallery renders pixel for pixel as before), and the paper turn the base's dragons turn with |
    | `src/game/needs.ts` | the five needs, the drains, the tiers, mood and lightning's charge |
    | `src/game/layout.ts` | the grid; the rooms, each with its purpose (#11), and their dragon slots and stand spots; the Dragon Lift and the Aerie; the garden's plots and the world's width for a garden of so many; the keepers' net (the ladders) and a dragon net per stage (the lift), built for the garden's end; routes between any two spots on a net; the name plates' places |
-   | `src/game/surfaces.ts` | every floor anyone stands on (`FLOORS`: straw, the garden's path), and everything a dragon is seen against (the walls, the sky's colours at every phase, the big props behind a slot, the lamps' and lanterns' light, the garden's hedge, lawn, wood and fence), each gated by `tools/palette-check.ts` (i, Ki, w) |
+   | `src/game/surfaces.ts` | every floor anyone stands on (`FLOORS`: straw, the garden's path, the mission road), and everything a dragon is seen against (the walls, the sky's colours at every phase, the big props behind a slot, the lamps' and lanterns' light, the garden's hedge, lawn, wood and fence), each gated by `tools/palette-check.ts` (i, Ki, w) |
    | `src/game/clock.ts` | the day's length and phases, the speeds, reading the clock (the day, the time, the phase and the sky's stepped turn) |
    | `src/game/sky.ts` | the sky behind the building, in screen space: the bands, the far hills and clouds, the moon and the stars |
    | `src/game/hud.ts` | the top bar (the clock, the jobs, the keepers' badges, NEW, pause, the speed), the toasts and the hint |
@@ -684,8 +714,10 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    | `src/game/eggs.ts` | the eggs, drawn: the shell, its cracks and wobble, the hatch's shell bits |
    | `src/game/garden.ts` | the elder garden: retiring (30 days into the elder stage), the plots it grows, the residents' nap, sit and stroll (napping only at night: the one simulation module that reads the day's phase), their resting places kept apart (clear of each other's eyes, no two bodies overlapping more than 20 px), their jobs met where they rest |
    | `src/game/gardenArt.ts` | the garden, drawn: a plot's tile (the hedge, the lawn, an apple tree on every other, a nest mound, a lantern, flowers on stalks; the path, the kerb, the ground), drawn only where it is on screen; the fence at the world's end; the lanterns' rings at night, clipped to the hedge's own shape; the GARDEN sign |
+   | `src/game/missionview.ts` | the watchable scene: the scene as a pure function of the trip and the clock (`sceneAt`: the beats, the pace from each walk's own root motion, the turn back, the baddie's beat), the team's characters played to it, and its drawing (the climate, the road, the set pieces, the baddie, the banner, the result card, the TEAM OUT chip) |
+   | `src/game/tripdemo.ts` | the `trip` preset's missions: a copy of S8's regions, challenges, baddies and riders' skills, and a team of two pairs on a region's mission (until S8's own) |
    | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks, turns and rides; a resident's nap and wake) and their anims, the lift's car, the eggs, the grow-up's flash, the garden, the sky and the lights, the speed, the camera (out to the garden's end), the HUD (the dragon card too) and the input; a live page loads and saves the barn |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled with room to grow every time, each grow-up held still for its `happy`, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days; a baby Rushed on its way to grow up met in a sub-slot) and eggs (the nests, hatching exactly 2 days on into a new baby, in front of its own nest or an empty one, fed within 3 minutes, a full barn's egg waiting, no baby moved on to the Hatchery, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up; the elder garden (routes out through the Garden Gate to every plot; retiring 30 days after growing into an elder (however late that was) and soon after, a retiree at a landing no longer than a barn dragon, in a crowded barn too, the gate passed, a plot each and the garden grown to hold them, a resident in the garden with no slot; the residents' 30 minutes: food and love only at a quarter of an elder's drain, asleep half their steps or more and every night step, strolling, met where they rest by a keeper come out to them, none at rest under another's body or lying across another, the barn's service beside them; saves taken with residents napping, sitting, strolling, waiting and being met, and with elders on their way out). Section 10 (the capacity runs, about 9 s) runs in a worker thread beside the rest, so the whole check keeps to about 22 s |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled with room to grow every time, each grow-up held still for its `happy`, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days; a baby Rushed on its way to grow up met in a sub-slot) and eggs (the nests, hatching exactly 2 days on into a new baby, in front of its own nest or an empty one, fed within 3 minutes, a full barn's egg waiting, no baby moved on to the Hatchery, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up; the elder garden (routes out through the Garden Gate to every plot; retiring 30 days after growing into an elder (however late that was) and soon after, a retiree at a landing no longer than a barn dragon, in a crowded barn too, the gate passed, a plot each and the garden grown to hold them, a resident in the garden with no slot; the residents' 30 minutes: food and love only at a quarter of an elder's drain, asleep half their steps or more and every night step, strolling, met where they rest by a keeper come out to them, none at rest under another's body or lying across another, the barn's service beside them; saves taken with residents napping, sitting, strolling, waiting and being met, and with elders on their way out). Section 10 (the capacity runs, about 9 s) runs in a worker thread beside the rest, so the whole check keeps to about 26 s; section 24 reads the watchable scene at every step of eight trips (an easy, a normal and three hard missions with their baddies, each way it can end): the team at its places as it leaves, done when its time is up, never walking back before it turns or on after, standing still through every beat, turning back at the first uncovered stop, no dragon skating on a single travel step, each baddie's exit shown |
 
    Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play (seed
    1), 136 jobs opened and 128 were done, every one by a keeper (none closed on its own). A keeper started on a job
@@ -736,9 +768,11 @@ stand spot <= 20 s, the bay's edge <= 60 s.
      (the presets show it);
    - the base is the fixed starting one (or a preset); it is kept in the browser (7), but there is one barn, with no
      save slots;
-   - no building of rooms (the rooms are section 3's fixed set), and no missions.
+   - no building of rooms (the rooms are section 3's fixed set), and no Map Room missions yet (S8): the watchable
+     scene (6) shows a preview trip (`preset=trip`), whose team is still drawn in the barn, and the mission art kit's
+     stand-ins (S9a).
 2. **Rooms you build:** place, merge and upgrade rooms; move dragons between them; ~~save and load~~ (built: 7).
-3. **Missions:** the table, then the scene.
+3. **Missions:** the table, then the scene (~~the scene~~ built: 6).
 4. **The rest of the world:** people's own lives (the bunks), ~~eggs and hatching~~ (built: 7), ~~day and night~~
    (built: 7), the neighbour effects, the blueprint zoom-out.
 

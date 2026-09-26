@@ -24,6 +24,8 @@ export const FLOORS = Object.freeze({
   straw: '#e0d6b8',
   /** The elder garden's path, pale gravel (plan S6: no green underfoot, D3): L 0.671, S 0.13. */
   path: '#dcd6c0',
+  /** The mission road the team walks in the watchable scene (plan S9): pale packed earth, L 0.673, S 0.11. */
+  road: '#dcd6c4',
 });
 export type FloorName = keyof typeof FLOORS;
 
@@ -31,6 +33,13 @@ export type FloorName = keyof typeof FLOORS;
 export const STRAW_SEAM = '#c9bd9c';
 /** The garden path's back edge (a 1 px line, not a surface). */
 export const PATH_EDGE = '#c2baa2';
+
+/**
+ * The mission scene's ground under and below its road (plan S9, missionview.ts): the road band's back edge (a 1 px
+ * line), the road's slab, the strip of grass below the slab in the green climates (never underfoot: D3), and the
+ * earth down to the screen's bottom. Gate (w), as backdrops: a dragon walking the road is seen against them.
+ */
+export const ROAD_SCENE = Object.freeze({ edge: '#c4bca8', slab: '#b8ab90', grass: '#8fae76', earth: '#a88e6e' });
 
 /** The back wall of a barn slot no room fills, and of the keepers' ladder bay (L 0.26). */
 export const EMPTY_WALL = '#9a8a76';

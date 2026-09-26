@@ -38,6 +38,10 @@
 // hatched into a baby by t=120; live, a tap on the head of a dragon with nothing waiting opens its card, and a tap on
 // the card closes it. The elder garden (plan S6): the new game's garden has its two empty plots; the garden preset's
 // three residents live on three plots, by day and by night (each dragon says where it lives: the barn or the garden).
+// The watchable scene (plan S9): frozen with a team away (preset=trip&trip=...&panel=watch), the scene is on screen at
+// the baddie (the Mole King in view, dozing off calmed; in its beat, surprised), at a challenge the team met (with its
+// banner), turned back on a failure, and home with the result card; live, the TEAM OUT chip opens the scene over the
+// barn, the world steps on under it, and BACK TO BARN closes it.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -360,6 +364,52 @@ function gardenIs(residents: number, plots: number) {
   };
 }
 
+/**
+ * The watchable scene (plan S9), frozen: the overlay is the scene, and the scene is as `want` says (the last stop
+ * reached, whether it was met, the baddie in view, its exit, the way the team faces...), with a banner once a stop is
+ * reached.
+ */
+function sceneIs(want: Partial<NonNullable<BaseHook['scene']>>) {
+  return (b: BaseHook): string[] => {
+    const out: string[] = [], s = b.scene;
+    if (b.ui?.screen !== 'watch') out.push(`the overlay is ${b.ui?.screen}, not watch`);
+    if (!b.ui?.back || b.ui.back.w <= 0) out.push('no BACK TO BARN button while watching');
+    if (!s) return [...out, 'no scene in the hook'];
+    for (const [k, v] of Object.entries(want)) if ((s as Record<string, unknown>)[k] !== v) out.push(`scene.${k} is ${JSON.stringify((s as Record<string, unknown>)[k])}, not ${JSON.stringify(v)}`);
+    if (s.stop != null && !s.banner) out.push(`the team is past the ${s.stop} and no banner shows`);
+    if (!(s.progress >= 0 && s.progress <= 1)) out.push(`the progress is ${s.progress}`);
+    return out;
+  };
+}
+
+/**
+ * view=base&preset=trip, live (save=0; plan S9): a team is out, so the TEAM OUT chip shows under the top bar; a tap on
+ * it opens the scene over the barn (the world stepping on underneath), and BACK TO BARN closes it.
+ */
+async function baseWatch(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 10, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const a = await st(), chip = a.ui?.chip;
+  if (a.ui?.screen !== 'none' || !chip) return [`with a team out the overlay is ${a.ui?.screen} and the chip ${JSON.stringify(chip)}`];
+  await page.mouse.click(box.x + (chip.x + chip.w / 2) * k, box.y + (chip.y + chip.h / 2) * k);
+  await page.waitForTimeout(300);
+  const b = await st();
+  if (b.ui?.screen !== 'watch' || !b.scene) out.push(`tapping the TEAM OUT chip left the overlay ${b.ui?.screen}`);
+  await page.waitForTimeout(300);
+  const c = await st();
+  if (!(c.tick > b.tick)) out.push(`the world stood still under the scene (tick ${b.tick} -> ${c.tick})`);
+  const back = c.ui?.back;
+  if (!back) return [...out, 'no BACK TO BARN button while watching'];
+  await page.mouse.click(box.x + (back.x + back.w / 2) * k, box.y + (back.y + back.h / 2) * k);
+  await page.waitForTimeout(300);
+  const d = await st();
+  if (d.ui?.screen !== 'none') out.push(`BACK TO BARN left the overlay ${d.ui?.screen}`);
+  if (!out.length) console.log(`        watch: the chip opened the scene (${b.scene?.stop ?? 'on the road'}, ${Math.round((b.scene?.progress ?? 0) * 100)} % along), the world stepped on under it, BACK returned to the barn`);
+  return out;
+}
+
 /** The base's dragons include every stage. */
 function everyStage(b: BaseHook): string[] {
   const st = new Set(b.dragons.map((d) => d.stage)), missing = AGE_STAGES.filter((s) => !st.has(s));
@@ -522,6 +572,12 @@ const CASES: Case[] = [
   // night (napping, the lanterns lit)
   { query: 'view=base&preset=garden&cam=1304,376&t=600', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...travels(b)] },
   { query: 'view=base&preset=garden&cam=1304,376&t=600&hour=22', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...timeFields('night', false)(b)] },
+  { query: 'view=base&preset=trip&trip=oldmine:0.95&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', baddie: 'moleking', exit: 'calmed', facing: 1 }) },
+  { query: 'view=base&preset=trip&trip=oldmine:0.91&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', beat: true, baddie: 'moleking', face: 'surprised' }) },
+  { query: 'view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ covered: true, baddie: null, facing: 1 })(b), ...(b.scene?.stop && b.scene.stop !== 'baddie' ? [] : [`the last stop is ${b.scene?.stop}, not a challenge`])] },
+  { query: 'view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ facing: -1, exit: null }) },
+  { query: 'view=base&preset=trip&trip=oldmine:1&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result: 'HOME SAFE!' }) },
+  { query: 'view=base&preset=trip&trip=oldmine:0.2&save=0', minColours: 150, allScales: false, act: baseWatch },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);

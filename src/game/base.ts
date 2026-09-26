@@ -35,7 +35,11 @@ import { makePet, petOpts, stepPet, stepWary, extentX, bowlFor, drawBowl } from 
 import type { Pet } from './pet.ts';
 import { CareSim } from './sim.ts';
 import type { Dragon, Job } from './sim.ts';
-import { startSpec, buildSim } from './presets.ts';
+import { startSpec, buildSim, tripStart } from './presets.ts';
+import { currentTrip } from './seams.ts';
+import type { Trip } from './trip.ts';
+import { sceneAt, drawMissionScene, drawBackButton, drawResultCard, drawTeamChip, ScenePets, BACK_BUTTON, RESULT_CARD, TEAM_CHIP } from './missionview.ts';
+import type { SceneFrame } from './missionview.ts';
 import { worldKey, barnKey, fnv1a, serialize } from './save.ts';
 import type { SaveV } from './save.ts';
 import { readClock, hourSteps, PHASE_HOURS, HATCH_DAYS } from './clock.ts';
@@ -130,6 +134,11 @@ export interface BaseViewOpts {
   hour?: number | null;
   /** 'world': only the building, the lift's car, the cast, the bubbles and the plates -- no sky, lights, HUD or toasts (the no-tint check). */
   layers?: 'all' | 'world';
+  /** An overlay open from the start (panel=watch: the team out, watched on its road; plan S9). */
+  panel?: string | null;
+  /** preset=trip's trip (trip=<region>:<progress>[:fail]) and the step it is to be at that progress (the frozen t=, else 0). */
+  trip?: string | null;
+  at?: number;
 }
 
 /**
@@ -197,12 +206,22 @@ export class BaseView {
   /** Last frame's heads of the dragons drawn (screen px, by dragon id), for the hook. */
   private heads = new Map<number, { x: number; y: number }>();
   private detachers: (() => void)[] = [];
+  /**
+   * The overlay on screen (plan S9): none (the barn), or `watch` -- the team out on its mission, watched on its road
+   * (missionview.ts), the world stepping on underneath at the chosen speed; the team's characters for the trip watched;
+   * whether its result card was tapped away; and the last scene drawn (for the hook).
+   */
+  private screen: 'none' | 'watch' = 'none';
+  private watching: ScenePets | null = null;
+  private resultClosed = false;
+  private scene: { trip: Trip; f: SceneFrame } | null = null;
 
   constructor(opts: BaseViewOpts) {
     this.persist = !!opts.persist;
     this.layers = opts.layers === 'world' ? 'world' : 'all';
-    this.use(buildSim(startSpec(opts.preset), opts.seed, opts.hour));
+    this.use(buildSim(opts.preset === 'trip' ? tripStart(opts.trip, opts.at ?? 0) : startSpec(opts.preset), opts.seed, opts.hour));
     if (opts.cam) { this.camAsked = { ...opts.cam }; this.setCam(opts.cam.x, opts.cam.y); }
+    if (opts.panel === 'watch') this.openWatch();
   }
 
   /**
@@ -219,6 +238,7 @@ export class BaseView {
     for (const [id, v] of cast) this.cast.set(id, v);
     this.keeperAgents = agents; this.building = building; this.plates = plates;
     this.bubbles = []; this.chips = []; this.card = null; this.hatches = []; this.heads.clear(); this.news = [];
+    this.screen = 'none'; this.watching = null; this.resultClosed = false; this.scene = null;
     // (a world with a smaller garden: the camera inside its end)
     this.setCam(this.camX, this.camY);
   }
@@ -425,6 +445,11 @@ export class BaseView {
   draw(ctx: CanvasRenderingContext2D): void {
     const cx = Math.round(this.camX), cy = Math.round(this.camY), all = this.layers === 'all';
     const read = readClock(this.sim.clock, this.sim.dayLen);
+    const trip = currentTrip(this.sim);
+    this.scene = trip ? { trip, f: sceneAt(this.sim, trip) } : null;
+    // (the team watched on its road: the overlay over the barn, the top bar kept; once the trip is over, the barn again)
+    if (this.screen === 'watch' && !trip) this.screen = 'none';
+    if (this.screen === 'watch' && all && this.scene) { this.drawWatch(ctx, read, this.scene.trip, this.scene.f); this.publish(read); return; }
     const seen = (x0: number, x1: number, y0: number, y1: number) => x1 >= cx && x0 <= cx + VIEW_W && y1 >= cy && y0 <= cy + VIEW_H;
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = CLEAR; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
@@ -498,6 +523,36 @@ export class BaseView {
       this.hud(ctx, read);
       if (this.toast) drawToast(ctx, this.toast.text);
     }
+    this.publish(read);
+  }
+
+  /**
+   * The team out, watched (plan S9): the scene over the barn (missionview.ts: the road, its stops, the baddie, the team,
+   * the banner), the result card once the trip's time is up (until tapped away), the way back to the barn, and the top
+   * bar over it all -- the world steps on underneath (the barn's own frame is not drawn meanwhile).
+   */
+  private drawWatch(ctx: CanvasRenderingContext2D, read: ClockRead, trip: Trip, f: SceneFrame): void {
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = CLEAR; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    if (!this.watching || this.watching.trip !== trip) this.watching = new ScenePets(this.sim, trip);
+    drawMissionScene(ctx, this.sim, trip, this.watching, f);
+    if (f.done && !this.resultClosed) drawResultCard(ctx, trip, this.sim.tick);
+    drawBackButton(ctx);
+    drawTopBar(ctx, { clock: read, jobs: this.sim.jobs.length, keepers: this.sim.keepers.map((k) => ({ name: k.name, look: k.look, busy: !!k.job })),
+      speed: this.speed, rate: this.rate, armed: this.newArmed > 0 });
+    this.bubbles = []; this.chips = []; this.heads.clear();
+  }
+
+  /** Open the watch overlay on the trip that is out (none out: nothing happens). */
+  private openWatch(): void {
+    const trip = currentTrip(this.sim);
+    if (!trip) return;
+    this.screen = 'watch'; this.card = null;
+    if (!this.watching || this.watching.trip !== trip) { this.watching = null; this.resultClosed = false; }
+  }
+
+  /** The hook (window.__dragonCare.base): the world as of this frame, and the overlay and the scene (plan S9). */
+  private publish(read: ClockRead): void {
     if (typeof window !== 'undefined' && window.__dragonCare) {
       const st = this.sim.stats;
       window.__dragonCare.base = { tick: this.sim.tick, camX: this.camX, camY: this.camY, jobs: this.sim.jobs.length, done: st.done, rushes: st.rushes, preempted: st.preempted,
@@ -516,8 +571,19 @@ export class BaseView {
         walked: st.dragonWalked,
         eggs: this.sim.eggs.map((e) => ({ element: e.element, nest: e.nest, progress: this.progress(e) })),
         card: this.cardDragon()?.name ?? null,
-        garden: { residents: this.sim.dragons.filter((d) => d.place === 'garden').length, plots: this.sim.garden.plots, worldW: this.sim.worldW } };
+        garden: { residents: this.sim.dragons.filter((d) => d.place === 'garden').length, plots: this.sim.garden.plots, worldW: this.sim.worldW },
+        ui: { screen: this.screen, chip: this.scene && this.screen === 'none' && this.layers === 'all' ? { ...TEAM_CHIP } : null, back: this.screen === 'watch' ? { ...BACK_BUTTON } : null },
+        scene: this.sceneHook() };
     }
+  }
+
+  /** The scene as the hook reports it (plan S9): the last stop reached, its banner, the baddie on the road, its exit, which way the team faces, how far along it is. */
+  private sceneHook(): NonNullable<NonNullable<Window['__dragonCare']>['base']>['scene'] {
+    if (!this.scene) return null;
+    const { trip, f } = this.scene, s = f.last == null ? null : trip.stops[f.last];
+    return { stop: s ? (s.kind === 'baddie' ? 'baddie' : s.challenge) : null, covered: s ? s.covered : null, beat: f.stop != null, banner: f.banner,
+      baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, exit: s?.kind === 'baddie' ? trip.exit : null, facing: f.facing,
+      progress: f.L ? f.E / f.L : 0, done: f.done, result: f.done ? (trip.success ? 'HOME SAFE!' : 'HOME EARLY') : null };
   }
 
   /** How far on an egg is: 0 laid, 1 due (its HATCH_DAYS in the nest; one past it waits for a sub-slot at 1). */
@@ -548,6 +614,8 @@ export class BaseView {
       x += 6 * s.length + 7;
     }
     drawHint(ctx, x);
+    // (a team out: its chip under the top bar, which opens the scene)
+    if (this.scene) drawTeamChip(ctx, this.sim, this.scene.trip);
     const d = this.cardDragon();
     if (d) {
       // (a garden resident has only food and love: GARDEN_NEEDS)
@@ -607,6 +675,13 @@ export class BaseView {
       const b = buttonAt(sx, sy);
       if (b) { this.press(b); return; }
       if (sy < BAR_H) return;
+      // (the scene takes every tap under the bar: back to the barn, or the result card tapped away)
+      if (this.screen === 'watch') {
+        if (hit(BACK_BUTTON, sx, sy)) this.screen = 'none';
+        else if (this.scene?.f.done && !this.resultClosed && hit(RESULT_CARD, sx, sy)) this.resultClosed = true;
+        return;
+      }
+      if (this.scene && hit(TEAM_CHIP, sx, sy)) { this.openWatch(); return; }
       if (this.cardDragon() && hit(CARD, sx, sy)) { this.card = null; return; }
     }
     this.card = null;

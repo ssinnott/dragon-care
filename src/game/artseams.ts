@@ -33,6 +33,18 @@ export function drawBaddie(ctx: CanvasRenderingContext2D, id: BaddieId, x: numbe
 export function drawBaddiePortrait(ctx: CanvasRenderingContext2D, id: BaddieId, x: number, y: number): void {
   box(ctx, x, y, 24, 24, '#8a7060', id.slice(0, 1).toUpperCase());
 }
+/**
+ * Every fill a baddie is drawn in (S9a: baddies.ts BADDIE_ART[id].palette's values), for palette gate (x) (plan S9:
+ * each >= 25 % in luminance from the road and its region's backdrop bands, >= 6 okL from ink). Stand-in: the greybox
+ * box's one fill, as drawBaddie above draws it.
+ */
+export const BADDIE_FILLS: Readonly<Record<BaddieId, readonly string[]>> = { moleking: ['#8a7060'], stormroc: ['#8a7060'], frostgiant: ['#8a7060'] };
+/**
+ * The backdrop bands a region's climate is drawn in at a phase (S9a: backdrops.ts, its BACKDROPS.climate[climate][phase]
+ * layers), which gate (x) holds every baddie fill apart from, or null while there is no band palette. Stand-in: null
+ * (the greybox climate is a labelled box, not the art's bands).
+ */
+export function climateBands(_climate: Climate, _phase: DayPhase): readonly string[] | null { return null; }
 /** The grumpy miller, a person on the keeper rig (S9a: npcs.ts). */
 export function drawMiller(ctx: CanvasRenderingContext2D, mood: MillerMood, x: number, feetY: number, facing: 1 | -1, t: number): void {
   void facing; void t;

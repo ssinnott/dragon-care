@@ -82,6 +82,23 @@ const pairs: string[] = [
   'shots/base_garden.png=view=base&preset=garden&cam=1304,376&t=600',
   'shots/base_garden_night.png=view=base&preset=garden&cam=1304,376&t=600&hour=22',
   'shots/base_gate.png=view=base&preset=retire&cam=1060,376&t=2564',
+  // the watchable scene (plan S9; frozen, preset=trip: a team away on the region's hard mission, that far along its road
+  // at t=60): on the road past a challenge met (its banner); each big baddie in its beat -- walked in, grumpy (0.906:
+  // the beat is 0.900-0.928 of a three-day trip) -- and leaving (0.921: the Mole King dozing, the Storm Roc wandering
+  // off the wrong way, the Frost Giant shuffling off); the Mole King's two counters' moments (dusk's breath, Bea's
+  // wave); a failure turned back for home; the result card; the TEAM OUT chip over the barn; and the barn at t=1800
+  'shots/base_watch.png=view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60',
+  'shots/base_baddie_moleking.png=view=base&preset=trip&trip=oldmine:0.906&panel=watch&t=60',
+  'shots/base_baddie_stormroc.png=view=base&preset=trip&trip=highfold:0.906&panel=watch&t=60',
+  'shots/base_baddie_frostgiant.png=view=base&preset=trip&trip=frostmere:0.906&panel=watch&t=60',
+  'shots/base_baddie_moleking_moments.png=view=base&preset=trip&trip=oldmine:0.912&panel=watch&t=60',
+  'shots/base_baddie_moleking_exit.png=view=base&preset=trip&trip=oldmine:0.921&panel=watch&t=60',
+  'shots/base_baddie_stormroc_exit.png=view=base&preset=trip&trip=highfold:0.921&panel=watch&t=60',
+  'shots/base_baddie_frostgiant_exit.png=view=base&preset=trip&trip=frostmere:0.921&panel=watch&t=60',
+  'shots/base_turnback.png=view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60',
+  'shots/base_result.png=view=base&preset=trip&trip=oldmine:1&panel=watch&t=60',
+  'shots/base_team_chip.png=view=base&preset=trip&trip=oldmine:0.2&t=60',
+  'shots/base_final.png=view=base&t=1800',
 ];
 for (const el of ['fire', 'rock', 'slinkwing']) {
   for (const stage of ['elder', 'adult', 'young', 'baby']) {
