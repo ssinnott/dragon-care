@@ -36,7 +36,7 @@ export const COIN_X = 334;
 export const BADGE_X0 = 138, BADGE_DX = 48, BADGE_W = 46, BADGE_Y = 1, BADGE_H = 13;
 /**
  * `BARN n/12`, the barn's dragons against its cap (life.ts BARN_CAP; BASE_DESIGN 4.7), at x 392 -- or a space after a
- * longer `COIN n` (barnAt: from 10 000 coin), never over it. Up to `COIN 9999999` and `BARN 99/12` it ends by x 472,
+ * longer `COIN n` (barnAt: from 1 000 coin), never over it. Up to `COIN 9999999` and `BARN 99/12` it ends by x 472,
  * clear of NEW (x 528); the TEAM OUT chip (maptable.ts CHIP, x 394, y 19) is under the bar. Full, it turns amber.
  */
 export const BARN_COUNT_X = 392;
@@ -164,10 +164,18 @@ export function drawHint(ctx: CanvasRenderingContext2D, stripEnd: number): void 
   text(ctx, s, x, y + 5, HINT, 'right');
 }
 
-// ---------- the dragon card (plan S5) ----------
+// ---------- the dragon card (BASE_DESIGN 4.8) ----------
 
-/** Where a dragon's card opens (screen px): under the top bar at the left, clear of the toasts (centred at x 320). */
+/**
+ * Where a dragon's card opens (screen px), on the far side of the screen from the dragon tapped, so it never covers its
+ * own dragon (nor, for a dragon tapped in the Hatchery, the nests: the start camera frames them at the left): for a
+ * dragon in the right half, under the top bar at the left, clear of the toasts (centred at x 320); for one in the left
+ * half, at the right under the TEAM OUT chip (maptable.ts CHIP: 394-508, y 19-34), clear of it and of the toasts.
+ */
 export const CARD: Readonly<Rect> = Object.freeze({ x: 8, y: 20, w: 160, h: 76 });
+export const CARD_RIGHT: Readonly<Rect> = Object.freeze({ x: 472, y: 38, w: 160, h: 76 });
+/** The card's place for a dragon tapped at screen x `sx`: the far side (CARD_RIGHT left of x 320, CARD from it on). */
+export function cardAt(sx: number): Readonly<Rect> { return sx < 320 ? CARD_RIGHT : CARD; }
 /**
  * What a dragon's card shows: its name, element and stage, its day of the stage (1..STAGE_DAYS), each need (null: one
  * it hasn't got, or a garden resident's held full), and whether it lives in the garden (plan S6: its stage line says so).
@@ -177,13 +185,13 @@ export interface CardInfo { name: string; element: string; stage: string; day: n
 const DAY_ON = '#e3b23e', DAY_OFF = '#2e2428', NEED_OK = '#7bbf6a', NEED_TIER = ['#f2d36a', '#e3b23e', '#d8402e'];
 
 /**
- * A dragon's card (160 x 76 at 8, 20): its name (outlined) and element; its stage and `DAY d OF 30`; the stage's 30
+ * A dragon's card (160 x 76 at `at`: CARD or CARD_RIGHT, cardAt): its name (outlined) and element; its stage and `DAY d OF 30`; the stage's 30
  * days as a bar of 4 x 5 segments a px apart, the days so far filled; and its needs, each its icon over a 20 x 4 bar
  * (a need it hasn't got -- fire's bath -- left out, the rest centred). The stage's days are the art of the age readout: a player
  * sees how far into its month a dragon is.
  */
-export function drawCard(ctx: CanvasRenderingContext2D, c: CardInfo): void {
-  const { x, y, w, h } = CARD;
+export function drawCard(ctx: CanvasRenderingContext2D, c: CardInfo, at: Readonly<Rect> = CARD): void {
+  const { x, y, w, h } = at;
   ctx.fillStyle = INK; ctx.fillRect(x, y, w, h);
   ctx.fillStyle = FACE; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
   drawTextOutlined(ctx, c.name, x + 6, y + 5, { size: 1, color: TEXT, outline: INK, thickness: 1, shadow: false });

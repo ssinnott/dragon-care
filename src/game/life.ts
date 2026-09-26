@@ -48,8 +48,9 @@ export const HATCH_FOOD = 0.45;
  * The most dragons the barn holds (BASE_DESIGN 4.7): the largest herd the repeated-room barn was measured to serve to the benchmark's
  * standard on every mix tried (every 11- and 12-dragon mix; 13 serves most but not all, 14 none: the barn's 13 grown
  * modules are the cliff, and babies need a module free of grown dragons), a hard cap one dragon short of that cliff.
- * An egg never hatches while the barn holds this many; a mission (S8) must not offer an egg while it is full, and reads
- * the cap and the count from here.
+ * An egg never hatches while the barn holds this many: it waits in its nest until a dragon leaves for the garden. A
+ * mission still brings its egg home to a full barn (BASE_DESIGN 4.7, 5.6): the chooser reads the room left through
+ * seams.ts `barnRoom` (the cap less barnCount) and says BARN FULL: THE EGG WILL WAIT, and the egg waits in its nest.
  */
 export const BARN_CAP = 12;
 /**

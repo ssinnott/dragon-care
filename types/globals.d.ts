@@ -54,7 +54,8 @@ interface Window {
      * a tap on it Rushes that job, where a tap on one not waiting opens its card) and `head` (the middle of its head in
      * canvas px as last drawn, or null when it was not drawn: off screen); the eggs in the Hatchery's nests (each one's
      * element, its nest 0-2 and how far on it is, 0 laid to 1 due); and the name of the dragon whose card is open, or
-     * null. The elder garden (S6): each dragon's `place` (`barn`, or retired, `garden`), and the garden's residents, its
+     * null, with the card's rect (`cardBox`, canvas px: on the far side of the screen from the dragon tapped, hud.ts
+     * cardAt; null while no card is open). The elder garden (S6): each dragon's `place` (`barn`, or retired, `garden`), and the garden's residents, its
      * plots (one a resident or a retiree, at least two) and the world's walkable width out to its end (world px: 1688
      * with two plots, 176 more a plot). Night you can see (S6c): `night`, the night's step the building's walls and
      * shell and the garden were drawn at (0 their day colours, 3 their moonlit night colours, 1 and 2 the stepped mixes
@@ -80,7 +81,8 @@ interface Window {
      * pins (canvas px, board order) and the named buttons on screen (canvas px: `back`, `best`, `send`, and `chip`, the
      * TEAM OUT chip while a team is out and the barn is on screen; over the watch overlay `log`, which opens the trip's
      * log), and S9's `chip` (the TEAM OUT chip's rect while it shows) and `back` (BACK TO BARN's while watching), and
-     * whether the trip's log is open over the watch overlay (`log`).
+     * whether the trip's log is open over the watch overlay (`log`); and the chooser's line about the egg (`notice`:
+     * `HATCHERY FULL: NO EGG`, `BARN FULL: THE EGG WILL WAIT` at the barn's cap, or null -- null too on any other screen).
      * The watchable scene (S9): `scene`, while a trip is out (null
      * otherwise): the last stop the team reached (`baddie` or its challenge; null before the first), whether it was met,
      * whether its beat is playing, the banner, the baddie on the road (its id, face and pose; null when none is in view),
@@ -105,6 +107,7 @@ interface Window {
       buttons: Record<string, { x: number; y: number; w: number; h: number }>;
       eggs: { element: string; nest: number; progress: number }[];
       card: string | null;
+      cardBox: { x: number; y: number; w: number; h: number } | null;
       garden: { residents: number; plots: number; worldW: number };
       keepers: { name: string; f: number; x: number; phase: string; carrying: string | null; box: { x: number; y: number; w: number; h: number } }[];
       controlled: string | null;
@@ -119,7 +122,8 @@ interface Window {
         departAt: number | null; returnAt: number | null; progress: number } | null;
       ui: { screen: 'none' | 'map' | 'mission' | 'watch'; mission: number | null; pairs: { dragon: number; keeper: number }[];
         pins: { x: number; y: number; w: number; h: number }[]; buttons: Record<string, { x: number; y: number; w: number; h: number }>;
-        chip: { x: number; y: number; w: number; h: number } | null; back: { x: number; y: number; w: number; h: number } | null; log: boolean };
+        chip: { x: number; y: number; w: number; h: number } | null; back: { x: number; y: number; w: number; h: number } | null; log: boolean;
+        notice: 'HATCHERY FULL: NO EGG' | 'BARN FULL: THE EGG WILL WAIT' | null };
       scene: { stop: string | null; covered: boolean | null; beat: boolean; banner: string | null; baddie: 'moleking' | 'stormroc' | 'frostgiant' | null;
         face: 'neutral' | 'grumpy' | 'surprised' | 'sleepy' | null; pose: 'walk' | 'stand' | 'sit' | 'turn' | 'leave' | null;
         exit: 'calmed' | 'outwitted' | 'drivenOff' | null; facing: 1 | -1; progress: number; done: boolean; result: string | null } | null;

@@ -23,7 +23,8 @@
 // (grow-ups, the dawn's tip) wait their turn, and grow-ups into one stage that come together share one;
 // the Hatchery's eggs lie in their nests (eggs.ts: their cracks and wobble), and one that hatches throws its shell bits
 // as the baby stands up; at 05:00 a tip says who grows up within two days. A tap on a dragon opens its card (its stage
-// and day of it, its needs: hud.ts); a tap on one with a job waiting also Rushes that job, as it always has.
+// and day of it, its needs: hud.ts), on the far side of the screen from it; a tap on one with a job waiting also Rushes
+// that job, as it always has.
 // The elder garden (plan S6): past the right tower, through the Garden Gate, the garden's plots are drawn after the
 // building (gardenArt.ts: only the plots on screen), their lanterns lit with the lights; the camera pans out to the
 // garden's end, which moves east as elders retire to it; a resident naps (`sleep`, then `wake`), sits (`idle`, the
@@ -73,7 +74,7 @@ import type { SaveV } from './save.ts';
 import { readClock, hourSteps, PHASE_HOURS, HATCH_DAYS } from './clock.ts';
 import type { Speed, ClockRead } from './clock.ts';
 import { drawSky } from './sky.ts';
-import { drawTopBar, drawToast, drawHint, drawCard, buttonAt, badgeAt, padAt, drawPad, drawActionLine, drawPortraitHint, BUTTONS, BAR_H, TOAST_FRAMES, CARD, PAD, PAD_DIR,
+import { drawTopBar, drawToast, drawHint, drawCard, buttonAt, badgeAt, padAt, drawPad, drawActionLine, drawPortraitHint, BUTTONS, BAR_H, TOAST_FRAMES, CARD, cardAt, PAD, PAD_DIR,
   BADGE_X0, BADGE_DX, BADGE_W, BADGE_Y, BADGE_H } from './hud.ts';
 import type { ButtonName, PadButton, BadgeState } from './hud.ts';
 import { actionFor, controlledKeeper, takeRefusal, SUPPLY_NAME } from './control.ts';
@@ -96,7 +97,7 @@ import type { KeeperAgent } from '../care/keeper.ts';
 import { drawBubble, drawChip, hit } from './icons.ts';
 import type { Rect } from './icons.ts';
 import { canSend, onTrip } from './missions.ts';
-import { newUi, drawMapScreen, drawMissionScreen, editTeam, drawTeamChip, drawTripCard, drawLogButton, hitAt, chosen, tripProgress, TRIP_CARD, PANEL, LOG_BUTTON } from './maptable.ts';
+import { newUi, drawMapScreen, drawMissionScreen, editTeam, drawTeamChip, drawTripCard, drawLogButton, hitAt, chosen, eggNotice, tripProgress, TRIP_CARD, PANEL, LOG_BUTTON } from './maptable.ts';
 import type { MapUi, Hit, Screen } from './maptable.ts';
 
 const INK = '#1a1018';
@@ -282,8 +283,9 @@ export class BaseView {
   /** Last frame's bubbles (world px) and chips (screen px), for tapping. */
   private bubbles: { job: Job; r: Rect }[] = [];
   private chips: { job: Job; r: Rect }[] = [];
-  /** The dragon whose card is open (by id; null: none). */
+  /** The dragon whose card is open (by id; null: none), and where the card opened (hud.ts cardAt: the far side from it). */
   private card: number | null = null;
+  private cardRect: Readonly<Rect> = CARD;
   /** Hatches whose shell bits are flying: the baby's id, the egg's element, its egg's spot (world px) and the world steps since. */
   private hatches: { id: number; el: Dragon['element']; x: number; y: number; age: number }[] = [];
   /** Last frame's heads of the dragons drawn (screen px, by dragon id), for the hook. */
@@ -771,6 +773,7 @@ export class BaseView {
         walked: st.dragonWalked,
         eggs: this.sim.eggs.map((e) => ({ element: e.element, nest: e.nest, progress: this.progress(e) })),
         card: this.cardDragon()?.name ?? null,
+        cardBox: this.cardDragon() ? { ...this.cardRect } : null,
         garden: { residents: this.sim.dragons.filter((d) => d.place === 'garden').length, plots: this.sim.garden.plots, worldW: this.sim.worldW },
         keepers: this.sim.keepers.map((k) => { const b = this.keeperBox(k); return { name: k.name, f: k.f, x: k.x, phase: k.phase, carrying: k.carrying, box: { x: b.x - cx, y: b.y - cy, w: b.w, h: b.h } }; }),
         controlled: controlledKeeper(this.sim)?.name ?? null,
@@ -786,7 +789,9 @@ export class BaseView {
         ui: { screen: this.ui.screen, mission: this.ui.mission, pairs: this.ui.pairs.map((p) => ({ ...p })),
           pins: this.uiHits.filter((h) => h.name?.startsWith('pin')).map((h) => ({ ...h.r })),
           buttons: Object.fromEntries([...this.uiHits.filter((h) => h.name && !h.name.startsWith('pin')).map((h) => [h.name!, { ...h.r }] as const), ...(chip ? [['chip', { ...chip }] as const] : [])]),
-          chip: chip ? { ...chip } : null, back: this.ui.screen === 'watch' ? { ...BACK_BUTTON } : null, log: this.ui.screen === 'watch' && this.ui.card },
+          chip: chip ? { ...chip } : null, back: this.ui.screen === 'watch' ? { ...BACK_BUTTON } : null, log: this.ui.screen === 'watch' && this.ui.card,
+          // (the chooser's line about the egg, as drawMissionScreen draws it: only while a mission's chooser is open)
+          notice: this.ui.screen === 'mission' && chosen(this.sim, this.ui) ? eggNotice(this.sim) : null },
         scene: this.sceneHook(),
         barn: { count: barnCount(this.sim), cap: BARN_CAP } };
     }
@@ -845,7 +850,7 @@ export class BaseView {
       // (a garden resident has only food and love: GARDEN_NEEDS)
       const garden = d.place === 'garden';
       const needs = Object.fromEntries(NEEDS.map((k) => [k, hasNeed(d.element, k) && (!garden || GARDEN_NEEDS.includes(k)) ? d.needs[k] : null])) as Record<NeedKind, number | null>;
-      drawCard(ctx, { name: d.name, element: d.element, stage: d.stage, day: Math.floor((this.sim.clock - d.stageSince) / this.sim.dayLen) + 1, needs, garden });
+      drawCard(ctx, { name: d.name, element: d.element, stage: d.stage, day: Math.floor((this.sim.clock - d.stageSince) / this.sim.dayLen) + 1, needs, garden }, this.cardRect);
     }
     this.lineRect = null;
     // (the pad and its line are the barn's: not under the Map Room's table either)
@@ -1015,7 +1020,7 @@ export class BaseView {
       }
       // (a team out: the TEAM OUT chip under the top bar opens the scene)
       if (this.chipRect && hit(this.chipRect, sx, sy)) { this.openWatch(); return; }
-      if (this.cardDragon() && hit(CARD, sx, sy)) { this.card = null; return; }
+      if (this.cardDragon() && hit(this.cardRect, sx, sy)) { this.card = null; return; }
     }
     this.card = null;
     for (const c of this.chips) if (hit(c.r, sx, sy)) { this.sim.rush(c.job); this.focus(c.job.dragon); return; }
@@ -1035,7 +1040,7 @@ export class BaseView {
       if (d.place === 'away') continue;
       const j = this.waitingJob(d);
       if (j) this.sim.rush(j);
-      this.card = d.id;
+      this.card = d.id; this.cardRect = cardAt(sx);
       return;
     }
     // (the Map Room's table: a tap on it opens the map at once)

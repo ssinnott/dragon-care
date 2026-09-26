@@ -353,9 +353,10 @@ function hatchedOne(b: BaseHook): string[] {
 /**
  * view=base, live (save=0): the dragon card. Paused (so nothing changes under the pointer), a tap on the head of a
  * dragon on screen that has no job waiting (the hook's `waiting` false, its `head` clear of the top bar, the job strip
- * and every waiting dragon's bubble) opens its card (the hook's `card` is its name) and Rushes nothing; a tap on the
- * card closes it; and a tap on the head of a dragon with a job waiting opens its card too, and Rushes that job (exactly
- * one Rush).
+ * and every waiting dragon's bubble) opens its card (the hook's `card` is its name) on the far side of the screen from
+ * it (`cardBox`: at the right for a dragon in the left half, at 8, 20 for one in the right half -- never over the head
+ * tapped) and Rushes nothing; a tap on the card closes it; and a tap on the head of a dragon with a job waiting opens
+ * its card too, and Rushes that job (exactly one Rush).
  */
 async function baseCard(page: any): Promise<string[]> {
   const out: string[] = [];
@@ -376,7 +377,11 @@ async function baseCard(page: any): Promise<string[]> {
   const c = await st();
   if (c.card !== d.name) out.push(`tapping ${d.name}'s head (nothing waiting) opened ${c.card === null ? 'no card' : `${c.card}'s card`}`);
   if (c.rushes !== rushes) out.push(`tapping ${d.name} (nothing waiting) Rushed a job`);
-  await page.mouse.click(box.x + 40 * k, box.y + 60 * k);
+  const cb = c.cardBox, h = d.head!;
+  const far = cb && (h.x < 320 ? cb.x === 472 && cb.y === 38 : cb.x === 8 && cb.y === 20) && cb.w === 160 && cb.h === 76;
+  if (!cb || !far || (h.x >= cb.x && h.x <= cb.x + cb.w && h.y >= cb.y && h.y <= cb.y + cb.h)) out.push(`${d.name}'s card (head at ${Math.round(h.x)}, ${Math.round(h.y)}) opened at ${JSON.stringify(cb)}, not on the far side of the screen from it`);
+  const at = cb ?? { x: 8, y: 20, w: 160, h: 76 };
+  await page.mouse.click(box.x + (at.x + at.w / 2) * k, box.y + (at.y + at.h / 2) * k);
   await page.waitForTimeout(150);
   if ((await st()).card !== null) out.push('tapping the card did not close it');
   // (a waiting dragon's head, clear of the card, the bars and every other bubble but its own)
@@ -389,7 +394,7 @@ async function baseCard(page: any): Promise<string[]> {
     if (e.rushes !== rushes + 1) out.push(`tapping ${w.name} (a job waiting) made ${e.rushes - rushes} Rushes, not 1`);
   } else out.push(`no dragon with a job waiting has its head on screen clear of the bubbles (${b.dragons.map((q) => `${q.name} ${q.waiting ? 'waiting' : 'free'} ${q.head ? `${Math.round(q.head.x)},${Math.round(q.head.y)}` : 'off'}`).join('; ')})`);
   await page.keyboard.press('p');
-  if (!out.length) console.log(`        card: ${d.name}'s opened by a tap on its head (nothing waiting, no Rush), closed by a tap on it; ${w!.name}'s opened by a tap on its head and its job Rushed`);
+  if (!out.length) console.log(`        card: ${d.name}'s opened by a tap on its head (x ${Math.round(h.x)}: nothing waiting, no Rush) at ${at.x}, ${at.y}, the far side, closed by a tap on it; ${w!.name}'s opened by a tap on its head and its job Rushed`);
   return out;
 }
 
@@ -510,6 +515,10 @@ function tableIs(screen: 'map' | 'mission') {
     if (screen === 'mission' && (!b.ui?.buttons.best || !b.ui.buttons.send || !b.ui.buttons.back || b.ui.mission !== b.board[0]?.id)) out.push(`the chooser shows mission ${b.ui?.mission} with buttons ${Object.keys(b.ui?.buttons ?? {})}`);
     return out;
   };
+}
+/** The chooser's line about the egg (the hook's `ui.notice`, as drawMissionScreen draws it): `want`, or none. */
+function noticeIs(want: string | null) {
+  return (b: BaseHook): string[] => (b.ui?.notice === want ? [] : [`the chooser's egg line is ${JSON.stringify(b.ui?.notice)}, not ${JSON.stringify(want)}`]);
 }
 /** The muster preset at the step its team all stands on the Aerie deck (npm run sim section 20): leaving now, every dragon in the barn's world (none away yet). */
 function mustered(b: BaseHook): string[] {
@@ -896,9 +905,9 @@ const CASES: Case[] = [
   // missions (plan S8): the Map Room's world map and a mission's chooser (frozen, the world stepped first), the muster
   // preset's team all on the Aerie deck, and live, MAP -> a pin -> BEST TEAM -> SEND
   { query: 'view=base&t=60&panel=map', minColours: 100, maxPanelColours: 40, allScales: false, check: tableIs('map') },
-  { query: 'view=base&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: tableIs('mission') },
+  { query: 'view=base&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: (b) => [...tableIs('mission')(b), ...noticeIs(null)(b)] },
   // (and over a full barn: the twelve preset at the cap, the chooser open on THE LOST NEST, its egg to wait)
-  { query: 'view=base&preset=twelve&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: (b) => [...tableIs('mission')(b), ...barnIs(12)(b)] },
+  { query: 'view=base&preset=twelve&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: (b) => [...tableIs('mission')(b), ...barnIs(12)(b), ...noticeIs('BARN FULL: THE EGG WILL WAIT')(b)] },
   { query: 'view=base&preset=muster&t=2186&cam=0,20', minColours: 150, allScales: false, check: (b) => [...mustered(b), ...travels(b)] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseMission },
   // the whole loop live (the S8 + S9 merge): MAP -> a pin -> BEST TEAM -> SEND -> the muster on the Aerie -> the TEAM

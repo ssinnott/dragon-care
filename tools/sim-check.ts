@@ -26,12 +26,12 @@
 // 6. Saves: a world saved at step 5000 and loaded (through JSON) steps on to the same world as the one it came from,
 //    from that save and from more taken mid-fetch, mid-climb, mid-job, mid-Rush, mid-walk, mid-turn, at a landing,
 //    boarding, mid-ride and alighting (and one at the first call for the car of all, one at the first ride); a save's
-//    walk speeds and each room's own uses are kept, and one it can't keep throws; and on a short day, with eggs incubating (plan
-//    S5), a baby walking to the module slot it will grow up in, an egg just hatched and a dragon just grown up; and with
-//    the garden (plan S6): residents napping, sitting, strolling, waiting and being met, elders setting off, riding down,
-//    passing the gate and arriving; and with a mission's team out (plan S8): mid-muster, departing, away, landing (the
-//    egg carried down, the saddles hung back) and resting; a save survives JSON unchanged, every field is in it; another
-//    version throws, and so does one whose missions this build can't run.
+//    walk speeds and each room's own uses are kept, and one it can't keep throws; and on a short day, with eggs incubating
+//    (BASE_DESIGN 7), a baby walking to the module slot it will grow up in, an egg just hatched and a dragon just grown up;
+//    and with the garden (BASE_DESIGN 3, The Garden): residents napping, sitting, strolling, waiting and being met, elders
+//    setting off, riding down, passing the gate and arriving; and with a mission's team out (BASE_DESIGN 5): mid-muster,
+//    departing, away, landing (the egg carried down, the saddles hung back) and resting; a save survives JSON unchanged,
+//    every field is in it; another version throws, and so does one whose missions this build can't run.
 // 7. rngAt: the same keys give the same draws, different tags different ones, and the draws are even.
 // 8. Rooms (#11): every room kind and structure has a purpose, each need is met in exactly one kind of room (its rooms
 //    repeated on the floors: the barn room by room as BASE_DESIGN 3's table says -- floor, module, post, the keepers'
@@ -234,8 +234,17 @@ type Role = 'main' | 'capacity' | 'full' | 'babies' | 'service' | 'saves';
 const ROLE: Role = isMainThread ? 'main' : (workerData as { role: Role }).role;
 const MAIN = ROLE === 'main';
 type WorkerResult = { fails: string[]; used: Record<string, number>; usedRoom: number[]; lines: string[]; ms: number };
-/** When this thread started (the report's wall times). */
-const T0 = performance.now();
+/**
+ * The machine's CPU seconds busy so far, every CPU's and every process's (Linux /proc/stat's first line: user, nice,
+ * system, irq, softirq and steal, in USER_HZ, 100ths of a second), or null where there is no /proc/stat.
+ */
+const machineBusyS = (): number | null => {
+  try { const f = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0].trim().split(/\s+/).map(Number); return (f[1] + f[2] + f[3] + f[6] + f[7] + f[8]) / 100; } catch { return null; }
+};
+/** When this thread started (the report's wall times), and the machine's busy CPU time and this process's then (the budget's allowance, at the end). */
+const T0 = performance.now(), BUSY0 = machineBusyS(), CPU0 = process.cpuUsage();
+/** The suite's budget, wall seconds (BASE_DESIGN 8.1), and the other work beside it (CPUs, on average) that excuses going over it. */
+const BUDGET_S = 30, BUSY_CPUS = 0.5;
 const spawn = (role: Role) => new Promise<WorkerResult>((ok, no) => {
   const w = new Worker(new URL(import.meta.url), { workerData: { role } });
   w.once('message', ok); w.once('error', no);
@@ -267,8 +276,8 @@ const noteUse = (w: CareSim, since: Uses | null = null) => {
  * and frozen with about 20 % headroom (docs/BASE_DESIGN.md 4.7, 4.9, 8.1). The gates a dragon feels most keep the
  * plan's values on every seed: no need ever empties, done >= 120, a keeper's wait at the stand spot <= 20 s, bay waits
  * <= 60 s, a walking dragon never stands still, nor turns about on one spot, 10 s. The waits: with one car between the
- * floors and one dragon at a time in its shaft (plan 7's mustFix), S3's barn -- one room per need -- kept the car busy
- * about 95 % of the run, and a job's wait was mostly its dragon's wait for it (83.5 s on average over seeds 1-3, gated
+ * floors and one dragon at a time in its shaft (the bay rule: BASE_DESIGN 2), S3's barn -- one room per need -- kept
+ * the car busy about 95 % of the run, and a job's wait was mostly its dragon's wait for it (83.5 s on average over seeds 1-3, gated
  * at 100 s; 360 s at most). The barn repeats the need rooms on the floors, so a dragon's needs are met on its own
  * floor and the car is nearly idle (1 to 4 rides in 30 minutes): seeds 1-3 wait 28.4 / 21.6 / 26.0 s on average (mean
  * 25.3; 29.1 on seed 1 before the S6b review), 112.3 s at most -- gated at 31 s (the mean over the three) and 135 s. A landing wait, a rider held in the car and Rush after
@@ -1280,12 +1289,12 @@ if (ROLE === 'capacity') {
   // The barn serves the herd eggs and missions grow it to (docs/BASE_DESIGN.md 4.7): each room meets one need, and a
   // need's rooms repeat on the floors, so a dragon's needs are met on its own floor and the one car -- one rider, one
   // dragon at a time in its shaft -- carries few; dragons step on and off the car, and across the lift bay, lively (at
-  // travel.ts LIVELY, their bodies moved by the same factor: G13). C1: the benchmark cast `twelve` (tools/capacity.ts
-  // parseCast / placeCast: the start's seven adults, three young and two babies) runs 30 minutes on seed 1, checked every
+  // travel.ts LIVELY, their bodies moved by the same factor: BASE_DESIGN 2, the lively step). The benchmark (4.7): the
+  // cast `twelve` (tools/capacity.ts parseCast / placeCast: the start's seven adults, three young and two babies) runs 30 minutes on seed 1, checked every
   // step by capacity.ts runOne with section 2's invariants and eye model -- no need empty, the waits short, the car mostly
   // free, no stall, no two in the shaft (the 8-seed sweep is `npm run capacity`). Then the crowds S3 measured the one car
-  // against -- eight adults, ten, the ages preset's twelve of every stage -- keep service gates, and (C3) the `full`
-  // preset, 21 dragons forced 9 over the cap, keeps moving, its due egg waiting.
+  // against -- eight adults, ten, the ages preset's twelve of every stage -- keep service gates, and the `full` preset,
+  // 21 dragons forced 9 over the cap (4.7: every rule holds over it too), keeps moving, its due egg waiting.
   const out: string[] = [];
   const twelve = placeCast(parseCast('twelve'));
   if (twelve.missing || twelve.places.length !== BARN_CAP) fail(`capacity: the twelve cast does not fit the start barn (${twelve.missing ?? `${twelve.places.length} dragons`})`);
@@ -1319,8 +1328,8 @@ if (ROLE === 'capacity') {
   console.log(`  10 capacity: ${out.join('; ')}`);
 }
 if (ROLE === 'full') {
-  // (C3) the full preset: forced 9 over the cap, starved, but moving -- jobs done, no keeper giving up, the car never
-  // standing with work for a minute -- and its due egg waiting in its nest (the barn full: life.ts); in a worker of its
+  // the full preset (BASE_DESIGN 4.7: every rule holds over the cap too): forced 9 over the cap, starved, but moving --
+  // jobs done, no keeper giving up, the car never standing with work for a minute -- and its due egg waiting in its nest (the barn full: life.ts); in a worker of its
   // own (its 36 000 steps of 21 dragons crowding the landings take about 14 s)
   const out: string[] = [];
   {
@@ -2803,7 +2812,17 @@ if (MAIN) {
     r.usedRoom.forEach((v, i) => { USED_ROOM[i] += v; });
     took.push(`${role} ${(r.ms / 1000).toFixed(1)} s`);
   }
-  console.log(`  wall: the main thread's sections ${(mainMs / 1000).toFixed(1)} s, the workers' ${took.join(', ')}; the suite ${((performance.now() - T0) / 1000).toFixed(1)} s (the budget: 30 s)`);
+  const wallS = (performance.now() - T0) / 1000;
+  console.log(`  wall: the main thread's sections ${(mainMs / 1000).toFixed(1)} s, the workers' ${took.join(', ')}; the suite ${wallS.toFixed(1)} s (the budget: ${BUDGET_S} s)`);
+  // The budget fails the suite -- unless the machine was busy with other work, which slows every thread here alike: the
+  // CPU time the whole machine spent over the suite's wall time (/proc/stat) less this process's own (every thread's:
+  // process.cpuUsage), per second of wall time, is the other work's CPUs; half a CPU or more of it excuses the suite.
+  const busy1 = machineBusyS(), ownU = process.cpuUsage(CPU0), ownS = (ownU.user + ownU.system) / 1e6;
+  const others = BUSY0 == null || busy1 == null ? null : Math.max(0, busy1 - BUSY0 - ownS) / wallS;
+  const beside = others == null ? 'no /proc/stat to read' : `the other work beside it ${others.toFixed(2)} CPUs on average, the suite's own ${(ownS / wallS).toFixed(2)}`;
+  if (wallS > BUDGET_S && (others == null || others < BUSY_CPUS)) fail(`wall: the suite took ${wallS.toFixed(1)} s, over its ${BUDGET_S} s budget (${beside})`);
+  else if (wallS > BUDGET_S) console.log(`  wall: over the ${BUDGET_S} s budget, not failed: the machine was busy with other work (${beside})`);
+  else console.log(`  wall: within the budget (${beside})`);
 }
 
 // ---------- 8 (the whole suite). every named room used (#11) ----------

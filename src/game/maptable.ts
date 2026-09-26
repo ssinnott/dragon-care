@@ -214,6 +214,16 @@ const counterWord = (c: Counter) => (c.element ? c.element.toUpperCase() : SKILL
 const meetsD = (c: Counter, d: Dragon) => !!c.element && d.element === c.element;
 const meetsK = (c: Counter, k: Keeper) => !!c.skill && KEEPER_SKILL[k.look] === c.skill;
 
+/**
+ * The chooser's line about the egg, under its rewards: the Hatchery full (every nest holds an egg: no egg reward), or
+ * the barn at its cap (life.ts BARN_CAP, read through seams.ts barnRoom: the egg still comes home and waits in its nest,
+ * BASE_DESIGN 5.6); null when neither. The hook's `ui.notice` reads it too.
+ */
+export type EggNotice = 'HATCHERY FULL: NO EGG' | 'BARN FULL: THE EGG WILL WAIT';
+export function eggNotice(sim: CareSim): EggNotice | null {
+  return freeNest(sim) == null ? 'HATCHERY FULL: NO EGG' : barnRoom(sim) <= 0 ? 'BARN FULL: THE EGG WILL WAIT' : null;
+}
+
 /** The mission the chooser shows (by id: on the board), or null. */
 export function chosen(sim: CareSim, ui: MapUi): Mission | null { return sim.missions.board.find((m) => m.id === ui.mission) ?? null; }
 
@@ -237,12 +247,10 @@ export function drawMissionScreen(ctx: CanvasRenderingContext2D, sim: CareSim, u
   drawClimate(ctx, region.climate, 'day', CLIMATE_RECT);
   title(ctx, m.title, 16, 142);
   text(ctx, `${region.name} - ${region.word}`, 16, 153, FADED);
-  const nest = freeNest(sim), days = `${m.days} DAY${m.days > 1 ? 'S' : ''}`, diff = m.difficulty.toUpperCase();
-  if (nest == null) { text(ctx, `${diff} - ${days} - ${m.coin} COIN`, 16, 163, INKY); text(ctx, 'HATCHERY FULL: NO EGG', 16, 173, FADED); }
-  else {
-    text(ctx, `${diff} - ${days} - ${m.coin} COIN - ${m.guaranteedEgg ? 'EGG: SURE (FIRST VISIT)' : `EGG ${Math.round(m.eggChance * 100)} %`}`, 16, 163, INKY);
-    if (barnRoom(sim) <= 0) text(ctx, 'BARN FULL: THE EGG WILL WAIT', 16, 173, FADED);
-  }
+  const notice = eggNotice(sim), days = `${m.days} DAY${m.days > 1 ? 'S' : ''}`, diff = m.difficulty.toUpperCase();
+  if (notice === 'HATCHERY FULL: NO EGG') text(ctx, `${diff} - ${days} - ${m.coin} COIN`, 16, 163, INKY);
+  else text(ctx, `${diff} - ${days} - ${m.coin} COIN - ${m.guaranteedEgg ? 'EGG: SURE (FIRST VISIT)' : `EGG ${Math.round(m.eggChance * 100)} %`}`, 16, 163, INKY);
+  if (notice) text(ctx, notice, 16, 173, FADED);
   const cov = coverage(sim, m, pairs), home = sim.dragons.filter((d) => !dragonReason(sim, d, m)), freeKs = sim.keepers.filter((k) => freeRider(sim, k));
   let y = 184;
   m.challenges.forEach((c, i) => {
