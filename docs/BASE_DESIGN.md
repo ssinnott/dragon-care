@@ -51,8 +51,8 @@ elder). A new game therefore starts with seven dragons, one per element, each 0 
 - **Floors stay pale.** Gate (i) (5.4): every floor a dragon stands on sits >= 25 % in luminance from every body and
   belly colour, with saturation under 0.20; straw `#e0d6b8` is the reference. A grass floor would swallow spike. **A
   room's identity comes from its walls, props and light, never its floor.** Walls behind the dragons are kept
-  mid-light and low in saturation (they separate from the ink, and from the dark bodies by value); a wall gate joins
-  `tools/palette-check.ts` once the room palette settles.
+  mid-light and low in saturation (they separate from the ink, and from the dark bodies by value); gate (w) in
+  `tools/palette-check.ts` holds every wall, and everything else a dragon is seen against, to that (7).
 - **Darkness hides the dark dragons.** Dusk's body sits at luminance 0.08 and slinkwing's at 0.05: a night sky or a
   mine swallows them whole. Dark places show the team **only inside a pool of light** (the mission tunnel, lit by
   dusk's lamp), and night outdoors stays mid-value (the blue hour of the mission mockup). The dragons are never tinted
@@ -88,6 +88,11 @@ picture.*
   and a car passing through floors that dragons stand on would clash with them.
 - **The towers** (the people): one at each end of the barn, five floors, a ladder up each. Their doors into the barn
   are human-sized, on the ground and upper floors: dragons don't fit, which is the reason for the split.
+- **Windows.** The ladder bay has a window each side of its ladder on every floor, and each bare hayloft module has
+  one: panes cut out of the back wall, so the sky shows through them (7: by day the day's, at night the night's; the
+  ground floor's look out on the far hills). The towers have a window slit a floor in their outer walls, lit at dusk
+  and night. A named room has none: its wall and its props are its identity (#11). Every wall, sky colour and big prop
+  a dragon is seen against is a `src/game/surfaces.ts` backdrop, held by gate (w) (7).
 - **The Aerie** is walkable **floor 5** (feet at y 136): one straw deck from x 8 to 648, over the left tower's top,
   then a gantry over the barn roof (x 168 to 488: a railing along its back, two trestles down to the roof and a knee
   brace to the tower), then the lift's head. The left tower's ladder climbs on to it. Teams will leave and land here (5).
@@ -335,10 +340,22 @@ second car or a second lift, a cap on the barn's dragons, the early-opening rule
 drains.
 
 **4.8 On screen.**
+- **The top bar** (y 0 to 15, `src/game/hud.ts`), left to right:
+  - the time of day: a sun by day, a low orange sun at dawn and dusk, the moon at night, and the clock, `DAY 3 14:00`
+    (the minutes in tens);
+  - `JOBS n`, the open jobs;
+  - a badge per keeper (46 x 13, at x 138, 186, 234 and 282): a chip in the keeper's own top colour, the name, and a
+    dot while at a job (display only; taking a keeper makes them tappable, S7);
+  - three buttons: **NEW** (x 528: tap it twice within 2 s for a new barn), **II** (x 558: pause) and **>1X** (x 578:
+    the speed, cycling 1x, 2x, 4x and 8x). A button is lit (`#6b4a34`) while it is in force: NEW asked, paused,
+    faster than 1x. A tap on the bar goes to its buttons, never to the world under it.
 - **Bubbles** over the dragons.
 - **The job strip** along the bottom: the top five jobs in order, numbered, each chip in its tier's colour with a
   check or an hourglass. Tapping a chip pans to that dragon and rushes the job.
-- **Panning:** drag the barn.
+- **The hint** (drag to look around, tap a bubble to Rush) on an ink strip at the bottom right, beside the job strip;
+  it gives way when the strip reaches it.
+- **Toasts**, centred under the top bar for 3 s: "SURE? TAP AGAIN", "A NEW BARN", "NEW BARN: THE OLD SAVE DIDN'T FIT".
+- **Panning:** drag the barn. **Keys:** 1 to 4 pick 1x, 2x, 4x and 8x; p pauses and plays.
 
 **4.9 First numbers** (tuning, not law):
 
@@ -450,11 +467,45 @@ stand spot <= 20 s, the bay's edge <= 60 s.
 ## 7. Time
 
 - **One clock.** One simulation clock, fixed 60 Hz steps, running only while the game is open (B6). Care, missions,
-  hatching and growing up all read it.
-- **Saves.** The world saves as it goes and when it closes; closing pauses it.
+  hatching and growing up all read it. It counts game time, in steps since day 1's midnight (`src/game/clock.ts`; the
+  simulation keeps `clock0 + tick`).
+- **The day.** A game day is **10 800 steps: 3 minutes at 1x** (23 s at 8x). A new game starts at 07:00 on day 1
+  (`hour=` starts one at another hour). The phases: **dawn** 05:00 to 07:00, **day** 07:00 to 18:00, **dusk** 18:00 to
+  20:00, **night** 20:00 to 05:00. The sky turns into a phase over its first hour, in three stepped thirds (each a flat
+  mix of the two phases' colours: no gradient, no alpha).
+- **Night lives in the sky and the lights; the dragons, floors and walls never change.**
+  - The sky is drawn behind the building, in screen space: three flat bands, far hills and clouds at half the camera's
+    pace, and at night the moon and 24 stars at a fifth of it (the stars come out a third at a time as the night comes
+    on, and go the same way at dawn). The barn's windows (2) show it.
+  - The lights: at dusk and night the towers' window slits are lit (and through the dawn's turn), and each Lamp Dorm
+    lamp throws two stepped rings on its wall, never on the floor's band; at night the hearth throws one on the
+    kitchen wall, and the hayloft's skylight shows the night.
+  - Nothing tints a dragon, a floor or a wall. The night is a mid-value blue hour (its bands L 0.19 to 0.28), never
+    black, so a dark dragon on the Aerie still shows against it. Gate (w) in `tools/palette-check.ts` holds every sky
+    colour at every phase and every stepped mix between two, every wall, the big props right behind a slot (the
+    hearth, the tub, the dorm's pallets) and the lamps' light >= 25 % in luminance from every dark body (lightning,
+    dusk and slinkwing, at every stage) and 6 Oklab L from the ink: 1001 gates, all passing (ART_BIBLE 5.8).
+  - The barn's care never reads the day's phase: a barn started at noon and one started at ten at night, stepped alike,
+    are the same barn (`npm run sim` section 12), and `view=base&layers=world` (the world alone: the building, the car,
+    the cast, the bubbles and the plates) is the same picture at noon and at ten at night (`npm run smoke`). Only a
+    garden resident's naps (S6) and the dawn's mission board (S8) will read it.
+- **Speed.** The top bar's speed button and the keys 1 to 4 run 1, 2, 4 or 8 whole world steps a frame; pause (II, or
+  p) runs none, and only the camera and the HUD move. A faster speed is more of the same fixed steps, never longer
+  ones, so the world is the same at every speed, only sooner. Speed is the view's: never saved, and 1x after a load.
+  (At 4x and 8x an effect's 3 to 6 frame keys can change every frame drawn: ART_BIBLE 5.1, accepted as the
+  fast-forward look.)
+- **Saves.** The browser keeps the barn (`localStorage`, key `dragon-care/base`; `src/game/storage.ts` is the only code
+  that touches it). It is loaded when the game's page opens, and saved every 10 s of play (600 frames) and when the
+  page is hidden or left; closing pauses the world (B6). A save is the whole world as JSON, loaded back exactly
+  (`src/game/save.ts`). **NEW** (tap twice) starts a new barn on a fresh seed, and it replaces the old one. A save this
+  build can't read (another version, or broken) starts a new barn, with a toast ("NEW BARN: THE OLD SAVE DIDN'T FIT"),
+  and the old save is kept aside at `dragon-care/base.bak`. **The tests and `t=` are exempt:** a frozen page (`t=`), a
+  preset page, `save=0` and every headless check never read or write it, so `t=` always shows the new game (or the
+  preset) stepped t times at 1x, whatever the browser holds.
 - **Seeded.** Every random choice (a mission's roll, a starting need, a keeper's tie-break) goes through the engine's
-  seeded RNG (`src/lib/engine/rng.ts`). That keeps a run reproducible and keeps the gallery's frozen-time screenshot
-  contract (`t=`) true for the base too.
+  seeded RNG (`src/lib/engine/rng.ts`); after the world is built every draw is stateless (`rngAt`), so a save keeps
+  only the seed. That keeps a run reproducible and keeps the gallery's frozen-time screenshot contract (`t=`) true for
+  the base too. The one seed drawn from the browser's randomness is NEW's.
 
 ---
 
@@ -469,6 +520,10 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    the base's first twelve-dragon cast) and `save=0` (a live page that never loads or saves; a preset page never
    does either); `t=` freezes it as in every gallery view. The gallery's own keys (the arrows, Space, E, the digits)
    do nothing here, and its arrows step over the base, so a debug view reached with them can still be left.
+   **Time is built too** (7): the day and night (a day is 3 minutes at 1x: watch one whole, or in 23 s at 8x), the
+   speed (the top bar's button, the keys 1 to 4, and p to pause), and the barn kept in the browser (a reload resumes
+   it; NEW, tapped twice, starts another). The page also takes `hour=0..23` (the hour day 1 starts at) and
+   `layers=world` (the world drawn alone, for the no-tint check).
 
    ![The built slice, 49 s in, in the start frame: RIPPLE walks off the Dragon Lift's car at the upper floor to the Romp Room, and Pip, sent for it now it is past its ride, goes for a ball at the box by the wheel; ZAP waits at the ground floor's east landing for the car up to the Lamp Dorm, back to back with COBBLE walking into the Bathhouse's first slot (Tomas brings the bucket, out of frame); WICK waits at the hayloft's east landing for the car down to the Romp Room; ECHO walks past BRAMBLE in the Grooming Parlour on its way down to the Bathhouse; Bea waits in the Hearth Kitchen; the job strip](base/base_live.png)
 
@@ -477,7 +532,11 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    | `src/game/pet.ts` | the pet code, moved out of `src/gallery.ts` unchanged (the gallery renders pixel for pixel as before), and the paper turn the base's dragons turn with |
    | `src/game/needs.ts` | the five needs, the drains, the tiers, mood and lightning's charge |
    | `src/game/layout.ts` | the grid; the rooms, each with its purpose (#11), and their dragon slots and stand spots; the Dragon Lift and the Aerie; the keepers' net (the ladders) and a dragon net per stage (the lift); routes between any two spots on a net; the name plates' places |
-   | `src/game/surfaces.ts` | every floor anyone stands on (`FLOORS`: straw), each gated by `tools/palette-check.ts`, and the bare and lift-shaft walls |
+   | `src/game/surfaces.ts` | every floor anyone stands on (`FLOORS`: straw), and everything a dragon is seen against (the walls, the sky's colours at every phase, the big props behind a slot, the lamps' light), each gated by `tools/palette-check.ts` (i, Ki, w) |
+   | `src/game/clock.ts` | the day's length and phases, the speeds, reading the clock (the day, the time, the phase and the sky's stepped turn) |
+   | `src/game/sky.ts` | the sky behind the building, in screen space: the bands, the far hills and clouds, the moon and the stars |
+   | `src/game/hud.ts` | the top bar (the clock, the jobs, the keepers' badges, NEW, pause, the speed), the toasts and the hint |
+   | `src/game/storage.ts` | the only code that touches the browser's storage: load the barn (or set aside one that doesn't fit), save it, forget it |
    | `src/game/start.ts` | the starting base: the rooms of section 3, seven newly adult dragons (one per element, 0 days into adulthood), each in a slot of its own need's room, and the four named keepers |
    | `src/game/presets.ts` | code-built starts for views that need what a new game hasn't got (`ages`: every stage) |
    | `src/game/sim.ts` | the care simulation: the queue, the keepers' trips and jobs (fetch, go, wait at the stand spot, work), and Rush; no drawing, seeded, deterministic; dragons with stable ids, a clock, and its options (seed, day length, start time) |
@@ -485,9 +544,9 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    | `src/game/gait.ts` | each element's walk at each stage as a table of per-frame root motion, the pace the simulation walks a dragon at |
    | `src/game/save.ts` | the save format: the whole world as JSON, every reference an id, loaded back exactly (`CareSim.fromSave`); the digest two runs compare |
    | `src/game/rand.ts` | stateless draws (`rngAt(seed, tag, ...keys)`): no RNG state is ever kept or saved |
-   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building (its rooms, the lift's shaft, car and headframe, the ladder bay, the Aerie's deck and gantry), the keepers on the named cast's rig (`docs/KEEPERS.md`), their walks played at their pace, the bubbles and chips |
-   | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks, turns and rides) and their anims, the lift's car, the camera, the HUD and the input |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen) |
+   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building (its rooms, the lift's shaft, car and headframe, the ladder bay, the windows, the Aerie's deck and gantry) and its lights by night, the keepers on the named cast's rig (`docs/KEEPERS.md`), their walks played at their pace, the bubbles and chips |
+   | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks, turns and rides) and their anims, the lift's car, the sky and the lights, the speed, the camera, the HUD and the input; a live page loads and saves the barn |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase) |
 
    Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play (seed
    1), 136 jobs opened and 128 were done, every one by a keeper (none closed on its own). A keeper started on a job
@@ -519,18 +578,22 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    - a dragon walking past one waiting at a landing (an alighter walking off toward it, a crosser through a line)
      covers it for the moment it takes to pass, and a landing crowded past its room leaves one over another's eye
      until the car takes it (section 2);
-   - the base is the fixed starting one (or a preset), and nothing is stored yet: the save format exists and is
-     checked, but nothing writes it to the browser;
+   - the base is the fixed starting one (or a preset); it is kept in the browser (7), but there is one barn, with no
+     save slots;
    - no building of rooms (the rooms are section 3's fixed set), and no missions.
-2. **Rooms you build:** place, merge and upgrade rooms; move dragons between them; save and load.
+2. **Rooms you build:** place, merge and upgrade rooms; move dragons between them; ~~save and load~~ (built: 7).
 3. **Missions:** the table, then the scene.
-4. **The rest of the world:** people's own lives (the bunks), eggs and hatching, day and night, the neighbour
-   effects, the blueprint zoom-out.
+4. **The rest of the world:** people's own lives (the bunks), eggs and hatching, ~~day and night~~ (built: 7), the
+   neighbour effects, the blueprint zoom-out.
 
 ## 9. Open questions
 
 - ~~Should a dragon ever take itself to a room (a tired dragon to the Lamp Dorm), or only ever be moved by the
   player?~~ Resolved (S3, #7): every dragon takes itself to its needs' rooms, and a keeper meets it there (2, 3, 4.4).
-- Day and night: dusk is the early sleeper and slinkwing the night owl (3.7, 3.8). A night shift of keepers?
+- Day and night: dusk is the early sleeper and slinkwing the night owl (3.7, 3.8). ~~A night shift of keepers?~~
+  Deferred (S4, plan P15): the barn keeps no keeper day and night rhythm in v1 (the care never reads the phase: 7),
+  and a resting keeper stays assignable. The elements' own night habits wait with it.
 - Is any care kept as a player action, the grow-up (240 f, "look at me") above all?
-- The wall gate's exact rule, once the room palette exists.
+- ~~The wall gate's exact rule, once the room palette exists.~~ Answered (S4): gate (w) (7) holds every wall, sky
+  colour, big prop behind a slot and lamp's light >= 25 % in luminance from every dark body and 6 Oklab L from the ink.
+  A prop's cel shadow band and its 1 px lines are marks, not backdrops, and are not gated.

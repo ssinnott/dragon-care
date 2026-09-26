@@ -1,12 +1,17 @@
-// The base's building, drawn once (docs/BASE_DESIGN.md 2): sky and ground, the two stone towers, every room with its
-// props, the gambrel roof over the hayloft, the Dragon Lift's shaft from the ground floor up through the roof to its
-// headframe over the Aerie, the keepers' centre ladder bay, and the Aerie deck on its gantry over the roof. Greybox:
+// The base's building, drawn once (docs/BASE_DESIGN.md 2): the ground, the two stone towers with their window slits,
+// every room with its props, the gambrel roof over the hayloft, the Dragon Lift's shaft from the ground floor up
+// through the roof to its headframe over the Aerie, the keepers' centre ladder bay, and the Aerie deck on its gantry
+// over the roof -- transparent above the ground and around its walls, where the view draws the sky (sky.ts: in screen
+// space, behind it, so the day turns without redrawing this). Greybox:
 // blocks in the house style (a 1 px #1a1018 outline, flat cel bands lit from the top-left, no gradients) standing in
 // for the room art to come. Every surface anyone stands on -- a room's band, a landing, a tower's floor, the deck, the
 // lift car's deck -- is a FLOORS colour (surfaces.ts; gated by tools/palette-check.ts, gates i and Ki). A room's
 // identity is its wall colour and its props; a slot no room fills is bare (an empty wall, no props, no name, #11). The
 // names go on a separate layer the view draws over the building and under the lift's car and the cast (so a name never
-// covers a face); the car is drawn in the world layer (drawLiftCar).
+// covers a face); the car is drawn in the world layer (drawLiftCar). Night (7) is the sky and the lights alone: the lit
+// window slits, the dorm lamps' and the hearth's light on their walls, the skylight's night (drawLights, drawn over the
+// building and under the plates); nothing on a floor, a wall or a dragon changes colour, and every colour a dragon is
+// seen against -- the walls, the props behind the slots, the light on the walls -- is a surfaces.ts backdrop, gate (w).
 import { makeTones } from '../lib/art/shading.ts';
 import { drawText, measureText } from '../lib/engine/text.ts';
 import {
@@ -14,14 +19,11 @@ import {
   KNEE_DX, KNEE_Y, BARN_FLOORS, TOWER_FLOORS, BARN_MODS, LIFT_MOD, LIFT_X0, LIFT_X1, LIFT_STOPS, CAR_X0, CAR_X1, LADDER_BAY_X0,
   LADDER_BAY_X1, AERIE_F, DECK_X0, DECK_X1, HEAD_Y, PULLEY_Y, KEEPER_NET, floorTop, feetY, modX, platesOf,
 } from './layout.ts';
-import type { Room, RoomKind, Link } from './layout.ts';
-import { FLOORS, INK, EMPTY_WALL, LIFT_WALL, STRAW_SEAM } from './surfaces.ts';
+import type { Room, Link } from './layout.ts';
+import { FLOORS, INK, EMPTY_WALL, LIFT_WALL, STONE, STRAW_SEAM, WALLS, PROPS, LIGHTS, LAMP_RINGS, HEARTH_RING, skyBands } from './surfaces.ts';
+import type { ClockRead } from './clock.ts';
 
 const STRAW = FLOORS.straw;
-/** Barn room walls: mid-light and low in saturation, each room its own (1: the floor stays straw). */
-const WALLS: Readonly<Partial<Record<RoomKind, string>>> = {
-  kitchen: '#c8ac92', hatchery: '#d4bc98', bath: '#b8c4cc', romp: '#b9b3cf', groom: '#cdb9a3', dorm: '#a39cb8',
-};
 /** Timber (posts, frames, rails, the trusses), and its dark tone (slabs, the car's underframe, the guide rails). */
 const TIMBER = '#8a6242', TIMBER_DK = '#6b4a34';
 /** The lift car's side rails (px tall), its cables' colour and x (one over each rail), and the headframe's pulleys. */
@@ -138,7 +140,7 @@ function liftBay(g: CanvasRenderingContext2D, f: number, top = floorTop(f)): voi
 /** A tower room's stone wall, its floor of straw boards, and its slab. */
 function towerWall(g: CanvasRenderingContext2D, x0: number, x1: number, f: number): void {
   const t = floorTop(f);
-  rect(g, x0, t, x1 - x0, WALL_H, '#c2bbb0');
+  rect(g, x0, t, x1 - x0, WALL_H, STONE);
   for (let y = t + 8, r = 0; y < t + WALL_H; y += 12, r++) {
     rect(g, x0, y, x1 - x0, 1, '#aaa396');
     for (let c = x0 + (r % 2 ? 6 : 14); c < x1; c += 20) rect(g, c, y, 1, Math.min(11, t + WALL_H - y), '#aaa396');
@@ -169,10 +171,53 @@ function nest(g: CanvasRenderingContext2D, cx: number, band: number): void {
 }
 /** A low sleeping pallet against the dorm's back wall, behind the band (its top at most t + WALL_H - 2), the pillow at `head`'s end. */
 function pallet(g: CanvasRenderingContext2D, cx: number, t: number, head: 1 | -1): void {
-  box(g, cx - 62, t + WALL_H - 8, 124, 8, TIMBER);
-  box(g, cx - 58, t + WALL_H - 14, 116, 7, '#e6dcc4');
+  box(g, cx - 62, t + WALL_H - 8, 124, 8, PROPS.pallet);
+  box(g, cx - 58, t + WALL_H - 14, 116, 7, PROPS.mattress);
   box(g, cx + head * 44 - 11, t + WALL_H - 17, 22, 6, '#f0ead8');
 }
+
+/** A lamp hanging in the dorm: where its box's top-left is (x - 4, y), and where its cord hangs from. */
+interface Lamp { x: number; y: number; cord: number }
+/** The dorm's two lamps, hanging from the rafters in the hayloft (under the room's plate, which hangs at t + 20 there). */
+function lampsOf(r: Room): Lamp[] {
+  const t = floorTop(r.floor), y = t + (r.floor === 2 ? 32 : 16), cord = r.floor === 2 ? RIDGE_Y - 20 : t;
+  return [r.x0 + 40, r.x0 + 280].map((x) => ({ x, y, cord }));
+}
+/** A lamp on its cord (the cord a flat 1 px ink column). */
+function lamp(g: CanvasRenderingContext2D, l: Lamp): void { rect(g, l.x, l.cord, 1, l.y - l.cord, INK); box(g, l.x - 4, l.y, 8, 10, LIGHTS.lamp); }
+/** A tower window slit's glass (6 x 10, inked round), one a floor in each tower's outer wall. */
+const SLIT_W = 6, SLIT_H = 10;
+const SLITS: readonly { x: number; y: number }[] = [TOWER_L + 1, TOWER_R + TOWER_W - 1 - SLIT_W].flatMap((x) =>
+  Array.from({ length: TOWER_FLOORS }, (_, f) => ({ x, y: floorTop(f) + 30 })));
+/**
+ * A window in the barn's back wall: its pane (world px), cut out of the building so the sky (sky.ts) shows through it
+ * -- by day the day's, at night the night's: the barn's own windows on the time of day, seen from the start frame. Two
+ * flank the centre ladder on each floor of the ladder bay, and one sits in each bare hayloft module; never in a named
+ * room, whose wall and props are its identity (#11), and each high on its wall, over a dragon's back.
+ */
+interface Pane { x: number; y: number; w: number; h: number }
+function panes(bare: readonly (readonly [number, number, number])[]): Pane[] {
+  const out: Pane[] = [];
+  for (let f = 0; f < BARN_FLOORS; f++) {
+    const t = floorTop(f);
+    out.push({ x: LADDER_BAY_X0 + 7, y: t + 16, w: 14, h: 24 }, { x: LADDER_BAY_X1 - 21, y: t + 16, w: 14, h: 24 });
+  }
+  for (const [f, x0, x1] of bare) if (f === 2) out.push({ x: (x0 + x1) / 2 - 14, y: floorTop(f) + 18, w: 28, h: 22 });
+  return out;
+}
+/** A window: its timber frame (inked) and sill, the pane cut out, a mullion down its middle (and a transom across a wide one). */
+function windowIn(g: CanvasRenderingContext2D, p: Pane): void {
+  rect(g, p.x - 3, p.y - 3, p.w + 6, p.h + 6, INK);
+  rect(g, p.x - 2, p.y - 2, p.w + 4, p.h + 4, TIMBER);
+  rect(g, p.x - 2, p.y - 2, p.w + 4, 1, '#a47a52');
+  g.clearRect(p.x, p.y, p.w, p.h);
+  rect(g, p.x + p.w / 2 - 1, p.y, 2, p.h, TIMBER);
+  if (p.w > 20) rect(g, p.x, p.y + p.h / 2 - 1, p.w, 2, TIMBER);
+  rect(g, p.x - 4, p.y + p.h + 2, p.w + 8, 3, INK); rect(g, p.x - 3, p.y + p.h + 3, p.w + 6, 1, TIMBER);
+}
+
+/** The hayloft's skylight, on the roof's right slope over the lamp dorm. */
+const SKYLIGHT: readonly number[] = [930, 318, 884, 310, 886, 298, 932, 306];
 
 /** Each room kind's props, over its wall. */
 function props(g: CanvasRenderingContext2D, r: Room): void {
@@ -181,9 +226,9 @@ function props(g: CanvasRenderingContext2D, r: Room): void {
     case 'kitchen': {
       // the hearth (the kitchen's post: keepers take the bowls from here) and a shelf of crocks
       const hx = x + 6, hf = t + WALL_H;
-      box(g, hx, hf - 62, 60, 62, '#9c948a');
+      box(g, hx, hf - 62, 60, 62, PROPS.hearth);
       for (let row = 0; row < 5; row++) for (let c = 0; c < 4; c++) rect(g, hx + 2 + c * 15 + (row % 2) * 7, hf - 60 + row * 12, 1, 11, '#7c746c');
-      rect(g, hx + 12, hf - 34, 36, 34, INK); rect(g, hx + 13, hf - 33, 34, 33, '#3a2626');
+      rect(g, hx + 12, hf - 34, 36, 34, INK); rect(g, hx + 13, hf - 33, 34, 33, PROPS.firebox);
       poly(g, [hx + 18, hf, hx + 24, hf - 18, hx + 30, hf - 8, hx + 34, hf - 24, hx + 42, hf], '#f39a2e');
       poly(g, [hx + 24, hf, hx + 28, hf - 10, hx + 34, hf - 14, hx + 38, hf], '#ffd86a', false);
       box(g, hx + 18, hf - 22, 24, 14, '#4a4450');
@@ -201,7 +246,7 @@ function props(g: CanvasRenderingContext2D, r: Room): void {
       // the tub (the bathhouse's post: the buckets are filled here), standing on the band's back edge like the hearth,
       // so a dragon in the slot in front of it has straw under its paws, not the tub
       const bx = x + 150, w = 150, bf = t + WALL_H;
-      box(g, bx, bf - 34, w, 34, '#8e6240');
+      box(g, bx, bf - 34, w, 34, PROPS.tub);
       for (let i = 1; i < 4; i++) rect(g, bx + 1, bf - 34 + i * 8, w - 2, 1, '#6e4a30');
       rect(g, bx + 3, bf - 38, w - 6, 5, INK); rect(g, bx + 4, bf - 37, w - 8, 3, '#bfe3e0');
       for (const [cx, cy, cr] of [[bx + 20, bf - 44, 3], [bx + 36, bf - 50, 2], [bx + w - 30, bf - 46, 3], [bx + w - 18, bf - 55, 2]]) disc(g, cx, cy, cr, '#dff3f1');
@@ -232,7 +277,7 @@ function props(g: CanvasRenderingContext2D, r: Room): void {
       for (const s of r.slots) if (!s.baby) pallet(g, s.x, t, s.facing);
       box(g, x + 157, t + 50, 6, WALL_H - 50, TIMBER, false);
       // (each cord a flat 1 px ink column)
-      for (const lx of [x + 40, x + 280]) { const ly = t + (r.floor === 2 ? 32 : 16), cy = r.floor === 2 ? RIDGE_Y - 20 : t; rect(g, lx, cy, 1, ly - cy, INK); box(g, lx - 4, ly, 8, 10, '#ffa98c'); }
+      for (const l of lampsOf(r)) lamp(g, l);
       break;
     case 'tack':
       box(g, x + 6, t + 40, 40, 4, TIMBER, false);
@@ -271,12 +316,7 @@ export function drawBuilding(rooms: readonly Room[]): HTMLCanvasElement {
   const g = c.getContext('2d')!;
   g.imageSmoothingEnabled = false;
 
-  // sky, clouds, far hills, ground
-  rect(g, 0, 0, WORLD_W, WORLD_H, '#cfe3ea');
-  for (const [cx, cy, s] of [[300, 64, 1], [760, 84, 1.4], [980, 170, 1], [1250, 250, 0.8], [360, 250, 0.7]]) {
-    for (const [dx, dy, r] of [[0, 0, 14], [16, -6, 18], [34, 0, 13], [18, 6, 12]]) disc(g, cx + dx * s, cy + dy * s, r * s, '#eef6f7', false);
-  }
-  poly(g, [0, 640, 180, 600, 420, 630, 700, 590, 980, 626, 1200, 596, WORLD_W, 620, WORLD_W, GROUND, 0, GROUND], '#b3cfae', false);
+  // the ground (the sky, the far hills and the clouds are the view's: sky.ts)
   rect(g, 0, GROUND, WORLD_W, WORLD_H - GROUND, '#7a5a40'); rect(g, 0, GROUND, WORLD_W, 5, '#86a860'); rect(g, 0, GROUND + 5, WORLD_W, 1, '#5e7a44');
   for (let x = 7; x < WORLD_W; x += 23) rect(g, x, GROUND + 14 + (x % 3) * 6, 3, 2, '#654834');
 
@@ -287,6 +327,8 @@ export function drawBuilding(rooms: readonly Room[]): HTMLCanvasElement {
     for (let y = top + 6; y < GROUND; y += 9) { rect(g, tx, y, WALL, 1, '#857d72'); rect(g, tx + TOWER_W - WALL, y, WALL, 1, '#857d72'); }
     rect(g, tx, top, 1, GROUND - top, INK); rect(g, tx + TOWER_W - 1, top, 1, GROUND - top, INK);
   }
+  // their window slits, one a floor in each outer wall: day glass (drawLights lights them at dusk and night)
+  for (const s of SLITS) { rect(g, s.x - 1, s.y - 1, SLIT_W + 2, SLIT_H + 2, INK); rect(g, s.x, s.y, SLIT_W, SLIT_H, LIGHTS.glass); }
 
   const barnRoom = (r: Room, top?: number) => { barnWall(g, r.x0, r.x1, r.floor, WALLS[r.kind] ?? EMPTY_WALL, top); props(g, r); };
   const barn = rooms.filter((r) => r.part === 'barn');
@@ -301,6 +343,8 @@ export function drawBuilding(rooms: readonly Room[]): HTMLCanvasElement {
   for (const r of barn) if (r.floor < 2) barnRoom(r);
   for (const [f, x0, x1] of empty) if (f < 2) barnWall(g, x0, x1, f, EMPTY_WALL);
   for (const f of [0, 1]) { liftBay(g, f); barnWall(g, LADDER_BAY_X0, LADDER_BAY_X1, f, EMPTY_WALL); }
+  const windows = panes(empty);
+  for (const p of windows) if (p.y > floorTop(2) + WALL_H) windowIn(g, p);
   // the roof; the lift's shaft up through it to the Aerie deck (a housing, the shaft wall between two posts); then the
   // hayloft inside the roof (its walls run up to the rafters)
   const topRow = RIDGE_Y - 20;
@@ -316,9 +360,10 @@ export function drawBuilding(rooms: readonly Room[]): HTMLCanvasElement {
   for (const [f, x0, x1] of empty) if (f === 2) barnWall(g, x0, x1, f, EMPTY_WALL, topRow);
   liftBay(g, 2, topRow);
   barnWall(g, LADDER_BAY_X0, LADDER_BAY_X1, 2, EMPTY_WALL, topRow);
+  for (const p of windows) if (p.y < floorTop(2) + WALL_H) windowIn(g, p);
   g.restore();
   // the hayloft's skylight, on the right slope over the lamp dorm
-  poly(g, [930, 318, 884, 310, 886, 298, 932, 306], '#e8f4f8');
+  poly(g, SKYLIGHT, '#e8f4f8');
 
   // posts between the barn's rooms, the lift bay's two walls and the ladder bay's
   for (let f = 0; f < BARN_FLOORS; f++) {
@@ -419,4 +464,43 @@ export function drawLiftCar(g: CanvasRenderingContext2D, y: number): void {
   rect(g, CAR_X0, top - 1, w, BAND + SLAB + 1, INK);
   rect(g, CAR_X0 + 1, top, w - 2, BAND, STRAW); rect(g, CAR_X0 + 1, top, w - 2, 1, STRAW_SEAM);
   rect(g, CAR_X0 + 1, top + BAND + 1, w - 2, SLAB - 2, TIMBER_DK); rect(g, CAR_X0 + 1, top + BAND + 1, w - 2, 1, '#86603f');
+}
+
+/** Whether the towers' slits are lit: at dusk and night, and while the dawn is still turning the night's sky. */
+export function slitsLit(c: ClockRead): boolean { return c.phase === 'dusk' || c.phase === 'night' || (c.phase === 'dawn' && c.blend < 3); }
+
+/**
+ * The lights (docs/BASE_DESIGN.md 7), drawn in the world layer over the building and under the plates, the lift's car
+ * and the cast (never over a dragon: G8). At dusk and night the towers' window slits are lit (and through the dawn's
+ * turn), and each dorm lamp throws two stepped rings on its wall (r 10 and 16, the lamp's colour mixed into the wall's
+ * at a half and a quarter: flat), clipped to the wall above the band, never on it; at night the hearth throws one flat
+ * ring on the kitchen wall round it, and the hayloft's skylight shows the night's top band and a star. By day, nothing.
+ */
+export function drawLights(g: CanvasRenderingContext2D, rooms: readonly Room[], c: ClockRead): void {
+  if (slitsLit(c)) for (const s of SLITS) rect(g, s.x, s.y, SLIT_W, SLIT_H, LIGHTS.slit);
+  const evening = c.phase === 'dusk' || c.phase === 'night';
+  if (!evening) return;
+  for (const r of rooms) {
+    const t = floorTop(r.floor), band = t + WALL_H;
+    if (r.kind === 'dorm') {
+      g.save();
+      g.beginPath(); g.rect(r.x0 + 3, t, r.x1 - r.x0 - 6, WALL_H); g.clip();
+      if (r.floor === 2) { path(g, ROOF_IN); g.clip(); }
+      for (const l of lampsOf(r)) {
+        const cy = l.y + 5;
+        disc(g, l.x, cy, 16, LAMP_RINGS[1], false);
+        disc(g, l.x, cy, 10, LAMP_RINGS[0], false);
+        lamp(g, l);
+      }
+      g.restore();
+    } else if (r.kind === 'kitchen' && c.phase === 'night') {
+      // (round the hearth: clipped to the wall above its shadow line, the hearth and its hood cut out, so it lies behind them)
+      const hx = r.x0 + 6;
+      g.save();
+      g.beginPath(); g.rect(r.x0 + 3, t, r.x1 - r.x0 - 6, WALL_H - 3); g.rect(hx, band - 62, 60, 62); g.rect(hx + 4, band - 88, 52, 26); g.clip('evenodd');
+      disc(g, hx + 30, band - 17, 60, HEARTH_RING, false);
+      g.restore();
+    }
+  }
+  if (c.phase === 'night') { poly(g, SKYLIGHT, skyBands(c)[0]); rect(g, 905, 306, 2, 2, LIGHTS.star); }
 }

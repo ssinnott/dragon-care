@@ -5,7 +5,9 @@ keepers who look after them (`docs/BASE_DESIGN.md`, `docs/KEEPERS.md`, `docs/ART
 TypeScript, no runtime dependencies.
 
 Open `index.html` (via `npm run dev`, or the deployed page) and you're straight into the base: drag to look around,
-tap a need bubble, a job chip or a dragon to Rush it. `docs/base/base_live.png` shows it running.
+tap a need bubble, a job chip or a dragon to Rush it. A day and a night pass in 3 minutes: the top bar's speed button
+(or the keys 1-4) runs it at 2x, 4x or 8x, and II (or p) pauses. The barn is kept in the browser and resumes on a reload;
+NEW, tapped twice, starts another. `docs/base/base_live.png` shows it running.
 
 ## Run it
 

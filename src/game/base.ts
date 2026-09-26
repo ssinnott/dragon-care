@@ -6,8 +6,13 @@
 // keyed by dragon id, which follows the simulation as dragons come, go and grow. The simulation walks the dragons to
 // their needs' rooms and rides them on the Dragon Lift (travel.ts); the view puts each pet where its dragon is, plays
 // its walk from the start of every walk bout at speed 1 (the sim moved it by that walk's own root motion, so the paws
-// stay planted), narrows it through a paper turn, and draws the lift's car where the car is. The constructor never
-// touches storage; a live page that may save (opts.persist) will load in attach() (S4).
+// stay planted), narrows it through a paper turn, and draws the lift's car where the car is.
+// Time (7): the sky behind the building turns with the clock and the lights come on at dusk -- night is drawn there
+// alone, never on a dragon, a floor or a wall (plan G8; layers=world draws the world without it) -- and the view runs
+// 0, 1, 2, 4 or 8 whole world steps a frame (the speed, the view's own: a save has none). The constructor never touches
+// storage: a live page that may save (opts.persist) loads the player's barn in attach() and saves it as it goes, every
+// 600 frames and when the page is hidden or left (storage.ts); a frozen page never calls attach(), so t= is always the
+// new game (or the preset) stepped t times at 1x.
 import { drawDragon, rootToScreen } from '../art/dragon/rig.ts';
 import { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
 import { ELEMENT_ANIM_FALLBACK } from '../art/dragon/anims.ts';
@@ -18,14 +23,21 @@ import type { Pet } from './pet.ts';
 import { CareSim } from './sim.ts';
 import type { Dragon, Job } from './sim.ts';
 import { startSpec, buildSim } from './presets.ts';
-import { worldKey, fnv1a } from './save.ts';
+import { worldKey, barnKey, fnv1a, serialize } from './save.ts';
+import { readClock } from './clock.ts';
+import type { Speed, ClockRead } from './clock.ts';
+import { drawSky } from './sky.ts';
+import { drawTopBar, drawToast, drawHint, buttonAt, BUTTONS, BAR_H, TOAST_FRAMES } from './hud.ts';
+import type { ButtonName } from './hud.ts';
+import { loadSave, writeSave, clearSave, backupSave } from './storage.ts';
+import { freshSeed } from '../lib/engine/rng.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import { WORLD_W, WORLD_H, feetY } from './layout.ts';
 import { walking, feetOf } from './travel.ts';
 import { gaitOf, wrapT } from './gait.ts';
 import { SOON, tierOf, chargeOf } from './needs.ts';
 import type { NeedKind } from './needs.ts';
-import { drawBuilding, drawPlates, drawLiftCar } from './building.ts';
+import { drawBuilding, drawPlates, drawLiftCar, drawLights } from './building.ts';
 import { makeKeeperAgent, stepKeeperVisual, drawKeeperVisual } from './people.ts';
 import type { KeeperAgent } from '../care/keeper.ts';
 import { drawBubble, drawChip, hit } from './icons.ts';
@@ -33,6 +45,8 @@ import type { Rect } from './icons.ts';
 
 const INK = '#1a1018';
 export const VIEW_W = 640, VIEW_H = 360;
+/** Behind everything (the page's own colour: index.html). */
+const CLEAR = '#16141c';
 /**
  * Where the camera starts: the barn's three floors, the kitchen and the romp room (EMBER and ZAP), the Dragon Lift
  * (its car starts at the ground floor), the ladder bay, and the first slots of the bathhouse, the grooming parlour and
@@ -50,17 +64,32 @@ const STRIP = 5;
 const ACT_ANIM: Readonly<Record<NeedKind, string>> = { food: 'eat', love: 'pet', play: 'happy', bath: 'happy', sleep: 'sleep' };
 /** A drag starts once the pointer has moved this far (canvas px); less is a tap. */
 const DRAG_PX = 4;
+/** A live page that may save saves every this many frames (10 s), and when it is hidden or left. */
+const AUTOSAVE_FRAMES = 600;
+/** NEW asks again: a second tap within this many frames (2 s) starts a new barn. */
+const NEW_FRAMES = 120;
+/** The speeds the keys 1-4 and the speed button pick (world steps a frame); pause is 0. */
+const RATES = [1, 2, 4, 8] as const;
+type Rate = typeof RATES[number];
+const DIDNT_FIT = 'NEW BARN: THE OLD SAVE DIDN\'T FIT';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-/** How a base view starts: the world's seed, where the camera starts (world px, clamped), a preset, and whether it may save. */
+/**
+ * How a base view starts: the world's seed, where the camera starts (world px, clamped), a preset, whether it may save,
+ * the hour of day 1 the world starts at, and which layers it draws.
+ */
 export interface BaseViewOpts {
   seed: number;
   cam?: { x: number; y: number } | null;
   /** A start from presets.ts by name (null, or a name no preset has: the new game). */
   preset?: string | null;
-  /** A live page that loads and autosaves (the gallery sets it only without t=, save=0 or preset=). Unused until S4. */
+  /** A live page that loads and autosaves in attach() (the gallery sets it only without t=, save=0 or preset=). */
   persist?: boolean;
+  /** The hour of day 1 the world starts at, 0-23 (null: 07:00, the new game's). A loaded save keeps its own clock. */
+  hour?: number | null;
+  /** 'world': only the building, the lift's car, the cast, the bubbles and the plates -- no sky, lights, HUD or toasts (the no-tint check). */
+  layers?: 'all' | 'world';
 }
 
 /**
@@ -78,38 +107,62 @@ export interface PetView {
 export class BaseView {
   readonly w = VIEW_W;
   readonly h = VIEW_H;
-  readonly sim: CareSim;
+  /** The world: built from the start in the constructor; a live page may swap in the player's saved barn (attach) or a new one (NEW). */
+  sim!: CareSim;
   /** The dragons on screen, by dragon id, in id order (syncCast keeps it matched to the simulation). */
   readonly cast = new Map<number, PetView>();
-  /** Whether this page may load and autosave (S4). */
+  /** Whether this page may load and autosave (attach). */
   readonly persist: boolean;
+  /** Which layers draw() draws. */
+  readonly layers: 'all' | 'world';
+  /** World steps a frame while playing (the keys 1-4, the speed button), and whether it is paused (p, the pause button). Never saved: 1x after a load. */
+  private rate: Rate = 1;
+  private paused = false;
   camX = START_CAM.x;
   camY = START_CAM.y;
   /** Where the camera is easing to after a job chip was tapped (null: it stays put). */
   private camTo: { x: number; y: number } | null = null;
-  private readonly keeperAgents: KeeperAgent[];
-  private readonly building: HTMLCanvasElement;
-  private readonly plates: HTMLCanvasElement;
+  private keeperAgents!: KeeperAgent[];
+  private building!: HTMLCanvasElement;
+  private plates!: HTMLCanvasElement;
   private readonly top = new TopPass(160);
   private readonly budget = new AmbientBudget();
+  /** World steps drawn (the ambient budget's clock), and frames shown (the UI's: toasts, NEW's second tap, the autosave). */
   private frame = 0;
+  private uiFrame = 0;
+  /** The toast showing and the frames it has left; NEW's frames left to be tapped again (0: not asked). */
+  private toast: { text: string; left: number } | null = null;
+  private newArmed = 0;
+  /** Attached with saving on: the autosave runs. */
+  private saving = false;
   /** Last frame's bubbles (world px) and chips (screen px), for tapping. */
   private bubbles: { job: Job; r: Rect }[] = [];
   private chips: { job: Job; r: Rect }[] = [];
   private detachers: (() => void)[] = [];
 
   constructor(opts: BaseViewOpts) {
-    this.sim = buildSim(startSpec(opts.preset), opts.seed);
     this.persist = !!opts.persist;
+    this.layers = opts.layers === 'world' ? 'world' : 'all';
     if (opts.cam) this.setCam(opts.cam.x, opts.cam.y);
+    this.use(buildSim(startSpec(opts.preset), opts.seed, opts.hour));
+  }
+
+  /** Put a world on screen: its cast, its keepers' characters, its building and its plates (the constructor, a load, NEW). */
+  private use(sim: CareSim): void {
+    this.sim = sim;
+    this.cast.clear();
     this.syncCast();
-    this.keeperAgents = this.sim.keepers.map((k) => makeKeeperAgent(k.look));
-    this.building = drawBuilding(this.sim.rooms);
-    this.plates = drawPlates(this.sim.rooms);
+    this.keeperAgents = sim.keepers.map((k) => makeKeeperAgent(k.look));
+    this.building = drawBuilding(sim.rooms);
+    this.plates = drawPlates(sim.rooms);
+    this.bubbles = []; this.chips = [];
   }
 
   /** Every dragon's pet, in id order. */
   get pets(): Pet[] { return [...this.cast.values()].map((v) => v.pet); }
+
+  /** World steps a frame: 0 paused, else 1, 2, 4 or 8. */
+  get speed(): Speed { return this.paused ? 0 : this.rate; }
 
   /**
    * A dragon's feet: on the lift's car while it rides, else its floor's straw band, a px apart from its neighbours' so
@@ -136,7 +189,25 @@ export class BaseView {
 
   // ---------- a step ----------
 
+  /**
+   * A frame: `speed` whole world steps (each the simulation's step, then the cast, the pets and the keepers' characters
+   * after it, exactly as at 1x: a faster speed is more of the same steps, never longer ones), then the camera eases and
+   * the UI's timers run once. Paused, only the camera and the UI move. A frozen page's steps are always at 1x.
+   */
   step(): void {
+    for (let n = this.speed; n > 0; n--) this.worldStep();
+    if (this.camTo) {
+      this.setCam(this.camX + (this.camTo.x - this.camX) / 6, this.camY + (this.camTo.y - this.camY) / 6);
+      if (Math.abs(this.camTo.x - this.camX) < 0.5 && Math.abs(this.camTo.y - this.camY) < 0.5) { this.setCam(this.camTo.x, this.camTo.y); this.camTo = null; }
+    }
+    this.uiFrame++;
+    if (this.toast && --this.toast.left <= 0) this.toast = null;
+    if (this.newArmed > 0) this.newArmed--;
+    if (this.saving && this.uiFrame % AUTOSAVE_FRAMES === 0) this.save();
+  }
+
+  /** One world step, and the view kept in step with it. */
+  private worldStep(): void {
     this.sim.step();
     this.syncCast();
     for (const d of this.sim.dragons) this.sync(d, this.cast.get(d.id)!);
@@ -144,10 +215,6 @@ export class BaseView {
     stepWary(pets);
     for (const p of pets) stepPet(p);
     this.sim.keepers.forEach((k, i) => stepKeeperVisual(this.keeperAgents[i], k, k.climbing ? k.y : k.y - 3));
-    if (this.camTo) {
-      this.setCam(this.camX + (this.camTo.x - this.camX) / 6, this.camY + (this.camTo.y - this.camY) / 6);
-      if (Math.abs(this.camTo.x - this.camX) < 0.5 && Math.abs(this.camTo.y - this.camY) < 0.5) { this.setCam(this.camTo.x, this.camTo.y); this.camTo = null; }
-    }
     this.frame++;
   }
 
@@ -210,11 +277,23 @@ export class BaseView {
 
   // ---------- drawing ----------
 
+  /**
+   * The frame, back to front: the sky (screen space), the building, the lights, the plates, the lift's car, the cast,
+   * the top pass, the bubbles, then the HUD and a toast. layers=world leaves out the sky, the lights, the HUD and the
+   * toast: what is left is the same by day and by night (the no-tint check).
+   */
   draw(ctx: CanvasRenderingContext2D): void {
-    const cx = Math.round(this.camX), cy = Math.round(this.camY);
+    const cx = Math.round(this.camX), cy = Math.round(this.camY), all = this.layers === 'all';
+    const read = readClock(this.sim.clock, this.sim.dayLen);
     const seen = (x0: number, x1: number, y0: number, y1: number) => x1 >= cx && x0 <= cx + VIEW_W && y1 >= cy && y0 <= cy + VIEW_H;
     ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = CLEAR; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    if (all) drawSky(ctx, read, this.camX, this.camY, WORLD_W);
     ctx.drawImage(this.building, cx, cy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
+    ctx.save();
+    ctx.translate(-cx, -cy);
+    if (all) drawLights(ctx, this.sim.rooms, read);
+    ctx.restore();
     // the names are on the walls: under the lift's car and the cast, so a name never covers a face (a keeper passing
     // under the Lamp Dorm's plate hides part of it for a moment instead)
     ctx.drawImage(this.plates, cx, cy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
@@ -254,12 +333,21 @@ export class BaseView {
       this.bubbles.push({ job: j, r: drawBubble(ctx, pt.x, pt.y - 2, j.need, tierOf(d.needs[j.need]), !!j.keeper) });
     }
     ctx.restore();
-    this.hud(ctx);
+    this.chips = [];
+    if (all) {
+      this.hud(ctx, read);
+      if (this.toast) drawToast(ctx, this.toast.text);
+    }
     if (typeof window !== 'undefined' && window.__dragonCare) {
       const st = this.sim.stats;
       window.__dragonCare.base = { tick: this.sim.tick, camX: this.camX, camY: this.camY, jobs: this.sim.jobs.length, done: st.done, rushes: st.rushes, preempted: st.preempted,
         chips: this.chips.map((c) => ({ ...c.r, dragon: c.job.dragon.name, need: c.job.need, rushed: c.job.rushed })),
         digest: fnv1a(worldKey(this.sim)),
+        barnDigest: fnv1a(barnKey(this.sim)),
+        clock: { day: read.day, hour: read.hour, minute: read.minute, phase: read.phase },
+        speed: this.speed,
+        persist: this.persist,
+        buttons: { ...BUTTONS },
         dragons: this.sim.dragons.map((d) => ({ id: d.id, name: d.name, element: d.element, stage: d.stage, f: d.f, x: d.x, move: d.move,
           room: this.sim.rooms.find((r) => r.floor === d.f && d.x >= r.x0 && d.x <= r.x1)?.kind ?? null,
           slot: d.slot ? `${this.sim.rooms[d.slot.room].kind}:${d.slot.i}` : null })),
@@ -268,15 +356,14 @@ export class BaseView {
     }
   }
 
-  /** The top bar (jobs, busy keepers, the two gestures) and the job strip along the bottom (4.8). */
-  private hud(ctx: CanvasRenderingContext2D): void {
-    const text = (s: string, x: number, y: number, color: string, align: 'left' | 'right' = 'left') => drawText(ctx, s, x, y, { color, align, shadow: false });
-    ctx.fillStyle = INK; ctx.fillRect(0, 0, VIEW_W, 15);
-    const busy = this.sim.keepers.filter((k) => k.job).length;
-    text(`JOBS ${this.sim.jobs.length}`, 6, 4, '#f3e6c8');
-    text(`KEEPERS ${busy} OF ${this.sim.keepers.length} BUSY`, 64, 4, '#f3e6c8');
-    text('DRAG: LOOK AROUND   TAP A BUBBLE: RUSH', VIEW_W - 6, 4, '#b8ac8e', 'right');
-    this.chips = [];
+  /**
+   * The HUD (4.8): the top bar (the time, the jobs, the keepers' badges, NEW, pause and the speed: hud.ts), the job
+   * strip along the bottom, and the two gestures at the bottom right.
+   */
+  private hud(ctx: CanvasRenderingContext2D, read: ClockRead): void {
+    const text = (s: string, x: number, y: number, color: string) => drawText(ctx, s, x, y, { color, shadow: false });
+    drawTopBar(ctx, { clock: read, jobs: this.sim.jobs.length, keepers: this.sim.keepers.map((k) => ({ name: k.name, look: k.look, busy: !!k.job })),
+      speed: this.speed, rate: this.rate, armed: this.newArmed > 0 });
     const q = this.sim.queue(), y = VIEW_H - 21;
     let x = 6;
     q.slice(0, STRIP).forEach((j, i) => {
@@ -288,8 +375,40 @@ export class BaseView {
       const s = `+${q.length - STRIP}`;
       ctx.fillStyle = INK; ctx.fillRect(x, y, 6 * s.length + 7, 17);
       text(s, x + 4, y + 5, '#f3e6c8');
+      x += 6 * s.length + 7;
     }
+    drawHint(ctx, x);
   }
+
+  /** Show a toast (it replaces the one showing). */
+  private say(text: string): void { this.toast = { text, left: TOAST_FRAMES }; }
+
+  /** Pick a speed (1, 2, 4 or 8 steps a frame), playing; pause and play. */
+  private setRate(r: Rate): void { this.rate = r; this.paused = false; }
+  private togglePause(): void { this.paused = !this.paused; }
+
+  /** A top-bar button: NEW (asked twice), pause, the speed (the next of 1x, 2x, 4x, 8x). */
+  private press(b: ButtonName): void {
+    if (b === 'pause') this.togglePause();
+    else if (b === 'speed') this.setRate(RATES[(RATES.indexOf(this.rate) + 1) % RATES.length]);
+    else if (this.newArmed <= 0) { this.newArmed = NEW_FRAMES; this.say('SURE? TAP AGAIN'); }
+    else this.newBarn();
+  }
+
+  /**
+   * NEW, asked twice: a new barn (the new game, on a fresh seed -- the one place the game draws a seed from the wall
+   * clock's randomness: rng.ts freshSeed), at 1x; a page that saves forgets the old barn and keeps the new one.
+   */
+  private newBarn(): void {
+    this.newArmed = 0;
+    this.use(buildSim(startSpec(null), freshSeed()));
+    this.rate = 1; this.paused = false;
+    if (this.persist) { clearSave(); this.save(); }
+    this.say('A NEW BARN');
+  }
+
+  /** Keep the barn (a page that saves: storage.ts). */
+  private save(): void { if (this.persist) writeSave(serialize(this.sim)); }
 
   // ---------- input ----------
 
@@ -298,8 +417,16 @@ export class BaseView {
     this.camY = clamp(y, 0, WORLD_H - VIEW_H);
   }
 
-  /** A tap: a job chip rushes its job and brings its dragon into view; a bubble, or the dragon itself, rushes its job. */
+  /**
+   * A tap: a top-bar button first (the rest of the bar takes the tap too: it covers the world there); then a job chip
+   * rushes its job and brings its dragon into view; a bubble, or the dragon itself, rushes its job.
+   */
   tap(sx: number, sy: number): void {
+    if (this.layers === 'all') {
+      const b = buttonAt(sx, sy);
+      if (b) { this.press(b); return; }
+      if (sy < BAR_H) return;
+    }
     for (const c of this.chips) if (hit(c.r, sx, sy)) { this.sim.rush(c.job); this.focus(c.job.dragon); return; }
     const wx = sx + Math.round(this.camX), wy = sy + Math.round(this.camY);
     // (the top-most bubble first: later ones are drawn over earlier ones)
@@ -322,8 +449,41 @@ export class BaseView {
     this.camTo = { x: clamp(d.x - VIEW_W / 2, 0, WORLD_W - VIEW_W), y: clamp(this.feet(d) - VIEW_H * 0.6, 0, WORLD_H - VIEW_H) };
   }
 
-  /** Live only: size the canvas to the window (whole pixels) and take the pointer -- drag to pan, tap to Rush. */
+  /**
+   * Live only: size the canvas to the window (whole pixels); take the pointer -- drag to pan, tap to Rush or press a
+   * button -- and the keys (1-4 the speed, p pause). A page that may save loads the player's barn now (one that didn't
+   * fit -- another version, or broken -- is kept aside and a new barn starts, with a toast), saves every 600 frames and
+   * when it is hidden or left, and lends the page window.__dragonCare.baseSaveNow.
+   */
   attach(canvas: HTMLCanvasElement): void {
+    if (this.persist) {
+      const { save, note } = loadSave();
+      if (save) {
+        try { this.use(CareSim.fromSave(save)); } catch { backupSave(); this.say(DIDNT_FIT); }
+      } else if (note === 'old' || note === 'bad') this.say(DIDNT_FIT);
+      this.saving = true;
+      const onHide = () => { if (document.visibilityState === 'hidden') this.save(); };
+      const onLeave = () => this.save();
+      document.addEventListener('visibilitychange', onHide);
+      addEventListener('pagehide', onLeave);
+      if (window.__dragonCare) window.__dragonCare.baseSaveNow = () => { this.save(); return this.sim.tick; };
+      this.detachers.push(() => {
+        this.saving = false;
+        document.removeEventListener('visibilitychange', onHide);
+        removeEventListener('pagehide', onLeave);
+        if (window.__dragonCare) delete window.__dragonCare.baseSaveNow;
+      });
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const i = ['1', '2', '3', '4'].indexOf(e.key);
+      if (i >= 0) this.setRate(RATES[i]);
+      else if (e.key === 'p' || e.key === 'P') this.togglePause();
+      else return;
+      e.preventDefault();
+    };
+    addEventListener('keydown', onKey);
+    this.detachers.push(() => removeEventListener('keydown', onKey));
     const fit = () => {
       const s = Math.max(1, Math.floor(Math.min(innerWidth / VIEW_W, innerHeight / VIEW_H)));
       canvas.style.width = `${VIEW_W * s}px`; canvas.style.height = `${VIEW_H * s}px`;
@@ -356,7 +516,7 @@ export class BaseView {
     });
   }
 
-  /** Give the page back: the pointer and the resize, and the hook (it describes a base that is running). */
+  /** Give the page back: the pointer, the keys, the resize, the saving, and the hook (it describes a base that is running). */
   detach(): void {
     for (const f of this.detachers) f();
     this.detachers = [];

@@ -27,7 +27,11 @@
 // its hook reports each dragon's move, room and slot, the lift, and the px walked; and between the frames at t=600 and
 // t=3600 at least three dragons stand somewhere else); live (never saving: save=0), a drag must pan the camera, a tap
 // on the first job chip must Rush that job, and the gallery's keys (E, the arrows, Space, the digits) must neither
-// rebuild the world nor leave it.
+// rebuild the world nor leave it. Time (docs/BASE_DESIGN.md 7): hour=22 is night; the world drawn alone (layers=world)
+// is the same picture and the same barn at noon and at ten at night, while the whole frame is not (night is drawn, and
+// only in the sky and the lights); live, the speed button and the keys 1-4 and p run the world faster, and pause it;
+// a frozen page with a save in storage neither loads nor writes it; a live page that saves resumes its world after a
+// reload, and one whose save doesn't fit starts a new barn and keeps the old save aside.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -36,6 +40,10 @@ import type { AgeStage } from '../src/art/dragon/palettes.ts';
 import { KEEPER_PALETTES } from '../src/art/keeper/palettes.ts';
 import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
 import { REACH_MISS } from '../src/care/limits.ts';
+import { CareSim } from '../src/game/sim.ts';
+import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts';
+import { serialize } from '../src/game/save.ts';
+import { SAVE_KEY, BACKUP_KEY } from '../src/game/storage.ts';
 
 const require = createRequire(import.meta.url);
 function loadPlaywright(): any {
@@ -70,6 +78,10 @@ interface Case {
   check?: (hook: BaseHook) => string[];
   /** A live page to drive (pointer input); returns what went wrong. */
   act?: (page: any) => Promise<string[]>;
+  /** Before the page loads (a save planted in its storage). */
+  init?: (page: any) => Promise<void>;
+  /** Hash the frame (an in-page FNV-1a over the canvas's pixels) for TINT: the whole frame, and the world between the HUD's bars (rows 16-338). */
+  hash?: boolean;
 }
 
 type BaseHook = NonNullable<NonNullable<Window['__dragonCare']>['base']>;
@@ -104,6 +116,114 @@ function walkedOver(px: number) {
 }
 /** Two frozen frames of one world (by query): at least `n` dragons stand at a different x in the second (#7: they move around the rooms). */
 const PAIRS: { a: string; b: string; n: number }[] = [{ a: 'view=base&t=600', b: 'view=base&t=3600', n: 3 }];
+
+/**
+ * Day against night (plan S4): each pair is one world at noon and at ten at night. `same`: the world layer alone
+ * (layers=world) must be the same picture and the same barn (barnDigest); otherwise the frames must differ, in the
+ * world between the HUD's bars too (the sky and the lights, not only the clock).
+ */
+const TINT: { a: string; b: string; same: boolean }[] = [
+  { a: 'view=base&t=600&hour=12&layers=world', b: 'view=base&t=600&hour=22&layers=world', same: true },
+  { a: 'view=base&t=600&hour=12', b: 'view=base&t=600&hour=22', same: false },
+];
+/** The in-page hashes of each hashed case's frame, by query. */
+const frames = new Map<string, { all: string; world: string }>();
+
+/** A real save, built in Node: the new game stepped 5000 (the planted-save cases put it in the page's storage). */
+const PLANTED = JSON.stringify((() => { const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1 }); for (let i = 0; i < 5000; i++) w.step(); return serialize(w); })());
+/** Put a blob at the save's key before the page's scripts run. */
+const plant = (blob: string) => async (page: any) => { await page.addInitScript(([k, v]: [string, string]) => { try { localStorage.setItem(k, v); } catch { /* none */ } }, [SAVE_KEY, blob]); };
+const stored = (page: any, key: string): Promise<string | null> => page.evaluate((k: string) => localStorage.getItem(k), key);
+
+/** The hook's time and saving fields (S4). */
+function timeFields(phase: string | null, persist: boolean) {
+  return (b: BaseHook): string[] => {
+    const out: string[] = [];
+    if (!b.clock || typeof b.clock.day !== 'number' || typeof b.clock.hour !== 'number') out.push(`the hook's clock is ${JSON.stringify(b.clock)}`);
+    else if (phase && b.clock.phase !== phase) out.push(`it is ${b.clock.phase} at ${b.clock.hour}:${b.clock.minute}, not ${phase}`);
+    if (b.speed !== 1) out.push(`a frozen page runs at speed ${b.speed}, not 1`);
+    if (b.persist !== persist) out.push(`persist is ${b.persist}, not ${persist}`);
+    if (!/^[0-9a-f]{8}$/.test(b.barnDigest)) out.push(`the barn digest is ${JSON.stringify(b.barnDigest)}`);
+    for (const k of ['new', 'pause', 'speed']) { const r = b.buttons?.[k]; if (!r || !(r.w > 0 && r.h > 0) || r.y > 15) out.push(`no ${k} button in the top bar (${JSON.stringify(r)})`); }
+    return out;
+  };
+}
+
+/**
+ * view=base, a frozen page with the player's save in storage (plan G4): it is not loaded -- the frame is the new game's
+ * at t=600, the same digest as a clean page's -- and it is not written (the blob is as planted).
+ */
+async function plantedFrozen(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare?.base);
+  const clean = hooks.get('view=base&t=600');
+  if (b.tick !== 600) out.push(`the frozen page is at tick ${b.tick}, not 600: it loaded the save`);
+  if (!clean) out.push('no clean view=base&t=600 hook to compare with');
+  else if (b.digest !== clean.digest) out.push(`its digest ${b.digest} is not the clean page's ${clean.digest}: it loaded the save`);
+  if (b.persist) out.push('a frozen page says it persists');
+  if ((await stored(page, SAVE_KEY)) !== PLANTED) out.push('the frozen page wrote the save');
+  return out;
+}
+
+/**
+ * view=base, live and saving (no save=0; its own page, so its own storage): run to tick 300, save now, reload; the
+ * world resumes (its tick at or past the save's: a new game would start again from 0) and says it persists.
+ */
+async function livePersist(page: any): Promise<string[]> {
+  const out: string[] = [];
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) >= 300, null, { timeout: 20000 });
+  const T: number = await page.evaluate(() => (window as any).__dragonCare.baseSaveNow());
+  const saved = await stored(page, SAVE_KEY);
+  if (!saved || JSON.parse(saved).tick !== T) out.push(`baseSaveNow returned ${T}, the stored save is at ${saved ? JSON.parse(saved).tick : 'nothing'}`);
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => (window as any).__dragonCare?.ready === true && !!(window as any).__dragonCare?.base, null, { timeout: 15000 });
+  const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare.base);
+  if (!(b.tick >= T)) out.push(`after the reload the world is at tick ${b.tick}, before the save's ${T}: it did not resume`);
+  if (b.persist !== true) out.push(`after the reload persist is ${b.persist}`);
+  return out;
+}
+
+/** view=base, live and saving, with a save of another version in storage: a new barn, no page error, the old save kept aside. */
+async function liveOldSave(page: any): Promise<string[]> {
+  const out: string[] = [];
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 5, null, { timeout: 15000 });
+  const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare.base);
+  if (b.tick > 2000) out.push(`the world is at tick ${b.tick}: it loaded the old save`);
+  if ((await stored(page, BACKUP_KEY)) !== OLD_SAVE) out.push('the old save was not kept at the backup key');
+  return out;
+}
+const OLD_SAVE = JSON.stringify({ ...JSON.parse(PLANTED), v: 999, tick: 9999 });
+
+/**
+ * view=base, live (save=0): the speed. The speed button's rect (the hook's) picks 2x; the key 4 picks 8x, which runs at
+ * least four times as many world steps in a second as 1x did; p pauses (the tick stands still); 1 plays at 1x again.
+ */
+async function baseSpeed(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const delta = async (ms: number) => { const a = (await st()).tick; await page.waitForTimeout(ms); return (await st()).tick - a; };
+  const one = await delta(1000);
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640, r = (await st()).buttons.speed;
+  await page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  await page.waitForTimeout(100);
+  if ((await st()).speed !== 2) out.push(`the speed button made the speed ${(await st()).speed}, not 2`);
+  await page.keyboard.press('4');
+  await page.waitForTimeout(100);
+  if ((await st()).speed !== 8) out.push(`the key 4 made the speed ${(await st()).speed}, not 8`);
+  const eight = await delta(1000);
+  if (!(eight >= 4 * one)) out.push(`at 8x the world ran ${eight} steps in a second, at 1x ${one}: not 4 times as many`);
+  await page.keyboard.press('p');
+  await page.waitForTimeout(100);
+  const paused = await delta(500);
+  if (paused !== 0 || (await st()).speed !== 0) out.push(`paused, the world ran ${paused} steps in 500 ms (speed ${(await st()).speed})`);
+  await page.keyboard.press('1');
+  await page.waitForTimeout(200);
+  const again = await delta(500);
+  if ((await st()).speed !== 1 || !(again > 0)) out.push(`the key 1 left the speed ${(await st()).speed}, ${again} steps in 500 ms`);
+  if (!out.length) console.log(`        speed: 1x ${one} steps in a second, 8x ${eight}; paused 0 in 500 ms`);
+  return out;
+}
 
 /** The base's dragons include every stage. */
 function everyStage(b: BaseHook): string[] {
@@ -243,6 +363,17 @@ const CASES: Case[] = [
   { query: 'view=base&t=3600', minColours: 150, allScales: false, base: true, check: walkedOver(100) },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseInput },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseKeys },
+  // time: night by the hour, day against night (the world layer the same, the frame not), the speed, and saves --
+  // a frozen page ignores the one in storage, a live page resumes its own after a reload, and sets aside one that
+  // doesn't fit (the only live cases without save=0, each in its own page and storage)
+  { query: 'view=base&t=600&hour=22', minColours: 150, allScales: false, hash: true, check: (b) => [...castIs(7, 'adult')(b), ...timeFields('night', false)(b)] },
+  { query: 'view=base&t=600&hour=12', minColours: 150, allScales: false, hash: true, check: timeFields('day', false) },
+  { query: 'view=base&t=600&hour=12&layers=world', minColours: 150, allScales: false, hash: true, check: timeFields('day', false) },
+  { query: 'view=base&t=600&hour=22&layers=world', minColours: 150, allScales: false, hash: true, check: timeFields('night', false) },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseSpeed },
+  { query: 'view=base&t=600', minColours: 150, allScales: false, init: plant(PLANTED), act: plantedFrozen },
+  { query: 'view=base', minColours: 150, allScales: false, act: livePersist, timeout: 45000 },
+  { query: 'view=base', minColours: 150, allScales: false, init: plant(OLD_SAVE), act: liveOldSave },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -265,6 +396,7 @@ for (const c of CASES) {
   page.on('console', (m: any) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   let msg = '';
   try {
+    if (c.init) await c.init(page);
     // (the audits run while the page loads, so the load itself gets the case's timeout)
     await page.goto(`http://localhost:${port}/index.html?${c.query}`, { waitUntil: 'load', timeout: c.timeout ?? 30000 });
     await page.waitForFunction(() => (window as any).__dragonCare?.ready === true, null, { timeout: c.timeout ?? 15000 });
@@ -311,7 +443,17 @@ for (const c of CASES) {
     if (c.check) {
       const b: BaseHook | undefined = await page.evaluate(() => (window as any).__dragonCare?.base);
       if (!b) errors.push('the base reported nothing');
-      else { errors.push(...c.check(b)); hooks.set(c.query, b); }
+      else { errors.push(...c.check(b)); if (!hooks.has(c.query)) hooks.set(c.query, b); }
+    }
+    if (c.hash) {
+      const h: { all: string; world: string } = await page.evaluate(() => {
+        const cv = document.getElementById('stage') as HTMLCanvasElement, d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
+        const fnv = (from: number, to: number) => { let x = 0x811c9dc5; for (let i = from; i < to; i++) x = Math.imul(x ^ d[i], 0x01000193); return (x >>> 0).toString(16).padStart(8, '0'); };
+        return { all: fnv(0, d.length), world: fnv(16 * cv.width * 4, 339 * cv.width * 4) };
+      });
+      const b: BaseHook | undefined = await page.evaluate(() => (window as any).__dragonCare?.base);
+      frames.set(c.query, h);
+      if (b && !hooks.has(c.query)) hooks.set(c.query, b);
     }
     if (c.act) errors.push(...await c.act(page));
     const colours: number[] = await page.evaluate(() => {
@@ -353,8 +495,20 @@ for (const p of PAIRS) {
   if (errors.length) { bad++; console.log(`  FAIL: ${p.a} -> ${p.b} -> ${errors.join(' | ')}`); }
 }
 
+// day against night: the world layer the same picture and the same barn; the whole frame (and its world) not
+for (const p of TINT) {
+  const a = frames.get(p.a), b = frames.get(p.b), ha = hooks.get(p.a), hb = hooks.get(p.b), errors: string[] = [];
+  if (!a || !b || !ha || !hb) errors.push(`no frame from ${a && ha ? p.b : p.a}`);
+  else if (p.same) {
+    if (a.all !== b.all) errors.push(`the world layer differs by night (${a.all} / ${b.all}): night tints the world`);
+    if (ha.barnDigest !== hb.barnDigest) errors.push(`the barn differs by night (${ha.barnDigest} / ${hb.barnDigest}): the simulation reads the hour`);
+  } else if (a.all === b.all || a.world === b.world) errors.push(`noon and night draw ${a.all === b.all ? 'the same frame' : 'the same world under the HUD'}: night is not drawn`);
+  if (errors.length) { bad++; console.log(`  FAIL: ${p.a} / ${p.b} -> ${errors.join(' | ')}`); }
+  else console.log(`  ok:   ${p.a} / ${p.b}  (${p.same ? `the same frame ${a!.all} and barn ${ha!.barnDigest}` : `frames ${a!.all} / ${b!.all}, world ${a!.world} / ${b!.world}`})`);
+}
+
 await browser.close();
 server.close();
-const total = CASES.length + PAIRS.length;
-console.log(bad ? `SMOKE: ${bad} of ${total} views and pairs failed` : `SMOKE: all ${CASES.length} views drew dragons (and keepers), no page errors; ${PAIRS.length} pair${PAIRS.length === 1 ? '' : 's'} moved`);
+const total = CASES.length + PAIRS.length + TINT.length;
+console.log(bad ? `SMOKE: ${bad} of ${total} views and pairs failed` : `SMOKE: all ${CASES.length} views drew dragons (and keepers), no page errors; ${PAIRS.length} pair${PAIRS.length === 1 ? '' : 's'} moved; day and night: the world alike, the frame not`);
 process.exit(bad ? 1 : 0);

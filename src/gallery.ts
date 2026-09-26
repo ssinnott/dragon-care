@@ -32,7 +32,10 @@
 //                              and tap a bubble, a job or a dragon to Rush it; seed= seeds the world, cam=x,y starts the
 //                              camera there (world px), preset=<name> starts from a code-built world instead of the new
 //                              game (src/game/presets.ts: ages = every stage), save=0 keeps a live page from saving
-//                              (a preset page, like a frozen one, never loads or saves: it isn't the player's barn)
+//                              (a preset page, like a frozen one, never loads or saves: it isn't the player's barn),
+//                              hour=0..23 starts day 1 at that hour (22: night), layers=world draws the world alone (the
+//                              building, the lift's car, the cast, the bubbles and the plates: no sky, lights or HUD);
+//                              live, the keys 1-4 pick 1x, 2x, 4x or 8x and p pauses
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
 //   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
@@ -121,6 +124,9 @@ export interface GalleryParams {
   cam: { x: number; y: number } | null;
   preset: string | null;
   save: boolean;
+  /** view=base: hour=0..23, the hour of day 1 the world starts at (null: 07:00); layers=world, the world without the sky, lights or HUD. */
+  hour: number | null;
+  layers: 'all' | 'world';
 }
 
 export function parseParams(search: string): GalleryParams {
@@ -157,7 +163,15 @@ export function parseParams(search: string): GalleryParams {
     cam: camParam(q.get('cam')),
     preset: q.get('preset') || null,
     save: q.get('save') !== '0',
+    hour: hourParam(q.get('hour')),
+    layers: q.get('layers') === 'world' ? 'world' : 'all',
   };
+}
+
+/** hour= as a whole hour 0-23 (null otherwise). */
+function hourParam(v: string | null): number | null {
+  const h = v == null || v.trim() === '' ? NaN : Number(v);
+  return Number.isInteger(h) && h >= 0 && h <= 23 ? h : null;
 }
 
 /** cam=x,y as two numbers (null unless both are). */
@@ -1332,7 +1346,7 @@ function makeScene(P: GalleryParams): Scene {
     case 'yardaudit': return yardAuditScene(P);
     // (a frozen view never loads or saves (G4), and nor does a preset: loading would hide it, autosaving would put it
     // in place of the player's barn)
-    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset });
+    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset, hour: P.hour, layers: P.layers });
     default: return lineupScene(P);
   }
 }

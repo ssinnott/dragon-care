@@ -18,6 +18,7 @@ import type { SaveV } from './save.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
+import { DAY_STEPS, START_HOUR, hourSteps } from './clock.ts';
 
 // ---------- tuning (4.9: first numbers, not law) ----------
 
@@ -37,10 +38,11 @@ const SPECIALIST_PX = 300;
 
 // ---------- time ----------
 
-/** A game day, in steps at 1x: three minutes (docs/BASE_DESIGN.md 7). Tests pass a shorter SimOptions.dayLen. */
-export const DAY_STEPS = 10800;
-/** A new game starts at this hour (07:00 on day 1). */
-export const START_HOUR = 7;
+/**
+ * A game day, in steps at 1x (three minutes), and the hour a new game starts at: clock.ts, which reads the clock for
+ * the view. The simulation keeps the clock and never reads the day's phase (plan G8): care runs the same by night.
+ */
+export { DAY_STEPS, START_HOUR };
 
 /** How a world is built: its seed (the starting needs, and every rngAt draw), the steps in a day, and the clock at tick 0. */
 export interface SimOptions {
@@ -48,7 +50,9 @@ export interface SimOptions {
   seed?: number;
   /** Steps in a game day at 1x (default DAY_STEPS); a whole number divisible by 24. */
   dayLen?: number;
-  /** The clock at tick 0, in steps from day 1's midnight (default START_HOUR's: 7 x dayLen / 24). */
+  /** The hour of day 1 the world starts at, 0-23 (default START_HOUR, 07:00): clock0 is that many hours of steps. */
+  hour?: number;
+  /** The clock at tick 0, in steps from day 1's midnight (default the hour's: 7 x dayLen / 24); it wins over `hour`. */
   clock0?: number;
 }
 
@@ -227,7 +231,9 @@ export class CareSim {
     this.seed = opts.seed ?? 1;
     this.dayLen = opts.dayLen ?? DAY_STEPS;
     if (!Number.isInteger(this.dayLen) || this.dayLen < 24 || this.dayLen % 24) throw new Error(`dayLen ${this.dayLen}: a day must be a whole number of steps divisible by 24`);
-    this.clock0 = opts.clock0 ?? START_HOUR * this.dayLen / 24;
+    const hour = opts.hour ?? START_HOUR;
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) throw new Error(`hour ${hour}: a start hour is a whole hour, 0-23`);
+    this.clock0 = opts.clock0 ?? hour * hourSteps(this.dayLen);
     if (!Number.isInteger(this.clock0)) throw new Error(`clock0 ${this.clock0}: the clock counts whole steps`);
     this.roomPlaces = rooms.map((p) => ({ ...p }));
     this.rooms = placeRooms(rooms);

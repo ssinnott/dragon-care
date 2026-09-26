@@ -56,6 +56,15 @@ const pairs: string[] = [
   'shots/base_lift.png=view=base&t=1100&cam=328,300',
   'shots/base_ages.png=view=base&preset=ages&t=60',
   'shots/base_aerie.png=view=base&t=60&cam=0,0',
+  // the time of day (7): the start frame at night, at dusk and at dawn (t=600 is an hour and twenty minutes on from the
+  // hour: 23:20, 19:20, 06:20) -- the dragons' pixels the same as base_t600's, night in the windows, the lamps and the
+  // sky alone -- and the night seen outside: the sky over the roof (the stars, the moon's blue hour, the skylight, the
+  // dorm lamp's rings) and the west tower's lit slits by the hearth's glow
+  'shots/base_night.png=view=base&t=600&hour=22',
+  'shots/base_dusk.png=view=base&t=600&hour=18',
+  'shots/base_dawn.png=view=base&t=600&hour=5',
+  'shots/base_night_roof.png=view=base&t=600&hour=22&cam=300,100',
+  'shots/base_night_west.png=view=base&t=600&hour=22&cam=0,300',
 ];
 for (const el of ['fire', 'rock', 'slinkwing']) {
   for (const stage of ['elder', 'adult', 'young', 'baby']) {

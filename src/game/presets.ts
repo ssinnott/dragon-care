@@ -54,9 +54,15 @@ export function startSpec(name: string | null | undefined): StartSpec {
   return make ? make() : newGame();
 }
 
-/** A world built from a start: the spec's options with `seed` over them, then its last touch. */
-export function buildSim(spec: StartSpec, seed?: number): CareSim {
-  const sim = new CareSim(spec.rooms, spec.dragons, spec.keepers, seed == null ? spec.opts : { ...spec.opts, seed });
+/**
+ * A world built from a start: the spec's options with `seed` over them, and `hour` (view=base&hour=: the hour of day 1
+ * it starts at, in place of any clock the spec sets), then its last touch.
+ */
+export function buildSim(spec: StartSpec, seed?: number, hour?: number | null): CareSim {
+  const opts: SimOptions = { ...spec.opts };
+  if (seed != null) opts.seed = seed;
+  if (hour != null) { delete opts.clock0; opts.hour = hour; }
+  const sim = new CareSim(spec.rooms, spec.dragons, spec.keepers, opts);
   spec.after?.(sim);
   return sim;
 }

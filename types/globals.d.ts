@@ -43,15 +43,29 @@ interface Window {
      * 8-hex FNV-1a hash of src/game/save.ts worldKey: the save's JSON less the seed) and every dragon (its stable id,
      * element, stage, floor and x; what its body is doing, sim.ts DragonMove; the kind of room at its floor and x, or
      * null in the lift bay and the ladder bay; its slot as `kind:index`, or null); the Dragon Lift's car (y, its rider's
-     * feet, and the rider's dragon id or null); and the px the dragons have walked in all. Gone once the base is
-     * detached (the page left it).
+     * feet, and the rider's dragon id or null); and the px the dragons have walked in all. Time (S4): the barn's
+     * digest (`barnDigest`: the hash of save.ts barnKey, the dragons, keepers, jobs and lift with every absolute clock
+     * left out, so two worlds started at different hours but stepped alike agree on it), the clock as the view reads it
+     * (day 1-based, hour, minute, the day's phase), the speed (world steps a frame: 0 paused, 1, 2, 4 or 8), whether
+     * the page loads and saves the player's barn (`persist`), and the top bar's buttons (canvas px, by name: `new`,
+     * `pause`, `speed`). Gone once the base is detached (the page left it).
      */
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
       chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[];
       digest: string;
       dragons: { id: number; name: string; element: string; stage: string; f: number; x: number; move: string; room: string | null; slot: string | null }[];
       lift: { y: number; rider: number | null };
-      walked: number };
+      walked: number;
+      barnDigest: string;
+      clock: { day: number; hour: number; minute: number; phase: 'dawn' | 'day' | 'dusk' | 'night' };
+      speed: number;
+      persist: boolean;
+      buttons: Record<string, { x: number; y: number; w: number; h: number }> };
+    /**
+     * view=base, live and saving (src/game/base.ts attach, only when the page loads and saves the player's barn): save
+     * the barn now, and return the step it was saved at. Gone once the base is detached.
+     */
+    baseSaveNow?: () => number;
   };
 }
 

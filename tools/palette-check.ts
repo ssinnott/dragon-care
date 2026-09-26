@@ -50,6 +50,15 @@
 //   (k) visible greying: each greying step (young -> adult, adult -> elder) moves the scale or its highlight band
 //                   (the silver back and crown, palettes.ts AGE_SILVER) by >= GREY_STEP Oklab dE, over the ~0.02 a
 //                   player can see, so "a little greyer" is a step anyone sees, not a number.
+// BACKDROPS (counted apart, its own RESULT line: BACKDROPS):
+//   (w) backdrops : everything a dragon is seen against (src/game/surfaces.ts: the sky's three bands, the far hills and
+//                   the clouds at every phase of the day AND the two stepped mixes between each phase and the next --
+//                   the sky turns in thirds, so a mix is on screen for a third of an hour --, every room wall, the bare
+//                   and lift-shaft walls, the towers' stone, the big props right behind a slot, and the light the dorm
+//                   lamps and the hearth throw on their walls at night) keeps >= 25 % luminance from every DARK body
+//                   (an element's scale under L 0.15 at a stage: lightning, dusk and slinkwing at every stage), and
+//                   >= OKL_MIN Oklab L from the outline. So night stays mid-value (the blue hour, never black: a dark
+//                   dragon on the Aerie at night still shows), and a wall is never the colour of a dark body.
 // REPORTED, NOT GATED:
 //   (g) any scale pair that passes (b) on hue alone at the same stage (it would merge in greyscale); any body pair
 //       that passes (f) on simulated value alone under the dark-pair floor (they are told apart by zone); glow colours
@@ -67,7 +76,8 @@ import type { KeeperPalette } from '../src/art/keeper/palettes.ts';
 import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
 import type { KeeperId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
-import { FLOORS } from '../src/game/surfaces.ts';
+import { FLOORS, INK, BACKDROPS, WALLS, PROPS, LAMP_RINGS, HEARTH_RING, stepped } from '../src/game/surfaces.ts';
+import { PHASE_ORDER } from '../src/game/clock.ts';
 
 // ---------- thresholds ----------
 /** House ladder: adjacent parts separate by this relative luminance difference... */
@@ -772,9 +782,49 @@ for (const slot of ['secondary', 'primary'] as const) {
   out.push(`${allOk ? '  ok  ' : '  FAIL'} (Kg) iris ${(slot === 'secondary' ? 'trousers' : 'cardigan').padEnd(9)} ${c} on dusk: ${cells.join('  ')}`);
 }
 
+// ---------- (w) backdrops (src/game/surfaces.ts) ----------
+/** A body is dark, for gate (w), under this luminance (lightning 0.119, dusk 0.083, slinkwing 0.053 at every stage). */
+const W_DARK = 0.15;
+let wGates = 0, wFailures = 0;
+const wFailed: string[] = [];
+function wcount(label: string, ok: boolean): boolean {
+  wGates++;
+  if (!ok) { wFailures++; wFailed.push(label); }
+  return ok;
+}
+{
+  const dark = DRAGON_ELEMENTS.flatMap((e) => STAGES.map((st) => ({ who: `${e} ${st}`, hex: PAL(e, st).scale }))).filter((b) => lumOf(b.hex) < W_DARK);
+  const list: [string, string][] = [];
+  // (each phase, then the two stepped mixes into the next: the sky turns night -> dawn -> day -> dusk -> night)
+  for (let i = 0; i < PHASE_ORDER.length; i++) {
+    const a = PHASE_ORDER[i], b = PHASE_ORDER[(i + 1) % PHASE_ORDER.length];
+    for (const k of [0, 1, 2]) {
+      const at = k ? `${a}>${b} ${k}/3` : a;
+      ['top', 'middle', 'low'].forEach((band, j) => list.push([`sky ${band} ${at}`, stepped(BACKDROPS.sky[a][j], BACKDROPS.sky[b][j], k)]));
+      list.push([`hills ${at}`, stepped(BACKDROPS.hills[a], BACKDROPS.hills[b], k)], [`clouds ${at}`, stepped(BACKDROPS.clouds[a], BACKDROPS.clouds[b], k)]);
+    }
+  }
+  list.push(['lift wall', BACKDROPS.liftWall], ['bare wall', BACKDROPS.emptyWall], ['tower stone', BACKDROPS.stone]);
+  for (const [k, hex] of Object.entries(WALLS)) list.push([`${k} wall`, hex]);
+  for (const [k, hex] of Object.entries(PROPS)) list.push([`prop ${k}`, hex]);
+  list.push(['lamp ring inner', LAMP_RINGS[0]], ['lamp ring outer', LAMP_RINGS[1]], ['hearth ring', HEARTH_RING]);
+  head(`(w) BACKDROPS  (everything a dragon is seen against, each >= ${LUM_MIN * 100}% luminance from every dark body (scale L < ${W_DARK}: ${dark.length} element-stages) and >= ${OKL_MIN} Oklab L from the ink ${INK})`);
+  for (const [what, hex] of list) {
+    let least = Infinity, by = '';
+    for (const b of dark) {
+      const d = relDiff(hex, b.hex);
+      wcount(`(w) ${what} / ${b.who}`, d >= LUM_MIN);
+      if (d < least) { least = d; by = b.who; }
+    }
+    const ink = okDiff(hex, INK), inkOk = wcount(`(w) ${what} / ink`, ink >= OKL_MIN);
+    out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${what.padEnd(28)} ${hex}  L ${lumOf(hex).toFixed(3)}  least ${pct(least)} (${by})  ${okf(ink)} from ink`);
+  }
+}
+
 // ---------- verdict ----------
 out.push('');
 out.push(failures ? `RESULT: FAIL  ${failures} of ${gates} gates failed: ${failed.join('; ')}` : `RESULT: PASS  ${gates} of ${gates} gates passed`);
 out.push(kFailures ? `KEEPERS: FAIL  ${kFailures} of ${kGates} gates failed: ${kFailed.join('; ')}` : `KEEPERS: PASS  ${kGates} of ${kGates} gates passed`);
+out.push(wFailures ? `BACKDROPS: FAIL  ${wFailures} of ${wGates} gates failed: ${wFailed.join('; ')}` : `BACKDROPS: PASS  ${wGates} of ${wGates} gates passed`);
 console.log(out.join('\n'));
-if (failures || kFailures) process.exitCode = 1;
+if (failures || kFailures || wFailures) process.exitCode = 1;

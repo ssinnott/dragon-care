@@ -38,7 +38,14 @@
 //    walk would carry it; the paper turn is the yard's.
 // 10. Capacity (measured, for the slices that grow the barn): eight adults, ten, and the ages preset's twelve, printed
 //    with the ceiling they show; no keeper gives up, the car never stalls, and its throughput holds.
+// 11. The clock (docs/BASE_DESIGN.md 7) on a real day and a 600-step test day: the day, the hour and the phase at each
+//    phase's start, the sky's three stepped thirds over a phase's first hour, day 2 at midnight, a whole day read step
+//    by step (the phases in order, the turn never going back), the label, and a world's start hour.
+// 12. Night is not the barn's (plan G8): a world started at 07:00 and one started at 19:00, the same seed, are the same
+//    barn (save.ts barnKey: every absolute clock left out) every 1000 steps for 20000 -- so view=base's no-tint check,
+//    day against night, compares one world -- and no simulation module reads the day's phase.
 import { isDeepStrictEqual } from 'node:util';
+import fs from 'node:fs';
 import { CareSim, REACH, DAY_STEPS, START_HOUR } from '../src/game/sim.ts';
 import type { DragonPlace } from '../src/game/start.ts';
 import type { Keeper, Dragon } from '../src/game/sim.ts';
@@ -54,7 +61,10 @@ import { animTuning } from '../src/art/dragon/tuning.ts';
 import { DragonAnimPlayer } from '../src/art/dragon/anim.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts';
 import { startSpec, PRESETS } from '../src/game/presets.ts';
-import { serialize, SaveVersionError, SAVE_VERSION } from '../src/game/save.ts';
+import { serialize, barnKey, SaveVersionError, SAVE_VERSION } from '../src/game/save.ts';
+import { readClock, clockLabel, hourSteps, PHASE_ORDER } from '../src/game/clock.ts';
+import type { ClockRead } from '../src/game/clock.ts';
+import { skyBands, BACKDROPS } from '../src/game/surfaces.ts';
 import { rngAt, mix32, TAG } from '../src/game/rand.ts';
 import {
   route, spanOf, postX, placeRooms, platesOf, standSpot, fitsSlot, slotBody, dragonNet, feetY, floorTop, KEEPER_NET, ROOM_INFO, ROOM_KINDS, STRUCTURES,
@@ -753,6 +763,76 @@ let firstRide = '';
     noteUse(sim);
   }
   console.log(`  10 capacity: ${out.join('; ')}`);
+}
+
+// ---------- 11. the clock ----------
+{
+  const lines: string[] = [];
+  for (const dayLen of [DAY_STEPS, 600]) {
+    const hs = hourSteps(dayLen), third = Math.ceil(hs / 3);
+    const want = (clock: number, w: Partial<ClockRead>, what: string) => {
+      const r = readClock(clock, dayLen);
+      for (const [k, v] of Object.entries(w)) if (r[k as keyof ClockRead] !== v) fail(`clock (${dayLen}-step day): ${what} (clock ${clock}) reads ${k} ${r[k as keyof ClockRead]}, not ${v}`);
+    };
+    want(0, { day: 1, hour: 0, minute: 0, phase: 'night', blend: 3 }, 'midnight of day 1');
+    want(5 * hs, { day: 1, hour: 5, phase: 'dawn', prev: 'night', blend: 0 }, 'dawn');
+    want(5 * hs + third - 1, { phase: 'dawn', blend: 0 }, 'dawn, a third of an hour less a step');
+    want(5 * hs + third, { phase: 'dawn', blend: 1 }, 'dawn, a third of an hour in');
+    want(5 * hs + 2 * third, { phase: 'dawn', blend: 2 }, 'dawn, two thirds of an hour in');
+    want(6 * hs, { phase: 'dawn', blend: 3 }, 'dawn, an hour in');
+    want(7 * hs, { hour: 7, minute: 0, phase: 'day', prev: 'dawn', blend: 0 }, 'day');
+    want(18 * hs, { hour: 18, phase: 'dusk', prev: 'day', blend: 0 }, 'dusk');
+    want(20 * hs, { hour: 20, phase: 'night', prev: 'dusk', blend: 0 }, 'night');
+    want(24 * hs, { day: 2, hour: 0, minute: 0, phase: 'night', blend: 3 }, 'midnight of day 2');
+    want(24 * hs - 1, { day: 1, hour: 23, minute: Math.floor((hs - 1) * 60 / hs), phase: 'night' }, 'the last step of day 1');
+    // a whole day, step by step: the phases in the day's order, each turning in once (blend 0, 1, 2, 3, never back),
+    // the hour and the minute never going back within the day
+    let last = readClock(0, dayLen), turns = 0;
+    for (let c = 1; c < dayLen; c++) {
+      const r = readClock(c, dayLen);
+      if (r.phase !== last.phase) {
+        turns++;
+        if (PHASE_ORDER[(PHASE_ORDER.indexOf(last.phase) + 1) % 4] !== r.phase || r.prev !== last.phase || r.blend !== 0) fail(`clock (${dayLen}): at ${c} the phase turned ${last.phase} -> ${r.phase} (prev ${r.prev}, blend ${r.blend})`);
+      } else if (r.blend < last.blend) fail(`clock (${dayLen}): at ${c} the ${r.phase}'s sky turned back (blend ${last.blend} -> ${r.blend})`);
+      if (r.hour * 60 + r.minute < last.hour * 60 + last.minute) fail(`clock (${dayLen}): at ${c} the time went back`);
+      // (the sky at blend 0 is the phase before's, at 3 its own)
+      const bands = skyBands(r);
+      if (r.blend === 0 && bands.join() !== BACKDROPS.sky[r.prev].join()) fail(`clock: the sky at the start of the ${r.phase} is not the ${r.prev}'s`);
+      if (r.blend === 3 && bands.join() !== BACKDROPS.sky[r.phase].join()) fail(`clock: the sky an hour into the ${r.phase} is not its own`);
+      last = r;
+    }
+    if (turns !== 4) fail(`clock (${dayLen}): the phase turned ${turns} times from midnight to midnight, not 4 (night to dawn, day, dusk, and night again at 20:00)`);
+    lines.push(`${dayLen}-step day (an hour ${hs} steps): ${[0, 5 * hs, 5 * hs + third, 7 * hs, 18 * hs, 20 * hs, 24 * hs].map((c) => { const r = readClock(c, dayLen); return `${c} ${clockLabel(r)} ${r.phase}${r.blend < 3 ? ` ${r.blend}/3` : ''}`; }).join(', ')}`);
+  }
+  if (clockLabel(readClock(2 * DAY_STEPS + 14 * 450 + 278, DAY_STEPS)) !== 'DAY 3 14:30') fail(`clock: 14:37 on day 3 reads ${clockLabel(readClock(2 * DAY_STEPS + 14 * 450 + 278))}, not DAY 3 14:30`);
+  // a world's start: 07:00 by default, any whole hour by SimOptions.hour, and nothing else
+  const at = (hour?: number, dayLen?: number) => new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { hour, dayLen });
+  if (at().clock !== 7 * 450 || at(22).clock !== 22 * 450 || at(22, 600).clock !== 22 * 25 || readClock(at(22).clock).phase !== 'night') fail(`clock: worlds start at ${at().clock}, ${at(22).clock}, ${at(22, 600).clock}, not 07:00 and 22:00`);
+  for (const bad of [-1, 24, 7.5]) { try { at(bad); fail(`clock: a world started at hour ${bad}`); } catch { /* as it should */ } }
+  console.log(`  11 clock: ${lines.join('; ')}; a whole day read step by step turns night, dawn, day, dusk, night, each sky in three stepped thirds; hour= starts a world at 22:00`);
+}
+
+// ---------- 12. night is not the barn's ----------
+{
+  const day = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1, hour: 7 });
+  const eve = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1, hour: 19 });
+  let checked = 0;
+  for (let s = 1; s <= 20000; s++) {
+    day.step(); eve.step();
+    if (s % 1000 === 0) {
+      checked++;
+      if (barnKey(day) !== barnKey(eve)) { fail(`night: the barn started at 07:00 and the one started at 19:00 differ at step ${s}`); break; }
+    }
+  }
+  if (day.clock === eve.clock || day.digest() === eve.digest()) fail('night: the two worlds should differ in their clocks (and so their saves)');
+  const phases = new Set<string>();
+  for (let s = 0; s <= 20000; s += 450) phases.add(readClock(eve.clock0 + s).phase);
+  // (the simulation's own modules: none reads the phase, the hour or the sky; only the view does)
+  const SIM_FILES = ['sim.ts', 'travel.ts', 'needs.ts', 'layout.ts', 'gait.ts', 'save.ts', 'start.ts', 'presets.ts', 'rand.ts'];
+  const reads = SIM_FILES.filter((f) => /\b(readClock|phaseOf|PHASE_HOURS|PHASE_ORDER|DayPhase|skyBands|nightness)\b/.test(fs.readFileSync(new URL(`../src/game/${f}`, import.meta.url), 'utf8')));
+  if (reads.length) fail(`night: ${reads.join(', ')} read the day's phase (only the view may: plan G8)`);
+  console.log(`  12 night: a barn started at 07:00 and one at 19:00 (seed 1) agree on barnKey at all ${checked} checks over 20000 steps, through ${[...phases].join(', ')}; ${SIM_FILES.length} simulation modules, none reading the day's phase`);
+  noteUse(day); noteUse(eve);
 }
 
 if (fails.length) { console.log('SIM: FAIL\n' + fails.map((f) => '  ' + f).join('\n')); process.exit(1); }
