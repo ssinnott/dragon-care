@@ -91,11 +91,13 @@ export function drawClimate(ctx: CanvasRenderingContext2D, climate: Climate, pha
     inkDisc(ctx, x + w - R(28 * Math.min(k, 1.6)), y + R(12 * Math.min(k, 1.6)) + 2, R(5 * Math.min(k, 1.6)), LIGHTS.moon);
   }
   const off = (p: number) => R(scroll * p);
-  const ro = off(PARALLAX.ridge), no = off(PARALLAX.near), wo = off(PARALLAX.weather);
+  // The ridge, near forms and storm clouds place in world u = (screen x - rect.x) + scroll * parallax, so a picture
+  // depends only on its size, phase and scroll, never on where on the canvas it sits: their offsets carry -x.
+  const ro = off(PARALLAX.ridge) - x, no = off(PARALLAX.near) - x, wo = off(PARALLAX.weather);
   const bottom = y + h;
   // weather behind the ridge (heat bands in the low sky, storm clouds high)
   if (climate === 'ash') heatBands(ctx, x, w, b1, b2 + R(h * 0.1), wo, P, k);
-  if (climate === 'peaks') stormClouds(ctx, x, y, w, h, wo, P, k);
+  if (climate === 'peaks') stormClouds(ctx, x, y, w, h, wo - x, P, k);
   drawRidge(ctx, climate, x, w, y, h, bottom, ro, P, k);
   drawNear(ctx, climate, x, w, y, h, bottom, no, P, k);
   if (climate === 'meadow' || climate === 'forest') rain(ctx, x, y, w, h, wo, P);
@@ -278,7 +280,7 @@ function heatBands(g: CanvasRenderingContext2D, x: number, w: number, y0: number
 function stormClouds(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, off: number, P: ClimatePhase, k: number): void {
   const per = 150 * k;
   for (let i = Math.floor((off + x - per) / per); i * per - off < x + w + per; i++) {
-    const cx = x + i * per - off + per * 0.4, cy = y + h * 0.16;
+    const cx = i * per - off + per * 0.4, cy = y + h * 0.16;
     for (const [dx, dy, r] of [[-16, 3, 9], [0, -2, 12], [16, 2, 10], [28, 5, 7]] as const) inkDisc(g, R(cx + dx * k), R(cy + dy * k), R(r * k), P.detail);
     g.fillStyle = P.detail; g.fillRect(R(cx - 16 * k), R(cy + 2 * k), R(44 * k), R(7 * k));
     g.fillStyle = INK; g.fillRect(R(cx - 16 * k), R(cy + 9 * k), R(44 * k), 1);

@@ -135,7 +135,7 @@ function drawMillerMoustache(ctx: CanvasRenderingContext2D, rig: Rig, _pose: Pos
 function drawMillerCap(ctx: CanvasRenderingContext2D, rig: Rig, _pose: Pose, info: Info): void {
   const k = M(rig), r = info.r;
   ctx.save();
-  if (k.tip > 0) { ctx.translate(-r * 0.2, -r * 0.6); ctx.rotate(-0.28 * k.tip); ctx.translate(r * 0.2, r * 0.6 - 3 * k.tip); }
+  if (k.tip > 0) { ctx.translate(-r * 0.2, -r * 0.6); ctx.rotate(-0.28 * k.tip); ctx.translate(r * 0.2, r * 0.6 - 4 * k.tip); }
   ctx.beginPath();
   ctx.moveTo(-r * 1.14, -r * 0.46); ctx.lineTo(-r * 1.2, -r * 0.92); ctx.quadraticCurveTo(-r * 1.1, -r * 1.22, -r * 0.4, -r * 1.2);
   ctx.lineTo(r * 0.8, -r * 1.16); ctx.quadraticCurveTo(r * 1.1, -r * 1.1, r * 1.04, -r * 0.7); ctx.lineTo(r * 1.62, -r * 0.62);
@@ -234,15 +234,21 @@ export function drawMiller(ctx: CanvasRenderingContext2D, x: number, feetY: numb
   drawSack(ctx, R(x) - f * 18, R(feetY), silhouette);
   drawKeeper(ctx, k, millerPose(state, t), { x, y: feetY, facing: f, shadow: !silhouette, silhouette });
   if (!grumpy) {
-    // the far hand on the cap's crown, lifting it (drawn over the cap: behind his head it was lost)
-    const h = jointScreen(k, 'handF', { x: 0, y: 0 }), c = celTarget(f, silhouette);
+    // the far forearm rising up the back of his head to the cap (rolled sleeve: skin), then the far hand on the cap's
+    // crown, lifting it -- both drawn over the head and cap (behind his head the arm was lost and the fist floated)
+    const h = jointScreen(k, 'handF', { x: 0, y: 0 }), e = jointScreen(k, 'elbowF', { x: 0, y: 0 }), c = celTarget(f, silhouette);
+    const dx = h.x - e.x, dy = h.y - e.y, L = Math.hypot(dx, dy) || 1, nx = (-dy / L) * 2, ny = (dx / L) * 2;
+    const far = farPalette({ skin: PAL.skin }, KEEPER_FAR.shade, KEEPER_FAR.desat) as { skin: string };
+    celPoly(ctx, c, [R(e.x + nx), R(e.y + ny), R(h.x + nx), R(h.y + ny), R(h.x - nx), R(h.y - ny), R(e.x - nx), R(e.y - ny)], far.skin, 0.3, 0);
     celRect(ctx, c, R(h.x) - 4, R(h.y) - 3, 9, 7, 3, PAL.skin, 0.3, 0);
   }
   if (grumpy && !silhouette && Math.floor(t / 45) % 4 === 1) {
-    // "hmph": a small flat puff out of his nose, level, in front of his face (two inked discs, flat)
-    const hx = R(x) + f * 17, hy = R(feetY) - 56;
-    for (const [dx, r] of [[0, 3], [f * 5, 4]] as const) { ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(hx + dx, hy, r + 1, 0, Math.PI * 2); ctx.fill(); }
-    for (const [dx, r] of [[0, 3], [f * 5, 4]] as const) { ctx.fillStyle = PAL.trim!; ctx.beginPath(); ctx.arc(hx + dx, hy, r, 0, Math.PI * 2); ctx.fill(); }
+    // "hmph": a snort out of his nose -- three small flat puffs, level, stepping bigger away from his face (inked
+    // discs, flat; one blank oval read as an empty speech bubble)
+    const hx = R(x) + f * 14, hy = R(feetY) - 56;
+    const puffs = [[0, 1.5], [f * 5, 2.5], [f * 12, 3.5]] as const;
+    for (const [dx, r] of puffs) { ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(hx + dx, hy, r + 1, 0, Math.PI * 2); ctx.fill(); }
+    for (const [dx, r] of puffs) { ctx.fillStyle = PAL.trim!; ctx.beginPath(); ctx.arc(hx + dx, hy, r, 0, Math.PI * 2); ctx.fill(); }
   }
 }
 

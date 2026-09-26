@@ -98,6 +98,7 @@ import type { KeeperPalette } from '../src/art/keeper/palettes.ts';
 import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
 import type { KeeperId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
+import { SETPIECE_COLOURS } from '../src/game/setpieces.ts';
 import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, CAVE, stepped } from '../src/game/surfaces.ts';
 import { lampPool } from '../src/game/backdrops.ts';
 import { BADDIE_ART, BADDIE_HOME, BADDIE_EDGE, BADDIE_PAIRS, BADDIE_WHITE } from '../src/game/baddies.ts';
@@ -931,6 +932,15 @@ function lighterBy(a: string, b: string): number {
     const ink = okDiff(CAVE.mouth, INK), inkOk = wcount('(w) cave mouth / ink', ink >= OKL_MIN);
     out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${'prop cave mouth'.padEnd(28)} ${CAVE.mouth}  L ${lumOf(CAVE.mouth).toFixed(3)}  least ${pct(least)} apart   (${by})  ${okf(ink)} from ink`);
   }
+  // (the fog bank's bands, setpieces.ts SETPIECE_COLOURS.fog: the one set piece drawn as a backdrop BEHIND the team, so
+  // gated like one -- each band lighter than every dark body, and off the ink. S9a review.)
+  SETPIECE_COLOURS.fog.forEach((hex, i) => {
+    const what = `set piece fog band ${i}`;
+    let least = Infinity, by = '';
+    for (const b of dark) { const d = lighterBy(hex, b.hex); wcount(`(w) ${what} / ${b.who}`, d >= LUM_MIN); if (d < least) { least = d; by = b.who; } }
+    const ink = okDiff(hex, INK), inkOk = wcount(`(w) ${what} / ink`, ink >= OKL_MIN);
+    out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${what.padEnd(28)} ${hex}  L ${lumOf(hex).toFixed(3)}  least ${pct(least)} lighter (${by})  ${okf(ink)} from ink`);
+  });
 }
 
 // ---------- (egg) the Hatchery's eggs (src/game/eggs.ts) ----------

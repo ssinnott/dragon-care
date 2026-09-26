@@ -139,13 +139,17 @@ function drawFace(g: CanvasRenderingContext2D, f: FaceAt, face: BaddieFace, lid:
   } else g.fillRect(R(mx - 2), R(my), 5, 2);
 }
 
-/** Three 3 x 3 "z" marks stepping up and out from (x, y), one more every 20 frames (a doze), inked. */
+/**
+ * Three 5 x 5 "z" marks stepping up and out from (x, y), one more every 20 frames (a doze), inked. (The plan said 3 x 3,
+ * but a 3 x 3 z -- two bars and a centre pixel -- reads as an "I" or a "=": ART_BIBLE C16's lesson for the dragons' z;
+ * at 5 x 5 the diagonal has three steps and reads as a z.)
+ */
 function zeds(g: CanvasRenderingContext2D, x: number, y: number, t: number): void {
   const n = 1 + (Math.floor(t / 20) % 3);
   for (let i = 0; i < n; i++) {
-    const zx = R(x + i * 7), zy = R(y - i * 8);
-    g.fillStyle = INK; g.fillRect(zx - 1, zy - 1, 5, 5);
-    g.fillStyle = WHITE; g.fillRect(zx, zy, 3, 1); g.fillRect(zx + 1, zy + 1, 1, 1); g.fillRect(zx, zy + 2, 3, 1);
+    const zx = R(x + i * 8), zy = R(y - i * 9);
+    g.fillStyle = INK; g.fillRect(zx - 1, zy - 1, 7, 7);
+    g.fillStyle = WHITE; g.fillRect(zx, zy, 5, 1); g.fillRect(zx + 3, zy + 1, 1, 1); g.fillRect(zx + 2, zy + 2, 1, 1); g.fillRect(zx + 1, zy + 3, 1, 1); g.fillRect(zx, zy + 4, 5, 1);
   }
 }
 /** Two 2 px dust puffs at the heels, stepping back and up (a shuffle's). */

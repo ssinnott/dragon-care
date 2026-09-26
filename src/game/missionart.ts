@@ -55,6 +55,23 @@ export function roadBand(ctx: CanvasRenderingContext2D, x0: number, x1: number, 
   ctx.fillStyle = '#b8ab92'; ctx.fillRect(x0, feetY + 7, x1 - x0, 5);
 }
 
+/**
+ * Run `fn` and say whether it changed any pixel inside the rect (x, y, w, h in the ctx's current user space; no
+ * rotation). The sheets publish an item only when its drawing really changed pixels, so the smoke run's "every item was
+ * drawn" check can fail when a draw call silently draws nothing.
+ */
+function drew(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, fn: () => void): boolean {
+  const m = ctx.getTransform();
+  const ax = Math.max(0, Math.floor(m.a * x + m.e)), ay = Math.max(0, Math.floor(m.d * y + m.f));
+  const aw = Math.min(ctx.canvas.width - ax, Math.ceil(m.a * w)), ah = Math.min(ctx.canvas.height - ay, Math.ceil(m.d * h));
+  if (aw <= 0 || ah <= 0) { fn(); return false; }
+  const before = ctx.getImageData(ax, ay, aw, ah).data;
+  fn();
+  const after = ctx.getImageData(ax, ay, aw, ah).data;
+  for (let i = 0; i < after.length; i++) if (after[i] !== before[i]) return true;
+  return false;
+}
+
 /** Record what a sheet drew on the page's hook. */
 function publish(sheet: string, drawn: string[]): void {
   const dc = (globalThis as { __dragonCare?: Window['__dragonCare'] }).__dragonCare;
@@ -88,7 +105,10 @@ function climatesSheet(): ArtScene {
       const drawn: string[] = [];
       CLIMATES.forEach((c, i) => {
         label(ctx, c.toUpperCase(), 4, gy + i * ch + CLIMATE_PIC.h / 2 - 3, LABEL, 'left');
-        PHASES.forEach((p, j) => { drawClimate(ctx, c, p, { x: left + j * cw, y: gy + i * ch, w: CLIMATE_PIC.w, h: CLIMATE_PIC.h }); drawn.push(`${c}:${p}`); });
+        PHASES.forEach((p, j) => {
+          const r = { x: left + j * cw, y: gy + i * ch, w: CLIMATE_PIC.w, h: CLIMATE_PIC.h };
+          if (drew(ctx, r.x, r.y, r.w, r.h, () => drawClimate(ctx, c, p, r))) drawn.push(`${c}:${p}`);
+        });
       });
       publish('climates', drawn);
     },
@@ -103,11 +123,11 @@ function roadScene(climate: Climate, phase: DayPhase): ArtScene {
     w, h, pets: [], step() { t++; },
     draw(ctx) {
       ctx.fillStyle = PAGE; ctx.fillRect(0, 0, w, h);
-      drawClimate(ctx, climate, phase, { x: 0, y: 16, w, h: 290 }, t);
+      const ok = drew(ctx, 0, 16, w, 290, () => drawClimate(ctx, climate, phase, { x: 0, y: 16, w, h: 290 }, t));
       roadBand(ctx, 0, w, 300);
       ctx.fillStyle = '#9a8a70'; ctx.fillRect(0, 312, w, h - 312);
       label(ctx, `${climate.toUpperCase()} - ${phase.toUpperCase()} - SCROLL ${t}`, w / 2, 3);
-      publish('climates', [`${climate}:${phase}:scene`]);
+      publish('climates', ok ? [`${climate}:${phase}:scene`] : []);
     },
   };
 }
@@ -131,9 +151,9 @@ function setPiecesSheet(): ArtScene {
         ctx.fillStyle = INK; ctx.fillRect(x0 + cw - 1, y0, 1, ch);
         label(ctx, `${id.toUpperCase()}`, x0 + cw / 2, y0 + 3);
         label(ctx, 'AHEAD', x0 + 80, y0 + ch - 11, SUB); label(ctx, 'MET', x0 + 240, y0 + ch - 11, SUB);
-        drawSetPiece(ctx, id, x0 + 80, feet, 'ahead', t);
-        drawSetPiece(ctx, id, x0 + 240, feet, 'met', t);
-        drawn.push(id);
+        const a = drew(ctx, x0 + 1, y0 + 12, cw / 2 - 2, ch - 12, () => drawSetPiece(ctx, id, x0 + 80, feet, 'ahead', t));
+        const m = drew(ctx, x0 + cw / 2, y0 + 12, cw / 2 - 2, ch - 12, () => drawSetPiece(ctx, id, x0 + 240, feet, 'met', t));
+        if (a && m) drawn.push(id);
       });
       drawPets(ctx, pets, { top, budget, frame: t });
       publish('setpieces', drawn);
@@ -164,17 +184,18 @@ function baddiesSheet(ids: readonly BaddieId[]): ArtScene {
             return [e.toUpperCase(), () => drawBaddie(ctx, id, 0, 0, L.facing, L.face, L.pose, t)];
           }),
         ];
+        let all = true;
         cells.forEach(([name, draw], j) => {
           const cx = 60 + j * cw + cw / 2;
-          ctx.save(); ctx.translate(cx, feet); draw(); ctx.restore();
+          all = drew(ctx, cx - cw / 2, y0 + 12, cw, feet - y0, () => { ctx.save(); ctx.translate(cx, feet); draw(); ctx.restore(); }) && all;
           label(ctx, name, cx, feet + 14, SUB);
         });
-        drawn.push(id);
+        if (all) drawn.push(id);
       });
       drawPets(ctx, pets, { top, budget, frame: t });
       const py = h - 36;
       label(ctx, 'PORTRAITS', 8, py + 8, LABEL, 'left');
-      BADDIE_IDS.forEach((id, i) => { drawBaddiePortrait(ctx, id, 80 + i * 40, py); drawn.push(`${id}:portrait`); });
+      BADDIE_IDS.forEach((id, i) => { if (drew(ctx, 80 + i * 40, py, 24, 24, () => drawBaddiePortrait(ctx, id, 80 + i * 40, py))) drawn.push(`${id}:portrait`); });
       publish('baddies', drawn);
     },
   };
@@ -195,10 +216,11 @@ function peopleSheet(): ArtScene {
       ctx.fillStyle = PAGE; ctx.fillRect(0, 0, w, h);
       roadBand(ctx, 0, w, feet1);
       label(ctx, 'THE GRUMPY MILLER AT 1X, BESIDE THE KEEPERS', 8, 4, LABEL, 'left');
-      drawMiller(ctx, 60, feet1, 1, 'grumpy', t);
-      drawMiller(ctx, 150, feet1, 1, 'talkedRound', t);
+      const drawn: string[] = [];
+      if (drew(ctx, 20, 14, 80, feet1 - 14, () => drawMiller(ctx, 60, feet1, 1, 'grumpy', t))) drawn.push('miller:grumpy');
+      if (drew(ctx, 110, 14, 80, feet1 - 14, () => drawMiller(ctx, 150, feet1, 1, 'talkedRound', t))) drawn.push('miller:talkedRound');
       label(ctx, 'GRUMPY', 60, feet1 + 14, SUB); label(ctx, 'TALKED ROUND', 150, feet1 + 14, SUB);
-      for (const k of keepers) drawKeeperAgent(ctx, k);
+      keepers.forEach((k, i) => { if (drew(ctx, k.x - 20, 14, 40, feet1 - 14, () => drawKeeperAgent(ctx, k))) drawn.push(KEEPER_IDS[i]); });
       keepers.forEach((k, i) => label(ctx, KEEPERS[KEEPER_IDS[i]].name.toUpperCase(), 250 + i * 40, feet1 + 14, SUB));
       // 2x: both states side by side, under the 1x row
       const g = off.getContext('2d')!;
@@ -214,13 +236,14 @@ function peopleSheet(): ArtScene {
       s.clearRect(0, 0, sil.width, sil.height);
       drawMiller(s, 25, 100, 1, 'grumpy', t, INK);
       keepers.forEach((k, i) => { const x = k.x; k.x = 75 + i * 45; k.y = 100; drawKeeperAgent(s, k, { silhouette: INK }); k.x = x; k.y = feet1; });
-      label(ctx, 'SILHOUETTES: MILLER, BEA, TOMAS, IRIS, PIP', 452, 122, LABEL, 'left');
+      label(ctx, 'SILHOUETTES:', 452, 118, LABEL, 'left');
+      label(ctx, 'MILLER BEA TOMAS IRIS PIP', 452, 127, SUB, 'left');
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(sil, 0, 0, sil.width, sil.height, 460, 140, sil.width / 3, sil.height / 3);
       label(ctx, 'AT 1/3', 560, 160, SUB, 'left');
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(sil, 0, 0, sil.width, sil.height, 452, 190, sil.width * 0.7, sil.height * 0.7);
-      publish('people', ['miller:grumpy', 'miller:talkedRound', ...KEEPER_IDS]);
+      publish('people', drawn);
     },
   };
 }
@@ -240,26 +263,26 @@ function iconsSheet(): ArtScene {
       label(ctx, 'CHALLENGES', 8, 6, LABEL, 'left');
       CHALLENGE_IDS.forEach((id, i) => {
         const x = 16 + i * 56;
-        drawSprite(ctx, CHALLENGE_ICONS[id], x, 26);
+        const ok = drew(ctx, x - 6, 20, 12, 12, () => drawSprite(ctx, CHALLENGE_ICONS[id], x, 26));
         label(ctx, id.toUpperCase(), x, 36, SUB);
         drawSprite(g, CHALLENGE_ICONS[id], 8 + i * 18, 10);
-        drawn.push(`challenge:${id}`);
+        if (ok) drawn.push(`challenge:${id}`);
       });
       label(ctx, 'SKILLS', 8, 52, LABEL, 'left');
       SKILLS.forEach((sk, i) => {
         const x = 16 + i * 56;
-        drawSprite(ctx, SKILL_ICONS[sk], x, 72);
+        const ok = drew(ctx, x - 6, 66, 12, 12, () => drawSprite(ctx, SKILL_ICONS[sk], x, 72));
         label(ctx, sk.toUpperCase(), x, 82, SUB);
         drawSprite(g, SKILL_ICONS[sk], 8 + i * 18, 30);
-        drawn.push(`skill:${sk}`);
+        if (ok) drawn.push(`skill:${sk}`);
       });
       label(ctx, 'SADDLE', 260, 52, LABEL, 'left');
-      drawSprite(ctx, SADDLE, 276, 72); drawSprite(g, SADDLE, 90, 30);
-      drawn.push('saddle');
+      if (drew(ctx, 268, 66, 16, 12, () => drawSprite(ctx, SADDLE, 276, 72))) drawn.push('saddle');
+      drawSprite(g, SADDLE, 90, 30);
       label(ctx, 'CARRIED EGGS', 330, 52, LABEL, 'left');
-      DRAGON_ELEMENTS.forEach((el, i) => { drawCarriedEgg(ctx, el, 340 + i * 16, 78); drawCarriedEgg(g, el, 120 + i * 12, 40); drawn.push(`egg:${el}`); });
+      DRAGON_ELEMENTS.forEach((el, i) => { if (drew(ctx, 340 + i * 16 - 7, 70, 14, 16, () => drawCarriedEgg(ctx, el, 340 + i * 16, 78))) drawn.push(`egg:${el}`); drawCarriedEgg(g, el, 120 + i * 12, 40); });
       label(ctx, 'PORTRAITS', 8, 96, LABEL, 'left');
-      BADDIE_IDS.forEach((id, i) => { drawBaddiePortrait(ctx, id, 12 + i * 34, 108); drawBaddiePortrait(g, id, 8 + i * 30, 44); drawn.push(`portrait:${id}`); });
+      BADDIE_IDS.forEach((id, i) => { if (drew(ctx, 12 + i * 34, 108, 24, 24, () => drawBaddiePortrait(ctx, id, 12 + i * 34, 108))) drawn.push(`portrait:${id}`); drawBaddiePortrait(g, id, 8 + i * 30, 44); });
       label(ctx, 'AT 3X', 8, 138, LABEL, 'left');
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(off, 0, 0, off.width, off.height, 8, 150, off.width * 3, off.height * 3);
