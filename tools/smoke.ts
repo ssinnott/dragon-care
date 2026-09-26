@@ -51,7 +51,7 @@ import { CareSim } from '../src/game/sim.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts';
 import { serialize } from '../src/game/save.ts';
 import { SAVE_KEY, BACKUP_KEY } from '../src/game/storage.ts';
-import { FLOORS } from '../src/game/surfaces.ts';
+import { FLOORS, STRAW_SEAM, PATH_EDGE } from '../src/game/surfaces.ts';
 
 const require = createRequire(import.meta.url);
 function loadPlaywright(): any {
@@ -654,11 +654,11 @@ for (const c of CASES) {
 
 /**
  * Day against night, pixel by pixel (plan S6c N1, N2): the share of the frame's pixels that differ; over those, the
- * mean luminance and the mean blue less red (warmth) by day and by night; and the day's floor pixels (a FLOORS colour,
+ * mean luminance and the mean blue less red (warmth) by day and by night; and the day's floor pixels (a FLOORS colour, the straw seam or the path edge,
  * in the world between the HUD's bars) and how many of them differ by night.
  */
 function nightDiff(w: number, day: number[], night: number[]) {
-  const floors = new Set(Object.values(FLOORS).map(hexToInt));
+  const floors = new Set([...Object.values(FLOORS), STRAW_SEAM, PATH_EDGE].map(hexToInt));
   const lum = (c: number) => (0.2126 * ((c >> 16) & 255) + 0.7152 * ((c >> 8) & 255) + 0.0722 * (c & 255)) / 255;
   const cool = (c: number) => (c & 255) - ((c >> 16) & 255);
   let changed = 0, lumDay = 0, lumNight = 0, coolDay = 0, coolNight = 0, floor = 0, floorMoved = 0;

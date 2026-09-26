@@ -560,7 +560,7 @@ stand spot <= 20 s, the bay's edge <= 60 s.
     car's rails, the ground -- and the garden's hedge, lawn, trees, bench, lanterns' posts, kerb and fence take their
     **night colours**: each its day colour mixed half way to a mid blue (`src/game/surfaces.ts` `MOONLIGHT` `#5c6a9c`),
     cooler and darker, never black (the walls L 0.20 to 0.31 at night against 0.26 to 0.54 by day). One table maps a
-    day colour to its night colour (`surfaces.ts` `NIGHT`, 40 entries); the building (`building.ts`) and the garden
+    day colour to its night colour (`surfaces.ts` `NIGHT`, 42 entries); the building (`building.ts`) and the garden
     (`gardenArt.ts`) are drawn through it, every fill and the cel tones made from it, onto one canvas per step, built
     the first time the step is needed (about 6 ms) and kept: never a frame's work. The props behind the slots (the
     hearth, the tub, the pallets, the gate's leaf, the Map Room's map) are moonlit too; the lights, the flames, the
@@ -568,7 +568,7 @@ stand spot <= 20 s, the bay's edge <= 60 s.
     the garden's mounds and the dorm's mattresses (straw, like the floor) and the firebox's and the doorways' dark.
     The room names on their plates keep theirs. Measured at the opening frame (`view=base&t=600`, noon against 22:00),
     69.2 % of the pixels change, darker (mean L 0.560 to 0.481 over them) and cooler (blue less red -28.8 to +16.0),
-    and none of the 22 193 floor pixels does (`npm run smoke`, which asks for 35 % or more).
+    and none of the 23 809 floor pixels does (`npm run smoke`, which asks for 35 % or more).
   - **Nothing tints a dragon or a floor**: no `tint`, `tintAlpha` or `flash` by time of day, and every `FLOORS` colour
     (the straw of every band, landing, car deck and the Aerie deck, the garden's path) and the seams drawn on them are
     the same by night (gate w checks the table has no entry that changes one). The night is a mid-value blue hour (its

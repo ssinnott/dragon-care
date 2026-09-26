@@ -412,7 +412,7 @@ function buildingAt(rooms: readonly Room[]): HTMLCanvasElement {
   const topRow = RIDGE_Y - 20;
   poly(g, ROOF_OUT, '#8e3b30');
   g.save(); path(g, ROOF_OUT); g.clip();
-  for (const k of [5, 10]) { g.beginPath(); g.moveTo(ROOF_OUT[0], ROOF_OUT[1] + k); for (let i = 2; i < ROOF_OUT.length; i += 2) g.lineTo(ROOF_OUT[i], ROOF_OUT[i + 1] + k); g.strokeStyle = '#6e2a24'; g.lineWidth = 1; g.stroke(); }
+  for (const k of [5, 10]) { g.beginPath(); g.moveTo(ROOF_OUT[0], ROOF_OUT[1] + k); for (let i = 2; i < ROOF_OUT.length; i += 2) g.lineTo(ROOF_OUT[i], ROOF_OUT[i + 1] + k); g.strokeStyle = nc('#6e2a24'); g.lineWidth = 1; g.stroke(); }
   g.restore();
   const deckBottom = feetY(AERIE_F) - 8 + BAND + SLAB, housingFoot = Math.ceil(roofAt(LIFT_X0)) + 24;
   shaftWall(g, deckBottom, housingFoot);

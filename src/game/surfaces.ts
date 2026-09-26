@@ -147,6 +147,8 @@ const NIGHT_MOONLIT: readonly string[] = [
   '#7a5a40', '#86a860', '#5e7a44', '#654834',
   // the bathhouse's tile lines, the Map Room's map and its lines, the tack room's saddles
   '#a0adb6', '#e8d8a8', '#8a6a4a', '#9a5a3a',
+  // the bathhouse tub's water and its bubbles (left at the day's they read as lit in the moonlit room)
+  '#bfe3e0', '#dff3f1',
 ];
 /**
  * Day colours that are the same at night, on purpose (so they are in NIGHT, mapped to themselves): the nests' and the

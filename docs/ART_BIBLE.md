@@ -1954,7 +1954,7 @@ stages: baby / young / adult / elder (b/y/a/e), each the base palette greyed by 
   ok   prop gateLeaf night 2/3      #8c756b  L 0.194  least  38% apart   (lightning elder)  okL 39.1 from ink
   ok   prop gateLeaf night 3/3      #807277  L 0.180  least  33% apart   (lightning elder)  okL 37.7 from ink
 
-(w) NIGHT  (plan S6c: the one night table, a day colour to its night colour -- 40 entries, 37 moonlit, 3 the same on purpose; each night colour and its two stepped mixes are gated above, "night k/3")
+(w) NIGHT  (plan S6c: the one night table, a day colour to its night colour -- 42 entries, 39 moonlit, 3 the same on purpose; each night colour and its two stepped mixes are gated above, "night k/3")
   ok   night entries: every wall, backdrop and prop colour (19 fields, and every colour gated above) has one
   ok   floors: FLOORS.straw, FLOORS.path, STRAW_SEAM, PATH_EDGE the same by night (a floor is never moonlit: plan S6c N2)
   ok   keys: every entry #rrggbb in lower case, as the pens are given colours
