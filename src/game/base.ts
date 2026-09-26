@@ -107,7 +107,7 @@ const CLEAR = '#16141c';
  * Where the camera starts: the barn's three floors and its west half -- the Hatchery and the hayloft's kitchen, each
  * floor's Hearth Kitchen, the ground floor's Grooming Parlour, the Romp Room, the Dragon Lift (its car starts at the
  * ground floor), the ladder bay and the first module east of it (the Bathhouse, the upper and the hayloft's Grooming
- * Parlours) -- framed on the start (plan S6b's rooms): six of the seven young adults, EMBER facing its hearth, BRAMBLE,
+ * Parlours) -- framed on the start (BASE_DESIGN 3's rooms): six of the seven young adults, EMBER facing its hearth, BRAMBLE,
  * ZAP, RIPPLE, COBBLE and ECHO, span world x 199.5-842.8 (measured over their idles), 3 px more than a screen, so the
  * frame starts at 201: every face whole, the tips of EMBER's and COBBLE's snouts (under 2 px) at the edges, and every
  * plate in it whole (the kitchens' sit 44 px in from the barn's west wall: layout.ts platesOf). WICK, in the ground
@@ -543,7 +543,7 @@ export class BaseView {
         p.anim = 'walk'; v.walkSeq = d.walkSeq; v.waking = false; p.hold = 0;
       }
       // (the walk plays at the speed the simulation moved the body by this step: 1, or LIVELY on and off the car and
-      // across the bay -- G13, the body moved by the same factor, so the planted paws stay planted)
+      // across the bay -- the body moved by the same factor, so the planted paws stay planted)
       p.player.speed = d.gaitS;
     } else {
       // (a grow-up's happy plays through: the simulation holds the dragon where it stands meanwhile -- its hold, as long

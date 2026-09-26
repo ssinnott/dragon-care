@@ -1,11 +1,11 @@
-// Dragons on the move (docs/BASE_DESIGN.md 2 "Moving around", 3 "Slots"; plan 3.3, 3.4, S6b): a dragon with an open
+// Dragons on the move (docs/BASE_DESIGN.md 2 "Moving around", 3 "Slots", 4.7): a dragon with an open
 // need takes a slot in a room that meets it -- a need's rooms repeat on the floors, and it takes one on its own floor
 // if the floor has one (roomsFor) -- and walks there, riding the Dragon Lift between floors, and its keeper meets it at
 // the slot (sim.ts). This file is the dragons' half of a step: each free dragon chooses where to go (and moves a
 // lingerer out of a full room), every dragon walks or turns, and the lift runs. A walk moves the body by the walk
 // anim's own root motion (gait.ts), so the view's paws stay planted -- at the anim's speed 1, but for the lively step:
 // on and off the car and across the lift bay a dragon walks at LIVELY, its body moved by that factor too and the view
-// playing its walk at that speed (Dragon.gaitS; plan G13) -- and a reversal is a paper turn in place. The lift bay
+// playing its walk at that speed (Dragon.gaitS; BASE_DESIGN 2: no skating paw) -- and a reversal is a paper turn in place. The lift bay
 // has one rule for everyone who walks across it (the bay rule): nobody steps into the bay while the car moves past
 // their floor, the car never moves while anyone stands in its bay on a floor it passes, and a departure blocked too
 // long closes the bay until it goes -- and its shaft shows one dragon at a time (R5): the car serves one rider from its
@@ -48,7 +48,7 @@ export const LANDING_CLEAR = 2;
 /** A dragon held at the bay's edge this long in all (40 s, over its whole approach) crosses before the car's next rider on its floor boards. */
 export const CROSS_MAX = 2400;
 /**
- * Which of a need's rooms a dragon goes to (plan S6b, "fewer floor changes"; docs/BASE_DESIGN.md 3, 4.7): each room
+ * Which of a need's rooms a dragon goes to ("fewer floor changes": docs/BASE_DESIGN.md 3, 4.7): each room
  * meets one need, and a need's rooms are repeated on the floors (start.ts: the ground and upper floors have all five,
  * the hayloft three), so a dragon's needs are met on the floor it stands on and the one car carries few. Among a need's
  * rooms (roomsFor) the cheapest by its route there, a ride counted RIDE_PX more and a room with no slot free for it
@@ -72,9 +72,9 @@ export const STAY_TIER = 1;
 /** A keeper's half-width for the bay rule (layout.ts's PAD: how close to a wall their feet come). */
 export const KEEPER_HALF = 10;
 /**
- * The lively step (plan S6b): the speed a dragon's walk plays at while it steps on to the car (`board`) and off it until
+ * The lively step (BASE_DESIGN 2): the speed a dragon's walk plays at while it steps on to the car (`board`) and off it until
  * clear of the bay (`alight`), and wherever its body is in the lift bay or steps into it on a served floor (a crosser, a
- * follower); 1 anywhere else. G13: its body moves by exactly this factor (gaitT advances LIVELY a step, the body LIVELY x
+ * follower); 1 anywhere else. No skating paw (BASE_DESIGN 2): its body moves by exactly this factor (gaitT advances LIVELY a step, the body LIVELY x
  * the frame's move), and the view plays the walk at the same speed (Dragon.gaitS), so the planted paws stay planted.
  */
 export const LIVELY = 2;
@@ -291,7 +291,7 @@ export function nearestFree(sim: CareSim, d: Dragon, stage: Stage = d.stage, not
 /**
  * A dragon standing still in its slot with nowhere to be, no act, no keeper coming and not holding still to grow up
  * (evictable, 3.3), for room `room` -- never a baby with a job open: it walks at a third of an adult's pace, so a move
- * would cost it most of a need (plan S6b).
+ * would cost it most of a need (BASE_DESIGN 4.7).
  */
 function lingerer(sim: CareSim, o: Dragon, room: Room): boolean {
   const g = o.goalJob == null ? null : sim.jobs.find((j) => j.id === o.goalJob) ?? null;
@@ -351,7 +351,7 @@ function takeSlot(sim: CareSim, d: Dragon, room: Room, bump: boolean): Slot | nu
 }
 
 /**
- * Where a lingerer moved on goes (plan S6b): a free slot on its own floor in a room meeting its lowest need that has one
+ * Where a lingerer moved on goes (BASE_DESIGN 4.7): a free slot on its own floor in a room meeting its lowest need that has one
  * there (its next job, most likely: then met where it stands; its needs in level order, then NEEDS order); else the
  * cheapest free slot on any floor in a room meeting its lowest need that has one free; else the nearest free slot
  * (nearestFree) -- never the Hatchery's (S5: a baby moved on never rests in front of the nests).
@@ -517,7 +517,7 @@ export function retarget(sim: CareSim, d: Dragon, j: Job): void {
 export function walking(d: Dragon): boolean { return d.move === 'walk' || d.move === 'board' || d.move === 'alight' || (d.move === 'call' && d.gaitT > 0); }
 
 /**
- * The speed a dragon's walk plays at this step (LIVELY; G13: its body moves by the same factor): stepping on to the car and
+ * The speed a dragon's walk plays at this step (LIVELY; no skating paw: its body moves by the same factor): stepping on to the car and
  * off it until clear of the bay, and wherever its body is in the bay or steps into it this step on a served floor; 1
  * anywhere else.
  */
@@ -529,7 +529,7 @@ function pace(d: Dragon, dir: 1 | -1): number {
 }
 
 /**
- * The shaft guard (plan S6b): whether dragon d, stepping `m` px its way `dir` this step, would newly lie over another
+ * The shaft guard (BASE_DESIGN 2): whether dragon d, stepping `m` px its way `dir` this step, would newly lie over another
  * dragon's body in the lift bay on its floor -- its body in the bay after the step, over the body of one in the bay (or
  * the car's rider standing in the car here), where the two do not already lie over each other in the bay. The car's
  * rider is never held by it (the lift's own rules clear its way).
@@ -922,7 +922,7 @@ function stepDragon(sim: CareSim, d: Dragon): void {
   }
   // (held a moment: it stands -- the walk bout ends, so the view idles and no paw slides -- and walks on in a new one)
   if (stop === d.x) { d.gaitT = 0; return; }
-  // (the walk-start rule, plan S6b: walking up to the bay, a walk bout does not start under one walking its way over
+  // (the walk-start rule, BASE_DESIGN 2: walking up to the bay, a walk bout does not start under one walking its way over
   // it, a step on in its own bout -- that one passes first; with need rooms on both sides of the bay on every floor, one
   // passing through a dragon standing in a slot beside the bay, which then set off the same way under it, was held there
   // by the follow rule above, the two over each other at the bay's edge. A walker held a moment, its bout ended, is not

@@ -1,7 +1,7 @@
-// Capacity benchmark (plan S6b; docs/BASE_DESIGN.md 4.7): how well the barn serves herds bigger than the start's seven.
+// Capacity benchmark (docs/BASE_DESIGN.md 4.7): how well the barn serves herds bigger than the start's seven.
 // Headless, like tools/sim-check.ts: each cast is built on the real start base (START_ROOMS, the four keepers) and runs
 // `--min` minutes of play at the real day's length on every seed; what it got is printed as a markdown table, one row a
-// cast, then a SERVED / NOT SERVED verdict each (C1's standard: no need ever empty on 7 of 8 seeds or more, and jobs
+// cast, then a SERVED / NOT SERVED verdict each (BASE_DESIGN 4.7's standard: no need ever empty on 7 of 8 seeds or more, and jobs
 // waiting 90 s or less on average from opening to their keeper starting), then every run's own row.
 //
 //   node tools/capacity.ts                                  (npm run capacity: every cast, seeds 1-8, 30 min)
@@ -14,8 +14,8 @@
 // --json=path (every run's numbers as JSON), --workers=3 (runs at once, in worker threads, 1-3).
 //
 // Casts: start7, the new game's seven adults; eight, one more adult (sim-check section 10's EIGHTH: a fire adult in the
-// upper floor's kitchen); ten, the seven and three babies; twelve, the seven, three young and two babies (plan S6b's
-// benchmark, C1: sim-check section 10 runs it on seed 1); thirteen, the seven, three young and three babies; fifteen,
+// upper floor's kitchen); ten, the seven and three babies; twelve, the seven, three young and two babies (BASE_DESIGN 4.7's
+// benchmark: sim-check section 10 runs it on seed 1); thirteen, the seven, three young and three babies; fifteen,
 // the seven, four young and four babies. A cast's dragons past the start's seven are placed as any preset places its
 // dragons (presets.ts: a DragonPlace in a free slot, the nth room of its kind, which CareSim's constructor checks: the
 // slot fits the stage, nobody holds it, and its module holds one grown dragon or two babies) -- grown ones in the free
@@ -42,7 +42,7 @@
 //
 // Each run is a whole world stepped alone, so a run's numbers are the same on every machine and in every worker (the
 // ms per step aside). A prototype with more than one car changes `carsOf` (every other measure reads the dragons, the
-// keepers and the stats). The barn as built (plan S6b) serves `twelve` on every seed; its cap (life.ts BARN_CAP) is 12:
+// keepers and the stats). The barn as built (BASE_DESIGN 3) serves `twelve` on every seed; its cap (life.ts BARN_CAP) is 12:
 // docs/BASE_DESIGN.md 4.7 has the table this tool measured.
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { execFileSync } from 'node:child_process';
@@ -292,7 +292,7 @@ export function runOne(t: Task, done?: (sim: CareSim) => void): Run {
 
 // ---------- the report ----------
 
-/** A cast's verdict (C1): SERVED when no need empties on 7 of every 8 seeds or more and jobs wait 90 s or less on average. */
+/** A cast's verdict (BASE_DESIGN 4.7): SERVED when no need empties on 7 of every 8 seeds or more and jobs wait 90 s or less on average. */
 export const SERVED = { cleanShare: 7 / 8, waitAvgS: 90 } as const;
 
 /** A cast's runs, summed up over its seeds. */
@@ -363,7 +363,7 @@ export function report(sums: CastSummary[], runs: Run[], head: { rev: string; mi
     if (!s.fits) { L.push(`| ${who} | ${s.dragons} | does not fit | | | | | | | | | | | | | |`); continue; }
     L.push(`| ${who} | ${s.dragons} | ${s.seedsEmpty}/${s.seeds.length} | ${fmtInt(s.emptySteps)} | ${f1(s.waitAvgS)} | ${f1(s.waitMaxS)} | ${f1(s.done)} | ${f1(s.rides)} | ${pct(s.carBusy)} | ${f1(s.landingMaxS)} | ${f1(s.bayMaxS)} | ${pct(s.keeperBusy)} | ${f1(s.coverS)} (${f1(s.coverLongestS)}) | ${s.stalls}${s.breaks ? ` +${s.breaks} inv` : ''} | ${f1(s.openAtEnd)} (${f1(s.oldestOpenS)}) | ${s.msPerStep.toFixed(3)} |`);
   }
-  L.push('', `Verdicts (SERVED: no need empty on >= ${SERVED.cleanShare * 8} of 8 seeds, and jobs waiting <= ${SERVED.waitAvgS} s on average from opening to their keeper starting; C1 also wants no stall):`, '');
+  L.push('', `Verdicts (SERVED: no need empty on >= ${SERVED.cleanShare * 8} of 8 seeds, and jobs waiting <= ${SERVED.waitAvgS} s on average from opening to their keeper starting; BASE_DESIGN 4.7 also wants no stall):`, '');
   for (const s of sums) L.push(`- **${s.cast}** (${s.dragons}): ${s.verdict}`);
   const notes = runs.filter((r) => r.stallNotes.length || r.breakNotes.length);
   if (notes.length) {

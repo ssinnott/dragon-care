@@ -6,8 +6,11 @@ TypeScript, no runtime dependencies.
 
 Open `index.html` (via `npm run dev`, or the deployed page) and you're straight into the base: drag to look around,
 tap a need bubble, a job chip or a dragon to Rush it. A day and a night pass in 3 minutes: the top bar's speed button
-(or the keys 1-4) runs it at 2x, 4x or 8x, and II (or p) pauses. The barn is kept in the browser and resumes on a reload;
-NEW, tapped twice, starts another. `docs/base/base_live.png` shows it running.
+(or the keys 1-4) runs it at 2x, 4x or 8x, II (or p) pauses, and MAP (or m) opens the Map Room's table, where you pick
+a mission, BEST TEAM and SEND a team off from the Aerie, then tap the TEAM OUT chip to watch it on the road. Tap a
+keeper (or their badge, or Tab) to take them by hand: WASD or the arrows walk and climb, E or Space fetches and does
+the chore in reach, Esc lets go -- and on a touch screen a pad of arrows, E and LET GO does the same. The barn is kept
+in the browser and resumes on a reload; NEW, tapped twice, starts another. `docs/base/base_live.png` shows it running.
 
 ## Run it
 

@@ -49,7 +49,7 @@ const pairs: string[] = [
   // the base (docs/BASE_DESIGN.md): its first seconds (the start camera: the barn's west half under the Hatchery, the
   // lift, EMBER crossing its bay for the ground floor's Lamp Dorm; and the east half), a minute of care (the dragons
   // walked to their needs' rooms: every room repeats, so most never leave their floor), a ride (ECHO on the Dragon
-  // Lift's car on its way down from the hayloft, which has no Bathhouse, to the ground floor's: plan S6b), every stage
+  // Lift's car on its way down from the hayloft, which has no Bathhouse, to the ground floor's: BASE_DESIGN 3), every stage
   // at once (the ages preset: the barn at its cap, BARN 12/12), and the roof: the Aerie deck, its gantry, the lift's
   // shaft and headframe
   'shots/base_t600.png=view=base&t=600',
@@ -76,7 +76,7 @@ const pairs: string[] = [
   // growing up and eggs (7; plan S5): EMBER six steps into its grow-up (the new elder's silhouette flat in its glow's
   // highlight inside its own ink, the toast), the Hatchery's three eggs (a rock egg just laid, a dusk one with its first
   // crack, a water one with two and its wobble), and a hatch (CINDER standing up in the first nest, its shell's bits
-  // flying) -- the Hatchery in the hayloft's west corner, under the roof's slope (plan S6b)
+  // flying) -- the Hatchery in the hayloft's west corner, under the roof's slope (BASE_DESIGN 3)
   'shots/base_growup.png=view=base&preset=growup&t=36',
   'shots/base_hatchery.png=view=base&preset=eggs&t=600&cam=168,280',
   'shots/base_hatch.png=view=base&preset=hatch&t=70&cam=168,280',
@@ -91,7 +91,7 @@ const pairs: string[] = [
   'shots/base_garden.png=view=base&preset=garden&cam=1304,376&t=600',
   'shots/base_garden_night.png=view=base&preset=garden&cam=1304,376&t=600&hour=22',
   'shots/base_gate.png=view=base&preset=retire&cam=1060,376&t=1950',
-  // barn capacity (plan S6b): the capacity benchmark's twelve -- the barn at its cap, BARN 12/12 -- a minute and a half
+  // barn capacity (BASE_DESIGN 4.7): the capacity benchmark's twelve -- the barn at its cap, BARN 12/12 -- a minute and a half
   // in, west and east (a need's rooms repeat on every floor: the herd is met on its own floors, the lift nearly idle);
   // the full preset, 21 dragons forced over the cap (BARN 21/12, amber): its egg fell due on the first step (the toast
   // THE BARN IS FULL) and waits in its nest, three dots over it (partly behind the baby resting in front of it); and the

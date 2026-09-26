@@ -35,7 +35,7 @@ export interface StartSpec {
  * The base's first cast: twelve dragons, every element and every stage among them (the greybox mockups', docs/base/),
  * each in a slot: the grown ones in their need rooms' module slots, the babies in sub-slots (a module holds one grown
  * dragon or two babies), PEBBLE in the hatchery. The new game starts with seven newly adult dragons instead (start.ts, #9).
- * (A need's rooms are one module each, repeated on the floors -- plan S6b -- so a slot names the `n`th room of a kind.)
+ * (A need's rooms are one module each, repeated on the floors -- BASE_DESIGN 3 -- so a slot names the `n`th room of a kind.)
  */
 export const AGES_DRAGONS: readonly DragonPlace[] = [
   { name: 'EMBER', element: 'fire', stage: 'adult', seed: 11, slot: { room: 'kitchen', i: 0 } },
@@ -53,7 +53,7 @@ export const AGES_DRAGONS: readonly DragonPlace[] = [
 ];
 /**
  * The capacity benchmark's `twelve` (tools/capacity.ts: the start's seven, three young and two babies, placed as its
- * placeCast places them): the barn at its cap (life.ts BARN_CAP), for looking at a busy barn (plan S6b).
+ * placeCast places them): the barn at its cap (life.ts BARN_CAP), for looking at a busy barn (BASE_DESIGN 4.7).
  */
 export const TWELVE_EXTRA: readonly DragonPlace[] = [
   { name: 'CINDER', element: 'fire', stage: 'young', seed: 501, slot: { room: 'kitchen', i: 0, n: 1 }, days: 0 },
@@ -147,7 +147,7 @@ export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze(
   /** The capacity benchmark's twelve (tools/capacity.ts `twelve`): the new game's seven, three young and two babies. */
   twelve: () => ({ ...newGame(), dragons: [...START_DRAGONS, ...TWELVE_EXTRA] }),
   /**
-   * The barn at its cap with an egg waiting (plan S6b, C2): the twelve, its babies in the hayloft's Lamp Dorm
+   * The barn at its cap with an egg waiting (BASE_DESIGN 4.7): the twelve, its babies in the hayloft's Lamp Dorm
    * (CAPPED_BABIES), and a fire egg in the first nest falling due on the first step -- with the barn full it waits
    * ("THE BARN IS FULL" that step), the three dots over it, BARN 12/12 in amber.
    */

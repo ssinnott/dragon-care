@@ -25,7 +25,7 @@
 // nearest): a baby of its element, a new id, the next free
 // name of its element's (names.ts), the egg's seed, hungry (it asks for the kitchen at once), standing up in its nest
 // and walking to its sub-slot. With no sub-slot free it waits in its nest, and nothing is lost. The barn has a cap
-// (plan S6b, BARN_CAP: the largest herd the barn was measured to serve, docs/BASE_DESIGN.md 4.7): an egg never hatches
+// (BARN_CAP: the largest herd the barn was measured to serve, docs/BASE_DESIGN.md 4.7): an egg never hatches
 // while the barn holds BARN_CAP dragons -- it waits in its nest, and hatches the first step there is room (an elder
 // arriving in the garden frees one; growing up never changes the count) -- and on the step it falls due with the barn
 // full the view is told (SimEvent `full`: "THE BARN IS FULL"). DOM-free, deterministic, by id.
@@ -45,7 +45,7 @@ import type { Slot } from './layout.ts';
 export const HATCH_FOOD = 0.45;
 
 /**
- * The most dragons the barn holds (plan S6b, C2): the largest herd the repeated-room barn was measured to serve to C1's
+ * The most dragons the barn holds (BASE_DESIGN 4.7): the largest herd the repeated-room barn was measured to serve to the benchmark's
  * standard on every mix tried (every 11- and 12-dragon mix; 13 serves most but not all, 14 none: the barn's 13 grown
  * modules are the cliff, and babies need a module free of grown dragons), a hard cap one dragon short of that cliff.
  * An egg never hatches while the barn holds this many; a mission (S8) must not offer an egg while it is full, and reads
@@ -153,7 +153,7 @@ function hatch(sim: CareSim, e: Egg): boolean {
     if (cost < best) { best = cost; slot = s; }
   }
   // (every free Hatchery sub-slot hiding another egg -- under the hayloft's slope the second stands in front of two
-  // nests, plan S6b -- the nearest free sub-slot elsewhere comes first, if there is one: no hatchling hides an egg)
+  // nests, BASE_DESIGN 3 -- the nearest free sub-slot elsewhere comes first, if there is one: no hatchling hides an egg)
   if (slot && hides(slot)) slot = nearestFree(sim, baby, 'baby', ['hatchery']) ?? slot;
   slot ??= nearestFree(sim, baby);
   if (!slot) return false;

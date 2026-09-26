@@ -144,7 +144,7 @@ export interface Dragon {
   move: DragonMove;
   /** Steps into the current walk bout (0: not walking); the bout's number (the view restarts its walk on a new one). */
   gaitT: number;
-  /** The speed its walk played at on its last step (travel.ts LIVELY on and off the car and across the bay, else 1): the view plays the walk at it (G13). */
+  /** The speed its walk played at on its last step (travel.ts LIVELY on and off the car and across the bay, else 1): the view plays the walk at it, so no paw skates (BASE_DESIGN 2). */
   gaitS: number;
   walkSeq: number;
   /** Steps into a paper turn (0..TURN_STEPS - 1), or -1. */
@@ -279,7 +279,7 @@ export interface SimStats {
    */
   used: Record<string, number>;
   /**
-   * Each room's uses by room id (plan S6b: a need's rooms repeat, so each copy must earn its name too): a need met in
+   * Each room's uses by room id (BASE_DESIGN 3: a need's rooms repeat, so each copy must earn its name too): a need met in
    * that room's slot, a supply taken at its post, an egg laid or hatched in that Hatchery, a pass through that Garden
    * Gate. Indexed like `rooms`.
    */
@@ -798,7 +798,7 @@ export class CareSim {
   private workLen(k: Keeper, need: NeedKind): number { return Math.round(WORK[need] * (k.specialty === need ? SPECIALIST_TIME : 1)); }
 
   /**
-   * Count one use of a room or structure (stats.used, #11), and of the room itself (`room`: stats.usedRoom, plan S6b):
+   * Count one use of a room or structure (stats.used, #11), and of the room itself (`room`: stats.usedRoom, BASE_DESIGN 3):
    * travel.ts counts the lift's rides and the gate's passes here too, life.ts the hatches, garden.ts the arrivals.
    */
   use(kind: RoomKind | Structure, room: Room | null = null): void {
@@ -848,7 +848,7 @@ export class CareSim {
   }
 
   /**
-   * The room a need's supply comes from (plan S6b: any hearth, tub or ball box serves): the one making the whole trip
+   * The room a need's supply comes from (BASE_DESIGN 3: any hearth, tub or ball box serves): the one making the whole trip
    * shortest -- to it, then on to `stand` (the dragon's stand spot) -- ties to the lower room id; null if it needs none.
    */
   private supplyRoom(need: NeedKind, from: Spot, stand: Spot): Room | null {

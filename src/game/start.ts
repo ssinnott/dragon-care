@@ -1,5 +1,5 @@
 // The base a new game starts from, and the one view=base and tools/sim-check.ts run: the need rooms, repeated on the
-// floors (a room meets one need, and a need's rooms repeat: plan S6b), the hatchery, the riders' rooms and the Garden
+// floors (a room meets one need, and a need's rooms repeat: BASE_DESIGN 3), the hatchery, the riders' rooms and the Garden
 // Gate (docs/BASE_DESIGN.md 3), seven dragons -- one of each element, every one newly adult, 0 days into the stage (#9:
 // "start with a young adult dragon of each kind"; BASE_DESIGN's Decisions: *young adult* is the adult stage's first
 // day), each in a slot of its own need's room -- and the four named keepers, each at a fixed station. Views that need
@@ -11,7 +11,7 @@ import type { Stage } from '../art/dragon/stages.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
 
 export const START_ROOMS: readonly RoomPlace[] = [
-  // the barn (plan S6b, "fewer floor changes"): each room meets one need, and the need rooms are repeated so that a
+  // the barn (BASE_DESIGN 3, 4.7: "fewer floor changes"): each room meets one need, and the need rooms are repeated so that a
   // dragon's needs are met on the floor it stands on -- the ground and upper floors have all five, one module each; the
   // hayloft has food, love and sleep, and the Hatchery in its west corner, under the roof's low slope (babies fit there,
   // tail to the slope; a grown dragon does not); module 2 on every floor is the Dragon Lift, and the hayloft's module 5
@@ -62,7 +62,7 @@ export const START_DRAGONS: readonly DragonPlace[] = [
 
 /**
  * A keeper: which of the four named cast (docs/KEEPERS.md 2) they are, the need they're best at (4.4) and the room
- * they wait in, their station (the nth of its kind: fixed, plan S6b -- BEA the ground floor's kitchen, TOMAS the upper
+ * they wait in, their station (the nth of its kind: fixed, BASE_DESIGN 3 -- BEA the ground floor's kitchen, TOMAS the upper
  * floor's grooming parlour, PIP its romp room, IRIS the hayloft's lamp dorm; the supplies come from whichever hearth,
  * tub or ball box makes a job's trip shortest: sim.ts). Bea, Tomas, Iris and Pip -- the base's one job each, same as the yard's -- with Pip, the
  * apprentice who "pets the babies and cheers the others on", standing in for play; nobody specialises in a bath (no

@@ -67,7 +67,7 @@
 //                   (The garden's green is the hedge and the lawn behind the path, the grass strip below it: never a
 //                   floor. Its path is FLOORS.path, gated by (i) and (Ki) with the straw.) The mission scene's ground
 //                   (surfaces.ts ROAD_SCENE) is gated as it is drawn, at every hour: never through the night table.
-//                   The mission regions' climates (plan S9a; surfaces.ts CLIMATE_BACKDROPS, drawn by backdrops.ts) are
+//                   The mission regions' climates (ART_BIBLE 5.10; surfaces.ts CLIMATE_BACKDROPS, drawn by backdrops.ts) are
 //                   backdrops too: every layer of each climate at each phase (sky bands, far ridge, near forms, weather
 //                   marks, the caves' lamp pool) is held lighter than every dark body; the cave mouth is a prop. They
 //                   are phased (each climate has its own night) and drawn only in the mission screens, never into the
@@ -870,10 +870,10 @@ function lighterBy(a: string, b: string): number {
   list.push(['garden hedge', BACKDROPS.hedge], ['garden lawn', BACKDROPS.lawn], ['garden trunk', BACKDROPS.trunk], ['garden fence', BACKDROPS.fence], ['garden mound', NEST],
     ['lantern ring inner', LANTERN_RINGS[0]], ['lantern ring outer', LANTERN_RINGS[1]]);
   // (the mission scene's ground, under and below the road the team walks: the road's edge line, its slab, the grass
-  // strip below it in the green climates, the earth; plan S9)
+  // strip below it in the green climates, the earth; BASE_DESIGN 6)
   list.push(['road edge', ROAD_SCENE.edge], ['road slab', ROAD_SCENE.slab], ['road grass', ROAD_SCENE.grass], ['road earth', ROAD_SCENE.earth]);
   const props: [string, string][] = Object.entries(PROPS).map(([k, hex]) => [`prop ${k}`, hex]);
-  // (night, plan S6c: every wall, the stone, the garden and every prop by moonlight -- surfaces.ts NIGHT -- and each of
+  // (night, BASE_DESIGN 7: every wall, the stone, the garden and every prop by moonlight -- surfaces.ts NIGHT -- and each of
   // the two stepped mixes toward it, gated like the day's; the sky, hills, clouds and rings have their own phases, and
   // the mission scene's ground is not the barn's: the watch overlay draws ROAD_SCENE as it is at every hour, never
   // through NIGHT (missionview.ts drawRoad), so it needs no night entry and has no night steps -- its night is its
@@ -897,7 +897,7 @@ function lighterBy(a: string, b: string): number {
     const ink = okDiff(hex, INK), inkOk = wcount(`(w) ${what} / ink`, ink >= OKL_MIN);
     out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${what.padEnd(28)} ${hex}  L ${lumOf(hex).toFixed(3)}  least ${pct(least)} ${apart ? 'apart  ' : 'lighter'} (${by})  ${okf(ink)} from ink`);
   }
-  // (the mission regions' climates, plan S9a: every layer of each climate's picture at each phase -- the three sky
+  // (the mission regions' climates, ART_BIBLE 5.10: every layer of each climate's picture at each phase -- the three sky
   // bands, the far ridge, the near forms and their second colour, the weather marks, and the caves' lamp pool -- each
   // lighter than every dark body; the cave mouth is a dark mouth, a prop, either way. One line per climate and phase.)
   out.push(' the mission climates (src/game/surfaces.ts CLIMATE_BACKDROPS; backdrops.ts drawClimate): sky top / middle / low, ridge, near, detail, marks');
@@ -941,13 +941,13 @@ function lighterBy(a: string, b: string): number {
     ...Object.entries(PROPS).map(([k, h]) => [`PROPS.${k}`, h] as [string, string])];
   for (const [what, hex] of needs) if (NIGHT[hex] === undefined) noNight.push(`${what} ${hex}`);
   const moonlit = Object.entries(NIGHT).filter(([d, n]) => d !== n).length;
-  head(`(w) NIGHT  (plan S6c: the one night table, a day colour to its night colour -- ${Object.keys(NIGHT).length} entries, ${moonlit} moonlit, ${Object.keys(NIGHT).length - moonlit} the same on purpose; each night colour and its two stepped mixes are gated above, "night k/3")`);
+  head(`(w) NIGHT  (BASE_DESIGN 7: the one night table, a day colour to its night colour -- ${Object.keys(NIGHT).length} entries, ${moonlit} moonlit, ${Object.keys(NIGHT).length - moonlit} the same on purpose; each night colour and its two stepped mixes are gated above, "night k/3")`);
   const miss = wcount('(w) every wall, backdrop and prop colour has a night colour', noNight.length === 0);
   out.push(`${miss ? '  ok  ' : '  FAIL'} night entries: ${miss ? `every wall, backdrop and prop colour (${needs.length} fields, and every barn and garden colour gated above) has one` : `none for ${[...new Set(noNight)].join(', ')} (add it to surfaces.ts NIGHT)`}`);
   const floors: [string, string][] = [...Object.entries(FLOORS).map(([k, h]) => [`FLOORS.${k}`, h] as [string, string]), ['STRAW_SEAM', STRAW_SEAM], ['PATH_EDGE', PATH_EDGE]];
   const moved = floors.filter(([, h]) => NIGHT[h] !== undefined && NIGHT[h] !== h);
   const kept = wcount('(w) no floor changes at night', moved.length === 0);
-  out.push(`${kept ? '  ok  ' : '  FAIL'} floors: ${kept ? `${floors.map(([k]) => k).join(', ')} the same by night (a floor is never moonlit: plan S6c N2)` : `${moved.map(([k, h]) => `${k} ${h} -> ${NIGHT[h]}`).join(', ')} change at night`}`);
+  out.push(`${kept ? '  ok  ' : '  FAIL'} floors: ${kept ? `${floors.map(([k]) => k).join(', ')} the same by night (a floor is never moonlit: BASE_DESIGN 7)` : `${moved.map(([k, h]) => `${k} ${h} -> ${NIGHT[h]}`).join(', ')} change at night`}`);
   const odd = Object.keys(NIGHT).filter((k) => !/^#[0-9a-f]{6}$/.test(k) || !/^#[0-9a-f]{6}$/.test(NIGHT[k]));
   const keyed = wcount('(w) the night table is keyed by #rrggbb', odd.length === 0);
   out.push(`${keyed ? '  ok  ' : '  FAIL'} keys: ${keyed ? 'every entry #rrggbb in lower case, as the pens are given colours' : `not #rrggbb: ${odd.join(', ')}`}`);
@@ -989,7 +989,7 @@ for (const e of DRAGON_ELEMENTS) {
   out.push(`${bad ? '  FAIL' : '  ok  '} egg-lie    every egg lies against the nest's straw alone: the ${seen} pixels round its ink ring over its ${new Set(WOBBLE).size} wobbles, all in the heap (${NEST_RX} x ${NEST_RY} px), over the band, off the strands${bad ? ` -- ${bad}` : ''}`);
 }
 
-// ---------- (x) the big baddies (src/game/baddies.ts, plan S9/S9a; the watchable scene: src/game/missionview.ts) ----------
+// ---------- (x) the big baddies (src/game/baddies.ts, ART_BIBLE 5.10; the watchable scene: src/game/missionview.ts) ----------
 // (S9a) Every fill on a baddie's silhouette edge (BADDIE_EDGE) keeps >= 25 % luminance from the mission road
 // (FLOORS.road) and from every band of its home climate (the three sky bands, the far ridge, the near forms and their
 // second colour) at every phase, so it reads on the road and against its region at any hour; every fill keeps >= 6
@@ -1028,7 +1028,7 @@ for (const id of BADDIE_IDS) {
 }
 {
   const ground: [string, string][] = [['road', FLOORS.road], ['road slab', ROAD_SCENE.slab], ['road grass', ROAD_SCENE.grass], ['road earth', ROAD_SCENE.earth]];
-  out.push(` in the watchable scene (plan S9: every fill of artseams.ts BADDIE_FILLS >= ${LUM_MIN * 100}% in luminance from the road ${FLOORS.road}, the scene's ground and its region's backdrop bands at every phase (artseams.ts climateBands); >= ${OKL_MIN} Oklab L from the ink ${INK})`);
+  out.push(` in the watchable scene (BASE_DESIGN 6: every fill of artseams.ts BADDIE_FILLS >= ${LUM_MIN * 100}% in luminance from the road ${FLOORS.road}, the scene's ground and its region's backdrop bands at every phase (artseams.ts climateBands); >= ${OKL_MIN} Oklab L from the ink ${INK})`);
   for (const id of Object.keys(BADDIE_FILLS) as BaddieId[]) {
     const climate = REGIONS.find((r) => r.baddie === id)!.climate;
     const against: [string, string][] = [...ground];

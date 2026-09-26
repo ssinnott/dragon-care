@@ -37,8 +37,8 @@ it is doing; the anim plays with its root motion pinned (`KeeperAgent.pinX`), si
 itself, and a walk or carry plays at the keeper's pace over the look's own walk speed (`KeeperPlayer.setSpeed`: Bea's
 0.55 px a frame walk at 1.82x for the base's 1 px, 1.6x that on a Rush), so the feet no longer skate. A keeper who
 reaches the stand spot before the dragon stands in `watch` until it walks in, and one held at the Dragon Lift's bay
-stands in `idle`. On a mission (plan S8) a rider carries a saddle (the mission art kit's `SADDLE`, S9a) from the Tack
-Room up to the Aerie and back, and the egg a team brings home down to its nest, in `carry`; takes the saddle down or
+stands in `idle`. On a mission (`docs/BASE_DESIGN.md` 5) a rider carries a saddle (the mission art kit's `SADDLE`, S9a) from the Tack
+Room up to the Aerie and back, and the egg a team brings home down the left tower and up the centre ladder to its nest in the hayloft's Hatchery, in `carry`; takes the saddle down or
 hangs it back in `hold`; and rests in the Bunks in `idle`; away, a rider is not drawn in the barn (the watchable scene
 draws the team on its road, each rider with the saddle in the near hand: ART_BIBLE 5.11). This is a plainer join than
 the yard's: it skips the plan (6.3), so a base keeper's stand and stroke are not
@@ -48,7 +48,11 @@ proven eye-clear or on the mark the way the yard's and the two audits' are. **Th
 ladders, and doing a chore with E from the same stand spot a keeper sent there uses -- marked by a 7 x 5 arrow in the
 keeper's own top colour over the head (where the rush mark goes: a keeper held is never rushed). A rider on a
 mission's trip (mustering, away, landing) can't be taken (a toast says why), and a keeper held by hand is never picked
-to ride. The cast has no climb anim, so a climb, by hand or not, shows `idle` (a stand-in). **Not built:** a player-facing game loop
+to ride; a keeper held serves in any copy of a need's room, and E at any hearth, tub or ball box takes its supply (the
+need rooms repeat on the floors: `docs/BASE_DESIGN.md` 3). The cast has no climb anim, so a climb, by hand or not, shows `idle` (a stand-in: a
+follow-up). **The grumpy miller is a mission character:** he stands at the `miller` stop of a road that has one, grumpy
+(heavy flat brows, arms folded, turned a little away) until the Charm rider's wave talks him round, then tips his cap
+(`docs/BASE_DESIGN.md` 6, ART_BIBLE 5.10); he has no walk yet (a follow-up) and is never a keeper (`NPC_IDS`). **Not built:** a player-facing game loop
 for the yard itself (it still runs on its own: nothing lets a player send one of these keepers to a dragon from it),
 props for the keepers' stations, keepers in the habitat view, and night: Iris tucks in whoever is sleepy.
 A plan (6.3) is made the first time a keeper does a job for a look, in the tick the job starts (tens of ms; a game
@@ -95,7 +99,7 @@ the walk's px per frame.
 | **Iris**, the night keeper | tucks in the sleepy | NAVIGATOR: finds the way through fog | slight | periwinkle nightcap with a cream pom-pom, a bob, a mauve cardigan, rose slippers | 1.1, 0.6 |
 | **Pip**, the apprentice | pets the babies, and cheers the others on | NIMBLE: slips through a narrow gap | a child, about 58 px | ginger tufts, leaf-green tee, denim overalls, red sneakers | 0.8, 0.75 |
 
-**Riders** (the base's missions, `docs/BASE_DESIGN.md` 5; plan S8): the four keepers are the riders, each with the
+**Riders** (the base's missions, `docs/BASE_DESIGN.md` 5): the four keepers are the riders, each with the
 skill above (`src/game/regions.ts` `KEEPER_SKILL`). A dragon's **partner** is the keeper whose job is its element's own
 need -- Bea for fire (food), Tomas for spike, rock and slinkwing (love), Pip for lightning (play), Iris for dusk
 (sleep); water has none, as nobody has baths -- and a pair of partners goes 5 % better. Each dragon sent takes its

@@ -128,7 +128,7 @@ export interface Room { id: number; kind: RoomKind; part: Part; floor: number; x
 
 /**
  * Whether a room is in the hayloft's west end module, under the gambrel's low slope (x 172-226 of it steep): no grown
- * dragon fits there, but a baby does, tail to the slope -- the Hatchery's place (plan S6b: the barn's other modules are
+ * dragon fits there, but a baby does, tail to the slope -- the Hatchery's place (BASE_DESIGN 3: the barn's other modules are
  * need rooms; its babies face into the barn, their sub-slots 60 and 120 px in, its nests 60, 100 and 140 px in).
  */
 export function underSlope(r: { part: Part; floor: number; x0: number }): boolean { return r.part === 'barn' && r.floor === 2 && r.x0 === BARN_X; }
@@ -194,7 +194,7 @@ export function waitX(r: Room): number { const i = ROOM_INFO[r.kind], w = (r.par
 export function fitsSlot(slot: Slot, stage: Stage): boolean { return slot.baby === (stage === 'baby'); }
 
 /**
- * The Hatchery's nests (3.2): three, on its floor's band -- under the hayloft's west slope (the start's: plan S6b) 60,
+ * The Hatchery's nests (3.2): three, on its floor's band -- under the hayloft's west slope (the start's: BASE_DESIGN 3) 60,
  * 100 and 140 px in (x 228, 268 and 308), in a barn module elsewhere 30, 80 and 130 px in.
  */
 export const NESTS = 3;
