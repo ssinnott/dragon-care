@@ -117,17 +117,56 @@ Aerie deck, and the lift between them; never a tower.
 meets it there (section 3's slots, 4.4). It walks by its walk anim's own root motion, frame by frame (`src/game/gait.ts`:
 the body moves exactly as far each step as the anim's planted paws slide, so nothing skates; spike's creep and
 slinkwing's pointer pause stand still for whole frames), and a reversal is a paper turn in place (6 steps, the facing
-flipped halfway: the yard's). At the lift it waits on the landing just outside the bay, facing it; callers line up nose
-to tail (the one behind drawn over the rump of the one ahead, never over an eye) and step up as the car takes the one
-ahead. The car comes for it, it walks in to the car's middle, turns to face the side it will walk off, rides, and walks
-off. The car takes a rushed dragon's call first, then any call waiting a minute or more, then a caller on the floor the
-car is at, then the oldest call (`src/game/travel.ts`).
+flipped halfway: the yard's). Among its jobs in the same tier it takes one met on its own floor before one a ride away.
+
+**Waiting for the car.** A dragon going up or down waits at its side's landing, facing the bay, its snout just short
+of the bay's edge. The ones waiting there, and the ones held at the bay's edge (the bay rule, below), stand in a
+**line**: each at the place nearest the bay where its body covers no dragon's eye (ART_BIBLE 1.4) -- not the eye of a
+dragon in a slot beside the landing (or of one coming to that slot), of one standing there, or of one ahead of it in
+the line, whose rump its head is over (nose to tail: the mean of their half-bodies and 16 px apart, 88 px for two
+adults). Each one waiting is drawn over the ones ahead of it and over the dragons in the slots; where no such place is
+left (the room beside the landing full), it may stand drawn *behind* the dragons about it instead, where none of their
+bodies covers its eye. A dragon on its way to the line may have to walk back to its place (an evictee leaving the slot
+beside the landing that its evicter is coming to); one already waiting only ever steps up. A slot beside a landing is
+not taken while a dragon waits over it.
+
+What is left, and why. A dragon walking past one waiting (an alighter walking off toward the landing it came to, or a
+crosser through a line) covers it for the moment it takes to pass. And a landing has room for only so many dragons
+with every eye clear: the west landing of the ground and upper floors stands back to back with the Hearth Kitchen's
+and the Romp Room's second slot (x 408, facing west: 27 px from the landing's front, so no drawing order keeps both
+eyes clear), and while that slot is held it has room for one waiting adult (behind both slots' dragons, x 319). When
+more queue there than it has room for -- a second or third caller, a crosser held at the bay's edge, one leaving the
+slot beside it -- one stands over another's eye until the car takes the one ahead: about 29 s in 30 minutes on average
+(seeds 1 to 18), single moments up to 80 s (4.7, 8.1). Only fewer waiting (a car that keeps up) or a landing moved
+clear of the slots (the building's layout, section 3) would end it; placing rules tried on top of the line (a crosser
+counted in it, a caller waiting in its slot until a clear place frees, one past its place turning back) each moved the
+moments between seeds without making them fewer, and some let needs empty or two dragons stand waiting on each other.
+
+**The car.** It takes the waiting dragons one at a time, in this order: a rushed dragon's call first; then the one
+going for the most pressing need; then any call waiting a minute or more; then, while its last rider walks off, a
+caller who can walk in behind it; then a caller on the floor the car is at; then the front of a landing's line; then
+the oldest call. It comes for its rider, who walks in to the car's middle once no other dragon is in the bay, turns
+to face the side it will walk off, rides, and walks off; the car is its rider's until it has walked clear of the bay
+(`src/game/travel.ts`). A caller on the far side may follow the last rider in while it walks off, nose to tail, its
+body 8 px behind that one's; a rider turns in the car only once the one walking off is clear of its turn.
 
 **The bay rule.** The lift bay (x 488 to 648) is also the way across each barn floor, so one rule keeps a moving car
-clear of everyone: nobody (a keeper, or a dragon other than the car's rider) steps into the bay while the car moves past
-their floor, but waits at its edge (a keeper at x 478 or 658, a dragon a half-body out); the car sets off only when
-nobody stands in the bay on any floor from where it is to where it goes; a departure blocked for 4 s closes the bay to
-newcomers until the car goes; and anyone already in the bay walks on out, never stopping there.
+clear of everyone and the shaft never showing one dragon over another:
+- nobody (a keeper, or a dragon other than the car's rider) steps into the bay while the car moves past their floor,
+  but waits at its edge (a keeper at x 478 or 658, a dragon in that side's line); nor, once a rider is walking in,
+  on a floor its ride will pass, so the car finds the way clear when it goes;
+- the car sets off only when nobody stands in the bay on any floor from where it is to where it goes; a departure
+  blocked for 4 s closes the bay to newcomers until the car goes; anyone already in the bay walks on out, never
+  stopping there;
+- while the car stands at a floor for its rider there (about to board, walking in, aboard, walking off), no other
+  dragon steps into the bay there -- but a dragon held at the bay's edge 40 s in all goes before the next rider boards;
+- a dragon steps into the bay only if everyone in it walks its way (it follows them, nose to tail, its body 8 px
+  behind the one ahead -- and behind one ahead stepping in with it, so two let go from the bay's edge at once go in one
+  after the other), never into one coming the other way or standing there; a crosser that has stepped through a line
+  toward the bay has the right of way, paused behind one ahead of it too: the car does not set off past its floor, no
+  rider boards there, and nobody steps in from the other side until it has crossed;
+- a dragon near the bay does not start a turn that would swing its body into a bay the car is using, or over one in
+  it; it waits at the edge.
 
 ---
 
@@ -169,8 +208,9 @@ grown dragon or up to two babies; the Hatchery has baby sub-slots only. A keeper
 spot**: in front of its snout (58 px for an adult), kept inside the room. A dragon going for a need **reserves** the
 room's lowest free slot of its size and walks there; after its job it **lingers** in that slot (there is no home room)
 until it leaves for another need. If the room is full, it moves on a lingerer (one with nowhere to be, no act and no
-keeper coming: the lowest id), who walks to the nearest free slot elsewhere; a Rush may also move on a holder whose
-keeper has not started work (the lowest in the queue). A dragon standing in a room that meets another of its jobs in
+keeper coming: the lowest id), who walks to the nearest free slot elsewhere (one on its own floor first: a ride is
+counted 600 px more, for the car's time); a Rush may also move on a holder whose keeper has not started work (the
+lowest in the queue). A slot beside a lift landing is not free while a dragon waiting there stands over it (2). A dragon standing in a room that meets another of its jobs in
 the same tier as its most pressing one takes that job first, and saves the walk. The new game starts with one dragon
 per need room's first slot, the three love dragons filling the Grooming Parlour. Between jobs a keeper waits in their own
 room at a spot clear of every slot's body, whatever the stage in it (the middle of the Hearth Kitchen, the Romp Room
@@ -210,7 +250,9 @@ lightning's static (its crackle, then the zap: 3.5); a hungry dragon begs.
 - **Taking a job.** A free keeper takes the highest job in the queue. Among jobs that are close in priority, a keeper
   prefers their **specialty** (the cook feeds, the groomer grooms, the handler plays and bathes) and the nearer dragon.
 - **When.** A keeper goes to a job once its dragon is going for it, to a slot in the need's own room, and is there or
-  nearly there (300 px of route left, so they meet about when it arrives), or the job is rushed.
+  nearly there (300 px of route left, so they meet about when it arrives) -- or, for a rushed job, once the dragon is
+  past its lift ride (the keeper runs, so still meets it; no keeper stands at the stand spot while the dragon queues
+  for the car).
 - **Doing it.** The keeper fetches the **supply** from the room's post (a bowl at the hearth, a ball from the box by
   the Romp Room's wheel, a bucket filled at the Bathhouse's tub), walks to the slot's stand spot and, if the dragon
   is not there yet, **waits** for it (watching it come). The job starts the moment the dragon stands in its slot,
@@ -221,12 +263,14 @@ lightning's static (its crackle, then the zap: 3.5); a hungry dragon begs.
   - sleep: `sleep`, or dusk's `tuckin`. The keeper leaves once the dragon is down, and it sleeps on.
 - **After.** The need refills while the job runs. The keeper takes the next job, or goes back to their station.
 
-**4.5 Rush.** Tap a bubble (or its chip in the queue) and that job jumps to the top. The nearest keeper runs to it, at
-1.6 times their pace:
+**4.5 Rush.** Tap a bubble (or its chip in the queue) and that job jumps to the top. Its dragon sets off for it at
+once (taking a slot in the room from its lowest holder if the room is full, section 3) and its call for the lift goes
+first. As soon as the dragon is near (4.4's "When"), the nearest keeper runs to it, at 1.6 times their pace:
 - a free keeper, if there is one;
 - otherwise the keeper on the lowest job, which goes back into the queue.
 
-It costs nothing but the job it bumps.
+It costs nothing but the job it bumps. Rushed again and again (one every 30 s), the one car's queue is what a Rush
+reorders, so a dragon not rushed can wait long enough for a need to touch empty (8.1).
 
 **4.6 Rooms don't heal; keepers do.** A need rises only through a keeper's act, in that need's room (#7): the dragon
 walks there, and the keeper meets it. A room no longer restores the need it meets (the regeneration of the first slices
@@ -236,6 +280,34 @@ run).
 
 **4.7 Capacity.** A queue that keeps growing means too few keepers or the wrong rooms: hire, or build. Riders away on
 a mission are not keeping, which is the price of sending a team (5.6).
+
+**The Dragon Lift is the barn's limit today, not the keepers.** One car carries one dragon at a time, and a ride holds
+it about 15 s: the rider's walk in to the car's middle (about 130 px) and off until clear of the bay (about 150 px),
+both at the dragon's own walking pace (4.9: never hurried), plus the ride itself (under a second a floor). For about a
+fifth of its time the car also waits for a dragon crossing the bay (the ground and upper floors' rooms lie on both
+sides of it) to clear the floors it must pass. Never idle, it gives about 110 to 120 rides in 30 minutes. Measured on
+the starting base (`npm run sim` section 10, and seeds 1 to 6 or 1 to 18), 30 minutes each:
+
+| Dragons | Average wait | Longest | A need at 0 | The car |
+|---|---|---|---|---|
+| the start's 7 adults | 62 to 98 s | 185 to 307 s | never (18 seeds; nor in two hours, 8 seeds) | 96 % busy, 109 rides |
+| 8 adults | 84 to 110 s | 200 to 335 s | on one seed of six, briefly | 98 to 99 %, 110 to 119 rides |
+| 9 adults | 159 to 189 s | up to 535 s | on every seed | 100 % |
+| 10 adults | 273 to 322 s | 625 to 737 s | on every seed, much of the time | 100 %, 89 rides |
+| 7 adults and 3 babies | 310 to 362 s | 893 to 1036 s | on every seed, much of the time | 100 %, 80 rides |
+| the `ages` preset's 12 | 376 to 421 s | 1116 to 1566 s | nearly always, for someone | 100 %, 79 rides |
+
+So the barn serves **seven grown dragons well and eight at a stretch**. More dragons give the car *fewer* rides, not
+more (more crossings and more dragons moved out of slots hold it), and a baby walks at 0.15 to 0.30 px a frame, so
+its ride holds the car about twice as long as an adult's. What was tried and measured, each within the noise at seven
+and eight dragons: the car at 2.5 px a frame (about 5 s off the average wait at seven; 2 is the cap on that lever),
+closing the bay at once instead of after 4 s, a dragon moved on avoiding a slot across the bay, a stronger own-floor
+preference, and call orders that favour following the last rider in or the car's own floor. One more was measured and
+not built, because it changes when a job opens (4.3): a need met on the floor a dragon stands on opening its job
+early (at 0.65 or 0.8, not 0.5), so one ride serves two needs. It cuts the start's rides by about a quarter (the car
+86 to 87 % busy, waits about 65 s), but ten dragons still run needs empty on every seed. Growing the barn past eight (S5's
+hatchlings, S8's trips to the Aerie) needs a decision first: a second car or a second lift, a cap on the barn's
+dragons, the early-opening rule above with more besides, or slower drains.
 
 **4.8 On screen.**
 - **Bubbles** over the dragons.
@@ -247,26 +319,35 @@ a mission are not keeping, which is the price of sending a team (5.6).
 
 | | |
 |---|---|
-| Base drain | full to 0.5 in 7 minutes of play; a dragon's own need in 3.5 (`HALF_LIFE_S` 420; it was 6 and 3 until S3, see below) |
+| Base drain | full to 0.5 in 7.5 minutes of play; a dragon's own need in 3.75 (`HALF_LIFE_S` 450; it was 6 and 3 until S3, see below) |
 | Keeper pace | 1 px a frame walking, 0.8 climbing, 1.6 times either when rushed |
 | Dragon pace | its walk anim's own: each frame's `move` at the anim's speed 1, 0.28 to 0.54 px a frame for adults (spike 0.28 and slinkwing 0.32 with their pauses, rock 0.30, dusk 0.40, fire and water 0.45, lightning 0.54); no hurrying, even under Rush |
 | Fetching a supply | 40 frames |
 | A job at the dragon | food 200 frames, love 160, play 200, bath 200; sleep: 90 of tuck-in, then 15 s asleep while it refills |
-| A keeper sets off (`LEAD_PX`) | when the dragon has 300 px of route left, or is there, or the job is rushed |
+| A keeper sets off (`LEAD_PX`) | when the dragon has 300 px of route left, or is there; for a rushed job, also once the dragon is past its lift ride |
 | A keeper waits at the stand spot (`WAIT_MAX`) | at most 7200 frames (2 min), then gives the job back |
-| The lift (`LIFT_SPEED`) | 1.5 px a frame (the plan's third lever; it started at 1) |
+| The lift (`LIFT_SPEED`) | 2 px a frame, a floor in 0.93 s (the plan's third lever, 1 to 1.5, taken to its cap of 2) |
 | The bay closes (`BAY_CLOSE`) | after a departure is blocked 240 frames (4 s) |
-| A call is overdue (`OVERDUE`) | after 3600 frames (1 min): it is served before the car's own floor's |
+| A call is overdue (`OVERDUE`) | after 3600 frames (1 min): it is served before the follow-in, the car's own floor and the front of a line |
+| Waiting at a landing (`LANDING_CLEAR`, `DRAGON_EYE`) | the snout 2 px short of the bay; nose to tail behind the one ahead (the mean of their half-bodies and 16 px: 88 px for adults); no body over an eye (an eye 21 to 38 px ahead of an adult's root) |
+| Walking in behind the last rider (`FOLLOW_GAP`) | 8 px, body to body |
+| A dragon moved on picks a slot (`RIDE_PX`) | a ride counted 600 px more than its route: one on its own floor first |
+| A dragon held at the bay's edge (`CROSS_MAX`) | 2400 frames (40 s) in all, and it goes before the next rider on its floor boards |
 
-The two changes from the first numbers were measured (`npm run sim`, 30 minutes on the starting base, section 8.1).
-With the dragons walking and one car between the floors, the car is the barn's bottleneck: about 0.9 rides per job,
-each keeping the car about 13 s (half of it the rider's 152 px walk in, then the ride, then waiting for the bay to
-clear), so the car is busy 95 % of the time. Served strictly oldest call first, the car made empty trips: jobs waited
-131 s on average, and needs ran empty on five of six seeds. Serving a caller on the car's own floor first (with a
-one-minute overdue rule, so nobody waits on for ever) brought that to 81 to 97 s with no need empty; then the plan's
-third and fourth levers, a faster car (1.5) and slower drains (`HALF_LIFE_S` 420), to 55 to 74 s (seeds 1 to 6). Its
-first two levers were tried and did not help: `LEAD_PX` 450 only kept keepers standing longer, and `QUEUE` 0.55 opened
-more jobs and let needs empty.
+The changes from the first numbers were measured (`npm run sim`, 30 minutes on the starting base, section 8.1).
+With the dragons walking and one car between the floors, the car is the barn's bottleneck (4.7). Served strictly
+oldest call first, it made empty trips: jobs waited 131 s on average, and needs ran empty on five of six seeds.
+Serving a caller on the car's own floor first (with a one-minute overdue rule, so nobody waits on for ever), then the
+plan's third and fourth levers, a faster car and slower drains (its first two, `LEAD_PX` 450 and `QUEUE` 0.55, did not
+help), brought that to 55 to 74 s as first built. That car let the next rider walk in through the last one walking
+off, and anyone cross the bay through a rider; the shaft now shows one dragon at a time (the bay rule, 2), which costs
+the car that overlap. Some of it came back: the next rider on the far side follows the last one in, nose to tail; a
+landing's front is the snout's length from the bay, not half a body's; a rider's ride closes the floors it will pass
+while it walks in; a dragon picks a job on its own floor first in the same tier, and one moved on takes a slot on its
+own floor first. The car goes at 2 px a frame. With `HALF_LIFE_S` 420, the fourth lever as planned, a need still
+touched empty on some seeds (one of 18 in 30 minutes; within two hours on seed 2); at 450 none did, so it is 450 -- a
+step past the plan's lever, for the one-dragon shaft the plan did not count on: waits of 62 to 98 s on average over
+seeds 1 to 18, the longest 185 to 307 s, and no need ever empty.
 
 ---
 
@@ -352,7 +433,7 @@ more jobs and let needs empty.
    does either); `t=` freezes it as in every gallery view. The gallery's own keys (the arrows, Space, E, the digits)
    do nothing here, and its arrows step over the base, so a debug view reached with them can still be left.
 
-   ![The built slice, 49 s in, in the start frame: RIPPLE rides the Dragon Lift up to the Romp Room, where Pip waits at its slot's stand spot with a ball; ZAP waits at the ground floor's east landing for the car up to the Lamp Dorm, and WICK at the hayloft's for the car down to the Romp Room; COBBLE walks into the Bathhouse to its slot (Tomas fills the bucket at the tub, out of frame); ECHO walks past BRAMBLE in the Grooming Parlour on its way down to the Bathhouse; Bea waits in the Hearth Kitchen; the job strip](base/base_live.png)
+   ![The built slice, 49 s in, in the start frame: RIPPLE walks off the Dragon Lift's car at the upper floor to the Romp Room, where Pip waits at its slot's stand spot with a ball; ZAP waits at the ground floor's east landing for the car up to the Lamp Dorm, back to back with COBBLE walking into the Bathhouse's first slot (Tomas brings the bucket, out of frame); WICK waits at the hayloft's east landing for the car down to the Romp Room; ECHO walks past BRAMBLE in the Grooming Parlour on its way down to the Bathhouse; Bea waits in the Hearth Kitchen; the job strip](base/base_live.png)
 
    | File | What it is |
    |---|---|
@@ -363,29 +444,41 @@ more jobs and let needs empty.
    | `src/game/start.ts` | the starting base: the rooms of section 3, seven newly adult dragons (one per element, 0 days into adulthood), each in a slot of its own need's room, and the four named keepers |
    | `src/game/presets.ts` | code-built starts for views that need what a new game hasn't got (`ages`: every stage) |
    | `src/game/sim.ts` | the care simulation: the queue, the keepers' trips and jobs (fetch, go, wait at the stand spot, work), and Rush; no drawing, seeded, deterministic; dragons with stable ids, a clock, and its options (seed, day length, start time) |
-   | `src/game/travel.ts` | the dragons on the move: each chooses its need's room and takes a slot there (moving a lingerer on, or bumping a holder for a Rush), walks and turns, queues at a landing, and rides the Dragon Lift; the lift's car and its calls; the bay rule |
+   | `src/game/travel.ts` | the dragons on the move: each chooses its need's room and takes a slot there (moving a lingerer on, or bumping a holder for a Rush), walks and turns, waits in a landing's line where it covers no eye, and rides the Dragon Lift; the lift's car and its calls; the bay rule, and one dragon at a time in the shaft; how deep each dragon is drawn |
    | `src/game/gait.ts` | each element's walk at each stage as a table of per-frame root motion, the pace the simulation walks a dragon at |
    | `src/game/save.ts` | the save format: the whole world as JSON, every reference an id, loaded back exactly (`CareSim.fromSave`); the digest two runs compare |
    | `src/game/rand.ts` | stateless draws (`rngAt(seed, tag, ...keys)`): no RNG state is ever kept or saved |
    | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building (its rooms, the lift's shaft, car and headframe, the ladder bay, the Aerie's deck and gantry), the keepers on the named cast's rig (`docs/KEEPERS.md`), their walks played at their pace, the bubbles and chips |
    | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks, turns and rides) and their anims, the lift's car, the camera, the HUD and the input |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play with its invariants (the bay rule among them), determinism, Rush (and a slot bump), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), and the gait (the walks' tables, a scripted walk as far as the anim carries it) |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen) |
 
-   Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play, 149
-   jobs opened and 143 were done, every one by a keeper (none closed on its own). A keeper started on a job 73.5 s after
-   it opened on average (330.3 s at most), most of it the dragon's own walk and its wait for the lift; no need ever
-   emptied. Keepers who reached the stand spot first waited 7.1 s on average for the dragon, and none gave up. The
-   dragons walked 95 304 px and rode the lift 129 times (a wait at a landing of 76.4 s at most, and a rider held in the
-   car at most 19.5 s while the bay cleared); dragons were held at the bay's edge at most 11.8 s and keepers 12.9 s;
-   44 lingerers were moved on. Every dragon had its needs met in four rooms or more (EMBER, which has no bath need, in
-   four; the rest in five), and the rooms were used 54 (Hearth Kitchen), 50 (Bathhouse), 60 (Romp Room), 33 (Grooming
-   Parlour), 28 (Lamp Dorm) and 129 (the lift) times. (With the dragons in their slots and the rooms restoring their
-   needs, S2's building gave 149 opened, 146 done, 14.5 s and 41.0 s; its checks wanted 30 s and 120 s, and this
-   slice's are 90 s and 400 s: 4.9 says why.) Not in this slice:
+   Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play, 142
+   jobs opened and 136 were done, every one by a keeper (none closed on its own). A keeper started on a job 66.6 s after
+   it opened on average (272.8 s at most), most of it the dragon's own walk and its wait for the lift; no need ever
+   emptied. Keepers who reached the stand spot first waited 7.6 s on average for the dragon, and none gave up. The
+   dragons walked 95 644 px and rode the lift 109 times (a wait at a landing of 88.1 s at most, a rider held in the car
+   at most 15.0 s while the bay cleared); dragons were held at the bay's edge at most 45.2 s and keepers 9.6 s; 37
+   lingerers were moved on. The shaft never showed two dragons one over the other; an eye was under the body of a
+   dragon standing over it 28.8 s in all (12 moments, the longest 16.2 s: section 2's "What is left"). Every dragon had
+   its needs met in four rooms or more (EMBER, which has no bath need, in four; the rest in five), and the rooms were
+   used 50 (Hearth Kitchen), 50 (Bathhouse), 56 (Romp Room), 32 (Grooming Parlour), 26 (Lamp Dorm) and 109 (the lift)
+   times. Over seeds 1 to 18: waits of 62 to 98 s on average, 185 to 307 s at most, no need empty, and an eye covered
+   about 29 s in 30 minutes on average. Over two hours on seeds 1 to 8: no invariant broken, no keeper giving up and
+   no need empty, with single crowded moments of an eye covered up to 80 s. A Rush every 30 s for 30 minutes (seed 1):
+   no need empty, every rushed job done within 113.3 s, keepers standing for rushed dragons 12.1 % of their time; on
+   one of six seeds a need touched empty. Eight adults (seed 1): waits of 106 s on average, no need empty; nine or more
+   empty needs (4.7). (With the dragons in their slots and the rooms restoring their needs, S2's building gave 149
+   opened, 146 done, 14.5 s and 41.0 s; its checks wanted 30 s and 120 s, and this slice's are 80 s and 330 s: 4.9 says
+   why.) Not in this slice:
    - the seven span more than one screen, so the start camera shows some of them and a drag shows the rest; they
      no longer stay put;
    - nothing uses the Hatchery, the riders' rooms or the Aerie yet (section 3's table says which slice does), so no
      dragon rides the lift to the Aerie yet;
+   - one car serves seven grown dragons well and eight at a stretch; more (hatchlings, Aerie trips) need a decision
+     first (4.7);
+   - a dragon walking past one waiting at a landing (an alighter walking off toward it, a crosser through a line)
+     covers it for the moment it takes to pass, and a landing crowded past its room leaves one over another's eye
+     until the car takes the one ahead (section 2);
    - the base is the fixed starting one (or a preset), and nothing is stored yet: the save format exists and is
      checked, but nothing writes it to the browser;
    - no building of rooms (the rooms are section 3's fixed set), and no missions.

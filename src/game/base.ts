@@ -21,8 +21,8 @@ import { startSpec, buildSim } from './presets.ts';
 import { worldKey, fnv1a } from './save.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import { WORLD_W, WORLD_H, feetY } from './layout.ts';
-import { walking, landingPlace } from './travel.ts';
-import { gaitOf } from './gait.ts';
+import { walking, feetOf } from './travel.ts';
+import { gaitOf, wrapT } from './gait.ts';
 import { SOON, tierOf, chargeOf } from './needs.ts';
 import type { NeedKind } from './needs.ts';
 import { drawBuilding, drawPlates, drawLiftCar } from './building.ts';
@@ -113,13 +113,10 @@ export class BaseView {
 
   /**
    * A dragon's feet: on the lift's car while it rides, else its floor's straw band, a px apart from its neighbours' so
-   * the y-sort never ties -- and in a landing's queue a px deeper per place, so each one behind is drawn over the rump
-   * of the one ahead, never the other way over its eye.
+   * the y-sort never ties -- and waiting in a landing's line deeper, a px more per place, so each one waiting is drawn
+   * over the ones ahead of it and the dragons in the slots, whose eyes its place keeps clear (travel.ts feetOf).
    */
-  private feet(d: Dragon): number {
-    if (d.move === 'ride') return this.sim.lift.y;
-    return feetY(d.f, d.move === 'call' ? 2 + Math.min(3, landingPlace(this.sim, d).i) : (d.id % 3) - 1);
-  }
+  private feet(d: Dragon): number { return feetOf(this.sim, d); }
 
   /**
    * Match the cast to the simulation's dragons: a pet for a dragon it hasn't seen, none for one that's gone, and a
@@ -182,8 +179,8 @@ export class BaseView {
       if (v.walkSeq !== d.walkSeq) {
         p.player.play('walk', { restart: true, speed: 1, blend: 8 });
         // (a view that meets a bout already under way -- a world loaded mid-walk -- catches the anim up to it: its
-        // tick this step then lands on the bout's own frame)
-        const n = (d.gaitT - 1) % gaitOf(d.element, d.stage).len;
+        // tick this step then lands on the bout's own frame, wrapped as the walk loops, back to its loop start: gait.ts moveAt)
+        const n = wrapT(gaitOf(d.element, d.stage), d.gaitT - 1);
         for (let i = 0; i < n; i++) p.player.tick();
         p.anim = 'walk'; v.walkSeq = d.walkSeq; v.waking = false; p.hold = 0;
       }
@@ -225,10 +222,14 @@ export class BaseView {
     ctx.translate(-cx, -cy);
     drawLiftCar(ctx, this.sim.lift.y);
     // the cast, y-sorted by the feet; keepers stand a step behind the dragons they work with, so a dragon's head is
-    // never covered (ART_BIBLE 1.4: nothing covers the eye)
+    // never covered (ART_BIBLE 1.4: nothing covers the eye) -- and one on a ladder, behind the dragons of both floors it
+    // climbs between (sorted a step behind the upper floor's), so a head at a landing beside the ladder stays clear
     const cast: { y: number; pet?: Pet; keeper?: number }[] = [];
     for (const { pet: p } of this.cast.values()) { const [a, b] = extentX(p); if (seen(a - 24, b + 24, p.y - 110, p.y + 12)) cast.push({ y: p.y, pet: p }); }
-    this.sim.keepers.forEach((k, i) => { const y = k.climbing ? k.y : k.y - 3; if (seen(k.x - 30, k.x + 30, y - 100, y + 8)) cast.push({ y, keeper: i }); });
+    this.sim.keepers.forEach((k, i) => {
+      const y = k.climbing ? k.y : k.y - 3, key = k.climbing && k.legs.length ? Math.min(k.y, feetY(Math.max(k.f, k.legs[0].f))) - 3 : y;
+      if (seen(k.x - 30, k.x + 30, y - 100, y + 8)) cast.push({ y: key, keeper: i });
+    });
     cast.sort((a, b) => a.y - b.y);
     this.budget.begin(cast.filter((c) => c.pet).length, this.frame);
     let slot = 0;
@@ -301,7 +302,8 @@ export class BaseView {
   tap(sx: number, sy: number): void {
     for (const c of this.chips) if (hit(c.r, sx, sy)) { this.sim.rush(c.job); this.focus(c.job.dragon); return; }
     const wx = sx + Math.round(this.camX), wy = sy + Math.round(this.camY);
-    for (const b of this.bubbles) if (hit(b.r, wx, wy)) { this.sim.rush(b.job); return; }
+    // (the top-most bubble first: later ones are drawn over earlier ones)
+    for (let i = this.bubbles.length - 1; i >= 0; i--) { const b = this.bubbles[i]; if (hit(b.r, wx, wy)) { this.sim.rush(b.job); return; } }
     const pt = { x: 0, y: 0 };
     for (let i = this.sim.dragons.length - 1; i >= 0; i--) {
       const d = this.sim.dragons[i], v = this.cast.get(d.id);

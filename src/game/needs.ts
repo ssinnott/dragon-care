@@ -23,11 +23,12 @@ export function hasNeed(el: DragonElement, k: NeedKind): boolean { return !(el =
 /** Fixed simulation steps per second. */
 export const FPS = 60;
 /**
- * Seconds of play a full need takes to fall to QUEUE at the base rate (4.9: tuning, not law). 420 since S3 (was 360):
- * with dragons walking to their needs' rooms and one lift between the floors, 360 kept the car busy nearly every step
- * and the waits long (measured: docs/BASE_DESIGN.md 4.9 and 8.1).
+ * Seconds of play a full need takes to fall to QUEUE at the base rate (4.9: tuning, not law). 450 since S3 (was 360):
+ * with dragons walking to their needs' rooms, one lift between the floors and one dragon at a time in its shaft, 360
+ * kept the car busy nearly every step and the waits long, and 420 still let a need empty on some seeds (measured:
+ * docs/BASE_DESIGN.md 4.9 and 8.1).
  */
-export const HALF_LIFE_S = 420;
+export const HALF_LIFE_S = 450;
 /** The base drain per step: 1 -> QUEUE in HALF_LIFE_S. */
 export const BASE_DRAIN = 0.5 / (HALF_LIFE_S * FPS);
 /** Stage scales every drain: a baby needs more, an elder less. */

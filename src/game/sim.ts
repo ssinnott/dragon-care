@@ -11,7 +11,7 @@ import { NEEDS, QUEUE, OWN_NEED, drainRate, hasNeed, moodOf, tierOf, fullNeeds }
 import type { NeedKind, Needs } from './needs.ts';
 import { ROOM_INFO, REACH, LIFT_X0, LIFT_X1, placeRooms, postX, waitX, route, feetY, clampToFloor, standSpot, fitsSlot } from './layout.ts';
 import type { Room, RoomPlace, RoomKind, Leg, Spot, Slot } from './layout.ts';
-import { NEED_ROOM, LEAD_PX, WAIT_MAX, KEEPER_HALF, stepTravel, arrived, remainingCost, retarget, raiseCall, bayShut, inBay } from './travel.ts';
+import { NEED_ROOM, LEAD_PX, WAIT_MAX, KEEPER_HALF, stepTravel, arrived, remainingCost, ridesLeft, retarget, raiseCall, bayShut, inBay } from './travel.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
 import { SAVE_VERSION, SaveVersionError, worldKey } from './save.ts';
 import type { SaveV } from './save.ts';
@@ -358,8 +358,10 @@ export class CareSim {
    */
   private assign(): void {
     for (const j of this.queue()) {
-      if (!this.keepers.some((k) => !k.job)) return;
       if (j.keeper || !this.servable(j)) continue;
+      // (a rushed job, its dragon near now: a keeper runs to it, off another job if none is free: 4.5)
+      if (j.rushed) { this.sendRushed(j); continue; }
+      if (!this.keepers.some((k) => !k.job)) return;
       let best: Keeper | null = null, bestCost = Infinity;
       for (const k of this.keepers) {
         if (k.job) continue;
@@ -372,20 +374,22 @@ export class CareSim {
 
   /**
    * A job a keeper can go to (plan S3): its dragon is going for it, to a slot in the need's own room, and is there, or
-   * nearly (LEAD_PX of route left), or the job is rushed; the dragon is awake; and no other keeper is on it.
+   * nearly (LEAD_PX of route left) -- or, rushed, past its lift ride (the keeper runs: they meet about when it
+   * arrives, and no keeper stands waiting while it queues for the car); the dragon is awake; and no other keeper is on it.
    */
   private servable(j: Job): boolean {
     const d = j.dragon;
     if (d.goalJob !== j.id || !d.slot || this.rooms[d.slot.room].kind !== NEED_ROOM[j.need]) return false;
     if (d.asleep > 0 || (d.act && d.act.need === 'sleep')) return false;
     if (this.jobs.some((o) => o !== j && o.dragon === d && o.keeper)) return false;
-    return j.rushed || arrived(this, d) || remainingCost(this, d) <= LEAD_PX;
+    return arrived(this, d) || remainingCost(this, d) <= LEAD_PX || (j.rushed && !ridesLeft(this, d));
   }
 
   /**
    * Rush (4.5): the job jumps the queue; its dragon, if it wasn't going for it, goes for it at once (taking a slot in
-   * the room from its lowest holder if the room is full, and calling the lift at priority); and the nearest keeper runs
-   * to it -- a free one, else the one on the lowest job, which goes back in the queue.
+   * the room from its lowest holder if the room is full, and calling the lift at priority); and as soon as the dragon
+   * is near (servable), the nearest keeper runs to it -- a free one, else the one on the lowest job, which goes back in
+   * the queue.
    */
   rush(j: Job): void {
     if (!this.jobs.includes(j)) return;
@@ -398,7 +402,12 @@ export class CareSim {
     if (other) { other.keeper!.rushing = true; return; }
     if (d.goalJob !== j.id && !d.act) retarget(this, d, j);
     raiseCall(this, d);
-    if (!this.servable(j)) return;
+    if (this.servable(j)) this.sendRushed(j);
+  }
+
+  /** A keeper for a rushed job: the nearest free one, else the one on the lowest job, taken off it; they run. */
+  private sendRushed(j: Job): void {
+    const d = j.dragon;
     // (a keeper who can't reach the job is never chosen for it)
     let best: Keeper | null = null, bestCost = Infinity;
     for (const k of this.keepers) if (!k.job) { const c = this.tripCost(k, j); if (c < bestCost) { bestCost = c; best = k; } }

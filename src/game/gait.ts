@@ -55,12 +55,18 @@ export function gaitOf(el: DragonElement, stage: Stage): Gait {
 }
 
 /**
+ * Anim time t of a walk played from its start, folded into its first pass [0, len): the loop wraps at its length back
+ * to its loop start (a walk with an intro plays the intro once). The view catches a pet's walk up to a bout already
+ * under way by ticking its player this many times (base.ts sync).
+ */
+export function wrapT(g: Gait, t: number): number {
+  if (t < g.len) return t < 0 ? 0 : t;
+  return g.loopStart + ((t - g.loopStart) % (g.len - g.loopStart));
+}
+
+/**
  * The walk's move at anim time t (t steps after it was played from its start at speed 1): the frame containing t,
  * the loop wrapping at its length back to its loop start. `DragonAnimPlayer.tick` at speed 1 leaves its `move` at
  * exactly this after its t-th tick.
  */
-export function moveAt(g: Gait, t: number): number {
-  if (t < g.len) return g.steps[t < 0 ? 0 : t];
-  const loop = g.len - g.loopStart;
-  return g.steps[g.loopStart + ((t - g.loopStart) % loop)];
-}
+export function moveAt(g: Gait, t: number): number { return g.steps[wrapT(g, t)]; }

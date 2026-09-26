@@ -53,7 +53,7 @@ const pairs: string[] = [
   'shots/base_t600.png=view=base&t=600',
   'shots/base_t600_east.png=view=base&t=600&cam=560,376',
   'shots/base_t3600.png=view=base&t=3600',
-  'shots/base_lift.png=view=base&t=1200&cam=328,300',
+  'shots/base_lift.png=view=base&t=1100&cam=328,300',
   'shots/base_ages.png=view=base&preset=ages&t=60',
   'shots/base_aerie.png=view=base&t=60&cam=0,0',
 ];
