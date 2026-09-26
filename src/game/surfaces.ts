@@ -6,8 +6,9 @@
 // room's identity is its wall and its props, never its floor. Everything a dragon is seen against -- the sky's bands at
 // every phase of the day and every stepped mix between two phases, the far hills and the clouds, every room's wall,
 // the bare and lift-shaft walls, the towers' stone, the big props that stand right behind a slot, and the light the
-// lamps throw on the walls at night -- is here too, and gate (w) holds each >= 25 % in luminance from every dark body
-// (a scale under L 0.15 at any stage: lightning, dusk, slinkwing) and >= 6 Oklab L from the ink. Night is these
+// lamps throw on the walls at night -- is here too, and gate (w) holds each >= 25 % LIGHTER than every dark body (a
+// scale under L 0.15 at any stage: lightning, dusk, slinkwing; so L >= 0.159, never black) -- a big prop behind a slot
+// >= 25 % from them either way (the firebox is a dark mouth) -- and >= 6 Oklab L from the ink. Night is these
 // colours and the lights, never a tint on a dragon, a floor or a wall (plan G8). Plain data: no drawing, safe to import
 // from Node.
 import { mix } from '../lib/art/palettes.ts';

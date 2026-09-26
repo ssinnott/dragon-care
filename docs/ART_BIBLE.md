@@ -30,7 +30,7 @@
 
 **Status.** v1 is built: the quadruped rig, the shared features and all six v1 elements, each finished by its own element artist, reviewed and integrated (the **Element pass** in the Review log), live in `src/art/dragon/` (file list in 1.1). Built: the core animation set of 4.2 per stage (idle with its variants, walk, happy, eat, sleep and wake, breath, pet, beg), authored as tracks from the 4.1 stage timing rules and tuned per element by the generic knobs of 4.3; every element's signature breath, baby fizzle, idle fidget (section 3) and 4.3 column (walk, happy flourish, hungry tell, sleep pose); the element anims fire's `bath`, rock's `upset` tuck and slinkwing's lonely `call`; rock's roll-over happy and the E8 fan flop; a turn in place (a paper turn: 4.1) and a head that looks back over its shoulder (a head pitched past vertical: 4.1). **Not built yet:** the anims grow-up, hopGlide, fly and rock's boulder hop, play, refuse and zap, and the other elements' baths; water floating belly-up (the habitat has no water) and spike's shed quills (a collectible). The game's side of the care loop does not exist yet: nothing consumes `event: 'shriek'`, `'call'` or `'hush'` (nor plays dusk's `tuckin` on a tuck-in: `ELEMENT_ANIM_FALLBACK` names every other element's sleep for it), the pebble pile of rock's hungry tell is drawn by rock rather than placed as a habitat prop, and `bond` (DrawDragonOpts) is fed only by the gallery (its `bond` query). **The game's pet renderer** (the base, `src/game/base.ts` and `pet.ts`) now feeds `charge` from lightning's play need and runs the wary latch and the crowd rule (5.4) every step, which matters now that its dragons walk past each other: it walks each dragon by its walk anim's own root motion (the simulation moves the body by each frame's `move` at speed 1 and the view plays that walk from the start of every bout, `src/game/gait.ts`, so a planted paw holds still on the floor), turns it with the paper turn (4.1) and carries it on the Dragon Lift's car. Each element file's header lists what it draws.
 
-**v2 status: designed, reviewed and built: the colour half, the elder core and the element pass v2.** The palette is code: `src/art/dragon/palettes.ts` holds the seven base palettes and the greying transform (`agePalette`, `agedPalette`, the silvered highlight in `dragonTones`, the elder face greys `muzzleOf` / `beardOf`, with every strength as data), and `tools/palette-check.ts` runs every gate on all seven elements at all four stages (report in 5.8: **2256 of 2256 gates pass**, the water and rock beards' exempt pairs reported, not counted; gate (i) runs on every floor the base's dragons and keepers stand on, `src/game/surfaces.ts` `FLOORS`, each also held under HSV S 0.20; gate (w), counted apart, **1001 of 1001**, holds everything the base's dragons are seen against -- the sky at every hour of the day and night, every wall, the big props behind a slot, the lamps' light -- ≥ 25 % in luminance from every dark body and 6 Oklab L from the ink, so night stays mid-value and no dragon is ever tinted for it). Water is sea green and the sandstone a touch warmer in the rig today. **The elder core is built** in the shared rig (the Review log's **Elder core** entries): the elder in `Stage` and every per-stage table (`STAGE_DIMS.elder`, `STAGE_TIMING`, `TAIL_CHAIN`, the fidget's `FIDGET_TIMING`), every stage drawn through `agedPalette` with the tone cache seeded from `dragonTones` for every slot (no element renderer reads a base palette at runtime), the elder's posture (the settled chest, the paunch, the level head, the wider stance), face (the grey muzzle and brow tuft, the inked beard fitted to each head, the worn fangs, the slower blink), wing wear (the tears, and the notched hole at full spread, cut through the far wing and the back row), the elder column of the shared anims with its variants (the back stretch, reminisce, airing the wings), and the gallery's elder row (every view, and `view=wings`). **The element pass v2 is built and integrated** (the Review log's **Element pass v2**): every elder cue and elder-only extra of section 3 (the hearth and its coal bed, the sap-buds, the 36 × 12 dome and the fourth crystal, the third bolt tooth and the far bolt's tear, the 18 × 9 fluke with its rays and pearls, the 19 px fans and their frost, the resident moth), every elder breath's finale ring (4.2), spike's spikier comb (3.3), slinkwing's arm-panel tear and its own elder preen (2.9, 1.3), rock's sunning and lightning's storm-watch in the airing's place (4.2), and **dusk, built whole** (3.8: the lamp and its lexicon, the nose frost and the smoke tip, Nightfall and the fizzle, the moths and motes, the lantern carry, the search by lamplight, the lamp-bat and the tuck-in). An elder now gains its face, its greys, its airing and its element's extra: the last grow-up's reward (D15) is drawn, waiting for the grow-up anim to show it off. **Not built yet:** the grow-up and its "look at me" beat, the gliding flight (the holes' other showing), the fly and the hop-glide, and the game side of the care loop (the Review log's known gaps). `npm run shots` renders the standard sheets of 5.5 and `npm run smoke` checks every gallery view, the floor, leg-root, tail-ceiling, pour-column and neutral-area audits included (all seven elements; the gallery's lineup, cast, mood and silhouette views lay out seven columns, the habitat holds all seven). Every hex below comes from that module and passed that check. The bible has been through one design review round (a readability critique and a care-game critique), four review rounds of the built rig, the element pass, two cast reviews (the whole cast judged together), the v2 design round, the v2 review (a readability critique and a care-game critique of the v2 design), two review rounds of the built elder core, the element pass v2 (a critique and a fix round per element, then the integration) and two cast reviews of the v2 cast (appeal and distinctness, each round fixed and re-checked on renders: Nightfall is now breathed out in puffs that settle as one sheet, the habitat keeps spread wings apart by a crowd rule, and a pour-column audit joins the smoke run); what changed, and what was turned down, is in the **Review log** at the end, with what building the core animations found.
+**v2 status: designed, reviewed and built: the colour half, the elder core and the element pass v2.** The palette is code: `src/art/dragon/palettes.ts` holds the seven base palettes and the greying transform (`agePalette`, `agedPalette`, the silvered highlight in `dragonTones`, the elder face greys `muzzleOf` / `beardOf`, with every strength as data), and `tools/palette-check.ts` runs every gate on all seven elements at all four stages (report in 5.8: **2256 of 2256 gates pass**, the water and rock beards' exempt pairs reported, not counted; gate (i) runs on every floor the base's dragons and keepers stand on, `src/game/surfaces.ts` `FLOORS`, each also held under HSV S 0.20; gate (w), counted apart, **1001 of 1001**, holds everything the base's dragons are seen against -- the sky at every hour of the day and night, every wall and the lamps' light ≥ 25 % *lighter* than every dark body (L ≥ 0.159, so night stays mid-value, never black), the big props behind a slot ≥ 25 % from them either way, and all 6 Oklab L from the ink -- and no dragon is ever tinted for night). Water is sea green and the sandstone a touch warmer in the rig today. **The elder core is built** in the shared rig (the Review log's **Elder core** entries): the elder in `Stage` and every per-stage table (`STAGE_DIMS.elder`, `STAGE_TIMING`, `TAIL_CHAIN`, the fidget's `FIDGET_TIMING`), every stage drawn through `agedPalette` with the tone cache seeded from `dragonTones` for every slot (no element renderer reads a base palette at runtime), the elder's posture (the settled chest, the paunch, the level head, the wider stance), face (the grey muzzle and brow tuft, the inked beard fitted to each head, the worn fangs, the slower blink), wing wear (the tears, and the notched hole at full spread, cut through the far wing and the back row), the elder column of the shared anims with its variants (the back stretch, reminisce, airing the wings), and the gallery's elder row (every view, and `view=wings`). **The element pass v2 is built and integrated** (the Review log's **Element pass v2**): every elder cue and elder-only extra of section 3 (the hearth and its coal bed, the sap-buds, the 36 × 12 dome and the fourth crystal, the third bolt tooth and the far bolt's tear, the 18 × 9 fluke with its rays and pearls, the 19 px fans and their frost, the resident moth), every elder breath's finale ring (4.2), spike's spikier comb (3.3), slinkwing's arm-panel tear and its own elder preen (2.9, 1.3), rock's sunning and lightning's storm-watch in the airing's place (4.2), and **dusk, built whole** (3.8: the lamp and its lexicon, the nose frost and the smoke tip, Nightfall and the fizzle, the moths and motes, the lantern carry, the search by lamplight, the lamp-bat and the tuck-in). An elder now gains its face, its greys, its airing and its element's extra: the last grow-up's reward (D15) is drawn, waiting for the grow-up anim to show it off. **Not built yet:** the grow-up and its "look at me" beat, the gliding flight (the holes' other showing), the fly and the hop-glide, and the game side of the care loop (the Review log's known gaps). `npm run shots` renders the standard sheets of 5.5 and `npm run smoke` checks every gallery view, the floor, leg-root, tail-ceiling, pour-column and neutral-area audits included (all seven elements; the gallery's lineup, cast, mood and silhouette views lay out seven columns, the habitat holds all seven). Every hex below comes from that module and passed that check. The bible has been through one design review round (a readability critique and a care-game critique), four review rounds of the built rig, the element pass, two cast reviews (the whole cast judged together), the v2 design round, the v2 review (a readability critique and a care-game critique of the v2 design), two review rounds of the built elder core, the element pass v2 (a critique and a fix round per element, then the integration) and two cast reviews of the v2 cast (appeal and distinctness, each round fixed and re-checked on renders: Nightfall is now breathed out in puffs that settle as one sheet, the habitat keeps spread wings apart by a crowd rule, and a pour-column audit joins the smoke run); what changed, and what was turned down, is in the **Review log** at the end, with what building the core animations found.
 
 
 **The keepers.** People who look after the dragons now share their screen: four keepers (a cook, a groomer, a night
@@ -1806,84 +1806,84 @@ stages: baby / young / adult / elder (b/y/a/e), each the base palette greyed by 
  glow pairs across elements within 40deg hue AND 25% luminance (must differ by effect SHAPE; the glow never greys):
    fire/dusk              #ffa21f #ffa98c  lum   8%  hue 20deg
 
-(w) BACKDROPS  (everything a dragon is seen against, each >= 25% luminance from every dark body (scale L < 0.15: 12 element-stages) and >= 6 Oklab L from the ink #1a1018)
-  ok   sky top night                #6a78a8  L 0.193  least  38% (lightning elder)  okL 39.1 from ink
-  ok   sky middle night             #6f7fa8  L 0.214  least  44% (lightning elder)  okL 40.9 from ink
-  ok   sky low night                #7f8fb8  L 0.276  least  57% (lightning elder)  okL 46.3 from ink
-  ok   hills night                  #6a7aa0  L 0.195  least  39% (lightning elder)  okL 39.1 from ink
-  ok   clouds night                 #8090b0  L 0.277  least  57% (lightning elder)  okL 46.2 from ink
-  ok   sky top night>dawn 1/3       #848bb5  L 0.267  least  55% (lightning elder)  okL 45.7 from ink
-  ok   sky middle night>dawn 1/3    #929abb  L 0.328  least  64% (lightning elder)  okL 50.1 from ink
-  ok   sky low night>dawn 1/3       #a3a7bd  L 0.391  least  69% (lightning elder)  okL 54.2 from ink
-  ok   hills night>dawn 1/3         #7f8fa1  L 0.267  least  55% (lightning elder)  okL 45.3 from ink
-  ok   clouds night>dawn 1/3        #a5abc0  L 0.409  least  71% (lightning elder)  okL 55.3 from ink
-  ok   sky top night>dawn 2/3       #9e9dc3  L 0.353  least  66% (lightning elder)  okL 52.0 from ink
-  ok   sky middle night>dawn 2/3    #b5b5cd  L 0.473  least  75% (lightning elder)  okL 59.1 from ink
-  ok   sky low night>dawn 2/3       #c8bec3  L 0.530  least  77% (lightning elder)  okL 62.1 from ink
-  ok   hills night>dawn 2/3         #93a3a3  L 0.350  least  66% (lightning elder)  okL 51.3 from ink
-  ok   clouds night>dawn 2/3        #cbc5d0  L 0.572  least  79% (lightning elder)  okL 64.2 from ink
-  ok   sky top dawn                 #b8b0d0  L 0.458  least  74% (lightning elder)  okL 58.4 from ink
-  ok   sky middle dawn              #d8d0e0  L 0.651  least  82% (lightning elder)  okL 67.9 from ink
-  ok   sky low dawn                 #ecd6c8  L 0.701  least  83% (lightning elder)  okL 70.0 from ink
-  ok   hills dawn                   #a8b8a4  L 0.453  least  74% (lightning elder)  okL 57.5 from ink
-  ok   clouds dawn                  #f0e0e0  L 0.772  least  85% (lightning elder)  okL 73.0 from ink
-  ok   sky top dawn>day 1/3         #b9bdd7  L 0.516  least  77% (lightning elder)  okL 61.4 from ink
-  ok   sky middle dawn>day 1/3      #d5d6e3  L 0.678  least  82% (lightning elder)  okL 68.9 from ink
-  ok   sky low dawn>day 1/3         #e8ded5  L 0.742  least  84% (lightning elder)  okL 71.6 from ink
-  ok   hills dawn>day 1/3           #acc0a7  L 0.493  least  76% (lightning elder)  okL 59.6 from ink
-  ok   clouds dawn>day 1/3          #efe7e8  L 0.813  least  85% (lightning elder)  okL 74.5 from ink
-  ok   sky top dawn>day 2/3         #bbcbdd  L 0.585  least  80% (lightning elder)  okL 64.6 from ink
-  ok   sky middle dawn>day 2/3      #d2dde7  L 0.712  least  83% (lightning elder)  okL 70.2 from ink
-  ok   sky low dawn>day 2/3         #e4e6e3  L 0.786  least  85% (lightning elder)  okL 73.3 from ink
-  ok   hills dawn>day 2/3           #afc7ab  L 0.529  least  77% (lightning elder)  okL 61.4 from ink
-  ok   clouds dawn>day 2/3          #efefef  L 0.863  least  86% (lightning elder)  okL 76.2 from ink
-  ok   sky top day                  #bcd8e4  L 0.654  least  82% (lightning elder)  okL 67.5 from ink
-  ok   sky middle day               #cfe3ea  L 0.741  least  84% (lightning elder)  okL 71.3 from ink
-  ok   sky low day                  #e0eef0  L 0.833  least  86% (lightning elder)  okL 74.9 from ink
-  ok   hills day                    #b3cfae  L 0.573  least  79% (lightning elder)  okL 63.5 from ink
-  ok   clouds day                   #eef6f7  L 0.908  least  87% (lightning elder)  okL 77.7 from ink
-  ok   sky top day>dusk 1/3         #bbc3d3  L 0.543  least  78% (lightning elder)  okL 62.6 from ink
-  ok   sky middle day>dusk 1/3      #d5d5d1  L 0.663  least  82% (lightning elder)  okL 68.2 from ink
-  ok   sky low day>dusk 1/3         #e3e1d8  L 0.751  least  84% (lightning elder)  okL 71.9 from ink
-  ok   hills day>dusk 1/3           #abc2a4  L 0.499  least  76% (lightning elder)  okL 59.8 from ink
-  ok   clouds day>dusk 1/3          #efe9e5  L 0.823  least  85% (lightning elder)  okL 74.8 from ink
-  ok   sky top day>dusk 2/3         #b9afc1  L 0.448  least  73% (lightning elder)  okL 57.8 from ink
-  ok   sky middle day>dusk 2/3      #dac6b9  L 0.588  least  80% (lightning elder)  okL 65.0 from ink
-  ok   sky low day>dusk 2/3         #e5d5c0  L 0.681  least  82% (lightning elder)  okL 69.0 from ink
-  ok   hills day>dusk 2/3           #a2b59a  L 0.431  least  72% (lightning elder)  okL 56.1 from ink
-  ok   clouds day>dusk 2/3          #efddd2  L 0.747  least  84% (lightning elder)  okL 71.9 from ink
-  ok   sky top dusk                 #b89ab0  L 0.364  least  67% (lightning elder)  okL 53.0 from ink
-  ok   sky middle dusk              #e0b8a0  L 0.527  least  77% (lightning elder)  okL 62.2 from ink
-  ok   sky low dusk                 #e8c8a8  L 0.613  least  81% (lightning elder)  okL 66.2 from ink
-  ok   hills dusk                   #9aa890  L 0.369  least  68% (lightning elder)  okL 52.4 from ink
-  ok   clouds dusk                  #f0d0c0  L 0.674  least  82% (lightning elder)  okL 69.0 from ink
-  ok   sky top dusk>night 1/3       #9e8fad  L 0.299  least  60% (lightning elder)  okL 48.3 from ink
-  ok   sky middle dusk>night 1/3    #baa5a3  L 0.400  least  70% (lightning elder)  okL 55.0 from ink
-  ok   sky low dusk>night 1/3       #c5b5ad  L 0.479  least  75% (lightning elder)  okL 59.4 from ink
-  ok   hills dusk>night 1/3         #8a9995  L 0.304  least  61% (lightning elder)  okL 48.0 from ink
-  ok   clouds dusk>night 1/3        #cbbbbb  L 0.518  least  77% (lightning elder)  okL 61.5 from ink
-  ok   sky top dusk>night 2/3       #8483ab  L 0.241  least  50% (lightning elder)  okL 43.6 from ink
-  ok   sky middle dusk>night 2/3    #9592a5  L 0.297  least  60% (lightning elder)  okL 47.9 from ink
-  ok   sky low dusk>night 2/3       #a2a2b3  L 0.368  least  68% (lightning elder)  okL 52.8 from ink
-  ok   hills dusk>night 2/3         #7a899b  L 0.244  least  51% (lightning elder)  okL 43.4 from ink
-  ok   clouds dusk>night 2/3        #a5a5b5  L 0.382  least  69% (lightning elder)  okL 53.7 from ink
-  ok   lift wall                    #a8987e  L 0.323  least  63% (lightning elder)  okL 49.7 from ink
-  ok   bare wall                    #9a8a76  L 0.264  least  55% (lightning elder)  okL 45.2 from ink
-  ok   tower stone                  #c2bbb0  L 0.501  least  76% (lightning elder)  okL 60.5 from ink
-  ok   kitchen wall                 #c8ac92  L 0.439  least  73% (lightning elder)  okL 57.2 from ink
-  ok   hatchery wall                #d4bc98  L 0.522  least  77% (lightning elder)  okL 61.7 from ink
-  ok   bath wall                    #b8c4cc  L 0.540  least  78% (lightning elder)  okL 62.4 from ink
-  ok   romp wall                    #b9b3cf  L 0.471  least  75% (lightning elder)  okL 59.1 from ink
-  ok   groom wall                   #cdb9a3  L 0.503  least  76% (lightning elder)  okL 60.7 from ink
-  ok   dorm wall                    #a39cb8  L 0.350  least  66% (lightning elder)  okL 51.8 from ink
-  ok   prop hearth                  #9c948a  L 0.301  least  60% (lightning elder)  okL 48.1 from ink
-  ok   prop firebox                 #3a2626  L 0.024  least  55% (slinkwing baby)  okL 10.3 from ink
-  ok   prop tub                     #a47a52  L 0.224  least  47% (lightning elder)  okL 42.2 from ink
-  ok   prop pallet                  #a47a52  L 0.224  least  47% (lightning elder)  okL 42.2 from ink
-  ok   prop mattress                #e6dcc4  L 0.720  least  83% (lightning elder)  okL 70.6 from ink
-  ok   lamp ring inner              #d1a3a2  L 0.424  least  72% (lightning elder)  okL 56.7 from ink
-  ok   lamp ring outer              #ba9fad  L 0.383  least  69% (lightning elder)  okL 54.1 from ink
-  ok   hearth ring                  #d3a879  L 0.432  least  72% (lightning elder)  okL 57.0 from ink
+(w) BACKDROPS  (everything a dragon is seen against: the sky, hills, clouds, walls, stone and lamps' light each >= 25% LIGHTER in luminance than every dark body (scale L < 0.15: 12 element-stages), so L >= 0.159, never black; a big prop behind a slot >= 25% from them either way; all >= 6 Oklab L from the ink #1a1018)
+  ok   sky top night                #6a78a8  L 0.193  least  38% lighter (lightning elder)  okL 39.1 from ink
+  ok   sky middle night             #6f7fa8  L 0.214  least  44% lighter (lightning elder)  okL 40.9 from ink
+  ok   sky low night                #7f8fb8  L 0.276  least  57% lighter (lightning elder)  okL 46.3 from ink
+  ok   hills night                  #6a7aa0  L 0.195  least  39% lighter (lightning elder)  okL 39.1 from ink
+  ok   clouds night                 #8090b0  L 0.277  least  57% lighter (lightning elder)  okL 46.2 from ink
+  ok   sky top night>dawn 1/3       #848bb5  L 0.267  least  55% lighter (lightning elder)  okL 45.7 from ink
+  ok   sky middle night>dawn 1/3    #929abb  L 0.328  least  64% lighter (lightning elder)  okL 50.1 from ink
+  ok   sky low night>dawn 1/3       #a3a7bd  L 0.391  least  69% lighter (lightning elder)  okL 54.2 from ink
+  ok   hills night>dawn 1/3         #7f8fa1  L 0.267  least  55% lighter (lightning elder)  okL 45.3 from ink
+  ok   clouds night>dawn 1/3        #a5abc0  L 0.409  least  71% lighter (lightning elder)  okL 55.3 from ink
+  ok   sky top night>dawn 2/3       #9e9dc3  L 0.353  least  66% lighter (lightning elder)  okL 52.0 from ink
+  ok   sky middle night>dawn 2/3    #b5b5cd  L 0.473  least  75% lighter (lightning elder)  okL 59.1 from ink
+  ok   sky low night>dawn 2/3       #c8bec3  L 0.530  least  77% lighter (lightning elder)  okL 62.1 from ink
+  ok   hills night>dawn 2/3         #93a3a3  L 0.350  least  66% lighter (lightning elder)  okL 51.3 from ink
+  ok   clouds night>dawn 2/3        #cbc5d0  L 0.572  least  79% lighter (lightning elder)  okL 64.2 from ink
+  ok   sky top dawn                 #b8b0d0  L 0.458  least  74% lighter (lightning elder)  okL 58.4 from ink
+  ok   sky middle dawn              #d8d0e0  L 0.651  least  82% lighter (lightning elder)  okL 67.9 from ink
+  ok   sky low dawn                 #ecd6c8  L 0.701  least  83% lighter (lightning elder)  okL 70.0 from ink
+  ok   hills dawn                   #a8b8a4  L 0.453  least  74% lighter (lightning elder)  okL 57.5 from ink
+  ok   clouds dawn                  #f0e0e0  L 0.772  least  85% lighter (lightning elder)  okL 73.0 from ink
+  ok   sky top dawn>day 1/3         #b9bdd7  L 0.516  least  77% lighter (lightning elder)  okL 61.4 from ink
+  ok   sky middle dawn>day 1/3      #d5d6e3  L 0.678  least  82% lighter (lightning elder)  okL 68.9 from ink
+  ok   sky low dawn>day 1/3         #e8ded5  L 0.742  least  84% lighter (lightning elder)  okL 71.6 from ink
+  ok   hills dawn>day 1/3           #acc0a7  L 0.493  least  76% lighter (lightning elder)  okL 59.6 from ink
+  ok   clouds dawn>day 1/3          #efe7e8  L 0.813  least  85% lighter (lightning elder)  okL 74.5 from ink
+  ok   sky top dawn>day 2/3         #bbcbdd  L 0.585  least  80% lighter (lightning elder)  okL 64.6 from ink
+  ok   sky middle dawn>day 2/3      #d2dde7  L 0.712  least  83% lighter (lightning elder)  okL 70.2 from ink
+  ok   sky low dawn>day 2/3         #e4e6e3  L 0.786  least  85% lighter (lightning elder)  okL 73.3 from ink
+  ok   hills dawn>day 2/3           #afc7ab  L 0.529  least  77% lighter (lightning elder)  okL 61.4 from ink
+  ok   clouds dawn>day 2/3          #efefef  L 0.863  least  86% lighter (lightning elder)  okL 76.2 from ink
+  ok   sky top day                  #bcd8e4  L 0.654  least  82% lighter (lightning elder)  okL 67.5 from ink
+  ok   sky middle day               #cfe3ea  L 0.741  least  84% lighter (lightning elder)  okL 71.3 from ink
+  ok   sky low day                  #e0eef0  L 0.833  least  86% lighter (lightning elder)  okL 74.9 from ink
+  ok   hills day                    #b3cfae  L 0.573  least  79% lighter (lightning elder)  okL 63.5 from ink
+  ok   clouds day                   #eef6f7  L 0.908  least  87% lighter (lightning elder)  okL 77.7 from ink
+  ok   sky top day>dusk 1/3         #bbc3d3  L 0.543  least  78% lighter (lightning elder)  okL 62.6 from ink
+  ok   sky middle day>dusk 1/3      #d5d5d1  L 0.663  least  82% lighter (lightning elder)  okL 68.2 from ink
+  ok   sky low day>dusk 1/3         #e3e1d8  L 0.751  least  84% lighter (lightning elder)  okL 71.9 from ink
+  ok   hills day>dusk 1/3           #abc2a4  L 0.499  least  76% lighter (lightning elder)  okL 59.8 from ink
+  ok   clouds day>dusk 1/3          #efe9e5  L 0.823  least  85% lighter (lightning elder)  okL 74.8 from ink
+  ok   sky top day>dusk 2/3         #b9afc1  L 0.448  least  73% lighter (lightning elder)  okL 57.8 from ink
+  ok   sky middle day>dusk 2/3      #dac6b9  L 0.588  least  80% lighter (lightning elder)  okL 65.0 from ink
+  ok   sky low day>dusk 2/3         #e5d5c0  L 0.681  least  82% lighter (lightning elder)  okL 69.0 from ink
+  ok   hills day>dusk 2/3           #a2b59a  L 0.431  least  72% lighter (lightning elder)  okL 56.1 from ink
+  ok   clouds day>dusk 2/3          #efddd2  L 0.747  least  84% lighter (lightning elder)  okL 71.9 from ink
+  ok   sky top dusk                 #b89ab0  L 0.364  least  67% lighter (lightning elder)  okL 53.0 from ink
+  ok   sky middle dusk              #e0b8a0  L 0.527  least  77% lighter (lightning elder)  okL 62.2 from ink
+  ok   sky low dusk                 #e8c8a8  L 0.613  least  81% lighter (lightning elder)  okL 66.2 from ink
+  ok   hills dusk                   #9aa890  L 0.369  least  68% lighter (lightning elder)  okL 52.4 from ink
+  ok   clouds dusk                  #f0d0c0  L 0.674  least  82% lighter (lightning elder)  okL 69.0 from ink
+  ok   sky top dusk>night 1/3       #9e8fad  L 0.299  least  60% lighter (lightning elder)  okL 48.3 from ink
+  ok   sky middle dusk>night 1/3    #baa5a3  L 0.400  least  70% lighter (lightning elder)  okL 55.0 from ink
+  ok   sky low dusk>night 1/3       #c5b5ad  L 0.479  least  75% lighter (lightning elder)  okL 59.4 from ink
+  ok   hills dusk>night 1/3         #8a9995  L 0.304  least  61% lighter (lightning elder)  okL 48.0 from ink
+  ok   clouds dusk>night 1/3        #cbbbbb  L 0.518  least  77% lighter (lightning elder)  okL 61.5 from ink
+  ok   sky top dusk>night 2/3       #8483ab  L 0.241  least  50% lighter (lightning elder)  okL 43.6 from ink
+  ok   sky middle dusk>night 2/3    #9592a5  L 0.297  least  60% lighter (lightning elder)  okL 47.9 from ink
+  ok   sky low dusk>night 2/3       #a2a2b3  L 0.368  least  68% lighter (lightning elder)  okL 52.8 from ink
+  ok   hills dusk>night 2/3         #7a899b  L 0.244  least  51% lighter (lightning elder)  okL 43.4 from ink
+  ok   clouds dusk>night 2/3        #a5a5b5  L 0.382  least  69% lighter (lightning elder)  okL 53.7 from ink
+  ok   lift wall                    #a8987e  L 0.323  least  63% lighter (lightning elder)  okL 49.7 from ink
+  ok   bare wall                    #9a8a76  L 0.264  least  55% lighter (lightning elder)  okL 45.2 from ink
+  ok   tower stone                  #c2bbb0  L 0.501  least  76% lighter (lightning elder)  okL 60.5 from ink
+  ok   kitchen wall                 #c8ac92  L 0.439  least  73% lighter (lightning elder)  okL 57.2 from ink
+  ok   hatchery wall                #d4bc98  L 0.522  least  77% lighter (lightning elder)  okL 61.7 from ink
+  ok   bath wall                    #b8c4cc  L 0.540  least  78% lighter (lightning elder)  okL 62.4 from ink
+  ok   romp wall                    #b9b3cf  L 0.471  least  75% lighter (lightning elder)  okL 59.1 from ink
+  ok   groom wall                   #cdb9a3  L 0.503  least  76% lighter (lightning elder)  okL 60.7 from ink
+  ok   dorm wall                    #a39cb8  L 0.350  least  66% lighter (lightning elder)  okL 51.8 from ink
+  ok   lamp ring inner              #d1a3a2  L 0.424  least  72% lighter (lightning elder)  okL 56.7 from ink
+  ok   lamp ring outer              #ba9fad  L 0.383  least  69% lighter (lightning elder)  okL 54.1 from ink
+  ok   hearth ring                  #d3a879  L 0.432  least  72% lighter (lightning elder)  okL 57.0 from ink
+  ok   prop hearth                  #9c948a  L 0.301  least  60% apart   (lightning elder)  okL 48.1 from ink
+  ok   prop firebox                 #3a2626  L 0.024  least  55% apart   (slinkwing baby)  okL 10.3 from ink
+  ok   prop tub                     #a47a52  L 0.224  least  47% apart   (lightning elder)  okL 42.2 from ink
+  ok   prop pallet                  #a47a52  L 0.224  least  47% apart   (lightning elder)  okL 42.2 from ink
+  ok   prop mattress                #e6dcc4  L 0.720  least  83% apart   (lightning elder)  okL 70.6 from ink
 
 RESULT: PASS  2256 of 2256 gates passed
 BACKDROPS: PASS  1001 of 1001 gates passed

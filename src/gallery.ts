@@ -33,7 +33,8 @@
 //                              camera there (world px), preset=<name> starts from a code-built world instead of the new
 //                              game (src/game/presets.ts: ages = every stage), save=0 keeps a live page from saving
 //                              (a preset page, like a frozen one, never loads or saves: it isn't the player's barn),
-//                              hour=0..23 starts day 1 at that hour (22: night), layers=world draws the world alone (the
+//                              hour=0..23 starts day 1 at that hour (22: night; nor does a page given an hour load or
+//                              save, so it always starts there), layers=world draws the world alone (the
 //                              building, the lift's car, the cast, the bubbles and the plates: no sky, lights or HUD);
 //                              live, the keys 1-4 pick 1x, 2x, 4x or 8x and p pauses
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
@@ -1344,9 +1345,9 @@ function makeScene(P: GalleryParams): Scene {
     case 'careaudit': return careAuditScene(P);
     case 'yard': return yardScene(P);
     case 'yardaudit': return yardAuditScene(P);
-    // (a frozen view never loads or saves (G4), and nor does a preset: loading would hide it, autosaving would put it
-    // in place of the player's barn)
-    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset, hour: P.hour, layers: P.layers });
+    // (a frozen view never loads or saves (G4), and nor does a preset or a start hour: loading would hide it, autosaving
+    // would put it in place of the player's barn)
+    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset && P.hour == null, hour: P.hour, layers: P.layers });
     default: return lineupScene(P);
   }
 }

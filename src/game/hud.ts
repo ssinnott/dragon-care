@@ -8,6 +8,7 @@ import { drawSprite } from './icons.ts';
 import type { Rect, Sprite } from './icons.ts';
 import type { ClockRead, Speed } from './clock.ts';
 import { clockLabel } from './clock.ts';
+import { lightsOf } from './sky.ts';
 import { INK } from './surfaces.ts';
 import { KEEPER_PALETTES } from '../art/keeper/palettes.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
@@ -25,10 +26,18 @@ export const BUTTONS: Readonly<Record<ButtonName, Rect>> = Object.freeze({
 });
 /** The keepers' badges: 46 x 13 each from x 138, 48 apart (display only; S7 makes them tappable). */
 export const BADGE_X0 = 138, BADGE_DX = 48, BADGE_W = 46;
+/** The clock's x, and JOBS's while the clock is short (to day 9). */
+export const CLOCK_X = 16, JOBS_X = 90;
+/**
+ * Where `JOBS n` starts after the clock `label`: x 90, or a space after a longer label (from day 10: 94) -- never over
+ * it. With clock.ts's label (12 glyphs at most to day 99 999) and two-digit jobs it ends by x 135, clear of the badges
+ * (sim-check 11 holds it).
+ */
+export function jobsAt(label: string): number { return Math.max(JOBS_X, CLOCK_X + measureText(label) + 7); }
 /** A toast's life, frames (3 s). */
 export const TOAST_FRAMES = 180;
 
-/** The time of day in the corner: the sun by day, a low orange sun at dawn and dusk, the moon at night (9 x 9). */
+/** The time of day in the corner, as the sky shows it (sky.ts lightsOf): the sun by day, a low orange sun at dawn and dusk, the moon at night (9 x 9). */
 const SUN_ROWS = ['....s....', '.s.....s.', '...sss...', '..sssss..', 's.sssss.s', '..sssss..', '...sss...', '.s.....s.', '....s....'];
 const SKY_ICONS: Readonly<Record<'sun' | 'low' | 'moon', Sprite>> = Object.freeze({
   sun: { rows: SUN_ROWS, colors: { s: '#f6c84a' } },
@@ -63,10 +72,11 @@ function button(ctx: CanvasRenderingContext2D, r: Rect, label: string, active: b
 /** The top bar (plan 3.11): the sky icon and the clock, the jobs, the keepers' badges, and the buttons. */
 export function drawTopBar(ctx: CanvasRenderingContext2D, s: TopBar): void {
   ctx.fillStyle = INK; ctx.fillRect(0, 0, ctx.canvas.width, BAR_H);
-  const icon = s.clock.phase === 'night' ? 'moon' : s.clock.phase === 'day' ? 'sun' : 'low';
-  drawSprite(ctx, SKY_ICONS[icon], 7, 7);
-  text(ctx, clockLabel(s.clock), 16, 4);
-  text(ctx, `JOBS ${s.jobs}`, 90, 4);
+  // (the sky's own phase, not the clock's: at 20:00 the sky is still the dusk's, and the moon comes with its stars)
+  drawSprite(ctx, SKY_ICONS[lightsOf(s.clock).icon], 7, 7);
+  const label = clockLabel(s.clock);
+  text(ctx, label, CLOCK_X, 4);
+  text(ctx, `JOBS ${s.jobs}`, jobsAt(label), 4);
   s.keepers.forEach((k, i) => {
     const x = BADGE_X0 + i * BADGE_DX;
     ctx.fillStyle = INK; ctx.fillRect(x, 1, BADGE_W, 13);

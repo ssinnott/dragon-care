@@ -24,6 +24,7 @@ import { CareSim } from './sim.ts';
 import type { Dragon, Job } from './sim.ts';
 import { startSpec, buildSim } from './presets.ts';
 import { worldKey, barnKey, fnv1a, serialize } from './save.ts';
+import type { SaveV } from './save.ts';
 import { readClock } from './clock.ts';
 import type { Speed, ClockRead } from './clock.ts';
 import { drawSky } from './sky.ts';
@@ -84,9 +85,9 @@ export interface BaseViewOpts {
   cam?: { x: number; y: number } | null;
   /** A start from presets.ts by name (null, or a name no preset has: the new game). */
   preset?: string | null;
-  /** A live page that loads and autosaves in attach() (the gallery sets it only without t=, save=0 or preset=). */
+  /** A live page that loads and autosaves in attach() (the gallery sets it only without t=, save=0, preset= or hour=). */
   persist?: boolean;
-  /** The hour of day 1 the world starts at, 0-23 (null: 07:00, the new game's). A loaded save keeps its own clock. */
+  /** The hour of day 1 the world starts at, 0-23 (null: 07:00, the new game's). A loaded save keeps its own clock (the gallery never has a page given an hour load). */
   hour?: number | null;
   /** 'world': only the building, the lift's car, the cast, the bubbles and the plates -- no sky, lights, HUD or toasts (the no-tint check). */
   layers?: 'all' | 'world';
@@ -147,15 +148,46 @@ export class BaseView {
     this.use(buildSim(startSpec(opts.preset), opts.seed, opts.hour));
   }
 
-  /** Put a world on screen: its cast, its keepers' characters, its building and its plates (the constructor, a load, NEW). */
+  /**
+   * Put a world on screen: its cast, its keepers' characters, its building and its plates (the constructor, a load,
+   * NEW). All of them are built before any is swapped in, so a world the view can't build leaves the one on screen whole.
+   */
   private use(sim: CareSim): void {
+    const cast = new Map<number, PetView>();
+    this.syncCast(sim, cast);
+    const agents = sim.keepers.map((k) => makeKeeperAgent(k.look));
+    const building = drawBuilding(sim.rooms), plates = drawPlates(sim.rooms);
     this.sim = sim;
     this.cast.clear();
-    this.syncCast();
-    this.keeperAgents = sim.keepers.map((k) => makeKeeperAgent(k.look));
-    this.building = drawBuilding(sim.rooms);
-    this.plates = drawPlates(sim.rooms);
+    for (const [id, v] of cast) this.cast.set(id, v);
+    this.keeperAgents = agents; this.building = building; this.plates = plates;
     this.bubbles = []; this.chips = [];
+  }
+
+  /**
+   * Swap in the player's saved barn, if it holds together: CareSim.fromSave takes it, and the view builds it, steps it
+   * once and draws it (off screen) -- a trial on one copy, so the barn itself, a second copy, resumes where it was
+   * saved. False if any of that throws (a save of this version whose insides this build can't read: an element, a
+   * stage, a keeper or a need it doesn't know): the page keeps the world it had, so the next autosave writes that over
+   * the broken save, and a broken save can never freeze the page or be written back.
+   */
+  private load(save: SaveV): boolean {
+    const was = this.sim, frame = this.frame;
+    try {
+      this.use(CareSim.fromSave(save));
+      this.worldStep();
+      const trial = document.createElement('canvas');
+      trial.width = VIEW_W; trial.height = VIEW_H;
+      this.draw(trial.getContext('2d')!);
+      this.use(CareSim.fromSave(save));
+      return true;
+    } catch {
+      this.use(was);
+      return false;
+    } finally {
+      // (and nothing of the trial is left over for the first real frame: the frame count, the top pass's queue)
+      this.frame = frame; this.top.clear();
+    }
   }
 
   /** Every dragon's pet, in id order. */
@@ -172,19 +204,19 @@ export class BaseView {
   private feet(d: Dragon): number { return feetOf(this.sim, d); }
 
   /**
-   * Match the cast to the simulation's dragons: a pet for a dragon it hasn't seen, none for one that's gone, and a
-   * new one for a dragon that has grown into another stage (a new rig: its stage's proportions and anims).
+   * Match a cast to a world's dragons (the view's own, by default): a pet for a dragon it hasn't seen, none for one
+   * that's gone, and a new one for a dragon that has grown into another stage (a new rig: its stage's proportions and anims).
    */
-  private syncCast(): void {
+  private syncCast(sim: CareSim = this.sim, cast: Map<number, PetView> = this.cast): void {
     const ids = new Set<number>();
-    for (const d of this.sim.dragons) {
+    for (const d of sim.dragons) {
       ids.add(d.id);
-      const v = this.cast.get(d.id);
+      const v = cast.get(d.id);
       if (v && v.stage === d.stage) continue;
-      const pet = makePet(d.element, d.stage, d.seed, 'idle', d.x, this.feet(d), { facing: d.facing, mood: v ? v.pet.mood : d.mood });
-      this.cast.set(d.id, { pet, waking: false, bowl: null, stage: d.stage, walkSeq: -1 });
+      const pet = makePet(d.element, d.stage, d.seed, 'idle', d.x, feetOf(sim, d), { facing: d.facing, mood: v ? v.pet.mood : d.mood });
+      cast.set(d.id, { pet, waking: false, bowl: null, stage: d.stage, walkSeq: -1 });
     }
-    for (const id of this.cast.keys()) if (!ids.has(id)) this.cast.delete(id);
+    for (const id of cast.keys()) if (!ids.has(id)) cast.delete(id);
   }
 
   // ---------- a step ----------
@@ -452,14 +484,15 @@ export class BaseView {
   /**
    * Live only: size the canvas to the window (whole pixels); take the pointer -- drag to pan, tap to Rush or press a
    * button -- and the keys (1-4 the speed, p pause). A page that may save loads the player's barn now (one that didn't
-   * fit -- another version, or broken -- is kept aside and a new barn starts, with a toast), saves every 600 frames and
-   * when it is hidden or left, and lends the page window.__dragonCare.baseSaveNow.
+   * fit -- another version, not a save, or a save whose insides the view can't build, step or draw: load() -- is kept
+   * aside at the backup key and the page's new barn plays on, with a toast), saves every 600 frames and when it is
+   * hidden or left, and lends the page window.__dragonCare.baseSaveNow.
    */
   attach(canvas: HTMLCanvasElement): void {
     if (this.persist) {
       const { save, note } = loadSave();
       if (save) {
-        try { this.use(CareSim.fromSave(save)); } catch { backupSave(); this.say(DIDNT_FIT); }
+        if (!this.load(save)) { backupSave(); this.say(DIDNT_FIT); }
       } else if (note === 'old' || note === 'bad') this.say(DIDNT_FIT);
       this.saving = true;
       const onHide = () => { if (document.visibilityState === 'hidden') this.save(); };

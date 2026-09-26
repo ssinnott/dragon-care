@@ -30,8 +30,10 @@
 // rebuild the world nor leave it. Time (docs/BASE_DESIGN.md 7): hour=22 is night; the world drawn alone (layers=world)
 // is the same picture and the same barn at noon and at ten at night, while the whole frame is not (night is drawn, and
 // only in the sky and the lights); live, the speed button and the keys 1-4 and p run the world faster, and pause it;
-// a frozen page with a save in storage neither loads nor writes it; a live page that saves resumes its world after a
-// reload, and one whose save doesn't fit starts a new barn and keeps the old save aside.
+// a frozen page with a save in storage neither loads nor writes it, and nor does a live page given hour=; a live page
+// that saves resumes its world after a reload, and one whose save doesn't fit -- another version, or one of this
+// version the view can't build or draw (an unknown element, keeper or need) -- starts a new barn without a page
+// error, keeps the old save aside, and never writes it back.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -193,6 +195,53 @@ async function liveOldSave(page: any): Promise<string[]> {
   return out;
 }
 const OLD_SAVE = JSON.stringify({ ...JSON.parse(PLANTED), v: 999, tick: 9999 });
+/**
+ * Saves of this version that parse but that the view can't build (a dragon of an element no one knows, a keeper no one
+ * knows) or draw (a job for a need no one knows: it builds, and only the load's trial draw finds it), each with the
+ * word that marks it.
+ */
+const BROKEN = (mark: string, f: (s: any) => void): { blob: string; mark: string } => { const s = JSON.parse(PLANTED); f(s); return { blob: JSON.stringify(s), mark }; };
+const BROKEN_SAVES = [
+  BROKEN('plasma', (s) => { s.dragons[2].element = 'plasma'; }),
+  BROKEN('nobody', (s) => { s.keepers[1].look = 'nobody'; }),
+  BROKEN('dance', (s) => { s.jobs[0].need = 'dance'; }),
+];
+
+/**
+ * view=base, live and saving, with a broken save of this version in storage (plan 3.6): a new barn (the planted one is
+ * at tick 5000), with its seven young adults, the page running (the runner fails on any page error), the save kept at
+ * the backup key -- and a save now writes the new barn over it, never the broken one back.
+ */
+function liveBrokenSave({ blob, mark }: { blob: string; mark: string }) {
+  return async (page: any): Promise<string[]> => {
+    const out: string[] = [];
+    await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 5, null, { timeout: 15000 });
+    const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare.base);
+    if (b.tick > 2000) out.push(`the world is at tick ${b.tick}: it kept the broken save`);
+    out.push(...castIs(7, 'adult')(b));
+    if ((await stored(page, BACKUP_KEY)) !== blob) out.push('the broken save was not kept at the backup key');
+    const T: number = await page.evaluate(() => (window as any).__dragonCare.baseSaveNow());
+    const saved = await stored(page, SAVE_KEY), s = saved ? JSON.parse(saved) : null;
+    if (!s || s.tick !== T || s.tick > 2000 || saved!.includes(`"${mark}"`)) out.push(`the save written is ${s ? `at tick ${s.tick}` : 'nothing'}, not the new barn: the broken one ('${mark}') was written back`);
+    return out;
+  };
+}
+
+/**
+ * view=base&hour=22, live, with the player's save in storage: a page given its start hour is not the player's barn (like
+ * a preset page) -- it neither loads the save (it is night, at a low tick, persist false) nor writes it.
+ */
+async function liveHourNoSave(page: any): Promise<string[]> {
+  const out: string[] = [];
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 5, null, { timeout: 15000 });
+  const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare.base);
+  if (b.tick > 2000) out.push(`the world is at tick ${b.tick}: it loaded the save`);
+  if (b.persist) out.push('a page given hour= says it persists');
+  if (b.clock?.phase !== 'night') out.push(`it is ${b.clock?.phase} on a page started at 22:00`);
+  if (await page.evaluate(() => typeof (window as any).__dragonCare.baseSaveNow) !== 'undefined') out.push('a page given hour= lends baseSaveNow');
+  if ((await stored(page, SAVE_KEY)) !== PLANTED) out.push('a page given hour= wrote the save');
+  return out;
+}
 
 /**
  * view=base, live (save=0): the speed. The speed button's rect (the hook's) picks 2x; the key 4 picks 8x, which runs at
@@ -364,8 +413,9 @@ const CASES: Case[] = [
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseInput },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseKeys },
   // time: night by the hour, day against night (the world layer the same, the frame not), the speed, and saves --
-  // a frozen page ignores the one in storage, a live page resumes its own after a reload, and sets aside one that
-  // doesn't fit (the only live cases without save=0, each in its own page and storage)
+  // a frozen page ignores the one in storage, and so does a live page given hour=; a live page resumes its own after a
+  // reload, and sets aside one that doesn't fit, of another version or broken (the only live cases without save=0,
+  // each in its own page and storage)
   { query: 'view=base&t=600&hour=22', minColours: 150, allScales: false, hash: true, check: (b) => [...castIs(7, 'adult')(b), ...timeFields('night', false)(b)] },
   { query: 'view=base&t=600&hour=12', minColours: 150, allScales: false, hash: true, check: timeFields('day', false) },
   { query: 'view=base&t=600&hour=12&layers=world', minColours: 150, allScales: false, hash: true, check: timeFields('day', false) },
@@ -374,6 +424,8 @@ const CASES: Case[] = [
   { query: 'view=base&t=600', minColours: 150, allScales: false, init: plant(PLANTED), act: plantedFrozen },
   { query: 'view=base', minColours: 150, allScales: false, act: livePersist, timeout: 45000 },
   { query: 'view=base', minColours: 150, allScales: false, init: plant(OLD_SAVE), act: liveOldSave },
+  ...BROKEN_SAVES.map((b): Case => ({ query: 'view=base', minColours: 150, allScales: false, init: plant(b.blob), act: liveBrokenSave(b) })),
+  { query: 'view=base&hour=22', minColours: 150, allScales: false, init: plant(PLANTED), act: liveHourNoSave },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);

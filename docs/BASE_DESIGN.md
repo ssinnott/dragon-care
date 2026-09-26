@@ -52,7 +52,8 @@ elder). A new game therefore starts with seven dragons, one per element, each 0 
   belly colour, with saturation under 0.20; straw `#e0d6b8` is the reference. A grass floor would swallow spike. **A
   room's identity comes from its walls, props and light, never its floor.** Walls behind the dragons are kept
   mid-light and low in saturation (they separate from the ink, and from the dark bodies by value); gate (w) in
-  `tools/palette-check.ts` holds every wall, and everything else a dragon is seen against, to that (7).
+  `tools/palette-check.ts` holds every wall, and everything else a dragon is seen against, to that (7): lighter than
+  every dark body, never darker.
 - **Darkness hides the dark dragons.** Dusk's body sits at luminance 0.08 and slinkwing's at 0.05: a night sky or a
   mine swallows them whole. Dark places show the team **only inside a pool of light** (the mission tunnel, lit by
   dusk's lamp), and night outdoors stays mid-value (the blue hour of the mission mockup). The dragons are never tinted
@@ -341,9 +342,9 @@ drains.
 
 **4.8 On screen.**
 - **The top bar** (y 0 to 15, `src/game/hud.ts`), left to right:
-  - the time of day: a sun by day, a low orange sun at dawn and dusk, the moon at night, and the clock, `DAY 3 14:00`
-    (the minutes in tens);
-  - `JOBS n`, the open jobs;
+  - the time of day, as the sky shows it (7): a sun by day, a low orange sun at dawn and dusk, the moon at night, and
+    the clock, `DAY 3 14:00` (the minutes in tens; from day 100 `D100 14:00`, so the clock never runs into JOBS);
+  - `JOBS n`, the open jobs (at x 90, or a space after a longer clock);
   - a badge per keeper (46 x 13, at x 138, 186, 234 and 282): a chip in the keeper's own top colour, the name, and a
     dot while at a job (display only; taking a keeper makes them tappable, S7);
   - three buttons: **NEW** (x 528: tap it twice within 2 s for a new barn), **II** (x 558: pause) and **>1X** (x 578:
@@ -477,14 +478,18 @@ stand spot <= 20 s, the bay's edge <= 60 s.
   - The sky is drawn behind the building, in screen space: three flat bands, far hills and clouds at half the camera's
     pace, and at night the moon and 24 stars at a fifth of it (the stars come out a third at a time as the night comes
     on, and go the same way at dawn). The barn's windows (2) show it.
-  - The lights: at dusk and night the towers' window slits are lit (and through the dawn's turn), and each Lamp Dorm
-    lamp throws two stepped rings on its wall, never on the floor's band; at night the hearth throws one on the
-    kitchen wall, and the hayloft's skylight shows the night.
+  - The lights follow the sky, not the clock's phase (the sky turns into a phase over its first hour, so at 20:00 it
+    is still the dusk's and at 05:00 still the night's; `src/game/sky.ts` `lightsOf`): as the dusk's sky turns (from
+    18:20) and until the dawn's has (06:00), the towers' window slits are lit and each Lamp Dorm lamp throws stepped
+    rings on its wall, the inner one and then both (they go out the same way), never on the floor's band; while the
+    stars are out the hearth throws one on the kitchen wall and the hayloft's skylight shows the sky and a star. The
+    top bar's sun or moon is the one the sky mostly shows.
   - Nothing tints a dragon, a floor or a wall. The night is a mid-value blue hour (its bands L 0.19 to 0.28), never
     black, so a dark dragon on the Aerie still shows against it. Gate (w) in `tools/palette-check.ts` holds every sky
-    colour at every phase and every stepped mix between two, every wall, the big props right behind a slot (the
-    hearth, the tub, the dorm's pallets) and the lamps' light >= 25 % in luminance from every dark body (lightning,
-    dusk and slinkwing, at every stage) and 6 Oklab L from the ink: 1001 gates, all passing (ART_BIBLE 5.8).
+    colour at every phase and every stepped mix between two, every wall and the lamps' light >= 25 % *lighter* than
+    every dark body (lightning, dusk and slinkwing, at every stage: so L >= 0.159, and a black night fails), the big
+    props right behind a slot (the hearth and its dark firebox, the tub, the dorm's pallets) >= 25 % from them either
+    way, and all 6 Oklab L from the ink: 1001 gates, all passing (ART_BIBLE 5.8).
   - The barn's care never reads the day's phase: a barn started at noon and one started at ten at night, stepped alike,
     are the same barn (`npm run sim` section 12), and `view=base&layers=world` (the world alone: the building, the car,
     the cast, the bubbles and the plates) is the same picture at noon and at ten at night (`npm run smoke`). Only a
@@ -498,10 +503,12 @@ stand spot <= 20 s, the bay's edge <= 60 s.
   that touches it). It is loaded when the game's page opens, and saved every 10 s of play (600 frames) and when the
   page is hidden or left; closing pauses the world (B6). A save is the whole world as JSON, loaded back exactly
   (`src/game/save.ts`). **NEW** (tap twice) starts a new barn on a fresh seed, and it replaces the old one. A save this
-  build can't read (another version, or broken) starts a new barn, with a toast ("NEW BARN: THE OLD SAVE DIDN'T FIT"),
-  and the old save is kept aside at `dragon-care/base.bak`. **The tests and `t=` are exempt:** a frozen page (`t=`), a
-  preset page, `save=0` and every headless check never read or write it, so `t=` always shows the new game (or the
-  preset) stepped t times at 1x, whatever the browser holds.
+  build can't read (another version, not a save at all, or one whose insides it can't build, step once and draw: an
+  element, a stage or a keeper it doesn't know) starts a new barn, with a toast ("NEW BARN: THE OLD SAVE DIDN'T
+  FIT"), and the old save is kept aside at `dragon-care/base.bak`; nothing of it is swapped in until the whole trial
+  has passed, so a broken save never freezes the page or is written back. **The tests and `t=` are exempt:** a frozen
+  page (`t=`), a preset page, a page given `hour=`, `save=0` and every headless check never read or write it, so `t=`
+  always shows the new game (or the preset) stepped t times at 1x, whatever the browser holds.
 - **Seeded.** Every random choice (a mission's roll, a starting need, a keeper's tie-break) goes through the engine's
   seeded RNG (`src/lib/engine/rng.ts`); after the world is built every draw is stateless (`rngAt`), so a save keeps
   only the seed. That keeps a run reproducible and keeps the gallery's frozen-time screenshot contract (`t=`) true for
@@ -522,8 +529,9 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    do nothing here, and its arrows step over the base, so a debug view reached with them can still be left.
    **Time is built too** (7): the day and night (a day is 3 minutes at 1x: watch one whole, or in 23 s at 8x), the
    speed (the top bar's button, the keys 1 to 4, and p to pause), and the barn kept in the browser (a reload resumes
-   it; NEW, tapped twice, starts another). The page also takes `hour=0..23` (the hour day 1 starts at) and
-   `layers=world` (the world drawn alone, for the no-tint check).
+   it; NEW, tapped twice, starts another). The page also takes `hour=0..23` (the hour day 1 starts at; like a preset
+   page, a page given an hour never loads or saves, so it always starts at that hour) and `layers=world` (the world
+   drawn alone, for the no-tint check).
 
    ![The built slice, 49 s in, in the start frame: RIPPLE walks off the Dragon Lift's car at the upper floor to the Romp Room, and Pip, sent for it now it is past its ride, goes for a ball at the box by the wheel; ZAP waits at the ground floor's east landing for the car up to the Lamp Dorm, back to back with COBBLE walking into the Bathhouse's first slot (Tomas brings the bucket, out of frame); WICK waits at the hayloft's east landing for the car down to the Romp Room; ECHO walks past BRAMBLE in the Grooming Parlour on its way down to the Bathhouse; Bea waits in the Hearth Kitchen; the job strip](base/base_live.png)
 
@@ -595,5 +603,11 @@ stand spot <= 20 s, the bay's edge <= 60 s.
   and a resting keeper stays assignable. The elements' own night habits wait with it.
 - Is any care kept as a player action, the grow-up (240 f, "look at me") above all?
 - ~~The wall gate's exact rule, once the room palette exists.~~ Answered (S4): gate (w) (7) holds every wall, sky
-  colour, big prop behind a slot and lamp's light >= 25 % in luminance from every dark body and 6 Oklab L from the ink.
+  colour and lamp's light >= 25 % lighter than every dark body, every big prop behind a slot >= 25 % from them either
+  way, and all 6 Oklab L from the ink.
   A prop's cel shadow band and its 1 px lines are marks, not backdrops, and are not gated.
+- Night in the start frame is quiet: the barn's windows, the Lamp Dorm's lamp and the hearth's glow change (about 2 %
+  of the frame at 23:20 against noon); the sky, the stars and the moon show once the camera is on the roof or the
+  Aerie. A lantern in each named room, lit at dusk with its own stepped rings (gated by (w) like the dorm's), would say
+  more -- but a lamp is furniture (#11: a room's props are its purpose) and the Lamp Dorm's own mark, so it waits for
+  a design call rather than being added with the time slice (S4 review).

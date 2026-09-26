@@ -22,6 +22,7 @@ import {
 import type { Room, Link } from './layout.ts';
 import { FLOORS, INK, EMPTY_WALL, LIFT_WALL, STONE, STRAW_SEAM, WALLS, PROPS, LIGHTS, LAMP_RINGS, HEARTH_RING, skyBands } from './surfaces.ts';
 import type { ClockRead } from './clock.ts';
+import { lightsOf } from './sky.ts';
 
 const STRAW = FLOORS.straw;
 /** Timber (posts, frames, rails, the trusses), and its dark tone (slabs, the car's underframe, the guide rails). */
@@ -466,34 +467,32 @@ export function drawLiftCar(g: CanvasRenderingContext2D, y: number): void {
   rect(g, CAR_X0 + 1, top + BAND + 1, w - 2, SLAB - 2, TIMBER_DK); rect(g, CAR_X0 + 1, top + BAND + 1, w - 2, 1, '#86603f');
 }
 
-/** Whether the towers' slits are lit: at dusk and night, and while the dawn is still turning the night's sky. */
-export function slitsLit(c: ClockRead): boolean { return c.phase === 'dusk' || c.phase === 'night' || (c.phase === 'dawn' && c.blend < 3); }
-
 /**
  * The lights (docs/BASE_DESIGN.md 7), drawn in the world layer over the building and under the plates, the lift's car
- * and the cast (never over a dragon: G8). At dusk and night the towers' window slits are lit (and through the dawn's
- * turn), and each dorm lamp throws two stepped rings on its wall (r 10 and 16, the lamp's colour mixed into the wall's
- * at a half and a quarter: flat), clipped to the wall above the band, never on it; at night the hearth throws one flat
- * ring on the kitchen wall round it, and the hayloft's skylight shows the night's top band and a star. By day, nothing.
+ * and the cast (never over a dragon: G8), in step with the sky (sky.ts lightsOf: the sky turns into a phase over its
+ * first hour, and the lights with it, never on the phase's first step). As the dusk's sky turns, and until the dawn's
+ * has, the towers' window slits are lit and each dorm lamp throws its stepped rings on its wall (r 10, then r 16 too,
+ * the lamp's colour mixed into the wall's at a half and a quarter: flat), clipped to the wall above the band, never on
+ * it; while the stars are out the hearth throws one flat ring on the kitchen wall round it, and the hayloft's skylight
+ * shows the sky's top band and a star. By day, nothing.
  */
 export function drawLights(g: CanvasRenderingContext2D, rooms: readonly Room[], c: ClockRead): void {
-  if (slitsLit(c)) for (const s of SLITS) rect(g, s.x, s.y, SLIT_W, SLIT_H, LIGHTS.slit);
-  const evening = c.phase === 'dusk' || c.phase === 'night';
-  if (!evening) return;
+  const lit = lightsOf(c);
+  if (lit.slits) for (const s of SLITS) rect(g, s.x, s.y, SLIT_W, SLIT_H, LIGHTS.slit);
   for (const r of rooms) {
     const t = floorTop(r.floor), band = t + WALL_H;
-    if (r.kind === 'dorm') {
+    if (r.kind === 'dorm' && lit.rings > 0) {
       g.save();
       g.beginPath(); g.rect(r.x0 + 3, t, r.x1 - r.x0 - 6, WALL_H); g.clip();
       if (r.floor === 2) { path(g, ROOF_IN); g.clip(); }
       for (const l of lampsOf(r)) {
         const cy = l.y + 5;
-        disc(g, l.x, cy, 16, LAMP_RINGS[1], false);
+        if (lit.rings > 1) disc(g, l.x, cy, 16, LAMP_RINGS[1], false);
         disc(g, l.x, cy, 10, LAMP_RINGS[0], false);
         lamp(g, l);
       }
       g.restore();
-    } else if (r.kind === 'kitchen' && c.phase === 'night') {
+    } else if (r.kind === 'kitchen' && lit.hearth) {
       // (round the hearth: clipped to the wall above its shadow line, the hearth and its hood cut out, so it lies behind them)
       const hx = r.x0 + 6;
       g.save();
@@ -502,5 +501,5 @@ export function drawLights(g: CanvasRenderingContext2D, rooms: readonly Room[], 
       g.restore();
     }
   }
-  if (c.phase === 'night') { poly(g, SKYLIGHT, skyBands(c)[0]); rect(g, 905, 306, 2, 2, LIGHTS.star); }
+  if (lit.skylight) { poly(g, SKYLIGHT, skyBands(c)[0]); rect(g, 905, 306, 2, 2, LIGHTS.star); }
 }

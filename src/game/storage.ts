@@ -25,7 +25,8 @@ export function backupSave(): void {
 /**
  * The barn as saved: `ok` with the save, or no save and why -- `none` (never saved), `old` (another version) or `bad`
  * (not JSON, or not a save). An old or bad save is copied to BACKUP_KEY. Never throws. (A save of this version whose
- * insides are broken is found only by CareSim.fromSave; the caller backs it up the same way: backupSave.)
+ * insides are broken is found only when the view loads it -- BaseView's load(): CareSim.fromSave, then a trial step
+ * and draw -- and the caller backs it up the same way: backupSave.)
  */
 export function loadSave(): { save: SaveV | null; note: LoadNote } {
   const s = store();

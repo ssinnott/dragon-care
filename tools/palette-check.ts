@@ -57,8 +57,11 @@
 //                   and lift-shaft walls, the towers' stone, the big props right behind a slot, and the light the dorm
 //                   lamps and the hearth throw on their walls at night) keeps >= 25 % luminance from every DARK body
 //                   (an element's scale under L 0.15 at a stage: lightning, dusk and slinkwing at every stage), and
-//                   >= OKL_MIN Oklab L from the outline. So night stays mid-value (the blue hour, never black: a dark
-//                   dragon on the Aerie at night still shows), and a wall is never the colour of a dark body.
+//                   >= OKL_MIN Oklab L from the outline. The sky, the hills, the clouds, the walls, the stone and the
+//                   lamps' light must be that much LIGHTER than each dark body (L >= about 0.16: a colour darker than
+//                   slinkwing is as far from it by relDiff, and black), so night stays mid-value (the blue hour, never
+//                   black: a dark dragon on the Aerie at night still shows) and a wall is never the colour of a dark
+//                   body; a big prop may lie either way (the hearth's firebox is a dark mouth behind kitchen slot 0).
 // REPORTED, NOT GATED:
 //   (g) any scale pair that passes (b) on hue alone at the same stage (it would merge in greyscale); any body pair
 //       that passes (f) on simulated value alone under the dark-pair floor (they are told apart by zone); glow colours
@@ -792,8 +795,16 @@ function wcount(label: string, ok: boolean): boolean {
   if (!ok) { wFailures++; wFailed.push(label); }
   return ok;
 }
+/** How much lighter `a` is than `b` in luminance, (La - Lb) / La: the same as relDiff when `a` is the lighter, below 0 when it is the darker. */
+function lighterBy(a: string, b: string): number {
+  const la = lumOf(a), lb = lumOf(b);
+  return la > 0 ? (la - lb) / la : -1;
+}
 {
   const dark = DRAGON_ELEMENTS.flatMap((e) => STAGES.map((st) => ({ who: `${e} ${st}`, hex: PAL(e, st).scale }))).filter((b) => lumOf(b.hex) < W_DARK);
+  // (the sky, the hills, the clouds, the walls, the stone and the lamps' light must be LIGHTER than every dark body:
+  // a colour darker than slinkwing is as far from it by relDiff and still black; only a prop's may lie either way)
+  const floorL = Math.max(...dark.map((b) => lumOf(b.hex))) / (1 - LUM_MIN);
   const list: [string, string][] = [];
   // (each phase, then the two stepped mixes into the next: the sky turns night -> dawn -> day -> dusk -> night)
   for (let i = 0; i < PHASE_ORDER.length; i++) {
@@ -806,18 +817,18 @@ function wcount(label: string, ok: boolean): boolean {
   }
   list.push(['lift wall', BACKDROPS.liftWall], ['bare wall', BACKDROPS.emptyWall], ['tower stone', BACKDROPS.stone]);
   for (const [k, hex] of Object.entries(WALLS)) list.push([`${k} wall`, hex]);
-  for (const [k, hex] of Object.entries(PROPS)) list.push([`prop ${k}`, hex]);
   list.push(['lamp ring inner', LAMP_RINGS[0]], ['lamp ring outer', LAMP_RINGS[1]], ['hearth ring', HEARTH_RING]);
-  head(`(w) BACKDROPS  (everything a dragon is seen against, each >= ${LUM_MIN * 100}% luminance from every dark body (scale L < ${W_DARK}: ${dark.length} element-stages) and >= ${OKL_MIN} Oklab L from the ink ${INK})`);
-  for (const [what, hex] of list) {
+  const props: [string, string][] = Object.entries(PROPS).map(([k, hex]) => [`prop ${k}`, hex]);
+  head(`(w) BACKDROPS  (everything a dragon is seen against: the sky, hills, clouds, walls, stone and lamps' light each >= ${LUM_MIN * 100}% LIGHTER in luminance than every dark body (scale L < ${W_DARK}: ${dark.length} element-stages), so L >= ${floorL.toFixed(3)}, never black; a big prop behind a slot >= ${LUM_MIN * 100}% from them either way; all >= ${OKL_MIN} Oklab L from the ink ${INK})`);
+  for (const [what, hex, apart] of [...list.map(([w, h]) => [w, h, false] as const), ...props.map(([w, h]) => [w, h, true] as const)]) {
     let least = Infinity, by = '';
     for (const b of dark) {
-      const d = relDiff(hex, b.hex);
+      const d = apart ? relDiff(hex, b.hex) : lighterBy(hex, b.hex);
       wcount(`(w) ${what} / ${b.who}`, d >= LUM_MIN);
       if (d < least) { least = d; by = b.who; }
     }
     const ink = okDiff(hex, INK), inkOk = wcount(`(w) ${what} / ink`, ink >= OKL_MIN);
-    out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${what.padEnd(28)} ${hex}  L ${lumOf(hex).toFixed(3)}  least ${pct(least)} (${by})  ${okf(ink)} from ink`);
+    out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${what.padEnd(28)} ${hex}  L ${lumOf(hex).toFixed(3)}  least ${pct(least)} ${apart ? 'apart  ' : 'lighter'} (${by})  ${okf(ink)} from ink`);
   }
 }
 

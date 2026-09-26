@@ -51,8 +51,11 @@ export function readClock(clock: number, dayLen: number = DAY_STEPS): ClockRead 
   return { day, hour, minute, phase, prev: PREV_PHASE[phase], blend };
 }
 
-/** The HUD's clock: 'DAY 3 14:00', the minutes floored to tens. */
+/**
+ * The HUD's clock: 'DAY 3 14:00', the minutes floored to tens -- and from day 100 'D100 14:00', so the label stays
+ * within 12 glyphs (the top bar's room before JOBS and the keepers' badges: hud.ts) to day 99 999.
+ */
 export function clockLabel(c: ClockRead): string {
   const two = (n: number) => String(n).padStart(2, '0');
-  return `DAY ${c.day} ${two(c.hour)}:${two(Math.floor(c.minute / 10) * 10)}`;
+  return `${c.day < 100 ? 'DAY ' : 'D'}${c.day} ${two(c.hour)}:${two(Math.floor(c.minute / 10) * 10)}`;
 }

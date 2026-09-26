@@ -40,7 +40,9 @@
 //    with the ceiling they show; no keeper gives up, the car never stalls, and its throughput holds.
 // 11. The clock (docs/BASE_DESIGN.md 7) on a real day and a 600-step test day: the day, the hour and the phase at each
 //    phase's start, the sky's three stepped thirds over a phase's first hour, day 2 at midnight, a whole day read step
-//    by step (the phases in order, the turn never going back), the label, and a world's start hour.
+//    by step (the phases in order, the turn never going back; the lights and the HUD's sun or moon in step with the
+//    sky, never switching on a phase's first step), the label (and the top bar's room for it to day 99 999), and a
+//    world's start hour.
 // 12. Night is not the barn's (plan G8): a world started at 07:00 and one started at 19:00, the same seed, are the same
 //    barn (save.ts barnKey: every absolute clock left out) every 1000 steps for 20000 -- so view=base's no-tint check,
 //    day against night, compares one world -- and no simulation module reads the day's phase.
@@ -65,6 +67,9 @@ import { serialize, barnKey, SaveVersionError, SAVE_VERSION } from '../src/game/
 import { readClock, clockLabel, hourSteps, PHASE_ORDER } from '../src/game/clock.ts';
 import type { ClockRead } from '../src/game/clock.ts';
 import { skyBands, BACKDROPS } from '../src/game/surfaces.ts';
+import { lightsOf, nightness } from '../src/game/sky.ts';
+import { jobsAt, CLOCK_X, BADGE_X0 } from '../src/game/hud.ts';
+import { measureText } from '../src/lib/engine/text.ts';
 import { rngAt, mix32, TAG } from '../src/game/rand.ts';
 import {
   route, spanOf, postX, placeRooms, platesOf, standSpot, fitsSlot, slotBody, dragonNet, feetY, floorTop, KEEPER_NET, ROOM_INFO, ROOM_KINDS, STRUCTURES,
@@ -799,17 +804,32 @@ let firstRide = '';
       const bands = skyBands(r);
       if (r.blend === 0 && bands.join() !== BACKDROPS.sky[r.prev].join()) fail(`clock: the sky at the start of the ${r.phase} is not the ${r.prev}'s`);
       if (r.blend === 3 && bands.join() !== BACKDROPS.sky[r.phase].join()) fail(`clock: the sky an hour into the ${r.phase} is not its own`);
+      // the lights and the icon follow the sky (sky.ts lightsOf): as the step before at a phase's first step (the sky
+      // is still the phase before's), all on while any star is out, all off (and the sun) under the day's own sky, the
+      // moon exactly while the sky is mostly night's
+      const lit = lightsOf(r), was = lightsOf(last), what = `${clockLabel(r)} (${r.phase} ${r.blend}/3)`;
+      if (r.phase !== last.phase && !isDeepStrictEqual(lit, was)) fail(`clock (${dayLen}): at ${what} the lights or the icon switched with the phase, not the sky: ${JSON.stringify(was)} -> ${JSON.stringify(lit)}`);
+      if (nightness(r) > 0 && !(lit.slits && lit.rings > 0 && lit.hearth && lit.skylight)) fail(`clock: at ${what} the stars are out but the lights are ${JSON.stringify(lit)}`);
+      if (bands.join() === BACKDROPS.sky.day.join() && (lit.slits || lit.rings || lit.hearth || lit.skylight || lit.icon !== 'sun')) fail(`clock: at ${what} the sky is the day's but the lights are ${JSON.stringify(lit)}`);
+      if ((lit.icon === 'moon') !== (nightness(r) >= 2)) fail(`clock: at ${what} the icon is the ${lit.icon} with the night ${nightness(r)}/3 in the sky`);
       last = r;
     }
     if (turns !== 4) fail(`clock (${dayLen}): the phase turned ${turns} times from midnight to midnight, not 4 (night to dawn, day, dusk, and night again at 20:00)`);
     lines.push(`${dayLen}-step day (an hour ${hs} steps): ${[0, 5 * hs, 5 * hs + third, 7 * hs, 18 * hs, 20 * hs, 24 * hs].map((c) => { const r = readClock(c, dayLen); return `${c} ${clockLabel(r)} ${r.phase}${r.blend < 3 ? ` ${r.blend}/3` : ''}`; }).join(', ')}`);
   }
   if (clockLabel(readClock(2 * DAY_STEPS + 14 * 450 + 278, DAY_STEPS)) !== 'DAY 3 14:30') fail(`clock: 14:37 on day 3 reads ${clockLabel(readClock(2 * DAY_STEPS + 14 * 450 + 278))}, not DAY 3 14:30`);
+  // the top bar: the clock, a space, then JOBS (two digits), all before the keepers' badges, from day 1 to day 99 999
+  const bar: string[] = [];
+  for (const day of [1, 9, 10, 99, 100, 999, 1000, 9999, 10000, 99999]) {
+    const label = clockLabel(readClock((day - 1) * DAY_STEPS + 23 * 450 + 449)), x = jobsAt(label), end = x + measureText('JOBS 99');
+    if (x < CLOCK_X + measureText(label) + 7 || end > BADGE_X0 - 3) fail(`clock: the top bar's '${label}' puts JOBS at x ${x}, ending at ${end} (want a space after the clock, and the end by ${BADGE_X0 - 3})`);
+    if (day === 99 || day === 100 || day === 99999) bar.push(`'${label}' JOBS at ${x}`);
+  }
   // a world's start: 07:00 by default, any whole hour by SimOptions.hour, and nothing else
   const at = (hour?: number, dayLen?: number) => new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { hour, dayLen });
   if (at().clock !== 7 * 450 || at(22).clock !== 22 * 450 || at(22, 600).clock !== 22 * 25 || readClock(at(22).clock).phase !== 'night') fail(`clock: worlds start at ${at().clock}, ${at(22).clock}, ${at(22, 600).clock}, not 07:00 and 22:00`);
   for (const bad of [-1, 24, 7.5]) { try { at(bad); fail(`clock: a world started at hour ${bad}`); } catch { /* as it should */ } }
-  console.log(`  11 clock: ${lines.join('; ')}; a whole day read step by step turns night, dawn, day, dusk, night, each sky in three stepped thirds; hour= starts a world at 22:00`);
+  console.log(`  11 clock: ${lines.join('; ')}; a whole day read step by step turns night, dawn, day, dusk, night, each sky in three stepped thirds, the lights and the icon with it; the top bar ${bar.join(', ')}; hour= starts a world at 22:00`);
 }
 
 // ---------- 12. night is not the barn's ----------
@@ -829,7 +849,7 @@ let firstRide = '';
   for (let s = 0; s <= 20000; s += 450) phases.add(readClock(eve.clock0 + s).phase);
   // (the simulation's own modules: none reads the phase, the hour or the sky; only the view does)
   const SIM_FILES = ['sim.ts', 'travel.ts', 'needs.ts', 'layout.ts', 'gait.ts', 'save.ts', 'start.ts', 'presets.ts', 'rand.ts'];
-  const reads = SIM_FILES.filter((f) => /\b(readClock|phaseOf|PHASE_HOURS|PHASE_ORDER|DayPhase|skyBands|nightness)\b/.test(fs.readFileSync(new URL(`../src/game/${f}`, import.meta.url), 'utf8')));
+  const reads = SIM_FILES.filter((f) => /\b(readClock|phaseOf|PHASE_HOURS|PHASE_ORDER|DayPhase|skyBands|nightness|dimness|skyPhase|lightsOf)\b/.test(fs.readFileSync(new URL(`../src/game/${f}`, import.meta.url), 'utf8')));
   if (reads.length) fail(`night: ${reads.join(', ')} read the day's phase (only the view may: plan G8)`);
   console.log(`  12 night: a barn started at 07:00 and one at 19:00 (seed 1) agree on barnKey at all ${checked} checks over 20000 steps, through ${[...phases].join(', ')}; ${SIM_FILES.length} simulation modules, none reading the day's phase`);
   noteUse(day); noteUse(eve);

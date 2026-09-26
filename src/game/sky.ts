@@ -4,7 +4,7 @@
 // the camera's pace, and at night the moon and the stars at a fifth of it. The phases change in three stepped mixes over
 // a phase's first hour (surfaces.ts skyBands): no gradient, no alpha. Night is only this and the lights (building.ts
 // drawLights): it never tints a dragon, a floor or a wall (plan G8).
-import type { ClockRead } from './clock.ts';
+import type { ClockRead, DayPhase } from './clock.ts';
 import { BACKDROPS, LIGHTS, INK, skyBands, phaseColour } from './surfaces.ts';
 import { GROUND } from './layout.ts';
 import { rngAt, TAG } from './rand.ts';
@@ -32,6 +32,41 @@ const MOON = { x: 420, y: 44, r: 5 } as const;
  */
 export function nightness(c: ClockRead): number {
   return c.phase === 'night' ? c.blend : c.phase === 'dawn' ? 3 - c.blend : 0;
+}
+
+/**
+ * How far the sky has turned from the day's toward the dark, 0 to 3, in its own thirds: 0 by day and in the dawn's
+ * colours, rising through the dusk's turn (18:00 to 19:00), 3 from then through the night, and falling through the
+ * dawn's turn (05:00 to 06:00). The lamps follow it, never the phase alone: at a phase's first step the sky still
+ * shows the phase before's colours.
+ */
+export function dimness(c: ClockRead): number {
+  return c.phase === 'dusk' ? c.blend : c.phase === 'night' ? 3 : c.phase === 'dawn' ? 3 - c.blend : 0;
+}
+
+/** The phase the sky mostly shows: the phase before's until two thirds into a phase's first hour, then its own. */
+export function skyPhase(c: ClockRead): DayPhase { return c.blend >= 2 ? c.phase : c.prev; }
+
+/** What the lights show (building.ts drawLights) and the HUD's time-of-day icon (hud.ts). */
+export interface Lights {
+  /** The towers' window slits lit. */
+  slits: boolean;
+  /** The rings each dorm lamp throws on its wall: none, the inner one, or both (they come on, and go, by shrinking). */
+  rings: 0 | 1 | 2;
+  /** The hearth's ring on the kitchen wall, and the skylight showing the night's sky and a star. */
+  hearth: boolean;
+  skylight: boolean;
+  /** The top bar's icon: the sun, the low sun of dawn and dusk, the moon. */
+  icon: 'sun' | 'low' | 'moon';
+}
+/**
+ * The lights as the sky stands, so the two never disagree: the slits and the dorm lamps' rings with the dimness (the
+ * inner ring from its first third, both from its second), the hearth's ring and the skylight's night with the stars
+ * (nightness), and the icon with the phase the sky mostly shows.
+ */
+export function lightsOf(c: ClockRead): Lights {
+  const dim = dimness(c), stars = nightness(c) > 0, sky = skyPhase(c);
+  return { slits: dim > 0, rings: Math.min(2, dim) as 0 | 1 | 2, hearth: stars, skylight: stars, icon: sky === 'night' ? 'moon' : sky === 'day' ? 'sun' : 'low' };
 }
 
 /** Each copy of a repeating layer that can reach the screen: its offset, screen x, for a layer at `pace`. */
