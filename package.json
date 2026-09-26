@@ -12,6 +12,7 @@
     "shots": "node tools/shots.ts",
     "smoke": "node tools/smoke.ts",
     "sim": "node tools/sim-check.ts",
+    "capacity": "node tools/capacity.ts",
     "check": "npm run typecheck && npm run palette && npm run sim && npm run smoke"
   },
   "license": "MIT",
