@@ -99,6 +99,8 @@ interface Case {
   init?: (page: any) => Promise<void>;
   /** view=missionart (plan S9a): the sheet the page's hook must name, and every item it must have drawn. */
   art?: { sheet: string; want: readonly string[] };
+  /** The Map Room's panel (inside its border, screen px 12-628 x 22-332): at most this many colours (flat pixel-art fills, no anti-aliased edges: G6). */
+  maxPanelColours?: number;
   /** Hash the frame (an in-page FNV-1a over the canvas's pixels) for TINT: the whole frame, and the world between the HUD's bars (rows 16-338). */
   hash?: boolean;
   /** Keep the frame's pixels (0xRRGGBB each) for TINT's day-and-night comparison (plan S6c N1). */
@@ -491,6 +493,112 @@ async function baseWatch(page: any): Promise<string[]> {
   return out;
 }
 
+/**
+ * The Map Room's table (plan S8): the overlay open is `screen`, with the board's three missions (day 1: THE LOST NEST
+ * first) and the coin on the hook; the map shows a pin per mission, the chooser its BEST TEAM, SEND and BACK.
+ */
+function tableIs(screen: 'map' | 'mission') {
+  return (b: BaseHook): string[] => {
+    const out: string[] = [];
+    if (!b.ui || b.ui.screen !== screen) out.push(`the table's screen is ${b.ui?.screen}, not ${screen}`);
+    if (!Array.isArray(b.board) || b.board.length !== 3 || b.board[0].title !== 'THE LOST NEST') out.push(`the board is ${JSON.stringify(b.board?.map((m) => m.title))}, not three missions with THE LOST NEST first`);
+    if (b.coin !== 0 || b.trip !== null) out.push(`coin ${b.coin}, trip ${JSON.stringify(b.trip)}: a new game has none`);
+    if (screen === 'map' && (b.ui?.pins.length !== 3 || !b.ui.buttons.back)) out.push(`the map has ${b.ui?.pins.length} pins and buttons ${Object.keys(b.ui?.buttons ?? {})}`);
+    if (screen === 'mission' && (!b.ui?.buttons.best || !b.ui.buttons.send || !b.ui.buttons.back || b.ui.mission !== b.board[0]?.id)) out.push(`the chooser shows mission ${b.ui?.mission} with buttons ${Object.keys(b.ui?.buttons ?? {})}`);
+    return out;
+  };
+}
+/** The muster preset at the step its team all stands on the Aerie deck (npm run sim section 20): leaving now, every dragon in the barn's world (none away yet). */
+function mustered(b: BaseHook): string[] {
+  const t = b.trip, team = t ? t.pairs.map((p) => b.dragons.find((d) => d.id === p.dragon)) : [];
+  if (!t || t.state !== 'depart' || t.mission !== 'THE LOST NEST') return [`the trip is ${JSON.stringify(t)}, not THE LOST NEST departing`];
+  return team.every((d) => d && d.f === 5 && d.place === 'barn') ? [] : [`the team is ${team.map((d) => d && `${d.name} f${d.f} ${d.place}`).join(', ')}, not on the Aerie`];
+}
+/**
+ * view=base, live (save=0): the Map Room's table (plan S8, #5.6). MAP eases the camera to the Map Room and opens the
+ * map (within 2 s); a tap on the first pin opens its mission's chooser; BEST TEAM puts a team together; SEND sends it
+ * -- the table closes, the trip is mustering, and the camera is at the Aerie within 2 s.
+ */
+async function baseMission(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (r: { x: number; y: number; w: number; h: number }) => page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  await click((await st()).buttons.map);
+  try { await page.waitForFunction(() => (window as any).__dragonCare?.base?.ui?.screen === 'map', null, { timeout: 2000 }); } catch { return [`MAP did not open the map within 2 s (screen ${(await st()).ui.screen})`]; }
+  const tick = (await st()).tick;
+  await page.waitForTimeout(300);
+  if ((await st()).tick !== tick) out.push(`the world ran on under the map (tick ${tick} -> ${(await st()).tick})`);
+  const pin = (await st()).ui.pins[0];
+  if (!pin) return [...out, 'the map has no pin'];
+  await click(pin);
+  await page.waitForTimeout(100);
+  const m = await st();
+  if (m.ui.screen !== 'mission' || !m.ui.buttons.best) return [...out, `the pin opened ${m.ui.screen}, not a mission's chooser`];
+  await click(m.ui.buttons.best);
+  await page.waitForTimeout(100);
+  const team = (await st()).ui.pairs;
+  if (!team.length) out.push('BEST TEAM put nobody on the team');
+  await click((await st()).ui.buttons.send);
+  await page.waitForTimeout(100);
+  const s = await st();
+  if (!s.trip || s.trip.state !== 'muster' || s.ui.screen !== 'none') out.push(`after SEND the trip is ${JSON.stringify(s.trip?.state)} and the table ${s.ui.screen}`);
+  try { await page.waitForFunction(() => ((window as any).__dragonCare?.base?.camY ?? 999) <= 200, null, { timeout: 2000 }); } catch { out.push(`the camera is at y ${(await st()).camY} 2 s after SEND, not at the Aerie (<= 200)`); }
+  if (!(await st()).ui.buttons.chip) out.push('no TEAM OUT chip with the team out');
+  if (!out.length) console.log(`        mission: MAP, pin 1 (${m.board[0].title}), BEST TEAM (${team.length} pairs), SEND: mustering, camera at y ${(await st()).camY}`);
+  return out;
+}
+
+/**
+ * view=base, live (save=0; the S8 + S9 merge): the whole mission loop, as a player plays it -- MAP opens the Map Room's
+ * map; the first pin (THE LOST NEST) its chooser; BEST TEAM puts a team together; SEND (a command the world takes at its
+ * next step) closes the table and the team musters; at 8x the team stands together on the Aerie deck (the muster done:
+ * leaving over the sky bridge); the TEAM OUT chip opens the watch overlay -- the team on its road, the world stepping
+ * on underneath -- its TRIP LOG opens the trip's log and closes it again, and BACK TO BARN goes back to the barn.
+ */
+async function baseLoop(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  const until = (fn: string, ms: number) => page.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (r: { x: number; y: number; w: number; h: number }) => page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  await click((await st()).buttons.map);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "map"', 2000))) return [`MAP did not open the map (screen ${(await st()).ui.screen})`];
+  await click((await st()).ui.pins[0]);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "mission"', 2000))) return [`the first pin opened ${(await st()).ui.screen}, not its chooser`];
+  const m = await st(), title = m.board.find((q) => q.id === m.ui.mission)?.title;
+  await click(m.ui.buttons.best);
+  await page.waitForTimeout(100);
+  const pairs = (await st()).ui.pairs;
+  if (!pairs.length) return ['BEST TEAM put nobody on the team'];
+  await click((await st()).ui.buttons.send);
+  if (!(await until('window.__dragonCare?.base?.trip?.state === "muster"', 2000))) return [`after SEND the trip is ${JSON.stringify((await st()).trip)} (the table ${(await st()).ui.screen})`];
+  // (8x: the muster -- the team's dragons up by the lift, the riders' saddles from the Tack Room -- in a few seconds)
+  await page.keyboard.press('4');
+  if (!(await until('["depart", "away"].includes(window.__dragonCare?.base?.trip?.state)', 40000))) return [`the team never stood together on the Aerie (the trip ${(await st()).trip?.state})`];
+  const deck = await st();
+  await page.keyboard.press('1');
+  const chip = (await st()).ui.chip;
+  if (!chip) return [`no TEAM OUT chip with the team ${deck.trip?.state}`];
+  await click(chip);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "watch"', 2000))) return [`the TEAM OUT chip left the overlay ${(await st()).ui.screen}`];
+  const w = await st();
+  if (!w.scene || w.scene.progress < 0 || !w.ui.back || !w.ui.buttons.log) out.push(`the watch overlay: scene ${JSON.stringify(w.scene)}, back ${JSON.stringify(w.ui.back)}, log ${JSON.stringify(w.ui.buttons.log)}`);
+  await click(w.ui.buttons.log);
+  if (!(await until('window.__dragonCare?.base?.ui?.log === true', 2000))) out.push('TRIP LOG did not open the trip\'s log');
+  await click(w.ui.buttons.log);
+  if (!(await until('window.__dragonCare?.base?.ui?.log === false', 2000))) out.push('TRIP LOG again did not close the log');
+  const t0 = (await st()).tick;
+  await page.waitForTimeout(300);
+  if (!((await st()).tick > t0)) out.push('the world stood still under the watch overlay');
+  await click((await st()).ui.back!);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "none"', 2000))) out.push(`BACK TO BARN left the overlay ${(await st()).ui.screen}`);
+  if (!out.length) console.log(`        loop: MAP, pin 1 (${title}), BEST TEAM (${pairs.length} pairs), SEND, the muster at 8x to the Aerie deck (${deck.trip?.state} at step ${deck.tick}), the TEAM OUT chip to the watch scene (${Math.round((w.scene?.progress ?? 0) * 100)} % along), TRIP LOG open and shut, BACK TO BARN`);
+  return out;
+}
+
 /** The base's dragons include every stage. */
 function everyStage(b: BaseHook): string[] {
   const st = new Set(b.dragons.map((d) => d.stage)), missing = AGE_STAGES.filter((s) => !st.has(s));
@@ -752,6 +860,15 @@ const CASES: Case[] = [
   { query: 'view=missionart&sheet=baddies&t=30', minColours: 1000, allScales: false, art: { sheet: 'baddies', want: [...BADDIE_IDS, ...BADDIE_IDS.map((b) => `${b}:portrait`)] } },
   { query: 'view=missionart&sheet=people&t=50', minColours: 1000, allScales: false, keepers: true, art: { sheet: 'people', want: ['miller:grumpy', 'miller:talkedRound', ...KEEPER_IDS] } },
   { query: 'view=missionart&sheet=icons&t=0', minColours: 300, allScales: false, art: { sheet: 'icons', want: [...CHALLENGE_IDS.map((c) => `challenge:${c}`), ...SKILLS.map((k) => `skill:${k}`), 'saddle', ...DRAGON_ELEMENTS.map((e) => `egg:${e}`), ...BADDIE_IDS.map((b) => `portrait:${b}`)] } },
+  // missions (plan S8): the Map Room's world map and a mission's chooser (frozen, the world stepped first), the muster
+  // preset's team all on the Aerie deck, and live, MAP -> a pin -> BEST TEAM -> SEND
+  { query: 'view=base&t=60&panel=map', minColours: 100, maxPanelColours: 40, allScales: false, check: tableIs('map') },
+  { query: 'view=base&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: tableIs('mission') },
+  { query: 'view=base&preset=muster&t=2860&cam=0,20', minColours: 150, allScales: false, check: (b) => [...mustered(b), ...travels(b)] },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseMission },
+  // the whole loop live (the S8 + S9 merge): MAP -> a pin -> BEST TEAM -> SEND -> the muster on the Aerie -> the TEAM
+  // OUT chip -> the watch scene (its trip log) -> BACK
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseLoop },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -858,6 +975,15 @@ for (const c of CASES) {
       for (let i = 0; i < d.length; i += 4) seen.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
       return [...seen];
     });
+    if (c.maxPanelColours != null) {
+      const n: number = await page.evaluate(() => {
+        const cv = document.getElementById('stage') as HTMLCanvasElement, s = cv.width / 640;
+        const d = cv.getContext('2d')!.getImageData(Math.round(12 * s), Math.round(22 * s), Math.round(616 * s), Math.round(310 * s)).data, seen = new Set<number>();
+        for (let i = 0; i < d.length; i += 4) seen.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
+        return seen.size;
+      });
+      if (n > c.maxPanelColours) errors.push(`the map's panel has ${n} colours (want <= ${c.maxPanelColours}): anti-aliased edges?`);
+    }
     const set = new Set(colours);
     if (colours.length < c.minColours) errors.push(`only ${colours.length} distinct colours (want >= ${c.minColours}): were dragons drawn?`);
     if (c.keepers) {

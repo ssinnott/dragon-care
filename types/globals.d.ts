@@ -60,17 +60,28 @@ interface Window {
      * shell and the garden were drawn at (0 their day colours, 3 their moonlit night colours, 1 and 2 the stepped mixes
      * of dusk and dawn: src/game/sky.ts lightsOf `walls`).
      * Taking a keeper (S7): each keeper (name, floor, x, phase -- sim.ts Phase,
-     * 'manual' while held by hand and free -- what they carry, and their tap box in canvas px), the keeper held by hand
+     * 'manual' while held by hand and free, a mission's phases on a trip -- what they carry, and their tap box in canvas
+     * px), the keeper held by hand
      * (or taken at work, finishing it first) by name or null, the keepers' badges in the top bar (canvas px, by name: a
      * tap takes that keeper or lets go of the one held), the touch pad's buttons (canvas px, by name: `up`, `left`,
      * `right`, `down`, `act`, `letgo`; published always, drawn and live only while a keeper is held and the barn is on
-     * screen: never over the watch overlay), the line under the pad (who is held, what they carry and what E does) or
-     * null (null over the watch overlay too) and its ink strip (canvas px) or null, and the jobs done by hand so far,
+     * screen: never over an overlay), the line under the pad (who is held, what they carry and what E does) or
+     * null (null over an overlay too) and its ink strip (canvas px) or null, and the jobs done by hand so far,
      * by keeper name. The keeper held counts takes and releases still waiting for the next world step in the line and
      * the badges, but not in `controlled` (the simulation's).
-     * The watchable scene (S9): `ui` -- the overlay on screen (`none`, the barn, or
-     * `watch`, the team out watched on its road), the TEAM OUT chip's rect while it shows (a trip out, the barn on
-     * screen) and the BACK TO BARN button's while watching (canvas px); and `scene`, while a trip is out (null
+     * Missions (S8): a dragon's place may be `away` (with a team out: not drawn); the coin the missions have brought
+     * home; the Map Room's board (each mission's id, region, title, difficulty, challenges, baddie or null, days and
+     * coin); the trip out, or null (its state -- muster, depart, away, return -- its mission's title and region, its
+     * outcome and egg (rolled when it was sent), its pairs by dragon and keeper id, the clocks it left and lands at, and
+     * how far along the road it is, 0..1).
+     * The overlays (`ui`, S8 and S9): the screen open -- `none` (the barn), `map` or `mission` (the Map Room table's
+     * world map or a mission's chooser: the world waits while one is open) or `watch` (the team out watched on its
+     * road, the world stepping on underneath) -- the mission chosen (id) and the team being put together, the map's
+     * pins (canvas px, board order) and the named buttons on screen (canvas px: `back`, `best`, `send`, and `chip`, the
+     * TEAM OUT chip while a team is out and the barn is on screen; over the watch overlay `log`, which opens the trip's
+     * log), and S9's `chip` (the TEAM OUT chip's rect while it shows) and `back` (BACK TO BARN's while watching), and
+     * whether the trip's log is open over the watch overlay (`log`).
+     * The watchable scene (S9): `scene`, while a trip is out (null
      * otherwise): the last stop the team reached (`baddie` or its challenge; null before the first), whether it was met,
      * whether its beat is playing, the banner, the baddie on the road (its id, face and pose; null when none is in view),
      * its exit (on a success), the way the team faces (-1 after turning back), how far along the trip is (0..1), and
@@ -79,7 +90,7 @@ interface Window {
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
       chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[];
       digest: string;
-      dragons: { id: number; name: string; element: string; stage: string; place: 'barn' | 'garden'; f: number; x: number; move: string; room: string | null; slot: string | null;
+      dragons: { id: number; name: string; element: string; stage: string; place: 'barn' | 'garden' | 'away'; f: number; x: number; move: string; room: string | null; slot: string | null;
         waiting: boolean; head: { x: number; y: number } | null }[];
       lift: { y: number; rider: number | null };
       walked: number;
@@ -99,7 +110,13 @@ interface Window {
       action: string | null;
       line: { x: number; y: number; w: number; h: number } | null;
       doneBy: Record<string, number>;
-      ui: { screen: 'none' | 'watch'; chip: { x: number; y: number; w: number; h: number } | null; back: { x: number; y: number; w: number; h: number } | null };
+      coin: number;
+      board: { id: number; region: string; title: string; difficulty: string; challenges: string[]; baddie: string | null; days: number; coin: number }[];
+      trip: { state: string; mission: string; region: string; success: boolean; egg: string | null; pairs: { dragon: number; keeper: number }[];
+        departAt: number | null; returnAt: number | null; progress: number } | null;
+      ui: { screen: 'none' | 'map' | 'mission' | 'watch'; mission: number | null; pairs: { dragon: number; keeper: number }[];
+        pins: { x: number; y: number; w: number; h: number }[]; buttons: Record<string, { x: number; y: number; w: number; h: number }>;
+        chip: { x: number; y: number; w: number; h: number } | null; back: { x: number; y: number; w: number; h: number } | null; log: boolean };
       scene: { stop: string | null; covered: boolean | null; beat: boolean; banner: string | null; baddie: 'moleking' | 'stormroc' | 'frostgiant' | null;
         face: 'neutral' | 'grumpy' | 'surprised' | 'sleepy' | null; pose: 'walk' | 'stand' | 'sit' | 'turn' | 'leave' | null;
         exit: 'calmed' | 'outwitted' | 'drivenOff' | null; facing: 1 | -1; progress: number; done: boolean; result: string | null } | null };

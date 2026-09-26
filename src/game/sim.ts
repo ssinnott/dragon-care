@@ -12,7 +12,9 @@
 // after it was laid; 30 game days into the elder stage an elder retires to the garden, as soon as it may be sent
 // somewhere new (travel.ts redirectable: not being met, not in the lift's hands or its bay). The garden (garden.ts,
 // after the keepers in every step) is the retired elders' home: its residents keep a nap, sit and stroll rhythm, and
-// need only food and love, slowly -- a keeper comes out to them (plan S6).
+// need only food and love, slowly -- a keeper comes out to them (plan S6). Missions (missions.ts, last in every step:
+// plan S8) take a team of dragons and their riders off the Aerie for days: while away they are nobody's to care for
+// (their needs wait), and two keepers always stay home to run the barn.
 import { makeRng } from '../lib/engine/rng.ts';
 import { NEEDS, QUEUE, OWN_NEED, GARDEN_NEEDS, drainRate, gardenDrain, hasNeed, moodOf, tierOf, fullNeeds } from './needs.ts';
 import type { NeedKind, Needs } from './needs.ts';
@@ -21,6 +23,8 @@ import type { Room, RoomPlace, RoomKind, Structure, Leg, Spot, Slot, Nets } from
 import { NEED_ROOM, LEAD_PX, WAIT_MAX, KEEPER_HALF, stepTravel, arrived, remainingCost, ridesLeft, retarget, raiseCall, bayShut, inBay } from './travel.ts';
 import { stepLife } from './life.ts';
 import { stepGarden, standAtResident } from './garden.ts';
+import { newMissions, firstBoard, stepMissions, checkMissions, TRIP_PHASES } from './missions.ts';
+import type { MissionsState } from './missions.ts';
 import { mix32, TAG } from './rand.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
 import { SAVE_VERSION, SaveVersionError, worldKey } from './save.ts';
@@ -72,10 +76,13 @@ export interface SimOptions {
 /**
  * What happened in a step, for the view to show (a union later slices extend: a departure, a return...): a dragon grew
  * into `stage` (life.ts), or an egg hatched into a baby, the dragon `dragon`; an elder retired and set off for the
- * garden, or a retiree arrived at its plot there, a resident now (garden.ts).
+ * garden, or a retiree arrived at its plot there, a resident now (garden.ts); the player's commands (control.ts): a
+ * team sent on a mission from the Map Room's table (`reason` null) or refused (missions.ts canSend's reason), and a
+ * keeper the player asked for who could not be taken (on a mission's trip).
  */
 export type SimEvent = { kind: 'grow'; dragon: number; stage: Stage } | { kind: 'hatch'; dragon: number; egg: number }
-  | { kind: 'retire'; dragon: number } | { kind: 'garden'; dragon: number; plot: number };
+  | { kind: 'retire'; dragon: number } | { kind: 'garden'; dragon: number; plot: number }
+  | { kind: 'send'; mission: number; reason: string | null } | { kind: 'refused'; keeper: number; reason: string };
 
 /**
  * An egg in the Hatchery (plan S5): its id, its element, the seed its baby will have (a stateless draw from the world's
@@ -97,12 +104,14 @@ export interface Act { need: NeedKind; t: number; len: number; from: number }
 export type DragonMove = 'still' | 'walk' | 'turn' | 'call' | 'board' | 'ride' | 'alight' | 'bay';
 /**
  * Why a dragon is on the move: to a slot in its need's room; out of a slot another dragon needed; a baby due to grow
- * up, to a module slot its next stage fits (life.ts: it grows once it is settled there); or an elder retired, to its
- * plot in the garden (garden.ts). A later slice adds more.
+ * up, to a module slot its next stage fits (life.ts: it grows once it is settled there) -- or a dragon back from a
+ * mission, to the nearest free slot of its size (missions.ts); an elder retired, to its plot in the garden
+ * (garden.ts); or with a mission's team (missions.ts): up to the Aerie and off over the sky bridge, and back onto the
+ * deck when it lands.
  */
-export type DragonGoal = 'need' | 'evict' | 'settle' | 'retire';
-/** Where a dragon lives: the barn, or (retired) the garden. S8 adds 'away'. */
-export type Place = 'barn' | 'garden';
+export type DragonGoal = 'need' | 'evict' | 'settle' | 'retire' | 'muster';
+/** Where a dragon lives: the barn, (retired) the garden, or away on a mission (off the map: not drawn, its needs waiting). */
+export type Place = 'barn' | 'garden' | 'away';
 /** What a garden resident is doing (garden.ts): napping, sitting, strolling to a resting place, or waiting for its keeper. */
 export type GardenMode = 'nap' | 'sit' | 'stroll' | 'wait';
 /**
@@ -161,9 +170,13 @@ export interface Dragon {
 /**
  * A keeper's phase: free; fetching a supply, picking it up; going to the dragon's stand spot, waiting there for it; at
  * work; going back; or held by the player's hand, free to be walked (control.ts: a keeper held by hand picks up and
- * works in 'pickup' and 'work' too).
+ * works in 'pickup' and 'work' too). A rider on a mission (missions.ts): mustering (the saddle from the Tack Room, up
+ * to the Aerie), departing over the sky bridge, away, landing and delivering (the egg to its nest, the saddle back),
+ * and resting in the Bunks after -- the one of these a job may still call them from (and the player take them from).
  */
-export type Phase = 'idle' | 'fetch' | 'pickup' | 'go' | 'wait' | 'work' | 'home' | 'manual';
+export type Phase = 'idle' | 'fetch' | 'pickup' | 'go' | 'wait' | 'work' | 'home' | 'manual' | 'muster' | 'depart' | 'away' | 'deliver' | 'rest';
+/** What a keeper carries: a job's supply, or on a mission a saddle, or the egg a team brings home. */
+export type Carried = NeedKind | 'saddle' | 'egg';
 export interface Keeper {
   id: number;
   name: string;
@@ -183,7 +196,7 @@ export interface Keeper {
   /** Steps into a pickup or a job. */
   t: number;
   job: Job | null;
-  carrying: NeedKind | null;
+  carrying: Carried | null;
   rushing: boolean;
   facing: 1 | -1;
   /** Px walked in all, for the view's stride. */
@@ -309,6 +322,8 @@ export class CareSim {
   nets: Nets = makeNets(worldWOf(GARDEN_MIN_PLOTS));
   /** The player's commands for the next step (control.ts: applied at its start, in this order, then cleared; never saved: input, not the world). */
   commands: Command[] = [];
+  /** The Map Room's board, the map, the coin and the trip out (missions.ts; rolled for the start's day at construction). */
+  missions: MissionsState = newMissions();
 
   constructor(rooms: readonly RoomPlace[], dragons: readonly DragonPlace[], keepers: readonly KeeperPlace[], opts: SimOptions = {}) {
     this.seed = opts.seed ?? 1;
@@ -359,6 +374,7 @@ export class CareSim {
         climbing: false, legs: [], phase: 'idle', t: 0, job: null, carrying: null, rushing: false, facing: 1, walked: 0, bayWait: 0,
         manual: false, held: { dx: 0, dy: 0 }, cue: 0, pendingTake: false });
     });
+    firstBoard(this);
   }
 
   /** Game time: steps since day 1's midnight. */
@@ -421,10 +437,14 @@ export class CareSim {
     if (!whole(plots, GARDEN_MIN_PLOTS)) throw new Error(`save: the garden's plots (${JSON.stringify(s.garden)}) are not a garden's`);
     sim.setPlots(plots);
     const homes = new Set<number>();
+    // (the missions: a board, a map and a trip this build can run -- missions.ts checkMissions; a dragon away on one
+    // holds no slot, no plot, no rhythm, and is its team's)
+    const ms = checkMissions(s.missions, s.dragons, s.keepers);
     for (const d of s.dragons) {
       if (!whole(d.stageSince) || !whole(d.hold, 0)) throw new Error(`save: ${d.name}'s stage began at ${d.stageSince}, its hold ${d.hold}`);
-      const out = d.place === 'garden' || d.goal === 'retire', g = d.garden;
-      if ((d.place !== 'barn' && d.place !== 'garden') || (out ? d.stage !== 'elder' || d.slot || !whole(d.home, 0) || d.home >= plots || homes.has(d.home) : d.home != null)
+      const out = d.place === 'garden' || d.goal === 'retire', g = d.garden, team = !!ms.trip?.pairs.some((p) => p.dragon === d.id);
+      if ((d.place === 'away' || d.goal === 'muster') && (!team || d.slot || d.home != null || g != null)) throw new Error(`save: ${d.name} is away with no team: ${JSON.stringify({ place: d.place, goal: d.goal })}`);
+      if ((d.place !== 'barn' && d.place !== 'garden' && d.place !== 'away') || (out ? d.stage !== 'elder' || d.slot || !whole(d.home, 0) || d.home >= plots || homes.has(d.home) : d.home != null)
         || (d.place === 'garden' ? !g || typeof g !== 'object' || !['nap', 'sit', 'stroll', 'wait'].includes(g.mode) || !whole(g.until, -1) || !Number.isFinite(g.tx) : g != null)) {
         throw new Error(`save: ${d.name} is not where this build can keep it: ${JSON.stringify({ place: d.place, home: d.home, goal: d.goal, garden: d.garden })}`);
       }
@@ -444,6 +464,7 @@ export class CareSim {
     sim.jobs = jobs;
     Object.assign(sim.stats, s.stats, { used: { ...s.stats.used }, doneBy: { ...s.stats.doneBy } });
     sim.lift = { ...s.lift, calls: s.lift.calls.map((c) => ({ ...c })) };
+    sim.missions = ms;
     return sim;
   }
 
@@ -471,7 +492,8 @@ export class CareSim {
    * by being done: a need rises through a keeper's act alone), so a hatchling's food job opens the step it hatches; the
    * dragons choose where to go, walk and turn, and the lift runs (travel.ts); then free keepers take jobs, and every
    * keeper steps; then the garden (garden.ts): a retiree at its plot settles in, and the residents keep their rhythm
-   * (a job opened this step has one waiting for its keeper from the next).
+   * (a job opened this step has one waiting for its keeper from the next); then the missions (missions.ts): the dawn's
+   * board, and the trip out -- its muster, departure, days away and landing -- and the riders resting after one.
    */
   step(): void {
     this.events = [];
@@ -479,6 +501,8 @@ export class CareSim {
     // (the player's commands first: a take, a steer or E given before this step acts in it -- control.ts)
     applyCommands(this);
     for (const d of this.dragons) {
+      // (a dragon away on a mission is nobody's to care for: its needs wait until it lands -- missions.ts)
+      if (d.place === 'away') continue;
       // (a garden resident, or an elder on its way there, drains only food and love, slowly: needs.ts gardenDrain)
       const out = d.place === 'garden' || d.goal === 'retire';
       for (const k of NEEDS) if (hasNeed(d.element, k)) d.needs[k] = clamp01(d.needs[k] - (out ? gardenDrain(d.element, k) : drainRate(d.element, d.stage, k)));
@@ -495,8 +519,9 @@ export class CareSim {
     stepLife(this);
     for (const d of this.dragons) for (const k of NEEDS) {
       if (!hasNeed(d.element, k) || d.needs[k] >= QUEUE || (d.act && d.act.need === k)) continue;
-      // (an elder on its way to the garden asks for nothing until it is there; a resident, only for food and love)
-      if (d.goal === 'retire' || (d.place === 'garden' && !GARDEN_NEEDS.includes(k))) continue;
+      // (an elder on its way to the garden asks for nothing until it is there; a resident, only for food and love; a
+      // dragon with a mission's team, for nothing until it is back in the barn: missions.ts)
+      if (d.goal === 'retire' || d.goal === 'muster' || d.place === 'away' || (d.place === 'garden' && !GARDEN_NEEDS.includes(k))) continue;
       if (this.jobs.some((j) => j.dragon === d && j.need === k)) continue;
       this.jobs.push({ id: this.nextJob++, dragon: d, need: k, opened: this.tick, keeper: null, rushed: false });
       this.stats.opened++;
@@ -506,7 +531,15 @@ export class CareSim {
     this.assign();
     for (const k of this.keepers) this.stepKeeper(k);
     stepGarden(this);
+    stepMissions(this);
   }
+
+  /**
+   * Whether a keeper is free for a job: none in hand, not held by the player's hand (control.ts: auto-assignment and
+   * Rush skip them, and a keeper taken at work finishing it first), and not on a mission's trip (missions.ts
+   * TRIP_PHASES: a rider resting in the Bunks after one is free).
+   */
+  free(k: Keeper): boolean { return !k.job && !k.manual && !k.pendingTake && !TRIP_PHASES.has(k.phase); }
 
   /**
    * Free keepers take jobs in queue order; each job goes to the free keeper with the shortest trip, a specialist's
@@ -527,9 +560,6 @@ export class CareSim {
       if (best) this.claim(best, j);
     }
   }
-
-  /** A keeper free for a job: none in hand, and not held by the player's hand (control.ts: auto-assignment skips them). */
-  private free(k: Keeper): boolean { return !k.job && !k.manual && !k.pendingTake; }
 
   /**
    * A job a keeper can go to (plan S3): its dragon is going for it, to a slot in the need's own room, and is there, or
@@ -593,6 +623,7 @@ export class CareSim {
   // ---------- keepers ----------
 
   private claim(k: Keeper, j: Job): void {
+    // (a rider resting after a mission is called from the Bunks: the rest ends)
     j.keeper = k; k.job = j; k.rushing = j.rushed; k.t = 0;
     if (k.carrying && k.carrying !== j.need) k.carrying = null;
     const sup = k.carrying === j.need ? null : this.supplyRoom(j.need, this.spotOf(k));
@@ -606,6 +637,19 @@ export class CareSim {
     if (k.phase === 'work' && j.dragon.act && j.dragon.act.need === j.need && j.need !== 'sleep') j.dragon.act = null;
     j.keeper = null; k.job = null; k.rushing = false;
     this.stats.preempted++;
+  }
+
+  /**
+   * A keeper lets their job go where they stand, for a mission (missions.ts: a rider off to muster): the job goes back
+   * in the queue, and one under way stops where it got to (a tuck-in excepted: the dragon sleeps on). Not a pre-emption.
+   */
+  unjob(k: Keeper): void {
+    const j = k.job;
+    if (j) {
+      if (k.phase === 'work' && j.dragon.act && j.dragon.act.need === j.need && j.need !== 'sleep') j.dragon.act = null;
+      j.keeper = null;
+    }
+    k.job = null; k.rushing = false; k.t = 0; k.legs = k.climbing && k.legs.length ? [k.legs[0]] : [];
   }
 
   /**
@@ -623,6 +667,9 @@ export class CareSim {
   }
 
   private stepKeeper(k: Keeper): void {
+    // (a rider on a mission, or resting after one, is the missions' to step: missions.ts; none is ever held by hand --
+    // control.ts take refuses a keeper on a trip, and a take ends a rest)
+    if (TRIP_PHASES.has(k.phase) || k.phase === 'rest') return;
     // (held by the player's hand: walked, climbing and picking up by control.ts; at work like anyone)
     if (k.manual && k.phase !== 'work') { stepManual(this, k); return; }
     // (a job its dragon has stopped going for -- it was moved out of the slot -- is given back)
@@ -653,9 +700,9 @@ export class CareSim {
   /**
    * One step along the route; true once it is walked. A climb is at the link's x, floor to floor. On a floor, the bay
    * rule (R1): a keeper does not step into the lift bay while the car is moving (or closing) past this floor, but waits
-   * at its edge; one already in it walks on out.
+   * at its edge; one already in it walks on out. (Public for the missions' riders: missions.ts.)
    */
-  private move(k: Keeper): boolean {
+  move(k: Keeper): boolean {
     const leg = k.legs[0];
     if (!leg) return true;
     const pace = k.rushing ? RUSH : 1;
@@ -736,14 +783,15 @@ export class CareSim {
   // ---------- eggs ----------
 
   /**
-   * Lay an egg of an element in the Hatchery (a mission brings eggs home: S8), in its lowest free nest, laid at clock
-   * `laidAt` (default now; a preset may lay one earlier). Its baby's seed is a stateless draw from the world's seed and
+   * Lay an egg of an element in the Hatchery (a mission brings eggs home: S8), in nest `into` if it is free (the one
+   * the mission reserved) else its lowest free nest, laid at clock `laidAt` (default now; a preset may lay one earlier). Its baby's seed is a stateless draw from the world's seed and
    * the egg's id. Null if every nest holds an egg (or the base has no hatchery): the egg is not taken. #11: the
    * Hatchery is used.
    */
-  addEgg(element: DragonElement, laidAt: number = this.clock): Egg | null {
+  addEgg(element: DragonElement, laidAt: number = this.clock, into?: number): Egg | null {
     if (!this.rooms.some((r) => r.kind === 'hatchery')) return null;
-    let nest = -1;
+    // (a nest asked for -- the one a mission reserved -- if it is free; else the lowest free one)
+    let nest = into != null && into >= 0 && into < NESTS && !this.eggs.some((e) => e.nest === into) ? into : -1;
     for (let i = 0; i < NESTS && nest < 0; i++) if (!this.eggs.some((e) => e.nest === i)) nest = i;
     if (nest < 0) return null;
     const id = this.nextEggId++;
@@ -790,7 +838,8 @@ export class CareSim {
     return a && b ? a.cost + b.cost : Infinity;
   }
 
-  private walkTo(k: Keeper, to: Spot): void {
+  /** Route a keeper to a spot (a keeper halfway up a ladder finishes the climb first). */
+  walkTo(k: Keeper, to: Spot): void {
     // (a keeper halfway up a ladder finishes the climb first)
     const climb = k.climbing && k.legs.length ? k.legs[0] : null;
     const r = route(this.spotOf(k), to, this.nets.keeper);

@@ -8,12 +8,15 @@
 //
 // The simulation takes the player's input as commands (CareSim.command), applied in the order they came at the start
 // of the next step (applyCommands) and then cleared, so the same commands at the same steps always make the same world
-// (G1). The taken keeper is `manual`: auto-assignment skips them, Rush never picks them or takes them off a job, and
+// (G1). The Map Room's SEND is one of them too (plan S8: `send`, a team on a board mission -- missions.ts send, which
+// sends it or refuses it with canSend's reason; either way a `send` event says so, for the chooser's toast). The taken keeper is `manual`: auto-assignment skips them, Rush never picks them or takes them off a job, and
 // their `phase` is 'manual' (free under the player's hand), 'pickup' (taking a supply) or 'work' (meeting a need).
 // DOM-free and deterministic like the rest of the simulation.
 //
 // Rules (plan S7):
-// - take(k): another keeper held by hand is let go first; a keeper at work (a tuck-in, a meal under way) finishes that
+// - take(k): refused for a keeper on a mission's trip (mustering, leaving, away, landing: missions.ts onTrip; a
+//   `refused` event says why) -- one resting in the Bunks after a trip may be taken, which ends the rest;
+//   another keeper held by hand is let go first; a keeper at work (a tuck-in, a meal under way) finishes that
 //   job first (`pendingTake`), then is the player's where they stand; otherwise any job they hold goes back to the
 //   queue (stats.taken counts every take), a climb under way is finished, and anything carried stays carried.
 // - steer: the held direction, kept until it changes. A climb goes on; W or S within 8 px of a ladder on this floor
@@ -33,14 +36,20 @@
 // A save never holds a keeper by hand (save.ts serialize): each is saved as released (`releasedState`), exactly the
 // world a release that step would make.
 import { WALK, CLIMB, PICKUP } from './sim.ts';
-import type { CareSim, Keeper, Job } from './sim.ts';
+import type { CareSim, Keeper, Job, Carried } from './sim.ts';
 import { ROOM_INFO, LIFT_X0, LIFT_X1, postX, spanOf, route, feetY, bayFloors, GATE_MID } from './layout.ts';
 import type { Leg, Room } from './layout.ts';
 import { NEED_ROOM, KEEPER_HALF, arrived, bayShut, inBay } from './travel.ts';
 import type { NeedKind } from './needs.ts';
+import { send, onTrip } from './missions.ts';
+import type { Pair } from './trip.ts';
 
-/** The player's input to the simulation, applied at the start of the next step: take a keeper (by id), let go, steer, act. */
-export type Command = { kind: 'take'; keeper: number } | { kind: 'release' } | { kind: 'steer'; dx: -1 | 0 | 1; dy: -1 | 0 | 1 } | { kind: 'act' };
+/**
+ * The player's input to the simulation, applied at the start of the next step: take a keeper (by id), let go, steer,
+ * act; and send a team (its pairs) on a board mission (by id) from the Map Room's table (plan S8).
+ */
+export type Command = { kind: 'take'; keeper: number } | { kind: 'release' } | { kind: 'steer'; dx: -1 | 0 | 1; dy: -1 | 0 | 1 } | { kind: 'act' }
+  | { kind: 'send'; mission: number; pairs: readonly Pair[] };
 
 /**
  * What E would do now (the view's label; act() does the same): pick up a supply, serve a job (its id), put a supply
@@ -52,8 +61,8 @@ export interface ActionPreview { kind: 'pickup' | 'serve' | 'putback' | 'wait' |
 export const REACH_PX = 24, LADDER_PX = 8;
 /** How long the "?" shows over a keeper whose E did nothing (steps). */
 export const CUE_STEPS = 30;
-/** What each supply is called on screen. */
-export const SUPPLY_NAME: Readonly<Partial<Record<NeedKind, string>>> = Object.freeze({ food: 'BOWL', play: 'BALL', bath: 'BUCKET' });
+/** What each supply (and a mission's saddle and egg) is called on screen. */
+export const SUPPLY_NAME: Readonly<Partial<Record<Carried, string>>> = Object.freeze({ food: 'BOWL', play: 'BALL', bath: 'BUCKET', saddle: 'SADDLE', egg: 'EGG' });
 /** What meeting each need is called on screen: "E: FEED WICK". */
 const VERB: Readonly<Record<NeedKind, string>> = Object.freeze({ food: 'FEED', love: 'GROOM', play: 'PLAY WITH', bath: 'BATHE', sleep: 'TUCK IN' });
 /** ...and while it is being done. */
@@ -76,6 +85,12 @@ export function applyCommands(sim: CareSim): void {
       case 'release': if (k) release(sim, k); break;
       case 'steer': if (k) k.held = { dx: c.dx, dy: c.dy }; break;
       case 'act': if (k && k.manual) act(sim, k); break;
+      case 'send': {
+        // (the Map Room's SEND: missions.ts sends the team -- the muster starts this step -- or says why not)
+        const r = send(sim, c.mission, c.pairs);
+        sim.events.push({ kind: 'send', mission: c.mission, reason: typeof r === 'string' ? r : null });
+        break;
+      }
     }
   }
 }
@@ -84,6 +99,8 @@ export function applyCommands(sim: CareSim): void {
 function take(sim: CareSim, id: number): void {
   const k = sim.keepers.find((q) => q.id === id);
   if (!k) return;
+  // (a rider on a mission's trip is the team's until they are home: plan S8)
+  if (onTrip(k)) { sim.events.push({ kind: 'refused', keeper: k.id, reason: takeRefusal(k) }); return; }
   for (const o of sim.keepers) if (o !== k && (o.manual || o.pendingTake)) release(sim, o);
   if (k.manual || k.pendingTake) return;
   sim.stats.taken++;
@@ -91,6 +108,11 @@ function take(sim: CareSim, id: number): void {
   // (a job under way is finished first: a tuck-in is never left half done)
   if (k.phase === 'work') { k.pendingTake = true; k.rushing = false; return; }
   becomeManual(k);
+}
+
+/** Why a keeper on a mission's trip can't be taken (the toast): the one line the view shows, and the take's refusal. */
+export function takeRefusal(k: Keeper): string {
+  return k.phase === 'deliver' ? `${k.name} IS BRINGING THE TEAM HOME` : k.phase === 'away' ? `${k.name} IS AWAY ON A MISSION` : `${k.name} IS OFF ON A MISSION`;
 }
 
 /** A keeper's job back in the queue (not counted as pre-empted), a climb under way kept, and the keeper the player's. */

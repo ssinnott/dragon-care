@@ -39,12 +39,15 @@
 //                              save, so it always starts there), layers=world draws the world alone (the
 //                              building, the lift's car, the cast, the bubbles and the plates: no sky, lights or HUD),
 //                              layers=cast the cast and the bubbles alone on a flat colour (the no-tint check);
-//                              live, the keys 1-4 pick 1x, 2x, 4x or 8x and p pauses; take=<keeper> (bea, tomas, iris,
+//                              live, the keys 1-4 pick 1x, 2x, 4x or 8x, p pauses and m opens the Map Room's table;
+//                              take=<keeper> (bea, tomas, iris,
 //                              pip) takes that keeper by hand at the first step (frozen too: the pad, the mark and the
 //                              line show); live, a tap on a keeper or their badge takes them, WASD or the arrows walk
 //                              them, E or Space does the chore in reach, Esc lets go; preset=trip&trip=<region>:
 //                              <progress>[:fail] has a team away on the region's hard mission, that far along its road
-//                              at the frozen t (plan S9), and panel=watch opens the watchable scene over the barn
+//                              at the frozen t (plan S9); panel=map | mission | watch opens the Map Room table's world
+//                              map or a mission's chooser (mission=0..2: which of the board's; plan S8), or the
+//                              watchable scene of the team out, over the barn at the first frame
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
 //   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
@@ -139,8 +142,13 @@ export interface GalleryParams {
   layers: 'all' | 'world' | 'cast';
   /** view=base: take=<keeper name>, a keeper taken by hand at the first step (null: none). */
   take: string | null;
-  /** view=base: panel=watch opens the watchable scene (plan S9); trip=<region>:<progress>[:fail], preset=trip's team away. */
-  panel: string | null;
+  /**
+   * view=base: panel=map | mission, the Map Room table's overlay open from the first frame (plan S8), or panel=watch,
+   * the watchable scene (plan S9); mission=<i>, the board's mission the chooser shows (0-2); trip=<region>:<progress>
+   * [:fail], preset=trip's team away.
+   */
+  panel: 'map' | 'mission' | 'watch' | null;
+  mission: number;
   trip: string | null;
 }
 
@@ -181,7 +189,8 @@ export function parseParams(search: string): GalleryParams {
     hour: hourParam(q.get('hour')),
     layers: q.get('layers') === 'world' ? 'world' : q.get('layers') === 'cast' ? 'cast' : 'all',
     take: q.get('take') || null,
-    panel: q.get('panel') || null,
+    panel: q.get('panel') === 'map' || q.get('panel') === 'mission' || q.get('panel') === 'watch' ? q.get('panel') as 'map' | 'mission' | 'watch' : null,
+    mission: Math.max(0, Math.min(2, Math.round(num('mission', 0)))),
     trip: q.get('trip') || null,
   };
 }
@@ -1363,9 +1372,10 @@ function makeScene(P: GalleryParams): Scene {
     case 'yard': return yardScene(P);
     case 'yardaudit': return yardAuditScene(P);
     case 'missionart': return missionArtScene(location.search);
-    // (a frozen view never loads or saves (G4), and nor does a preset or a start hour: loading would hide it, autosaving
-    // would put it in place of the player's barn)
-    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset && P.hour == null, hour: P.hour, layers: P.layers, take: P.take, panel: P.panel, trip: P.trip, at: P.t ?? 0 });
+    // (a frozen view never loads or saves (G4), and nor does a preset, a start hour or an overlay asked for (panel=):
+    // loading would hide it, autosaving would put it in place of the player's barn)
+    case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset && P.hour == null && !P.panel, hour: P.hour, layers: P.layers,
+      take: P.take, panel: P.panel, mission: P.mission, trip: P.trip, at: P.t ?? 0 });
     default: return lineupScene(P);
   }
 }

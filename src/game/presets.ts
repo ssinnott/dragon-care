@@ -1,7 +1,7 @@
 // Starts built in code (view=base&preset=<name>): a world other than the new game's, for views and checks that need
 // what a new game has not got yet -- every stage at once, a dragon about to grow up, eggs in the nests (one about to
-// hatch), every baby sub-slot taken, elders in the garden and elders about to retire to it, and later (each slice
-// adds its own) a team away. A preset is always code, never a
+// hatch), every baby sub-slot taken, elders in the garden and elders about to retire to it, a team mustering for its
+// mission, and a team away on the road (so far along it). A preset is always code, never a
 // save and never hundreds of thousands of steps, so a frozen view of it (t=) is as quick and as deterministic as the
 // new game's.
 import { CareSim } from './sim.ts';
@@ -10,7 +10,8 @@ import { STAGE_DAYS, HATCH_DAYS, RETIRE_DAYS } from './clock.ts';
 import { NEEDS, hasNeed, moodOf } from './needs.ts';
 import { NAMES } from './names.ts';
 import { settleInGarden } from './garden.ts';
-import { setPreviewTrip } from './seams.ts';
+import { send, autoRider, awayNow, LOST_NEST } from './missions.ts';
+import type { Pair } from './trip.ts';
 import { demoTrip, parseTripParam } from './tripdemo.ts';
 import type { TripParam } from './tripdemo.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
@@ -83,19 +84,39 @@ export const TRIP_DEFAULT: TripParam = Object.freeze({ region: 'oldmine', progre
 /**
  * The new game with a team away on a hard mission (plan S9: view=base&preset=trip&trip=<region>:<progress>[:fail]):
  * the region's hard mission (its baddie at the end of the road, if it has one), the best two pairs of the seven with
- * their auto riders (tripdemo.ts demoTrip), the outcome as asked -- a success unless `:fail` -- and the team `away`,
- * left so long ago that at step `at` (the frozen t=; 0 live) exactly `progress` of the trip's length has gone by. It is
- * a preview beside the world (seams.ts setPreviewTrip): the world itself is the new game's, the team still in the barn.
+ * their auto riders and its road (tripdemo.ts demoTrip: the missions' own rider pick, odds and road, missions.ts), the
+ * outcome as asked -- a success unless `:fail` -- and the team away as a sent team is once it has left the Aerie
+ * (missions.ts awayNow: its dragons off the map, its riders away), left so long ago that at step `at` (the frozen t=;
+ * 0 live) exactly `progress` of the trip's length has gone by. The world's own trip (sim.missions.trip): it lands, and
+ * its riders come home, as any.
  */
 export function tripStart(param: TripParam | string | null | undefined, at = 0): StartSpec {
   const p = typeof param === 'string' || param == null ? parseTripParam(param) ?? TRIP_DEFAULT : param;
   return { ...newGame(), after: (sim) => {
     const trip = demoTrip(sim, p.region, 'hard', !p.fail);
     const L = trip.mission.days * sim.dayLen;
-    trip.departAt = sim.clock + at - Math.round(p.progress * L);
-    trip.returnAt = trip.departAt + L;
-    setPreviewTrip(sim, trip);
+    awayNow(sim, trip, sim.clock + at - Math.round(p.progress * L));
   } };
+}
+
+/** The `muster` preset's team: the two starters who meet THE LOST NEST (RIPPLE the flood, ECHO the lost things). */
+export const MUSTER_TEAM: readonly string[] = Object.freeze(['RIPPLE', 'ECHO']);
+/**
+ * Send THE LOST NEST (day 1's first mission) with MUSTER_TEAM, each with its auto rider (missions.ts): the muster
+ * starts at once. The `muster` preset's last touch, and sim-check's full trip (section 20) -- so the step it measures
+ * the team all on the deck at is the step the preset's shot shows.
+ */
+export function sendLostNest(sim: CareSim, opts: { awaySteps?: number } = {}): void {
+  const m = sim.missions.board.find((q) => q.title === LOST_NEST);
+  if (!m) throw new Error('muster: THE LOST NEST is not on the board');
+  const pairs: Pair[] = [];
+  for (const name of MUSTER_TEAM) {
+    const d = sim.dragons.find((q) => q.name === name)!, k = autoRider(sim, d, m, pairs);
+    if (k == null) throw new Error(`muster: no rider for ${name}`);
+    pairs.push({ dragon: d.id, keeper: k });
+  }
+  const t = send(sim, m.id, pairs, opts);
+  if (typeof t === 'string') throw new Error(`muster: ${t}`);
 }
 
 /** The presets by name (view=base&preset=<name>). */
@@ -138,6 +159,11 @@ export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze(
   retire: () => ({ ...newGame(), dragons: START_DRAGONS.map((p): DragonPlace => ({ ...p, stage: 'elder', days: RETIRE_AT })) }),
   /** A team away (tripStart): half way along the Old Mine Road, here; the view passes its own `trip=` and frozen t. */
   trip: () => tripStart(TRIP_DEFAULT),
+  /**
+   * The new game with THE LOST NEST sent at once (sendLostNest): RIPPLE and ECHO leave their rooms for the Dragon Lift
+   * and the Aerie, their riders fetch their saddles from the Tack Room and climb the left tower to the deck beside them.
+   */
+  muster: () => ({ ...newGame(), after: (sim) => sendLostNest(sim) }),
 });
 
 /** A preset's start by name; no name, or one no preset has, is the new game. */

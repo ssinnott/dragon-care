@@ -12,9 +12,11 @@ import { keeperJoint } from '../art/keeper/rig.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
 import { ICONS, drawSprite } from './icons.ts';
 import type { Sprite } from './icons.ts';
-import type { Keeper } from './sim.ts';
+import type { Keeper, Carried } from './sim.ts';
 import { WALK, RUSH } from './sim.ts';
-import type { NeedKind } from './needs.ts';
+import { SADDLE } from './artseams.ts';
+import { drawEgg } from './eggs.ts';
+import type { DragonElement } from '../art/dragon/palettes.ts';
 import { KEEPERS } from '../art/keeper/cast.ts';
 import { KEEPER_PALETTES } from '../art/keeper/palettes.ts';
 
@@ -25,7 +27,7 @@ export function makeKeeperAgent(id: KeeperId): KeeperAgent {
 
 /** What a keeper carries to a job, in the near hand (the yard's acts carry the real bowl prop; the base, its icon). */
 const BUCKET: Sprite = { rows: ['kkkkkkk', 'kbbbbbk', '.ggggg.', '.ggggg.', '..ggg..'], colors: { k: '#5a5460', b: '#4aa8d8', g: '#8c8a94' } };
-const CARRIED: Readonly<Partial<Record<NeedKind, Sprite>>> = { food: ICONS.food, play: ICONS.play, bath: BUCKET };
+const CARRIED: Readonly<Partial<Record<Carried, Sprite>>> = { food: ICONS.food, play: ICONS.play, bath: BUCKET, saddle: SADDLE };
 
 /**
  * The cast's anim closest to what a keeper is doing (docs/KEEPERS.md 5's vocabulary): walking to or from a job,
@@ -34,12 +36,19 @@ const CARRIED: Readonly<Partial<Record<NeedKind, Sprite>>> = { food: ICONS.food,
  * the dragon eat), `kneelIdle` for a tuck-in, and `pet` for love, play or a bath alike -- the named cast has no anim of
  * its own for those last two, so the same fond stroke stands in for them here. Held by the player's hand (plan S7):
  * walking (or carrying) while they moved this step, else `idle`; `hold` picking a supply up; a climb is `idle`, as
- * any keeper's (the cast has no climb anim: a stand-in).
+ * any keeper's (the cast has no climb anim: a stand-in). A rider on a mission walks or carries (the saddle, the egg),
+ * holds (a saddle taken down or hung back), or stands.
  */
 function animFor(k: Keeper, moved: boolean): string {
   if (k.climbing) return 'idle';
   if (k.phase === 'manual') return moved ? (k.carrying ? 'carry' : 'walk') : 'idle';
   if (k.phase === 'pickup') return 'hold';
+  // a rider on a mission (missions.ts): walking, with the saddle or the egg, or standing -- taking the saddle down or
+  // hanging it back in the Tack Room (`hold`), or on the deck with the team, or resting in the Bunks (`idle`)
+  if (k.phase === 'muster' || k.phase === 'depart' || k.phase === 'deliver' || k.phase === 'rest') {
+    if (k.legs.length && k.bayWait === 0) return k.carrying ? 'carry' : 'walk';
+    return k.t > 0 && k.phase !== 'rest' ? 'hold' : 'idle';
+  }
   if (k.phase === 'wait') return 'watch';
   if (k.bayWait > 0) return 'idle';
   if (k.phase === 'fetch' || k.phase === 'go' || k.phase === 'home') return k.carrying ? 'carry' : 'walk';
@@ -81,11 +90,17 @@ function markOf(look: KeeperId): Sprite {
 }
 const ASK: Sprite = { rows: ['.wwwww.', 'ww...ww', 'ww...ww', '....ww.', '...ww..', '...ww..', '.......', '...ww..', '...ww..'], colors: { w: '#f3e6c8' } };
 
-/** Draw a keeper (already stepped this tick): what they carry, the rush mark over their head while running, or the hand's mark and its "?". */
-export function drawKeeperVisual(ctx: CanvasRenderingContext2D, agent: KeeperAgent, k: Keeper): void {
+/**
+ * Draw a keeper (already stepped this tick): what they carry -- a mission's saddle (the art kit's SADDLE), or its egg
+ * (`egg`: its element) as the egg itself, just laid -- the rush mark over their head while running, or the hand's mark
+ * and its "?".
+ */
+export function drawKeeperVisual(ctx: CanvasRenderingContext2D, agent: KeeperAgent, k: Keeper, egg: DragonElement | null = null): void {
   drawKeeperAgent(ctx, agent);
   const item = k.carrying ? CARRIED[k.carrying] : undefined;
-  if (item) { keeperJoint(agent.rig, 'handN', PT); drawSprite(ctx, item, PT.x + k.facing * 3, PT.y - 2); }
+  if (item || (k.carrying === 'egg' && egg)) keeperJoint(agent.rig, 'handN', PT);
+  if (item) drawSprite(ctx, item, PT.x + k.facing * 3, PT.y - 2);
+  else if (k.carrying === 'egg' && egg) drawEgg(ctx, egg, PT.x + k.facing * 3, PT.y + 4, 0, 0);
   if (k.rushing) { keeperJoint(agent.rig, 'head', PT); drawSprite(ctx, ICONS.rush, PT.x, PT.y - 17); }
   if (k.manual || k.pendingTake) {
     keeperJoint(agent.rig, 'head', PT);

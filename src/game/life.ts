@@ -47,12 +47,13 @@ export function nextStage(st: Stage): Stage | null { return STAGES[STAGES.indexO
 export function stageDue(sim: CareSim, d: Dragon): number { return d.stageSince + STAGE_DAYS * sim.dayLen; }
 
 /**
- * Whether a dragon is settled (plan 3.5): in the barn (not a garden resident, nor an elder on its way there), no act
+ * Whether a dragon is settled (plan 3.5): in the barn (not a garden resident, nor an elder on its way there, nor with a
+ * mission's team: missions.ts), no act
  * (a sleeper has one), no keeper on any of its jobs (on the way, waiting at the stand spot or at work), no route left,
  * standing still (not turning, not waiting at a landing or held at the bay's edge), and not the lift's rider.
  */
 export function settled(sim: CareSim, d: Dragon): boolean {
-  return d.place === 'barn' && d.goal !== 'retire' && !d.act && d.asleep === 0 && !d.legs.length && d.move === 'still' && d.turn < 0 && sim.lift.rider !== d.id
+  return d.place === 'barn' && d.goal !== 'retire' && d.goal !== 'muster' && !d.act && d.asleep === 0 && !d.legs.length && d.move === 'still' && d.turn < 0 && sim.lift.rider !== d.id
     && !sim.jobs.some((j) => j.dragon === d && j.keeper);
 }
 

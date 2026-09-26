@@ -35,6 +35,11 @@ export const LIFT_MOD = 2, LIFT_X0 = BARN_X + LIFT_MOD * MOD, LIFT_X1 = LIFT_X0 
 export const LIFT_STOPS = [0, 1, 2, 5] as const;
 /** The Aerie: walkable floor 5, one deck from x 8 to 648 (over the left tower, a gantry over the barn roof, the lift head). */
 export const AERIE_F = 5, DECK_X0 = 8, DECK_X1 = LIFT_X1;
+/**
+ * The sky bridge (plan S8): the Aerie's floor runs on west off the deck, past the world's edge, to x -200 -- where a
+ * mission's team walks off (it stands in for `fly`, which rock can't anyway) and lands again (missions.ts).
+ */
+export const BRIDGE_X0 = -200;
 /** The gambrel roof over the hayloft (floor 2): its ridge, and the knee where the steep lower slope turns. */
 export const RIDGE_X = BARN_X + BARN_W / 2, RIDGE_Y = 276, KNEE_DX = 58, KNEE_Y = 360;
 
@@ -238,9 +243,11 @@ const NETS = new Map<number, Nets>();
  * - The keepers': the towers open into the barn on the ground and upper floors, so each of those is one span end to
  *   end -- and the ground floor goes on through the Garden Gate to the garden's end; the hayloft is cut off from the
  *   towers by the roof, and above it only the towers go on, up to the Aerie deck (floor 5), reached by the left
- *   tower's ladder. The three ladders (LADDERS); keepers never ride the lift.
+ *   tower's ladder, and the deck runs on west over the sky bridge, off the world's edge (BRIDGE_X0: plan S8). The
+ *   three ladders (LADDERS); keepers never ride the lift.
  * - A dragon's, per stage: the barn's ground and upper floors wall to wall, the hayloft between modules 1 and 5 (clear
- *   of the low roof slopes), and the Aerie deck, each kept DRAGON_PAD in from its ends; the ground floor goes on through
+ *   of the low roof slopes), and the Aerie deck, each kept DRAGON_PAD in from its ends (the deck's west end runs on over
+ *   the sky bridge to BRIDGE_X0, where a mission's team walks off the world); the ground floor goes on through
  *   the Garden Gate's arches (the one tower door a dragon fits) to the garden's end. No other tower span: the towers'
  *   other doors are human-sized. The one link is the lift.
  */
@@ -254,7 +261,7 @@ export function makeNets(gardenEnd: number): Nets {
       [TL, [BARN_X + 16, TOWER_R - 16], TR],
       [TL, TR],
       [TL, TR],
-      [[DECK_X0 + PAD, DECK_X1 - PAD]],
+      [[BRIDGE_X0, DECK_X1 - PAD]],
     ],
     links: LADDERS,
   });
@@ -262,7 +269,7 @@ export function makeNets(gardenEnd: number): Nets {
   for (const stage of Object.keys(DRAGON_PAD) as Stage[]) {
     const P = DRAGON_PAD[stage], barn: Span = [BARN_X + P, TOWER_R - P];
     dragon[stage] = Object.freeze<Net>({
-      spans: [[[BARN_X + P, gardenEnd - GARDEN_END - P]], [barn], [[modX(1) + P, modX(5) - P]], [], [], [[DECK_X0 + P, DECK_X1 - P]]],
+      spans: [[[BARN_X + P, gardenEnd - GARDEN_END - P]], [barn], [[modX(1) + P, modX(5) - P]], [], [], [[BRIDGE_X0, DECK_X1 - P]]],
       links: [{ name: 'lift', x: LIFT_CX, stops: LIFT_STOPS }],
     });
   }

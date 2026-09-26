@@ -37,13 +37,18 @@ it is doing; the anim plays with its root motion pinned (`KeeperAgent.pinX`), si
 itself, and a walk or carry plays at the keeper's pace over the look's own walk speed (`KeeperPlayer.setSpeed`: Bea's
 0.55 px a frame walk at 1.82x for the base's 1 px, 1.6x that on a Rush), so the feet no longer skate. A keeper who
 reaches the stand spot before the dragon stands in `watch` until it walks in, and one held at the Dragon Lift's bay
-stands in `idle`. This is a plainer join than the yard's: it skips the plan (6.3), so a base keeper's stand and stroke are not
+stands in `idle`. On a mission (plan S8) a rider carries a saddle (the mission art kit's `SADDLE`, S9a) from the Tack
+Room up to the Aerie and back, and the egg a team brings home down to its nest, in `carry`; takes the saddle down or
+hangs it back in `hold`; and rests in the Bunks in `idle`; away, a rider is not drawn in the barn (the watchable scene
+draws the team on its road, each rider with the saddle in the near hand: ART_BIBLE 5.11). This is a plainer join than
+the yard's: it skips the plan (6.3), so a base keeper's stand and stroke are not
 proven eye-clear or on the mark the way the yard's and the two audits' are. **The base now has a player loop** (#6;
 `docs/BASE_DESIGN.md` 4.10): the player may take any one keeper by hand -- walked with WASD, the arrows or a touch pad
 (`walk` or `carry` at the keeper's pace while moving, `idle` standing, `hold` picking a supply up), climbing the
 ladders, and doing a chore with E from the same stand spot a keeper sent there uses -- marked by a 7 x 5 arrow in the
-keeper's own top colour over the head (where the rush mark goes: a keeper held is never rushed). The cast has no climb
-anim, so a climb, by hand or not, shows `idle` (a stand-in). **Not built:** a player-facing game loop
+keeper's own top colour over the head (where the rush mark goes: a keeper held is never rushed). A rider on a
+mission's trip (mustering, away, landing) can't be taken (a toast says why), and a keeper held by hand is never picked
+to ride. The cast has no climb anim, so a climb, by hand or not, shows `idle` (a stand-in). **Not built:** a player-facing game loop
 for the yard itself (it still runs on its own: nothing lets a player send one of these keepers to a dragon from it),
 props for the keepers' stations, keepers in the habitat view, and night: Iris tucks in whoever is sleepy.
 A plan (6.3) is made the first time a keeper does a job for a look, in the tick the job starts (tens of ms; a game
@@ -83,12 +88,19 @@ in light skin went grey-brown and read as a stain on the trousers.
 `src/art/keeper/cast.ts`. Tempo multiplies every anim's durations (the dragons' 4.1 stage timing, on people); speed is
 the walk's px per frame.
 
-| Keeper | Job | Build | Tells | Tempo, speed |
-|---|---|---|---|---|
-| **Bea**, the cook | feeds (she brings the bowl from her kitchen) | an elder: shorter and rounder | silver bun, terracotta blouse, cream apron, plum skirt | 1.2, 0.55 |
-| **Tomas**, the groomer | grooms the young and grown dragons (a pet, with his brush) | broad | straw hat with an oxblood band, dark beard, denim shirt, braces | 1, 0.7 |
-| **Iris**, the night keeper | tucks in the sleepy | slight | periwinkle nightcap with a cream pom-pom, a bob, a mauve cardigan, rose slippers | 1.1, 0.6 |
-| **Pip**, the apprentice | pets the babies, and cheers the others on | a child, about 58 px | ginger tufts, leaf-green tee, denim overalls, red sneakers | 0.8, 0.75 |
+| Keeper | Job | Rides as (missions) | Build | Tells | Tempo, speed |
+|---|---|---|---|---|---|
+| **Bea**, the cook | feeds (she brings the bowl from her kitchen) | CHARM: talks the grumpy miller round | an elder: shorter and rounder | silver bun, terracotta blouse, cream apron, plum skirt | 1.2, 0.55 |
+| **Tomas**, the groomer | grooms the young and grown dragons (a pet, with his brush) | MEDIC: bandages a hurt animal | broad | straw hat with an oxblood band, dark beard, denim shirt, braces | 1, 0.7 |
+| **Iris**, the night keeper | tucks in the sleepy | NAVIGATOR: finds the way through fog | slight | periwinkle nightcap with a cream pom-pom, a bob, a mauve cardigan, rose slippers | 1.1, 0.6 |
+| **Pip**, the apprentice | pets the babies, and cheers the others on | NIMBLE: slips through a narrow gap | a child, about 58 px | ginger tufts, leaf-green tee, denim overalls, red sneakers | 0.8, 0.75 |
+
+**Riders** (the base's missions, `docs/BASE_DESIGN.md` 5; plan S8): the four keepers are the riders, each with the
+skill above (`src/game/regions.ts` `KEEPER_SKILL`). A dragon's **partner** is the keeper whose job is its element's own
+need -- Bea for fire (food), Tomas for spike, rock and slinkwing (love), Pip for lightning (play), Iris for dusk
+(sleep); water has none, as nobody has baths -- and a pair of partners goes 5 % better. Each dragon sent takes its
+partner if free, else a keeper whose skill meets a challenge nobody on the team does, else any free keeper; two
+keepers always stay home. The mockups' riders, Rosa and Tam (`docs/base/`), are superseded by these four.
 
 ## 3. Colour
 

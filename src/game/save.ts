@@ -6,6 +6,8 @@
 import type { CareSim, Dragon, Keeper, Job, SimStats, LiftState, Egg } from './sim.ts';
 import type { RoomPlace } from './layout.ts';
 import { releasedState } from './control.ts';
+import { copyMissions } from './missions.ts';
+import type { MissionsState } from './missions.ts';
 
 /**
  * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded.
@@ -20,8 +22,13 @@ import { releasedState } from './control.ts';
  * delay (stats.retireDelayMax).
  * 7 (S7): a keeper's hand-held state (`manual`, the direction `held`, the "?" `cue`, `pendingTake` -- always saved
  * released: control.ts releasedState) and the takes, hand-overs and jobs done by hand (stats.taken, handovers, doneBy).
+ * (S8 bumped its own base to 7 for the missions, built beside S7; the merge made the two one version, 8.)
+ * 8 (S7 + S8): the missions -- the board and its day, the map (explored, to be revealed, first successes), the coin,
+ * the trip out (its mission, pairs, outcome, road and times) and each pair's deck spot; a dragon away (place `away`) or
+ * with a team (goal `muster`); a keeper's mission phases (muster, depart, away, deliver, rest) and what they carry (a
+ * saddle, the egg) -- beside S7's hand-held state.
  */
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }
@@ -53,6 +60,8 @@ export interface SaveV {
   eggs: Egg[];
   /** The elder garden: its plots (its residents are dragons, above). */
   garden: { plots: number };
+  /** The missions (missions.ts): the board, the map, the coin, the trip out (its pairs by id). */
+  missions: MissionsState;
   stats: SimStats;
 }
 
@@ -88,6 +97,7 @@ export function serialize(sim: CareSim, exact = false): SaveV {
     lift: { ...sim.lift, calls: sim.lift.calls.map((c) => ({ ...c })) },
     eggs: sim.eggs.map((e) => ({ ...e })),
     garden: { plots: sim.garden.plots },
+    missions: copyMissions(sim.missions),
     stats: { ...sim.stats, used: { ...sim.stats.used }, doneBy: { ...sim.stats.doneBy } },
   };
 }

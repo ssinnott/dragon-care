@@ -17,11 +17,11 @@ import type { BaddieFace, BaddiePose, BaddieExit, BaddieId, StopState } from './
 import type { Rect } from './icons.ts';
 import { gaitOf } from './gait.ts';
 import type { Gait } from './gait.ts';
-import { readClock, hourSteps } from './clock.ts';
+import { readClock } from './clock.ts';
 import { skyPhase } from './sky.ts';
 import { FLOORS, INK, ROAD_SCENE } from './surfaces.ts';
 import { drawClimate, drawSetPiece, drawBaddie, drawMiller, SADDLE } from './artseams.ts';
-import { climateOf } from './tripdemo.ts';
+import { regionOf } from './regions.ts';
 import { drawSprite, ICONS } from './icons.ts';
 import { drawEgg } from './eggs.ts';
 import { makePet, petOpts, stepPet } from './pet.ts';
@@ -53,8 +53,6 @@ export const CAM_BACK = 260;
 /** The overlay's way back to the barn, and the result card. */
 export const BACK_BUTTON: Readonly<Rect> = Object.freeze({ x: 8, y: 338, w: 110, h: 16 });
 export const RESULT_CARD: Readonly<Rect> = Object.freeze({ x: 170, y: 110, w: 300, h: 120 });
-/** The TEAM OUT chip under the top bar (plan 3.11), which opens the scene. */
-export const TEAM_CHIP: Readonly<Rect> = Object.freeze({ x: 520, y: 19, w: 114, h: 15 });
 
 /** A challenge's beat (the team stands while its counter meets it) and the baddie's, for a trip `L` steps long. */
 export const beatLen = (L: number) => Math.min(600, Math.round(0.08 * L));
@@ -408,7 +406,7 @@ function drawRoad(ctx: CanvasRenderingContext2D, green: boolean): void {
  * then the banner. Syncs `cast` to the frame first.
  */
 export function drawMissionScene(ctx: CanvasRenderingContext2D, sim: CareSim, trip: Trip, cast: ScenePets, f: SceneFrame = sceneAt(sim, trip)): void {
-  const R = SCENE_RECT, cam = Math.round(f.camX), climate = climateOf(trip.mission.region);
+  const R = SCENE_RECT, cam = Math.round(f.camX), climate = regionOf(trip.mission.region).climate;
   cast.sync(f, sim.clock);
   ctx.save();
   ctx.beginPath(); ctx.rect(R.x, R.y, R.w, R.h); ctx.clip();
@@ -466,16 +464,3 @@ export function drawResultCard(ctx: CanvasRenderingContext2D, trip: Trip, tick: 
   drawText(ctx, 'TAP TO CLOSE', cx, r.y + 98, { color: '#6b5a44', shadow: false, align: 'center' });
 }
 
-/** The TEAM OUT chip (a trip is out; a tap watches it): MUSTER, TEAM OUT - 14H (game hours to go), or LANDING. */
-export function teamChipText(sim: CareSim, trip: Trip): string {
-  if (trip.state === 'muster' || trip.state === 'depart' || trip.departAt == null) return 'MUSTER';
-  if (trip.state === 'return' || trip.state === 'home' || trip.returnAt == null) return 'LANDING';
-  const left = Math.max(0, Math.ceil((trip.returnAt - sim.clock) / hourSteps(sim.dayLen)));
-  return left > 0 ? `TEAM OUT - ${left}H` : 'LANDING';
-}
-export function drawTeamChip(ctx: CanvasRenderingContext2D, sim: CareSim, trip: Trip): void {
-  const r = TEAM_CHIP;
-  ctx.fillStyle = INK; ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.fillStyle = '#6b4a34'; ctx.fillRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
-  drawText(ctx, teamChipText(sim, trip), r.x + r.w / 2, r.y + 4, { color: '#f3e6c8', shadow: false, align: 'center' });
-}
