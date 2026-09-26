@@ -225,7 +225,7 @@ function atStand(sim: CareSim, k: Keeper, j: Job): boolean {
   return sp.f === k.f && Math.abs(k.x - sp.x) <= REACH_PX;
 }
 
-/** What E would do now for the keeper held by hand (plan S7's order: pick up, serve, put back; else nothing, or "on the way"). */
+/** What E would do now for the keeper held by hand (plan S7's order: pick up, serve, put back; else nothing, "on the way", or a ladder to climb here). */
 export function actionFor(sim: CareSim, k: Keeper): ActionPreview {
   const none = (label = ''): ActionPreview => ({ kind: 'none', label });
   if (!k.manual) return none();
@@ -244,6 +244,9 @@ export function actionFor(sim: CareSim, k: Keeper): ActionPreview {
   // (a dragon still walking to this slot can't be met yet, D6)
   const coming = here.find((j) => j.dragon.goalJob === j.id && !(j.keeper && j.keeper.phase === 'work') && !j.dragon.act);
   if (coming) return { kind: 'wait', label: `${coming.dragon.name} IS ON THE WAY` };
+  // (nothing for E here: a ladder in reach says so -- W or S, the arrows or the pad's -- S7 review)
+  const up = ladderAt(sim, k, -1), down = ladderAt(sim, k, 1);
+  if (up || down) return none(up && down ? '↑ ↓: CLIMB' : up ? '↑: CLIMB UP' : '↓: CLIMB DOWN');
   return none();
 }
 

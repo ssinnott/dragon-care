@@ -176,25 +176,42 @@ export function drawCard(ctx: CanvasRenderingContext2D, c: CardInfo): void {
 
 /** The pad's buttons: the four directions, ACT (E) and LET GO. */
 export type PadButton = 'up' | 'left' | 'right' | 'down' | 'act' | 'letgo';
-/** Where they are (screen px, 640 x 360: plan 3.11), at the bottom right, clear of the smoke drag's start (350, 200) and the job strip. */
+/**
+ * Where they are (screen px, 640 x 360): one row at the bottom right, y 305-335, between the ground floor's slab and the
+ * job strip's row -- LET GO, ACT (E), then the arrows ← ↑ ↓ →, right-aligned at 634. That band lies under the feet of the
+ * floor the camera frames lowest (base.ts follow: a floor's feet at screen y 296-308 at most, its heads 12-52 px over
+ * them), so the pad never covers a dragon's head (G6; S7 review: plan 3.11's cross, from y 272, sat over the ground
+ * floor's heads). Clear of the smoke drag's start (350, 200) and of the job strip (y 339).
+ */
 export const PAD: Readonly<Record<PadButton, Rect>> = Object.freeze({
-  up: { x: 562, y: 272, w: 26, h: 26 },
-  left: { x: 534, y: 300, w: 26, h: 26 },
-  right: { x: 590, y: 300, w: 26, h: 26 },
-  down: { x: 562, y: 328, w: 26, h: 26 },
-  act: { x: 476, y: 318, w: 48, h: 36 },
-  letgo: { x: 476, y: 298, w: 48, h: 16 },
+  letgo: { x: 404, y: 305, w: 48, h: 30 },
+  act: { x: 458, y: 305, w: 44, h: 30 },
+  left: { x: 508, y: 305, w: 30, h: 30 },
+  up: { x: 540, y: 305, w: 30, h: 30 },
+  down: { x: 572, y: 305, w: 30, h: 30 },
+  right: { x: 604, y: 305, w: 30, h: 30 },
 });
+/**
+ * The pad's whole area, a few px wider than its buttons each way: a touch in it that misses a button (a gap, an edge)
+ * goes to the nearest button -- never through to the world, where a tap on empty space would let go of the keeper.
+ */
+export const PAD_ZONE: Readonly<Rect> = Object.freeze({ x: 398, y: 299, w: 242, h: 42 });
 /** Each direction's dx, dy (dy -1 is up: the floor above). */
 export const PAD_DIR: Readonly<Partial<Record<PadButton, { dx: -1 | 0 | 1; dy: -1 | 0 | 1 }>>> = Object.freeze({
   up: { dx: 0, dy: -1 }, left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 }, down: { dx: 0, dy: 1 },
 });
 const PAD_LABEL: Readonly<Record<PadButton, string>> = Object.freeze({ up: '↑', left: '←', right: '→', down: '↓', act: 'E', letgo: 'LET GO' });
 
-/** The pad button under a screen point, if any. */
+/** The pad button under a screen point -- or, inside PAD_ZONE, the nearest one -- if any. */
 export function padAt(sx: number, sy: number): PadButton | null {
-  for (const [name, r] of Object.entries(PAD) as [PadButton, Rect][]) if (sx >= r.x && sx < r.x + r.w && sy >= r.y && sy < r.y + r.h) return name;
-  return null;
+  const z = PAD_ZONE;
+  if (sx < z.x || sx >= z.x + z.w || sy < z.y || sy >= z.y + z.h) return null;
+  let best: PadButton | null = null, bd = Infinity;
+  for (const [name, r] of Object.entries(PAD) as [PadButton, Rect][]) {
+    const dx = Math.max(r.x - sx, 0, sx - (r.x + r.w - 1)), dy = Math.max(r.y - sy, 0, sy - (r.y + r.h - 1)), d = dx * dx + dy * dy;
+    if (d < bd) { bd = d; best = name; }
+  }
+  return best;
 }
 
 /** The pad: each button an ink box on the buttons' face (lit while pressed), its arrow, E or LET GO in the middle. */
@@ -206,14 +223,22 @@ export function drawPad(ctx: CanvasRenderingContext2D, pressed: ReadonlySet<PadB
   }
 }
 
-/** The line over the pad: who is held, what they carry and what E does ("BEA - BOWL - E: FEED WICK"), right-aligned at (632, 258) on an ink strip. */
-export function drawActionLine(ctx: CanvasRenderingContext2D, s: string): void {
-  const w = measureText(s), x = 632, y = 258;
-  ctx.fillStyle = INK; ctx.fillRect(x - w - 4, y - 3, w + 8, 13);
-  text(ctx, s, x, y, TEXT, 'right');
+/**
+ * The line under the pad: who is held, what they carry and what E does ("BEA - BOWL - E: FEED WICK"), right-aligned at
+ * x 634 on an ink strip in the hint's place, level with the job strip (the hint is hidden while a keeper is held). If the
+ * strip reaches it (`stripEnd`, screen x), the line gives the action alone; the rect drawn, or null if nothing fits.
+ */
+export function drawActionLine(ctx: CanvasRenderingContext2D, full: string, short: string, stripEnd: number): Rect | null {
+  const x = ctx.canvas.width - 6, y = ctx.canvas.height - 21;
+  const s = [full, short].find((t) => t && stripEnd + 8 <= x - measureText(t) - 4);
+  if (!s) return null;
+  const w = measureText(s), r = { x: x - w - 4, y, w: w + 8, h: 17 };
+  ctx.fillStyle = INK; ctx.fillRect(r.x, r.y, r.w, r.h);
+  text(ctx, s, x, y + 5, TEXT, 'right');
+  return r;
 }
 
-/** In a portrait window while a keeper is held, a line under the top bar: the pad's buttons grow with a sideways screen. */
+/** In a portrait window while a keeper is held, a line left of the pad, on its row: the pad's buttons grow with a sideways screen. */
 export function drawPortraitHint(ctx: CanvasRenderingContext2D): void {
-  drawTextOutlined(ctx, 'TURN SIDEWAYS FOR BIG BUTTONS', ctx.canvas.width / 2, 34, { size: 1, color: HINT, outline: INK, thickness: 1, align: 'center', shadow: false });
+  drawTextOutlined(ctx, 'TURN SIDEWAYS FOR BIGGER BUTTONS', 6, PAD.left.y + 12, { size: 1, color: HINT, outline: INK, thickness: 1, align: 'left', shadow: false });
 }

@@ -429,7 +429,7 @@ be moved on, and in 80 000 steps its egg never finds a sub-slot while needs sit 
   keeper (takes them); a dragon (its card, and Rush if a job waits); empty space (lets go of the keeper held, closes
   the card).
 - **The canvas** is as big as the window allows: whole pixels from 1x up, and under 1x in a smaller window (a phone
-  held upright). In an upright window, while a keeper is held, a line under the top bar says TURN SIDEWAYS FOR BIG
+  held upright). In an upright window, while a keeper is held, a line left of the pad says TURN SIDEWAYS FOR BIGGER
   BUTTONS.
 
 **4.9 First numbers** (tuning, not law):
@@ -485,7 +485,9 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   another lets go of the one held first. A keeper taken while at work (mid-meal, mid-tuck-in) finishes that job first,
   then is yours where they stand; otherwise any job they had goes back to the queue, a climb under way is finished,
   and whatever they carry stays in their hand. A mark in their own colour hangs over their head, their badge is lit,
-  and the camera follows them (it keeps them inside the middle of the screen; a drag stops it for 3 s).
+  and the camera follows them (it keeps them inside the middle of the screen across, and frames their floor: their
+  feet 196 px down the screen, or as near as the world's edge lets it -- so their mark shows under the top bar and the
+  floors below them stand clear of the pad; a drag stops it for 3 s).
 - **Walk:** A and D (or the arrows) walk them along the floor at a keeper's pace; W and S at a ladder (within 8 px)
   climb it one floor. The lift bay's rule holds for them as for anyone (2): they wait at its edge while the car moves
   past their floor, and one let stand in the bay walks on the way they face until they are clear of it (at the Aerie
@@ -498,21 +500,27 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   play and a bath; the most pressing such job first. A keeper already sent for it hands it over and goes home. The job
   is done as any keeper does it, and counts to the keeper's name; **put back** the supply carried at its own post;
   else a "?" over their head says there is nothing to do there.
-- **The line over the pad** says who is held, what they carry and what E does: `BEA - BOWL - E: FEED WICK`, `E: TAKE
+- **The line under the pad** (in the hint's place, bottom right, level with the job strip; just the action when the
+  strip reaches it) says who is held, what they carry and what E does: `BEA - BOWL - E: FEED WICK`, `E: TAKE
   BOWL`, `E: GROOM COBBLE`, `E: TUCK IN ECHO`, `E: BATHE RIPPLE`, `E: PLAY WITH ZAP`, `E: PUT BOWL BACK`, `WICK IS ON
-  THE WAY`, `ZAP WANTS THE BALL`.
+  THE WAY`, `ZAP WANTS THE BALL`; and with nothing for E, at the foot or head of a ladder, `↑: CLIMB UP`, `↓: CLIMB
+  DOWN` or `↑ ↓: CLIMB`. Taken or let go while paused, the badge and the line answer at once; the world takes it when
+  it plays on.
 - **Let go:** Esc, a tap on empty space, a tap on their badge, or the pad's LET GO. They walk home (or, at work,
   finish the job first) and are a keeper like the others again.
 - **Left out of the automatic picks:** the keeper held is never given a job, never sent for a Rush and never taken off
   one for it, and is never rushed.
-- **The touch pad** (only while a keeper is held), bottom right: the four arrows (26 x 26), E (48 x 36) and LET GO
-  (48 x 16). A pad arrow held down walks until it is let up; E and LET GO act on a tap. Each finger is its own: one can
-  hold an arrow while another taps E, and the camera is dragged by a finger that isn't on the pad.
+- **The touch pad** (only while a keeper is held): one row at the bottom right, y 305-335 -- LET GO (48 x 30), E
+  (44 x 30) and the arrows ← ↑ ↓ → (30 x 30) -- in the band under the lowest floor on screen, over the job strip's row.
+  A pad arrow held down walks until it is let up; E and LET GO act on a tap; a touch in the pad's gaps or just past its
+  edge (6 px) goes to the nearest button, never through to the world (where it would let go). Each finger is its own:
+  one can hold an arrow while another taps E, and the camera is dragged by a finger that isn't on the pad.
 - **Saves:** a save never holds a keeper by hand: the one held is saved as if let go that moment (walking home, or
   finishing the job at hand), so a reload has every keeper on their own.
-- The pad and the line sit over the world at the bottom right, like the job strip: a dragon on the ground floor at
-  the right of the screen can stand under them for a while (the camera, following a keeper on the ground floor, is at
-  the world's bottom there).
+- The pad and the line never cover a dragon's head while the camera frames the keeper held: the lowest floor on
+  screen stands with its feet at y 296-308 and its heads (12-52 px over the feet, every stage) above the pad's row,
+  and the floor under that is off the screen (smoke checks every head against the pad and the line). A drag can still
+  pan a floor under them, as under the job strip.
 
 ---
 
@@ -610,7 +618,8 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   seven start on the adult stage's first day. A dragon's stage-up falls due 30 days after its stage began, and is
   applied as soon as the dragon is **settled**: no act (a sleeper has one), no keeper on any of its jobs (coming, waiting
   at the stand spot or at work), no route left, standing still in its slot (not turning, waiting for the car or held at
-  the bay's edge) -- and has **room to grow**: no keeper stands where its new body will be. A dragon settled but for a
+  the bay's edge) -- and has **room to grow**: no keeper stands where its new body will be (a keeper held by hand
+  (4.10) does not count: the player may park them anywhere as long as they like, so the dragon grows beside them). A dragon settled but for a
   keeper in that room (most often the one who has just served it, turning for home, or one at a post pickup) holds
   where it is, taking no errand, until the keeper has walked out of it (at most 184 steps, 3 s, over 91 grow-ups
   measured); without that hold it would set off on its next errand the step after being served and seldom be settled
@@ -786,7 +795,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    - the base is the fixed starting one (or a preset); it is kept in the browser (7), but there is one barn, with no
      save slots;
    - a keeper held by hand climbs a ladder in their `idle` pose (the cast has no climb anim: a stand-in, as for every
-     keeper's climb), and the touch pad and its line can stand over a ground-floor dragon at the screen's right (4.10);
+     keeper's climb);
    - no building of rooms (the rooms are section 3's fixed set), and no missions.
 2. **Rooms you build:** place, merge and upgrade rooms; move dragons between them; ~~save and load~~ (built: 7).
 3. **Missions:** the table, then the scene.

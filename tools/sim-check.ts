@@ -1578,6 +1578,9 @@ if (MAIN) {
     if (w.stats.doneBy.BEA !== 1 || ember.needs.food !== 1 || bea.phase !== 'manual' || w.jobs.includes(job!)) fail(`control: after the feed doneBy ${JSON.stringify(w.stats.doneBy)}, EMBER's food ${ember.needs.food}, BEA ${bea.phase}`);
     // 5. across the lift bay (the bay rule, R1) to the centre ladder (x 680), up to the upper floor, down, up again
     if (!walkTo(w, bea, 680, at)) fail('control: BEA never reached the centre ladder');
+    // (nothing for E at the foot of a ladder: the line says it climbs -- S7 review)
+    const lad = actionFor(w, bea);
+    if (lad.kind !== 'none' || lad.label !== '↑: CLIMB UP') fail(`control: at the centre ladder's foot the line is ${JSON.stringify(lad)}, not a climb up`);
     out.up = climb(w, bea, -1, at);
     if (out.up < 0 || out.up > 200) fail(`control: W at the centre ladder took BEA to floor ${bea.f} (${out.up} steps; want floor 1 within 200)`);
     out.down = climb(w, bea, 1, at);
@@ -1728,7 +1731,24 @@ if (MAIN) {
       else r4.push(`${what} out in ${n} steps`);
     }
   }
-  console.log(`  17 control: BEA taken, fetched the bowl and fed EMBER by hand (${a.fed} steps at work, doneBy ${JSON.stringify(a.w.stats.doneBy)}, ${a.handovers} handed over), climbed the centre ladder up in ${a.up} steps and down in ${a.down}; 10000 steps held with ${a.rushed} Rushes and no job she didn't take; let go, home in ${a.home} steps; the same script twice, the same world; every chore by hand: ${chores.join(', ')}; saved held, loaded released and stepping on as a release makes it: ${saves.join(', ')}; R4: ${r4.join(', ')}`);
+  // 11. a keeper held by hand never holds up a grow-up (S7 review): BEA parked at EMBER's stand spot -- inside its new
+  // elder body -- as it falls due (the growup preset) and left there; EMBER grows beside her at once and goes on about
+  // its needs, none of them ever at 0
+  let grewIn = -1;
+  {
+    const at = 'control grow', w = buildSim(startSpec('growup'), 1), k = w.keepers.find((q) => q.name === 'BEA')!, e = w.dragons.find((d) => d.name === 'EMBER')!;
+    send(w, { kind: 'take', keeper: k.id }); step(w, at);
+    if (!walkTo(w, k, w.standAt(e).x, at)) fail('control: BEA never reached EMBER\'s stand spot (growup)');
+    const due = stageDue(w, e);
+    let n = 0;
+    while (e.stage !== 'elder' && n++ < 3000) step(w, at);
+    grewIn = Math.max(0, w.clock - due);
+    if (e.stage !== 'elder' || grewIn > 5) fail(`control: EMBER due with BEA held at its stand spot is ${e.stage} ${grewIn} steps past due`);
+    step(w, at, 20000);
+    if (w.stats.emptySteps) fail(`control: with BEA parked at EMBER's stand spot a need sat at 0 for ${w.stats.emptySteps} dragon-steps`);
+    noteUse(w);
+  }
+  console.log(`  17 control: BEA taken, fetched the bowl and fed EMBER by hand (${a.fed} steps at work, doneBy ${JSON.stringify(a.w.stats.doneBy)}, ${a.handovers} handed over), climbed the centre ladder up in ${a.up} steps and down in ${a.down}; 10000 steps held with ${a.rushed} Rushes and no job she didn't take; let go, home in ${a.home} steps; the same script twice, the same world; every chore by hand: ${chores.join(', ')}; saved held, loaded released and stepping on as a release makes it: ${saves.join(', ')}; R4: ${r4.join(', ')}; parked at EMBER's stand spot as it fell due, it grew ${grewIn} steps past due, no need ever at 0`);
 }
 
 // ---------- 10 (its worker's result) ----------

@@ -122,10 +122,16 @@ function newsText(n: News): string {
 /** The dawn's tip looks this many game days ahead for stage-ups. */
 const TIP_DAYS = 2;
 /**
- * The camera follows the keeper held by hand: it keeps their feet inside this box on screen (px), easing an eighth of
- * the way a frame; a drag of the camera stops it following for FOLLOW_PAUSE frames (3 s).
+ * The camera follows the keeper held by hand, easing an eighth of the way a frame; a drag of the camera stops it
+ * following for FOLLOW_PAUSE frames (3 s). Across, it keeps their feet between screen x 160 and 480. Up and down it
+ * frames their floor: their feet at screen y FRAME_FEET (or as near as the world's edges let it: the ground floor's at
+ * 296), so their mark and "?" (up to 108 px over the feet) stay clear of the top bar, the floor below stands with its
+ * feet by y 308 and its heads (12-52 px over the feet, measured over every stage) clear of the pad's row (y 305) and the
+ * line's (339), and the floor two below -- the ground floor, seen from the hayloft -- is off the screen's bottom but
+ * for its feet, under the pad (S7 review: G6, nothing over a dragon's eye; plan S7's box of y 90-270 let the hayloft's
+ * mark go under the top bar and the ground floor's heads under the pad).
  */
-const FOLLOW = { x0: 160, x1: 480, y0: 90, y1: 270 } as const, FOLLOW_EASE = 8, FOLLOW_PAUSE = 180;
+const FOLLOW = { x0: 160, x1: 480 } as const, FRAME_FEET = 196, FOLLOW_EASE = 8, FOLLOW_PAUSE = 180;
 /** A keeper's tap box (world px, around their feet): 10 px either side, from 78 px over the feet (Pip, the smallest, 58) to 2 under. */
 const KEEPER_BOX = { half: 10, top: 78, topSmall: 58, below: 2 } as const;
 /** The keys that walk the keeper held by hand: WASD and the arrows. */
@@ -231,6 +237,8 @@ export class BaseView {
   private followPause = 0;
   /** A portrait window (live: fit()): the pad's buttons are small, and a line says so while a keeper is held. */
   private portrait = false;
+  /** Last frame's action line (screen px; null: none drawn), for the hook. */
+  private lineRect: Rect | null = null;
 
   constructor(opts: BaseViewOpts) {
     this.persist = !!opts.persist;
@@ -559,7 +567,8 @@ export class BaseView {
         controlled: controlledKeeper(this.sim)?.name ?? null,
         badges: Object.fromEntries(this.sim.keepers.map((k, i) => [k.name, { x: BADGE_X0 + i * BADGE_DX, y: BADGE_Y, w: BADGE_W, h: BADGE_H }])),
         pad: { ...PAD },
-        action: (() => { const k = controlledKeeper(this.sim); return k && all ? this.actionLine(k) : null; })(),
+        action: (() => { const k = this.held(); return k && all ? this.actionLine(k) : null; })(),
+        line: this.lineRect ? { ...this.lineRect } : null,
         doneBy: { ...st.doneBy } };
     }
   }
@@ -576,8 +585,8 @@ export class BaseView {
    */
   private hud(ctx: CanvasRenderingContext2D, read: ClockRead): void {
     const text = (s: string, x: number, y: number, color: string) => drawText(ctx, s, x, y, { color, shadow: false });
-    const held = controlledKeeper(this.sim);
-    drawTopBar(ctx, { clock: read, jobs: this.sim.jobs.length, keepers: this.sim.keepers.map((k) => ({ name: k.name, look: k.look, state: this.badgeState(k) })),
+    const held = this.held();
+    drawTopBar(ctx, { clock: read, jobs: this.sim.jobs.length, keepers: this.sim.keepers.map((k) => ({ name: k.name, look: k.look, state: this.badgeState(k, held) })),
       speed: this.speed, rate: this.rate, armed: this.newArmed > 0 });
     const q = this.sim.queue(), y = VIEW_H - 21;
     let x = 6;
@@ -601,20 +610,34 @@ export class BaseView {
       const needs = Object.fromEntries(NEEDS.map((k) => [k, hasNeed(d.element, k) && (!garden || GARDEN_NEEDS.includes(k)) ? d.needs[k] : null])) as Record<NeedKind, number | null>;
       drawCard(ctx, { name: d.name, element: d.element, stage: d.stage, day: Math.floor((this.sim.clock - d.stageSince) / this.sim.dayLen) + 1, needs, garden });
     }
+    this.lineRect = null;
     if (held) {
-      drawActionLine(ctx, this.actionLine(held));
+      this.lineRect = drawActionLine(ctx, this.actionLine(held), this.actionText(held), x);
       drawPad(ctx, new Set(this.padHeld.values()));
       if (this.portrait) drawPortraitHint(ctx);
     }
   }
 
-  /** What a keeper's badge shows: held by hand, at a job, or free. */
-  private badgeState(k: Keeper): BadgeState { return k.manual || k.pendingTake ? 'held' : k.job ? 'busy' : 'free'; }
+  /**
+   * The keeper held by hand as the player last asked: the simulation's (control.ts controlledKeeper), with the takes
+   * and releases still waiting for the next world step applied -- so a badge, Tab, the pad and the camera answer at
+   * once, paused too (a paused world steps none: S7 review).
+   */
+  private held(): Keeper | null {
+    let id = this.sim.controlled;
+    for (const c of this.sim.commands) if (c.kind === 'take') id = c.keeper; else if (c.kind === 'release') id = null;
+    return id == null ? null : this.sim.keepers.find((k) => k.id === id) ?? null;
+  }
 
-  /** The line over the pad: the keeper held, what they carry, and what E does now ("BEA - BOWL - E: FEED WICK"). */
+  /** What a keeper's badge shows: held by hand (or about to be), at a job, or free. */
+  private badgeState(k: Keeper, held: Keeper | null): BadgeState { return k === held ? 'held' : k.job ? 'busy' : 'free'; }
+
+  /** What E does now for the keeper held ("E: FEED WICK"), what they are at, or '' (taken while paused: not theirs yet). */
+  private actionText(k: Keeper): string { return k.manual ? actionFor(this.sim, k).label : k.pendingTake ? 'FINISHING A JOB' : ''; }
+
+  /** The line under the pad: the keeper held, what they carry, and what E does now ("BEA - BOWL - E: FEED WICK"). */
   private actionLine(k: Keeper): string {
-    const p = k.manual ? actionFor(this.sim, k).label : 'FINISHING A JOB';
-    return [k.name, k.carrying ? SUPPLY_NAME[k.carrying] : null, p || null].filter(Boolean).join(' - ');
+    return [k.name, k.carrying ? SUPPLY_NAME[k.carrying] : null, this.actionText(k) || null].filter(Boolean).join(' - ');
   }
 
   /** A keeper's tap box (world px): KEEPER_BOX around their feet as drawn. */
@@ -676,12 +699,12 @@ export class BaseView {
       const i = badgeAt(sx, sy, this.sim.keepers.length);
       if (i != null) {
         const k = this.sim.keepers[i];
-        if (this.sim.controlled === k.id) this.send({ kind: 'release' });
+        if (this.held() === k) this.send({ kind: 'release' });
         else { this.take(k.id); this.focusKeeper(k); }
         return;
       }
       if (sy < BAR_H) return;
-      if (this.sim.controlled != null) {
+      if (this.held()) {
         const pb = padAt(sx, sy);
         if (pb === 'act') { this.send({ kind: 'act' }); return; }
         if (pb === 'letgo') { this.send({ kind: 'release' }); return; }
@@ -696,7 +719,7 @@ export class BaseView {
     for (let i = this.bubbles.length - 1; i >= 0; i--) { const b = this.bubbles[i]; if (hit(b.r, wx, wy)) { this.sim.rush(b.job); return; } }
     // (a keeper: their body's box, the one drawn in front first)
     const ks = this.sim.keepers.filter((k) => hit(this.keeperBox(k), wx, wy)).sort((a, b) => b.y - a.y);
-    if (ks.length) { if (this.sim.controlled !== ks[0].id) this.take(ks[0].id); return; }
+    if (ks.length) { if (this.held() !== ks[0]) this.take(ks[0].id); return; }
     const pt = { x: 0, y: 0 };
     for (let i = this.sim.dragons.length - 1; i >= 0; i--) {
       const d = this.sim.dragons[i], v = this.cast.get(d.id);
@@ -710,7 +733,7 @@ export class BaseView {
       return;
     }
     // (empty space: the keeper held is let go)
-    if (this.sim.controlled != null) this.send({ kind: 'release' });
+    if (this.held()) this.send({ kind: 'release' });
   }
 
   /** Give the simulation a command (control.ts): it acts at the start of the next world step. */
@@ -740,14 +763,14 @@ export class BaseView {
 
   /**
    * The camera follows the keeper held by hand (not while a drag has it, FOLLOW_PAUSE frames): it eases an eighth of
-   * the way a frame to keep their feet inside FOLLOW on screen.
+   * the way a frame to keep their feet between FOLLOW's x on screen, and at FRAME_FEET's y (their floor framed).
    */
   private follow(): void {
-    const k = controlledKeeper(this.sim);
+    const k = this.held();
     if (!k || this.followPause > 0) return;
-    const feet = k.climbing ? k.y : k.y - 3, fx = k.x - this.camX, fy = feet - this.camY;
+    const feet = k.climbing ? k.y : k.y - 3, fx = k.x - this.camX;
     const tx = clamp(fx < FOLLOW.x0 ? k.x - FOLLOW.x0 : fx > FOLLOW.x1 ? k.x - FOLLOW.x1 : this.camX, 0, this.sim.worldW - VIEW_W);
-    const ty = clamp(fy < FOLLOW.y0 ? feet - FOLLOW.y0 : fy > FOLLOW.y1 ? feet - FOLLOW.y1 : this.camY, 0, WORLD_H - VIEW_H);
+    const ty = clamp(feet - FRAME_FEET, 0, WORLD_H - VIEW_H);
     if (tx === this.camX && ty === this.camY) return;
     this.camAsked = null;
     const was = { x: this.camX, y: this.camY };
@@ -808,7 +831,7 @@ export class BaseView {
       else if (e.key === 'e' || e.key === 'E' || e.key === ' ') { if (!e.repeat) this.send({ kind: 'act' }); }
       else if (e.key === 'Escape') this.send({ kind: 'release' });
       else if (e.key === 'Tab') {
-        const ks = this.sim.keepers, at = ks.findIndex((k) => k.id === this.sim.controlled);
+        const ks = this.sim.keepers, h = this.held(), at = h ? ks.indexOf(h) : -1;
         this.take(ks[(at + 1) % ks.length].id);
       } else return;
       e.preventDefault();
@@ -843,7 +866,7 @@ export class BaseView {
       return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height };
     };
     const onDown = (e: PointerEvent) => {
-      const p = at(e), pad = this.sim.controlled != null && this.layers === 'all' ? padAt(p.x, p.y) : null;
+      const p = at(e), pad = this.held() && this.layers === 'all' ? padAt(p.x, p.y) : null;
       down.set(e.pointerId, { ...p, camX: this.camX, camY: this.camY, drag: false, pad });
       try { canvas.setPointerCapture(e.pointerId); } catch { /* a synthetic pointer */ }
       if (pad) { this.padHeld.set(e.pointerId, pad); if (PAD_DIR[pad]) this.steer(); return; }

@@ -58,8 +58,10 @@ interface Window {
      * 'manual' while held by hand and free -- what they carry, and their tap box in canvas px), the keeper held by hand
      * (or taken at work, finishing it first) by name or null, the keepers' badges in the top bar (canvas px, by name: a
      * tap takes that keeper or lets go of the one held), the touch pad's buttons (canvas px, by name: `up`, `left`,
-     * `right`, `down`, `act`, `letgo`; drawn and live only while a keeper is held), the line over the pad (who is held,
-     * what they carry and what E does) or null, and the jobs done by hand so far, by keeper name. Gone once the base is
+     * `right`, `down`, `act`, `letgo`; drawn and live only while a keeper is held), the line under the pad (who is held,
+     * what they carry and what E does) or null and its ink strip (canvas px) or null, and the jobs done by hand so far,
+     * by keeper name. The keeper held counts takes and releases still waiting for the next world step in the line and
+     * the badges, but not in `controlled` (the simulation's). Gone once the base is
      * detached (the page left it).
      */
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
@@ -82,6 +84,7 @@ interface Window {
       badges: Record<string, { x: number; y: number; w: number; h: number }>;
       pad: Record<string, { x: number; y: number; w: number; h: number }>;
       action: string | null;
+      line: { x: number; y: number; w: number; h: number } | null;
       doneBy: Record<string, number> };
     /**
      * view=base, live and saving (src/game/base.ts attach, only when the page loads and saves the player's barn): save
