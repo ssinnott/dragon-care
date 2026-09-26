@@ -9,8 +9,8 @@
 // lamps throw on the walls at night -- is here too, and gate (w) holds each >= 25 % LIGHTER than every dark body (a
 // scale under L 0.15 at any stage: lightning, dusk, slinkwing; so L >= 0.159, never black) -- a big prop behind a slot
 // >= 25 % from them either way (the firebox is a dark mouth) -- and >= 6 Oklab L from the ink. Night is these
-// colours and the lights, never a tint on a dragon or a floor (plan G8): by night the walls and the building's shell
-// take their NIGHT colours (plan S6c: a day colour to its night colour, one table, each gated by (w) too), stepped in
+// colours and the lights, never a tint on a dragon or a floor (BASE_DESIGN 7): by night the walls and the building's
+// shell take their NIGHT colours (a day colour to its night colour, one table, each gated by (w) too), stepped in
 // thirds with the lights. Plain data: no drawing, safe to import from Node.
 import { mix } from '../lib/art/palettes.ts';
 import type { RoomKind } from './layout.ts';
@@ -20,13 +20,13 @@ import type { Climate } from './missiondata.ts';
 /** The house outline (ART_BIBLE 1.1). */
 export const INK = '#1a1018';
 
-/** Every floor anyone stands on, by name. Later slices add their own (the mission road). */
+/** Every floor anyone stands on, by name (a new floor is added here, and gated before anything stands on it). */
 export const FLOORS = Object.freeze({
   /** Pale straw, the reference habitat floor (ART_BIBLE 5.4): L 0.674, S 0.18. */
   straw: '#e0d6b8',
-  /** The elder garden's path, pale gravel (plan S6: no green underfoot, D3): L 0.671, S 0.13. */
+  /** The elder garden's path, pale gravel (BASE_DESIGN 3, The Garden: no green underfoot, gate i): L 0.671, S 0.13. */
   path: '#dcd6c0',
-  /** The mission road the team walks in the watchable scene (plan S9a/S9: pale packed earth; every baddie fill is gated from it, gate x): L 0.673, S 0.11. */
+  /** The mission road the team walks in the watchable scene (BASE_DESIGN 6: pale packed earth; every baddie fill is gated from it, gate x): L 0.673, S 0.11. */
   road: '#dcd6c4',
 });
 
@@ -36,13 +36,14 @@ export const STRAW_SEAM = '#c9bd9c';
 export const PATH_EDGE = '#c2baa2';
 
 /**
- * The mission scene's ground under and below its road (plan S9, missionview.ts): the road band's back edge (a 1 px
- * line), the road's slab, the strip of grass below the slab in the green climates (never underfoot: D3), and the
- * earth down to the screen's bottom. Gate (w), as backdrops: a dragon walking the road is seen against them. Gate (x)
- * too: every baddie edge fill keeps >= 25 % luminance from the slab, grass and earth, and the art kit's baddies (S9a)
- * sit dark (L <= 0.127) or mid (L 0.38-0.46), so the ground sits between them, L 0.19-0.27 (the S9a merge darkened
- * S9's slab #b8ab90, grass #8fae76 and earth #a88e6e, L 0.29-0.41, by 0.82, 0.80 and 0.84: each kept its hue, and the
- * slab stays the lightest, as before). Drawn as they are at every hour, never through NIGHT: not the barn.
+ * The mission scene's ground under and below its road (BASE_DESIGN 6, missionview.ts): the road band's back edge (a
+ * 1 px line), the road's slab, the strip of grass below the slab in the green climates (never underfoot: gate i), and
+ * the earth down to the screen's bottom. Gate (w), as backdrops: a dragon walking the road is seen against them. Gate
+ * (x) too: every baddie edge fill keeps >= 25 % luminance from the slab, grass and earth, and the art kit's baddies
+ * (ART_BIBLE 5.10) sit dark (L <= 0.127) or mid (L 0.38-0.46), so the ground sits between them, L 0.19-0.27 (a
+ * lighter ground -- slab #b8ab90, grass #8fae76 and earth #a88e6e, L 0.29-0.41 -- was darkened by 0.82, 0.80 and 0.84:
+ * each kept its hue, and the slab stays the lightest). Drawn as they are at every hour, never through NIGHT: not the
+ * barn.
  */
 export const ROAD_SCENE = Object.freeze({ edge: '#c4bca8', slab: '#978c76', grass: '#728b5e', earth: '#8d775c' });
 
@@ -87,7 +88,7 @@ export interface ClimatePhase { sky: readonly [string, string, string]; ridge: s
 
 const cp = (sky: readonly [string, string, string], ridge: string, near: string, detail: string, mark: string): ClimatePhase => Object.freeze({ sky: Object.freeze(sky) as readonly [string, string, string], ridge, near, detail, mark });
 /**
- * The six climates (plan S8's regions: MILD MEADOWS, DRY HILLS AND CAVES, DEEP FOREST, STORMY PEAKS, FROZEN LAKE, WARM
+ * The six climates (BASE_DESIGN 5.1's regions: MILD MEADOWS, DRY HILLS AND CAVES, DEEP FOREST, STORMY PEAKS, FROZEN LAKE, WARM
  * ASH HILLS), each at day, dusk, night and dawn. Night is mid-value everywhere (never black: the darkness rule).
  */
 export const CLIMATE_BACKDROPS: Readonly<Record<Climate, Readonly<Record<DayPhase, ClimatePhase>>>> = Object.freeze({
@@ -139,7 +140,7 @@ export interface Backdrops {
   liftWall: string;
   emptyWall: string;
   stone: string;
-  /** The elder garden, behind its residents (plan S6: green only behind and below the feet, never under them). */
+  /** The elder garden, behind its residents (BASE_DESIGN 3, The Garden: green only behind and below the feet, never under them). */
   hedge: string;
   lawn: string;
   trunk: string;
@@ -182,7 +183,7 @@ export const HEARTH_RING = mix(WALLS.kitchen!, LIGHTS.fire, 0.25);
 /** The two stepped rings each garden lantern throws on the hedge at dusk and night (never on the path): inner and outer, flat. Gate (w). */
 export const LANTERN_RINGS: readonly [string, string] = Object.freeze([mix(BACKDROPS.hedge, LIGHTS.lantern, 0.5), mix(BACKDROPS.hedge, LIGHTS.lantern, 0.25)] as [string, string]);
 
-// ---------- night (plan S6c: night you can see) ----------
+// ---------- night (BASE_DESIGN 7: night you can see) ----------
 
 /**
  * The moonlight: at night every colour of the building's shell and the garden (the walls, the towers' stone, the barn's
@@ -190,15 +191,15 @@ export const LANTERN_RINGS: readonly [string, string] = Object.freeze([mix(BACKD
  * and the props behind the slots) is its day colour mixed half way to this mid blue -- cooler and darker, never black:
  * every night wall and backdrop, and each stepped mix toward it, still passes gate (w) (tools/palette-check.ts), so a
  * dark dragon stays readable against it (the art bible's darkness rule). Never a dragon, never a floor (FLOORS, the
- * straw's seam, the path's edge), never a light (plan G8).
+ * straw's seam, the path's edge), never a light (BASE_DESIGN 7).
  */
 export const MOONLIGHT = '#5c6a9c';
 /** A day colour by moonlight: half way to MOONLIGHT. */
 export function moonlit(day: string): string { return mix(day, MOONLIGHT, 0.5); }
 
 /**
- * The day colours the night moonlights (NIGHT), by what they are. A slice that adds a structure, a wall or a backdrop
- * adds its day colours here (or to NIGHT_KEEPS, with the reason it stays): gate (w) fails any WALLS / BACKDROPS / PROPS
+ * The day colours the night moonlights (NIGHT), by what they are. A new structure, wall or backdrop adds its day
+ * colours here (or to NIGHT_KEEPS, with the reason it stays): gate (w) fails any WALLS / BACKDROPS / PROPS
  * colour -- and anything else it gates -- that has no NIGHT entry, and fails a floor that has one that changes it.
  */
 const NIGHT_MOONLIT: readonly string[] = [
@@ -219,7 +220,7 @@ const NIGHT_MOONLIT: readonly string[] = [
   '#7a5a40', '#86a860', '#5e7a44', '#654834',
   // the bathhouse's tile lines, the Map Room's map and its lines, the tack room's saddles
   '#a0adb6', '#e8d8a8', '#8a6a4a', '#9a5a3a',
-  // the sky bridge's rope rail (plan S8: the Aerie deck running on west, its planks the straw floor's, its posts timber)
+  // the sky bridge's rope rail (BASE_DESIGN 5: the Aerie deck running on west, its planks the straw floor's, its posts timber)
   '#b89868',
   // the bathhouse tub's water and its bubbles (left at the day's they read as lit in the moonlit room)
   '#bfe3e0', '#dff3f1',
@@ -234,7 +235,7 @@ const NIGHT_MOONLIT: readonly string[] = [
  */
 const NIGHT_KEEPS: readonly string[] = [NEST, PROPS.mattress, PROPS.firebox, '#3a2a26'];
 /**
- * The ONE night table: a day colour to its night colour (plan S6c N4). The building (building.ts) and the garden
+ * The ONE night table: a day colour to its night colour (BASE_DESIGN 7: night lives in the sky, the lights and the walls). The building (building.ts) and the garden
  * (gardenArt.ts) are drawn through it -- every fill, and the cel tones made from it -- at the night's step (sky.ts
  * lightsOf: walls), a canvas cached per step; a colour not in it (a floor, the ink, a light, a flag) is drawn as it is.
  */

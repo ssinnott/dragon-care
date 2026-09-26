@@ -32,7 +32,7 @@
 // average over the jobs started, and the most); jobs done; lift rides and the car's busy share (a rider, or a stop to
 // go to); the longest a dragon waited at a landing for the car and at the bay's edge; the keepers' busy share (steps
 // with a job); an eye under a standing body (sim-check section 2's measure, the sim's own model -- travel.ts depthOf,
-// eyeSpan, dragonSpan: seconds summed over every pair, and the longest); stalls (S3's rules: a keeper standing still 10 s
+// eyeSpan, dragonSpan: seconds summed over every pair, and the longest); stalls (sim-check section 2's rules: a keeper standing still 10 s
 // on the way somewhere, not held at the bay's edge; a dragon mid-walk -- walking, turning, boarding or walking off --
 // getting no more than 4 px on in 10 s, stood still or turned about on one spot; the car standing still with work to do
 // for a minute; a keeper giving up on a dragon, WAIT_MAX); breaks of section 2's
@@ -252,7 +252,7 @@ export function runOne(t: Task, done?: (sim: CareSim) => void): Run {
         if (m.grown > 1 || m.babies > 2 || (m.grown && m.babies)) broke(`module ${d.slot.mod} of the ${sim.rooms[d.slot.room].kind} holds ${m.grown} grown and ${m.babies} babies`);
       }
       if (d.place === 'barn' && d.act && (!d.slot || Math.abs(d.x - d.slot.x) >= 0.5 || sim.rooms[d.slot.room].kind !== NEED_ROOM[d.act.need])) broke(`${d.name} is met for ${d.act.need} away from its slot of the ${NEED_ROOM[d.act.need]}`);
-      // (S5: a dragon moved on never rests in the Hatchery -- its sub-slots are the hatchlings' first places)
+      // (BASE_DESIGN 7: a dragon moved on never rests in the Hatchery -- its sub-slots are the hatchlings' first places)
       if (d.goal === 'evict' && d.slot && sim.rooms[d.slot.room].kind === 'hatchery') broke(`${d.name} was moved on to the Hatchery`);
       const y = d.move === 'ride' ? L.y : feetY(d.f), key = `${d.move}@${d.f},${d.x},${y}`, was = stood.get(d);
       if (!was || was.key !== key) stood.set(d, { key, since: sim.tick, told: false });
@@ -383,7 +383,7 @@ export function report(sums: CastSummary[], runs: Run[], head: { rev: string; mi
     '*Jobs done*, *Rides* and the busy shares: the mean over the seeds (*Car busy*: a rider, or a stop to go to; *Keepers busy*: keeper-steps with a job).',
     '*Landing* and *Bay edge*: the longest a dragon waited at a landing for the car, and held at the bay\'s edge (the most on any seed).',
     '*Eye covered*: sim-check section 2\'s measure, seconds of an eye under a standing body summed over every pair, the mean a run (the longest one moment on any seed).',
-    '*Stalls*: S3\'s rules broken, summed over the seeds (a keeper standing still 10 s on the way somewhere, a dragon mid-walk getting no more than 4 px on in 10 s -- stood still or turned about on one spot --, the car still with work a minute, a keeper giving up); *inv*: section 2\'s invariants broken.',
+    '*Stalls*: sim-check section 2\'s rules broken, summed over the seeds (a keeper standing still 10 s on the way somewhere, a dragon mid-walk getting no more than 4 px on in 10 s -- stood still or turned about on one spot --, the car still with work a minute, a keeper giving up); *inv*: section 2\'s invariants broken.',
     `*ms/step*: CareSim.step() alone, the mean (${head.workers > 1 ? `${head.workers} worker threads at once` : 'one worker thread'}). Wall time ${f1(head.wallS)} s.`,
   ].join(' '));
   return L.join('\n');

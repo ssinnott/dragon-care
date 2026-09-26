@@ -1,4 +1,4 @@
-// The road's people who are not keepers (plan S9a; S9 draws them at their stop): THE GRUMPY MILLER ("Hob"), met at the
+// The road's people who are not keepers (ART_BIBLE 5.10; the watchable scene draws them at their stop): THE GRUMPY MILLER ("Hob"), met at the
 // mill on a `miller` stop, grumpy until a CHARM rider (Bea) talks him round. He is drawn through the keepers' own rig
 // (src/art/keeper: cast.ts NPCS.miller, palettes.ts KEEPER_PALETTES.miller, parts.ts's flat cap, rim of hair, bushy
 // brows, moustache, rolled sleeves, flour sack and the `grumpy` / `glad` faces, anims.ts millerAnims), but he is NOT a

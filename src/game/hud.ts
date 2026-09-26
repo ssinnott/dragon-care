@@ -1,5 +1,5 @@
 // The base's screen furniture (docs/BASE_DESIGN.md 4.8, 7): the top bar -- the time of day (a sun or a moon and
-// `DAY 3 14:00`), the open jobs, a badge per keeper (busy, held by hand -- a tap takes them: S7 -- away on a mission,
+// `DAY 3 14:00`), the open jobs, a badge per keeper (busy, held by hand -- a tap takes them: 4.10 -- away on a mission,
 // resting after one), the coin the missions have brought home, the barn's dragons against its cap (`BARN 9/12`), and
 // the buttons (NEW, pause, speed, MAP: the Map Room's table) with their hit rects -- the
 // toasts over the barn, the hint at the bottom right, and a dragon's card (its name, element, stage, its day of the
@@ -22,7 +22,7 @@ import type { KeeperId } from '../art/keeper/cast.ts';
 export const BAR_H = 15;
 const TEXT = '#f3e6c8', FACE = '#3a2e34', ACTIVE = '#6b4a34', HINT = '#b8ac8e';
 
-/** The top bar's buttons (screen px, 640 x 360): NEW (tap twice), pause, the speed that cycles 1x, 2x, 4x, 8x, and MAP (the Map Room's table: plan S8). */
+/** The top bar's buttons (screen px, 640 x 360): NEW (tap twice), pause, the speed that cycles 1x, 2x, 4x, 8x, and MAP (the Map Room's table: BASE_DESIGN 5). */
 export type ButtonName = 'new' | 'pause' | 'speed' | 'map';
 export const BUTTONS: Readonly<Record<ButtonName, Rect>> = Object.freeze({
   new: { x: 528, y: 1, w: 26, h: 13 },
@@ -32,7 +32,7 @@ export const BUTTONS: Readonly<Record<ButtonName, Rect>> = Object.freeze({
 });
 /** Where the coin the missions have brought home is shown (after the keepers' badges, which end at 328). */
 export const COIN_X = 334;
-/** The keepers' badges: 46 x 13 each from x 138, 48 apart; a tap on one takes that keeper, or lets go of the one held (S7). */
+/** The keepers' badges: 46 x 13 each from x 138, 48 apart; a tap on one takes that keeper, or lets go of the one held (BASE_DESIGN 4.10). */
 export const BADGE_X0 = 138, BADGE_DX = 48, BADGE_W = 46, BADGE_Y = 1, BADGE_H = 13;
 /**
  * `BARN n/12`, the barn's dragons against its cap (life.ts BARN_CAP; BASE_DESIGN 4.7), at x 392 -- or a space after a
@@ -77,8 +77,8 @@ export interface TopBar {
   clock: ClockRead;
   jobs: number;
   /**
-   * Each keeper: free, at a job, or held by the player's hand (S7); and on a mission's trip (`away`, from the muster to
-   * the landing) or resting after one (`rest`: S8).
+   * Each keeper: free, at a job, or held by the player's hand (BASE_DESIGN 4.10); and on a mission's trip (`away`, from
+   * the muster to the landing) or resting after one (`rest`: BASE_DESIGN 5).
    */
   keepers: readonly { name: string; look: KeeperId; state: BadgeState; trip?: 'away' | 'rest' | null }[];
   /** The coin the missions have brought home. */
@@ -230,7 +230,7 @@ export function drawCard(ctx: CanvasRenderingContext2D, c: CardInfo, at: Readonl
   });
 }
 
-// ---------- the touch pad (plan S7: shown while a keeper is held by hand) ----------
+// ---------- the touch pad (BASE_DESIGN 4.10: shown while a keeper is held by hand) ----------
 
 /** The pad's buttons: the four directions, ACT (E) and LET GO. */
 export type PadButton = 'up' | 'left' | 'right' | 'down' | 'act' | 'letgo';
@@ -238,8 +238,8 @@ export type PadButton = 'up' | 'left' | 'right' | 'down' | 'act' | 'letgo';
  * Where they are (screen px, 640 x 360): one row at the bottom right, y 305-335, between the ground floor's slab and the
  * job strip's row -- LET GO, ACT (E), then the arrows ← ↑ ↓ →, right-aligned at 634. That band lies under the feet of the
  * floor the camera frames lowest (base.ts follow: a floor's feet at screen y 296-308 at most, its heads 12-52 px over
- * them), so the pad never covers a dragon's head (G6; S7 review: plan 3.11's cross, from y 272, sat over the ground
- * floor's heads). Clear of the smoke drag's start (350, 200) and of the job strip (y 339).
+ * them), so the pad never covers a dragon's head (ART_BIBLE 1.4; a cross of buttons from y 272 sat over the ground
+ * floor's heads). Clear of the smoke test's drag start (350, 200) and of the job strip (y 339).
  */
 export const PAD: Readonly<Record<PadButton, Rect>> = Object.freeze({
   letgo: { x: 404, y: 305, w: 48, h: 30 },

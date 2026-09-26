@@ -1,6 +1,6 @@
-// A mission region's picture (plan S8/S9, S9a; docs/ART_BIBLE.md "Mission art"): its climate in stepped flat layers,
-// drawn into any rect -- the Map Room chooser's 300 x 112 climate picture, or the whole 640 x ~300 road scene, where S9
-// advances `scroll` and the layers slide at their own parallax. Drawing only: no dragons in it, no state, and every
+// A mission region's picture (BASE_DESIGN 5, 6; ART_BIBLE 5.10 "Mission art"): its climate in stepped flat layers,
+// drawn into any rect -- the Map Room chooser's 300 x 112 climate picture, or the whole 640 x ~300 road scene, where the
+// watchable scene advances `scroll` and the layers slide at their own parallax. Drawing only: no dragons in it, no state, and every
 // quantity a pure function of (climate, phase, rect, scroll), so a frozen view draws the same picture every time.
 //
 // The layers, back to front, all flat fills inside a 1 px #1a1018 ink (no gradients, no alpha: the house style):
@@ -22,7 +22,7 @@ import type { Climate } from './missiondata.ts';
 import type { Rect } from './icons.ts';
 import { mix32 } from './rand.ts';
 
-/** The chooser's climate picture size (plan S8: 300 x 112 at (16, 26)). */
+/** The chooser's climate picture size (BASE_DESIGN 5: 300 x 112 at (16, 26)). */
 export const CLIMATE_PIC = Object.freeze({ w: 300, h: 112 });
 /** The layers' parallax against `scroll` (the road scene's camera x): sky 0, far ridge 0.2, near forms 0.5, weather 0.35. */
 export const PARALLAX = Object.freeze({ sky: 0, ridge: 0.2, near: 0.5, weather: 0.35 });

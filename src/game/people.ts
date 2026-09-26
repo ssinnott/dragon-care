@@ -34,7 +34,7 @@ const CARRIED: Readonly<Partial<Record<Carried, Sprite>>> = { food: ICONS.food, 
  * carrying its supply; fetching one (`hold`, standing with it); at the stand spot before the dragon, `watch` (waiting
  * for it to walk in); held at the lift bay's edge, `idle`; at work, `watch` for a feed (the bowl is down, she watches
  * the dragon eat), `kneelIdle` for a tuck-in, and `pet` for love, play or a bath alike -- the named cast has no anim of
- * its own for those last two, so the same fond stroke stands in for them here. Held by the player's hand (plan S7):
+ * its own for those last two, so the same fond stroke stands in for them here. Held by the player's hand (BASE_DESIGN 4.10):
  * walking (or carrying) while they moved this step, else `idle`; `hold` picking a supply up; a climb is `idle`, as
  * any keeper's (the cast has no climb anim: a stand-in). A rider on a mission walks or carries (the saddle, the egg),
  * holds (a saddle taken down or hung back), or stands.
@@ -78,7 +78,7 @@ export function stepKeeperVisual(agent: KeeperAgent, k: Keeper, y: number, moved
 const PT = { x: 0, y: 0 };
 
 /**
- * The mark over the keeper held by hand (plan S7): a 7 x 5 inked arrow pointing down at them, in their own top colour,
+ * The mark over the keeper held by hand (BASE_DESIGN 4.10): a 7 x 5 inked arrow pointing down at them, in their own top colour,
  * where the rush mark goes (a keeper held by hand is never rushed, so the place is free). And the "?" a keeper shows a
  * moment when E did nothing, 7 x 9, over it.
  */

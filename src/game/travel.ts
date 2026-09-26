@@ -32,8 +32,8 @@ export const NEED_ROOM: Readonly<Record<NeedKind, RoomKind>> = Object.freeze(Obj
  * Tuning (4.9). A paper turn's steps (the facing flips at TURN_HALF: care/dragon.ts's TURN_HALF 3). A keeper may set
  * off for a dragon still this many px of route away (so they meet about when it arrives). A keeper waits this long at
  * the stand spot before giving the job back (2 min). A car's departure blocked this long closes the bay (4 s). The
- * car's pace, px per step (2: the plan's third lever, 1 -> 1.5, taken to the cap the orchestrator set -- the one car
- * is the barn's bottleneck; a floor in 0.93 s, though a ride's time is mostly its rider walking in and off: 4.7). A
+ * car's pace, px per step (2: first 1, then 1.5, then its cap of 2 -- the one car was the barn's bottleneck with one
+ * room per need; a floor in 0.93 s, though a ride's time is mostly its rider walking in and off: 4.7). A
  * call waiting this long is served before the car's own floor's (1 min).
  */
 export const TURN_STEPS = 6, TURN_HALF = 3, LEAD_PX = 300, WAIT_MAX = 7200, BAY_CLOSE = 240, LIFT_SPEED = 2, OVERDUE = 3600;
@@ -62,7 +62,7 @@ export const EVICT_PX = 200;
  * A job's wait for its own floor's room ends when its need falls to this tier (1: SOON, the yellow bubble) and no room
  * of the kind on the floor has a slot to be had: then it takes a slot free in one of the other floors' rooms, best first
  * (goFor; moving no one on there). A baby with a job is never moved on, so without it babies each resting in the room
- * another needs -- a floor of babies, every room of it held so -- wait for ever (the S6b review, tools/capacity.ts, 30
+ * another needs -- a floor of babies, every room of it held so -- wait for ever (measured with tools/capacity.ts, 30
  * minutes: twelve babies packed from the ground floor up starved, 11.7 M need-steps at 0 over seeds 1-4 and 83-104 jobs
  * done; with it none on 7 of 8 seeds, about 285 done; the benchmark's twelve unchanged or better). A slot taken a floor
  * away by moving a lingerer on there served about the same, and cost a starved barn's step (the `full` preset's) a
@@ -252,7 +252,7 @@ export function roomsFor(sim: CareSim, d: Dragon, need: NeedKind): Room[] {
 
 /**
  * Who stands in the way of dragon `d` taking slot s: its holder, or anyone holding or heading for a slot in the same
- * module that can't share it (a module holds one grown dragon, or up to two babies: 3.3).
+ * module that can't share it (a module holds one grown dragon, or up to two babies: BASE_DESIGN 3, Slots).
  */
 function blockers(sim: CareSim, d: Dragon, s: Slot): Dragon[] {
   return sim.dragons.filter((o) => o !== d && o.slot && o.slot.room === s.room && (o.slot === s || (o.slot.mod === s.mod && (!s.baby || !o.slot.baby))));
@@ -290,7 +290,7 @@ export function nearestFree(sim: CareSim, d: Dragon, stage: Stage = d.stage, not
 
 /**
  * A dragon standing still in its slot with nowhere to be, no act, no keeper coming, not holding still to grow up and
- * not with a mission's team (evictable, 3.3), for room `room` -- never a baby with a job open: it walks at a third of an adult's pace, so a move
+ * not with a mission's team (evictable: BASE_DESIGN 3, Slots), for room `room` -- never a baby with a job open: it walks at a third of an adult's pace, so a move
  * would cost it most of a need (BASE_DESIGN 4.7).
  */
 function lingerer(sim: CareSim, o: Dragon, room: Room): boolean {
@@ -354,7 +354,7 @@ function takeSlot(sim: CareSim, d: Dragon, room: Room, bump: boolean): Slot | nu
  * Where a lingerer moved on goes (BASE_DESIGN 4.7): a free slot on its own floor in a room meeting its lowest need that has one
  * there (its next job, most likely: then met where it stands; its needs in level order, then NEEDS order); else the
  * cheapest free slot on any floor in a room meeting its lowest need that has one free; else the nearest free slot
- * (nearestFree) -- never the Hatchery's (S5: a baby moved on never rests in front of the nests).
+ * (nearestFree) -- never the Hatchery's (BASE_DESIGN 7: a baby moved on never rests in front of the nests).
  */
 function movedTo(sim: CareSim, o: Dragon): Slot | null {
   const order = needsByLevel(o), net = sim.nets.dragon[o.stage];
@@ -462,7 +462,7 @@ function free(sim: CareSim, d: Dragon): boolean {
 }
 
 /**
- * A free dragon at a leg boundary (standing, or at the landing waiting for the car) chooses its goal (plan S3): its
+ * A free dragon at a leg boundary (standing, or at the landing waiting for the car) chooses its goal (BASE_DESIGN 2): its
  * most pressing job -- or, if it stands in a room that meets another of its jobs in the same tier, that one, saving
  * the walk. A goal a keeper is already coming for is kept. No job: it lingers where it is.
  */
@@ -739,7 +739,7 @@ function callX(sim: CareSim, d: Dragon): number { return landingPlace(sim, d).x;
 
 /**
  * Whether dragon d standing in slot s (as a dragon of `stage`) would have its eye under the body of a dragon waiting in
- * a landing's line on that floor (drawn over it): the slot is not d's to take while that one waits there (3.3;
+ * a landing's line on that floor (drawn over it): the slot is not d's to take while that one waits there (BASE_DESIGN 3, Slots;
  * ART_BIBLE 1.4).
  */
 function lineBlocks(sim: CareSim, d: Dragon, s: Slot, callers = true, stage: Stage = d.stage): boolean {
@@ -828,7 +828,7 @@ function legDone(sim: CareSim, d: Dragon): void {
 }
 
 /**
- * One step of a dragon's body (plan 3.4): a paper turn goes on, a wait goes on, or it walks. A walk step is the gait's
+ * One step of a dragon's body (BASE_DESIGN 2): a paper turn goes on, a wait goes on, or it walks. A walk step is the gait's
  * next frame at the step's pace s (`gaitS = s; gaitT += s; x += facing * s * moveAt(gaitT)`: what the view's walk anim,
  * restarted at the bout's start and played at speed s, moves on this same step; s is 1, or LIVELY on and off the car
  * and in the bay: pace), clamped on the leg's last step; a walk the other way starts with a turn; and R1 holds it at
@@ -1043,7 +1043,7 @@ function board(sim: CareSim, d: Dragon): void {
 }
 
 /**
- * One step of the lift (plan 3.4): a parked car takes the next call (or its rider, once in the car and facing its way
+ * One step of the lift (BASE_DESIGN 2): a parked car takes the next call (or its rider, once in the car and facing its way
  * off, to its floor); it sets off only when nobody stands in the bay on a floor it will pass (R2), and a departure
  * blocked BAY_CLOSE steps closes the bay to walkers (R3) until it goes; it moves LIFT_SPEED px a step. At the caller's
  * floor the caller boards, once no other dragon is in the bay there; at the rider's floor the rider walks off, and the
@@ -1092,7 +1092,7 @@ function stepLift(sim: CareSim): void {
 // ---------- the step ----------
 
 /**
- * A lingerer (3.3) standing in a slot beside a landing where a dragon waits or is on its way to wait, its body over
+ * A lingerer (BASE_DESIGN 3, Slots) standing in a slot beside a landing where a dragon waits or is on its way to wait, its body over
  * the line's front or its eye under it (kitchen and romp slot 1: back to back with the west landing), moves over to a
  * free slot of its own room clear of the landing, so the line can use its front (counted as a dragon moved on).
  */
@@ -1120,7 +1120,7 @@ function clearLandings(sim: CareSim): void {
 }
 
 /**
- * The dragons' half of a step (plan S3): free dragons at a leg boundary choose their goals, in the queue order of their
+ * The dragons' half of a step (BASE_DESIGN 2): free dragons at a leg boundary choose their goals, in the queue order of their
  * most pressing job, then by id; a lingerer still in the way of a landing's line moves over (clearLandings); every
  * dragon walks, turns or waits, by id; then the lift steps.
  */

@@ -1,11 +1,11 @@
-// The watchable scene (docs/BASE_DESIGN.md 6; plan S9): a team out on a mission, walking the road of its region, meeting
+// The watchable scene (docs/BASE_DESIGN.md 6): a team out on a mission, walking the road of its region, meeting
 // each challenge where it comes (the counter's moment, a banner), a hard mission's big baddie at the end of the road
-// (walks in grumpy, is met by its two counters, and leaves calmed, outwitted or driven off -- nobody hurt, ever: D4),
+// (walks in grumpy, is met by its two counters, and leaves calmed, outwitted or driven off -- nobody hurt, ever: BASE_DESIGN B8),
 // and the result card once the trip's time is up. "The scene is the timer" (B5): nothing here is stepped or saved;
 // every quantity is a pure function of the Trip and the world's clock (`sceneAt`), so a frozen view (t=) and a view
 // opened half way along show the same road. The simulation never reads any of it.
 //
-// The pace (G13, as the barn's): each team dragon walks by its own walk anim's root motion (gait.ts), all at the
+// The pace (as the barn's: BASE_DESIGN 2, the lively step): each team dragon walks by its own walk anim's root motion (gait.ts), all at the
 // slowest dragon's mean pace V: dragon i's walk plays at speed s_i = V / avg_i (1 or less) and its body moves D_i(s_i n)
 // -- the distance its walk carries it by anim time s_i n (the frames' moves summed, the last frame's in part) -- where n
 // is the trip's travel time so far (the time since it left, less the time spent standing at the stops' beats). So a
@@ -134,7 +134,7 @@ export interface Piece { stop: number; x: number; state: StopState }
 export interface BaddieAt { id: BaddieId; x: number; face: BaddieFace; pose: BaddiePose; facing: 1 | -1; fx: 'z' | 'dust' | null; t: number }
 
 /**
- * The scene at one clock value (plan S9's `SceneFrame`, plus what the view needs to draw it). E is the time since the
+ * The scene at one clock value (`SceneFrame`: BASE_DESIGN 6's scene, plus what the view needs to draw it). E is the time since the
  * team left (0..L), n the travel time in it; `stop` the stop whose beat is playing (else null), `beatT` how far into it;
  * `last` the last stop reached (its banner stays up until the next); xs each pair's dragon's road x, `speeds` each
  * one's walk speed; `camX` the road x at the screen's left edge.
@@ -152,15 +152,14 @@ export interface SceneFrame {
   done: boolean;
 }
 
-// (the type guards of plan S9 and D4: a baddie on the road has no hurt, health or defeat, and a baddie leaves the road
-// only calmed, outwitted or driven off. Beside them, the art kit's own over its Baddie record (S9a, baddies.ts: the
-// drawn baddie has no hurt, health or defeat field either, and the same three exits), re-exported here so the scene's
-// guards and the art's are read, and compiled, together)
+// (the scene's type guards, BASE_DESIGN B8: a baddie on the road has no hurt, health or defeat, and its face is one of
+// the four; the art kit's own guards over its Baddie record -- no hurt, health or defeat field, and the three cozy
+// exits alone -- are baddies.ts's _NoHurt and _Exits)
 type Assert<T extends true> = T;
 export type _NoHurt = Assert<Extract<keyof BaddieAt | keyof SceneFrame, 'hurt' | 'hp' | 'health' | 'defeated' | 'damage'> extends never ? true : false>;
 export type _Faces = Assert<[BaddieFace] extends ['neutral' | 'grumpy' | 'surprised' | 'sleepy'] ? true : false>;
 
-/** Each element's moment when it meets a challenge (plan S9's table): the breath, rock's happy heave, slinkwing's call. */
+/** Each element's moment when it meets a challenge (BASE_DESIGN 6): the breath, rock's happy heave, slinkwing's call. */
 export const DRAGON_MOMENT: Readonly<Record<DragonElement, string>> = Object.freeze({
   dusk: 'breath', rock: 'happy', fire: 'breath', lightning: 'breath', water: 'breath', spike: 'breath', slinkwing: 'call',
 });
@@ -404,7 +403,7 @@ export class ScenePets {
 
 /**
  * The road (screen space, from the road's band down): the road's pale band (FLOORS.road, a seam along its top), its
- * slab, a strip of grass BELOW it in the green climates (never underfoot, D3's rule), then the earth.
+ * slab, a strip of grass BELOW it in the green climates (never underfoot: gate i), then the earth.
  */
 function drawRoad(ctx: CanvasRenderingContext2D, green: boolean): void {
   const R = SCENE_RECT, bottom = R.y + R.h;

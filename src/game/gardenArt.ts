@@ -1,7 +1,7 @@
-// The elder garden, drawn (docs/BASE_DESIGN.md 3 "The Garden"; plan S6): outside, east of the right tower, a row of
+// The elder garden, drawn (docs/BASE_DESIGN.md 3 "The Garden"): outside, east of the right tower, a row of
 // 176 px plots. One plot's tile is drawn once and kept (three kinds: plot 0's with the bench and the GARDEN sign's
 // posts, every other plot's with an apple tree, the rest plain; and the strip past the last plot), and the view draws
-// only the plots on screen, in world space after the building -- so no canvas grows with the garden (plan P11), and
+// only the plots on screen, in world space after the building -- so no canvas grows with the garden (BASE_DESIGN 3, The Garden), and
 // the tile covers the building canvas's own ground east of the tower. The house style: a 1 px #1a1018 outline, flat
 // cel bands lit from the top left, no gradients, no mark under 2 px.
 // Behind the feet (y < 688): a lawn band, rounded hedge blobs, an apple tree on every other plot, a bench on plot 0,
@@ -10,7 +10,7 @@
 // stone kerb, and below the ground the earth and its 5 px grass strip: the only green below the feet. A picket fence
 // stands 40 px in from the world's end, and moves out as the garden grows. At dusk and night each lantern throws two
 // stepped rings on the hedge (never on the path: gate w, surfaces.ts LANTERN_RINGS), and by night the hedge, lawn,
-// trees, fence, kerb and ground are moonlit (plan S6c: surfaces.ts NIGHT; a tile cached per step). Nothing here is sad: no graves,
+// trees, fence, kerb and ground are moonlit (BASE_DESIGN 7: surfaces.ts NIGHT; a tile cached per step). Nothing here is sad: no graves,
 // no wilting, no autumn -- the garden is the elder's reward (B8, ART_BIBLE D21), always in leaf, apples on the trees.
 import { makeTones } from '../lib/art/shading.ts';
 import { GARDEN_X0, GARDEN_PLOT, GARDEN_END, GROUND, WORLD_H, BAND, SLAB, GARDEN_PLATE, floorTop, plotMid } from './layout.ts';
@@ -33,7 +33,7 @@ const FLOWERS: readonly (readonly [number, number, string])[] = [[14, 670, '#f3e
 const APPLES: readonly (readonly [number, number])[] = [[-14, -6], [-4, 4], [9, -10], [15, 3], [2, -18], [-18, 6]];
 
 /**
- * The night's step the pen draws at (plan S6c; 0 by day), as building.ts's: every colour through the one night table
+ * The night's step the pen draws at (BASE_DESIGN 7; 0 by day), as building.ts's: every colour through the one night table
  * (surfaces.ts NIGHT) -- the hedge, lawn, trees, fence, kerb and ground moonlit; the path (a floor), the flowers, the
  * apples and the lanterns' light as they are.
  */
@@ -172,7 +172,7 @@ function fence(g: CanvasRenderingContext2D, worldW: number): void {
 /**
  * The garden, in world space (the caller translates by the camera), after the building and before the lights: each
  * plot on screen from its cached tile, the strip past the last plot, and the fence at the world's end. `view`: the
- * world x the screen spans; `step`: the night's step (plan S6c: sky.ts lightsOf `walls`; a tile is cached per step).
+ * world x the screen spans; `step`: the night's step (BASE_DESIGN 7: sky.ts lightsOf `walls`; a tile is cached per step).
  */
 export function drawGarden(g: CanvasRenderingContext2D, plots: number, worldW: number, view: readonly [number, number], step = 0): void {
   for (let i = 0; i <= plots; i++) {
@@ -187,7 +187,7 @@ export function drawGarden(g: CanvasRenderingContext2D, plots: number, worldW: n
 
 /**
  * The lanterns' light, in world space after the lights of the building and before the plates (never over a dragon:
- * plan G8): as the dusk's sky turns, and until the dawn's has (sky.ts lightsOf, like the dorm's lamps), each lantern on
+ * BASE_DESIGN 7): as the dusk's sky turns, and until the dawn's has (sky.ts lightsOf, like the dorm's lamps), each lantern on
  * screen throws its stepped rings (the inner one, then both) on the hedge, clipped to the hedge's own shape -- its
  * blobs' fill and the band under them, so the light follows the scalloped top, inside its ink -- never on the sky over
  * it, the lawn or the path; and its lamp is drawn over them.

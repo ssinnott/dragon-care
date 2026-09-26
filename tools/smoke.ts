@@ -29,21 +29,31 @@
 // on the first job chip must Rush that job, and the gallery's keys (E, the arrows, Space, the digits) must neither
 // rebuild the world nor leave it. Time (docs/BASE_DESIGN.md 7): hour=22 is night; the cast drawn alone (layers=cast)
 // is the same picture and the same barn at noon and at ten at night, while the whole frame is not: at least 35 % of
-// its pixels change, darker and cooler, and no floor pixel does (plan S6c: the sky, the lights and the moonlit walls,
-// never a dragon or a floor), and the walls step with the dusk and the dawn; live, the speed button and the keys 1-4 and p run the world faster, and pause it;
+// its pixels change, darker and cooler, and no floor pixel does (BASE_DESIGN 7: the sky, the lights and the moonlit
+// walls, never a dragon or a floor), and the walls step with the dusk and the dawn; live, the speed button and the keys 1-4 and p run the world faster, and pause it;
 // a frozen page with a save in storage neither loads nor writes it, and nor does a live page given hour=; a live page
 // that saves resumes its world after a reload, and one whose save doesn't fit -- another version, or one of this
 // version the view can't build or draw (an unknown element, keeper or need) -- starts a new barn without a page
-// error, keeps the old save aside, and never writes it back. Growing up and eggs (plan S5): the growup preset's EMBER
+// error, keeps the old save aside, and never writes it back. Growing up and eggs (BASE_DESIGN 7): the growup preset's EMBER
 // is an elder a second in, the eggs preset shows its three eggs in the Hatchery's nests, the hatch preset's egg has
-// hatched into a baby by t=120; live, a tap on the head of a dragon with nothing waiting opens its card, and a tap on
-// the card closes it. The elder garden (plan S6): the new game's garden has its two empty plots; the garden preset's
+// hatched into a baby by t=120; live, a tap on the head of a dragon with nothing waiting opens its card (clear of the
+// other heads on screen where it can be), a tap on the card closes it, and a tap on the head of one with a job waiting
+// opens its card and Rushes the job -- a head drawn over a keeper included. The elder garden (BASE_DESIGN 3): the new game's garden has its two empty plots; the garden preset's
 // three residents live on three plots, by day and by night (each dragon says where it lives: the barn or the garden).
-// The watchable scene (plan S9): frozen with a team away (preset=trip&trip=...&panel=watch), the scene is on screen at
+// The watchable scene (BASE_DESIGN 6): frozen with a team away (preset=trip&trip=...&panel=watch), the scene is on screen at
 // the baddie (the Mole King in view, dozing off calmed; in its beat, surprised), at a challenge the team met (with its
 // banner), turned back on a failure, and home with the result card; live, the TEAM OUT chip opens the scene over the
-// barn, the world steps on under it, and BACK TO BARN closes it.
-// The mission art kit (plan S9a, view=missionart): every sheet -- the climates (and one as a scrolling road scene), the
+// barn, the world steps on under it, and BACK TO BARN closes it; beside a keeper held by hand (who stands still under
+// it), a badge or Esc goes back to the barn.
+// Taking a keeper (BASE_DESIGN 4.10, #6; take= frames too): a tap on a keeper or their badge takes them, d and the pad's
+// arrows walk them, the pad and the line over it (what E does) show while one is held, Esc and LET GO let go, a touch
+// in the pad's gaps is the pad's, and a badge takes and lets go while paused; no dragon's head is under the pad or the
+// line.
+// The Map Room (BASE_DESIGN 5; panel=map and panel=mission frames too): MAP opens the world map, a pin its chooser
+// (the climate picture, the challenges and who meets them, the odds, the egg's notice), BEST TEAM fills the team and
+// SEND starts the muster and eases the camera to the Aerie. The mission loop, live at 8x: the muster to the deck, the
+// TEAM OUT chip to the watch scene, TRIP LOG open and shut, BACK TO BARN.
+// The mission art kit (ART_BIBLE 5.10, view=missionart): every sheet -- the climates (and one as a scrolling road scene), the
 // set pieces, the baddies, the people (the miller beside the keepers) and the icons -- draws every item on it, with
 // no page error, in enough colours.
 // Barn capacity (BASE_DESIGN 4.7): the hook counts the barn's dragons against its cap (7 of 12 in the new game, the twelve
@@ -100,13 +110,13 @@ interface Case {
   act?: (page: any) => Promise<string[]>;
   /** Before the page loads (a save planted in its storage). */
   init?: (page: any) => Promise<void>;
-  /** view=missionart (plan S9a): the sheet the page's hook must name, and every item it must have drawn. */
+  /** view=missionart (ART_BIBLE 5.10): the sheet the page's hook must name, and every item it must have drawn. */
   art?: { sheet: string; want: readonly string[] };
-  /** The Map Room's panel (inside its border, screen px 12-628 x 22-332): at most this many colours (flat pixel-art fills, no anti-aliased edges: G6). */
+  /** The Map Room's panel (inside its border, screen px 12-628 x 22-332): at most this many colours (flat pixel-art fills, no anti-aliased edges: the house style). */
   maxPanelColours?: number;
   /** Hash the frame (an in-page FNV-1a over the canvas's pixels) for TINT: the whole frame, and the world between the HUD's bars (rows 16-338). */
   hash?: boolean;
-  /** Keep the frame's pixels (0xRRGGBB each) for TINT's day-and-night comparison (plan S6c N1). */
+  /** Keep the frame's pixels (0xRRGGBB each) for TINT's day-and-night comparison (BASE_DESIGN 7). */
   pixels?: boolean;
 }
 
@@ -126,7 +136,7 @@ function castIs(n: number, stage: string | null) {
   };
 }
 /**
- * While a keeper is held, the pad and the line under it cover no dragon's eye (G6; S7 review): no dragon's head
+ * While a keeper is held, the pad and the line under it cover no dragon's eye (ART_BIBLE 1.4): no dragon's head
  * (its cranium, 6 px either way for the eye) inside a pad button or the line's strip.
  */
 function hudClear(b: BaseHook): string[] {
@@ -166,11 +176,11 @@ function walkedOver(px: number) {
 const PAIRS: { a: string; b: string; n: number }[] = [{ a: 'view=base&t=600', b: 'view=base&t=3600', n: 3 }];
 
 /**
- * Day against night (plans S4, S6c): each pair is one world at noon and at ten at night. `same`: the cast alone
+ * Day against night (BASE_DESIGN 7): each pair is one world at noon and at ten at night. `same`: the cast alone
  * (layers=cast: the dragons, the keepers and the bubbles on a flat colour) must be the same picture and the same barn
- * (barnDigest) -- night never tints a dragon (plan G8). Otherwise the frames must differ, in the world between the HUD's
+ * (barnDigest) -- night never tints a dragon (BASE_DESIGN 7). Otherwise the frames must differ, in the world between the HUD's
  * bars too; with `differ`, in at least that share of the frame's pixels, the changed pixels darker and cooler by night
- * than by day (it reads as night: plan S6c N1), and every floor pixel of the day's frame (FLOORS) the same by night.
+ * than by day (it reads as night: BASE_DESIGN 7), and every floor pixel of the day's frame (FLOORS) the same by night.
  */
 const TINT: { a: string; b: string; same: boolean; differ?: number }[] = [
   { a: 'view=base&t=600&hour=12&layers=cast', b: 'view=base&t=600&hour=22&layers=cast', same: true },
@@ -187,11 +197,11 @@ const PLANTED = JSON.stringify((() => { const w = new CareSim(START_ROOMS, START
 const plant = (blob: string) => async (page: any) => { await page.addInitScript(([k, v]: [string, string]) => { try { localStorage.setItem(k, v); } catch { /* none */ } }, [SAVE_KEY, blob]); };
 const stored = (page: any, key: string): Promise<string | null> => page.evaluate((k: string) => localStorage.getItem(k), key);
 
-/** The hook's time and saving fields (S4). */
+/** The hook's time and saving fields (BASE_DESIGN 7: the clock, the speed, saves). */
 function timeFields(phase: string | null, persist: boolean, night?: number) {
   return (b: BaseHook): string[] => {
     const out: string[] = [];
-    // (plan S6c: the building's walls and shell drawn at the night's step, 0 by day to 3 at night)
+    // (BASE_DESIGN 7: the building's walls and shell drawn at the night's step, 0 by day to 3 at night)
     if (night !== undefined && b.night !== night) out.push(`the building is drawn at night step ${b.night}, not ${night}`);
     if (!b.clock || typeof b.clock.day !== 'number' || typeof b.clock.hour !== 'number') out.push(`the hook's clock is ${JSON.stringify(b.clock)}`);
     else if (phase && b.clock.phase !== phase) out.push(`it is ${b.clock.phase} at ${b.clock.hour}:${b.clock.minute}, not ${phase}`);
@@ -204,7 +214,7 @@ function timeFields(phase: string | null, persist: boolean, night?: number) {
 }
 
 /**
- * view=base, a frozen page with the player's save in storage (plan G4): it is not loaded -- the frame is the new game's
+ * view=base, a frozen page with the player's save in storage (BASE_DESIGN 7, Saves): it is not loaded -- the frame is the new game's
  * at t=600, the same digest as a clean page's -- and it is not written (the blob is as planted).
  */
 async function plantedFrozen(page: any): Promise<string[]> {
@@ -251,7 +261,7 @@ const OLD_SAVE = JSON.stringify({ ...JSON.parse(PLANTED), v: 999, tick: 9999 });
  * Saves of this version that parse but that the view can't build (a dragon of an element no one knows, a keeper no one
  * knows) or draw (a job for a need no one knows: it builds, and only the load's trial draw finds it), or whose egg this
  * build can't hatch (an element no one knows, a nest there isn't: the egg lies unstepped and off the start's camera for
- * days, so only CareSim.fromSave's own checks find it), or whose dragon lives somewhere this build hasn't got (plan S6:
+ * days, so only CareSim.fromSave's own checks find it), or whose dragon lives somewhere this build hasn't got (BASE_DESIGN 3, The Garden:
  * CareSim.fromSave's garden checks), each with the text that marks it in a save.
  */
 const BROKEN = (mark: string, f: (s: any) => void): { blob: string; mark: string } => { const s = JSON.parse(PLANTED); f(s); return { blob: JSON.stringify(s), mark }; };
@@ -262,12 +272,12 @@ const BROKEN_SAVES = [
   BROKEN('"dance"', (s) => { s.jobs[0].need = 'dance'; }),
   BROKEN('"lava"', (s) => EGG(s, { element: 'lava' })),
   BROKEN('"nest":7', (s) => EGG(s, { nest: 7 })),
-  // (a dragon somewhere this build has no place for: the elder garden's saves, plan S6)
+  // (a dragon somewhere this build has no place for: the elder garden's saves, BASE_DESIGN 3, The Garden)
   BROKEN('"moon"', (s) => { s.dragons[0].place = 'moon'; }),
 ];
 
 /**
- * view=base, live and saving, with a broken save of this version in storage (plan 3.6): a new barn (the planted one is
+ * view=base, live and saving, with a broken save of this version in storage (BASE_DESIGN 7, Saves): a new barn (the planted one is
  * at tick 5000), with its seven young adults, the page running (the runner fails on any page error), the save kept at
  * the backup key -- and a save now writes the new barn over it, never the broken one back.
  */
@@ -333,7 +343,7 @@ async function baseSpeed(page: any): Promise<string[]> {
   return out;
 }
 
-/** view=base&preset=growup: EMBER has grown up, an elder (plan S5), and nobody else has. */
+/** view=base&preset=growup: EMBER has grown up, an elder (BASE_DESIGN 7), and nobody else has. */
 function grownUp(b: BaseHook): string[] {
   const e = b.dragons.find((d) => d.name === 'EMBER'), others = b.dragons.filter((d) => d.name !== 'EMBER' && d.stage !== 'adult');
   return [...(e?.stage === 'elder' ? [] : [`EMBER is ${e?.stage ?? 'missing'}, not an elder`]), ...(others.length ? [`${others.map((d) => d.name).join(', ')} grew too`] : [])];
@@ -404,7 +414,7 @@ async function baseCard(page: any): Promise<string[]> {
 }
 
 /**
- * The elder garden (plan S6): this many residents on this many plots, the world as wide as that garden makes it
+ * The elder garden (BASE_DESIGN 3, The Garden): this many residents on this many plots, the world as wide as that garden makes it
  * (1304 + 176 a plot + 32), every dragon saying where it lives -- each resident an elder, in the garden.
  */
 function gardenIs(residents: number, plots: number) {
@@ -419,7 +429,7 @@ function gardenIs(residents: number, plots: number) {
 }
 
 /**
- * The watchable scene (plan S9), frozen: the overlay is the scene, and the scene is as `want` says (the last stop
+ * The watchable scene (BASE_DESIGN 6), frozen: the overlay is the scene, and the scene is as `want` says (the last stop
  * reached, whether it was met, the baddie in view, its exit, the way the team faces...), with a banner once a stop is
  * reached.
  */
@@ -437,10 +447,10 @@ function sceneIs(want: Partial<NonNullable<BaseHook['scene']>>) {
 }
 
 /**
- * view=base&preset=trip, live (save=0; plan S9): a team is out, so the TEAM OUT chip shows under the top bar; a tap on
+ * view=base&preset=trip, live (save=0): a team is out, so the TEAM OUT chip shows under the top bar; a tap on
  * it opens the scene over the barn (the world stepping on underneath), and BACK TO BARN closes it. Then the watch
- * overlay beside taking a keeper (plan S7; the merge), with keepers who are not on the trip (its riders, BEA and IRIS,
- * are away on the road once S8's trips are in, and never taken): TOMAS taken by his badge and the scene opened, he
+ * overlay beside taking a keeper (BASE_DESIGN 4.10), with keepers who are not on the trip (its riders, BEA and IRIS,
+ * are away on the road, and never taken): TOMAS taken by his badge and the scene opened, he
  * stays held but stands still under it -- d held walks him nowhere, and the line over the pad is gone -- a tap on the
  * pad's arrow or on the world is the overlay's (swallowed: never a pad press, nor empty space letting him go), Esc goes
  * back to the barn with him still held and walking on with d still down, and over the scene again PIP's badge goes
@@ -507,7 +517,7 @@ async function baseWatch(page: any): Promise<string[]> {
 }
 
 /**
- * The Map Room's table (plan S8): the overlay open is `screen`, with the board's three missions (day 1: THE LOST NEST
+ * The Map Room's table (BASE_DESIGN 5): the overlay open is `screen`, with the board's three missions (day 1: THE LOST NEST
  * first) and the coin on the hook; the map shows a pin per mission, the chooser its BEST TEAM, SEND and BACK.
  */
 function tableIs(screen: 'map' | 'mission') {
@@ -532,7 +542,7 @@ function mustered(b: BaseHook): string[] {
   return team.every((d) => d && d.f === 5 && d.place === 'barn') ? [] : [`the team is ${team.map((d) => d && `${d.name} f${d.f} ${d.place}`).join(', ')}, not on the Aerie`];
 }
 /**
- * view=base, live (save=0): the Map Room's table (plan S8, #5.6). MAP eases the camera to the Map Room and opens the
+ * view=base, live (save=0): the Map Room's table (BASE_DESIGN 5, #5: launched from the Aerie). MAP eases the camera to the Map Room and opens the
  * map (within 2 s); a tap on the first pin opens its mission's chooser; BEST TEAM puts a team together; SEND sends it
  * -- the table closes, the trip is mustering, and the camera is at the Aerie within 2 s.
  */
@@ -568,7 +578,7 @@ async function baseMission(page: any): Promise<string[]> {
 }
 
 /**
- * view=base, live (save=0; the S8 + S9 merge): the whole mission loop, as a player plays it -- MAP opens the Map Room's
+ * view=base, live (save=0; BASE_DESIGN 5, 6): the whole mission loop, as a player plays it -- MAP opens the Map Room's
  * map; the first pin (THE LOST NEST) its chooser; BEST TEAM puts a team together; SEND (a command the world takes at its
  * next step) closes the table and the team musters; at 8x the team stands together on the Aerie deck (the muster done:
  * leaving over the sky bridge); the TEAM OUT chip opens the watch overlay -- the team on its road, the world stepping
@@ -698,7 +708,7 @@ async function baseInput(page: any): Promise<string[]> {
   return out;
 }
 /**
- * view=base, live (save=0): taking a keeper (plan S7, #6). A tap on BEA's badge takes her (the hook's `controlled`);
+ * view=base, live (save=0): taking a keeper (BASE_DESIGN 4.10, #6). A tap on BEA's badge takes her (the hook's `controlled`);
  * holding d walks her right; Esc lets go; a tap on her body (low in her box: a bubble over a dragon's head may stand
  * over its top) takes her again; holding the pad's right arrow walks her right; a tap on LET GO lets go. The pad and the
  * line over it are there while she is held (the hook's `action`), and gone after.
@@ -870,20 +880,20 @@ const CASES: Case[] = [
   { query: 'view=base', minColours: 150, allScales: false, init: plant(OLD_SAVE), act: liveOldSave },
   ...BROKEN_SAVES.map((b): Case => ({ query: 'view=base', minColours: 150, allScales: false, init: plant(b.blob), act: liveBrokenSave(b) })),
   { query: 'view=base&hour=22', minColours: 150, allScales: false, init: plant(PLANTED), act: liveHourNoSave },
-  // growing up and eggs (plan S5): EMBER grown an elder, three eggs in the Hatchery's nests, an egg hatched into a baby;
+  // growing up and eggs (BASE_DESIGN 7): EMBER grown an elder, three eggs in the Hatchery's nests, an egg hatched into a baby;
   // live, a dragon's card
   { query: 'view=base&preset=growup&t=60', minColours: 150, allScales: false, check: (b) => [...grownUp(b), ...travels(b)] },
   { query: 'view=base&preset=eggs&t=600&cam=168,280', minColours: 150, allScales: false, check: (b) => [...eggsIn(b), ...travels(b)] },
   { query: 'view=base&preset=hatch&t=120&cam=168,280', minColours: 150, allScales: false, check: (b) => [...hatchedOne(b), ...travels(b)] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseCard },
-  // taking a keeper (plan S7): frozen, BEA held from the first step (the pad, her mark, the line); live, taken and let
+  // taking a keeper (BASE_DESIGN 4.10): frozen, BEA held from the first step (the pad, her mark, the line); live, taken and let
   // go by her badge, the keys, a tap on her and the pad
   { query: 'view=base&t=120&take=bea', minColours: 150, allScales: false, check: (b) => [...castIs(7, 'adult')(b), ...(b.controlled === 'BEA' && b.action?.startsWith('BEA') && b.keepers.find((k) => k.name === 'BEA')?.phase === 'manual' ? [] : [`take=bea: controlled ${b.controlled}, the line ${JSON.stringify(b.action)}`]), ...markShown('BEA')(b), ...hudClear(b)] },
   // (held in the hayloft, at night: the camera frames her floor, so her mark shows under the top bar, and the ground
   // floor's heads are off the screen, not under the pad)
   { query: 'view=base&t=200&hour=22&take=iris', minColours: 120, allScales: false, check: (b) => [...markShown('IRIS')(b), ...hudClear(b), ...(b.keepers.find((k) => k.name === 'IRIS')?.f === 2 ? [] : ['take=iris: IRIS is not in the hayloft'])] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseControl },
-  // the elder garden (plan S6): the garden preset's three residents on their plots, past the Garden Gate, by day and at
+  // the elder garden (BASE_DESIGN 3, The Garden): the garden preset's three residents on their plots, past the Garden Gate, by day and at
   // night (napping, the lanterns lit)
   { query: 'view=base&preset=garden&cam=1304,376&t=600', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...travels(b)] },
   { query: 'view=base&preset=garden&cam=1304,376&t=600&hour=22', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...timeFields('night', false, 3)(b)] },
@@ -900,14 +910,14 @@ const CASES: Case[] = [
   { query: 'view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ facing: -1, exit: null }) },
   { query: 'view=base&preset=trip&trip=oldmine:1&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result: 'HOME SAFE!' }) },
   { query: 'view=base&preset=trip&trip=oldmine:0.2&save=0', minColours: 150, allScales: false, act: baseWatch },
-  // the mission art kit (plan S9a): every sheet draws everything on it (the page's hook lists it), in its colours
+  // the mission art kit (ART_BIBLE 5.10): every sheet draws everything on it (the page's hook lists it), in its colours
   { query: 'view=missionart&sheet=climates&t=0', minColours: 1000, allScales: false, art: { sheet: 'climates', want: CLIMATES.flatMap((c) => PHASE_ORDER.map((p) => `${c}:${p}`)) } },
   { query: 'view=missionart&sheet=climates&climate=peaks&phase=night&t=90', minColours: 500, allScales: false, art: { sheet: 'climates', want: ['peaks:night:scene'] } },
   { query: 'view=missionart&sheet=setpieces&t=60', minColours: 1000, allScales: false, art: { sheet: 'setpieces', want: CHALLENGE_IDS } },
   { query: 'view=missionart&sheet=baddies&t=30', minColours: 1000, allScales: false, art: { sheet: 'baddies', want: [...BADDIE_IDS, ...BADDIE_IDS.map((b) => `${b}:portrait`)] } },
   { query: 'view=missionart&sheet=people&t=50', minColours: 1000, allScales: false, keepers: true, art: { sheet: 'people', want: ['miller:grumpy', 'miller:talkedRound', ...KEEPER_IDS] } },
   { query: 'view=missionart&sheet=icons&t=0', minColours: 300, allScales: false, art: { sheet: 'icons', want: [...CHALLENGE_IDS.map((c) => `challenge:${c}`), ...SKILLS.map((k) => `skill:${k}`), 'saddle', ...DRAGON_ELEMENTS.map((e) => `egg:${e}`), ...BADDIE_IDS.map((b) => `portrait:${b}`)] } },
-  // missions (plan S8): the Map Room's world map and a mission's chooser (frozen, the world stepped first), the muster
+  // missions (BASE_DESIGN 5): the Map Room's world map and a mission's chooser (frozen, the world stepped first), the muster
   // preset's team all on the Aerie deck, and live, MAP -> a pin -> BEST TEAM -> SEND
   { query: 'view=base&t=60&panel=map', minColours: 100, maxPanelColours: 40, allScales: false, check: tableIs('map') },
   { query: 'view=base&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: (b) => [...tableIs('mission')(b), ...noticeIs(null)(b)] },
@@ -915,7 +925,7 @@ const CASES: Case[] = [
   { query: 'view=base&preset=twelve&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: (b) => [...tableIs('mission')(b), ...barnIs(12)(b), ...noticeIs('BARN FULL: THE EGG WILL WAIT')(b)] },
   { query: 'view=base&preset=muster&t=2186&cam=0,20', minColours: 150, allScales: false, check: (b) => [...mustered(b), ...travels(b)] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseMission },
-  // the whole loop live (the S8 + S9 merge): MAP -> a pin -> BEST TEAM -> SEND -> the muster on the Aerie -> the TEAM
+  // the whole loop live (BASE_DESIGN 5, 6): MAP -> a pin -> BEST TEAM -> SEND -> the muster on the Aerie -> the TEAM
   // OUT chip -> the watch scene (its trip log) -> BACK
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseLoop },
 ];
@@ -1054,7 +1064,7 @@ for (const c of CASES) {
 }
 
 /**
- * Day against night, pixel by pixel (plan S6c N1, N2): the share of the frame's pixels that differ; over those, the
+ * Day against night, pixel by pixel (BASE_DESIGN 7): the share of the frame's pixels that differ; over those, the
  * mean luminance and the mean blue less red (warmth) by day and by night; and the day's floor pixels (a FLOORS colour, the straw seam or the path edge,
  * in the world between the HUD's bars) and how many of them differ by night.
  */

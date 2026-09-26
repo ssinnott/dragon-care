@@ -12,8 +12,8 @@
 // after it was laid; 30 game days into the elder stage an elder retires to the garden, as soon as it may be sent
 // somewhere new (travel.ts redirectable: not being met, not in the lift's hands or its bay). The garden (garden.ts,
 // after the keepers in every step) is the retired elders' home: its residents keep a nap, sit and stroll rhythm, and
-// need only food and love, slowly -- a keeper comes out to them (plan S6). Missions (missions.ts, last in every step:
-// plan S8) take a team of dragons and their riders off the Aerie for days: while away they are nobody's to care for
+// need only food and love, slowly -- a keeper comes out to them (BASE_DESIGN 3, The Garden). Missions (missions.ts, last in every step:
+// BASE_DESIGN 5) take a team of dragons and their riders off the Aerie for days: while away they are nobody's to care for
 // (their needs wait), and two keepers always stay home to run the barn.
 import { makeRng } from '../lib/engine/rng.ts';
 import { NEEDS, QUEUE, OWN_NEED, GARDEN_NEEDS, drainRate, gardenDrain, hasNeed, moodOf, tierOf, fullNeeds } from './needs.ts';
@@ -57,7 +57,7 @@ const SPECIALIST_PX = 300;
 
 /**
  * A game day, in steps at 1x (three minutes), and the hour a new game starts at: clock.ts, which reads the clock for
- * the view. The simulation keeps the clock and never reads the day's phase (plan G8): care runs the same by night.
+ * the view. The simulation keeps the clock and never reads the day's phase (BASE_DESIGN 7): care runs the same by night.
  */
 export { DAY_STEPS, START_HOUR };
 
@@ -74,7 +74,7 @@ export interface SimOptions {
 }
 
 /**
- * What happened in a step, for the view to show (a union later slices extend: a departure, a return...): a dragon grew
+ * What happened in a step, for the view to show: a dragon grew
  * into `stage` (life.ts), or an egg hatched into a baby, the dragon `dragon`; an elder retired and set off for the
  * garden, or a retiree arrived at its plot there, a resident now (garden.ts); an egg fell due with the barn full (life.ts
  * BARN_CAP: it waits in its nest); the player's commands (control.ts): a team sent on a mission from the Map Room's
@@ -86,7 +86,7 @@ export type SimEvent = { kind: 'grow'; dragon: number; stage: Stage } | { kind: 
   | { kind: 'send'; mission: number; reason: string | null } | { kind: 'refused'; keeper: number; reason: string };
 
 /**
- * An egg in the Hatchery (plan S5): its id, its element, the seed its baby will have (a stateless draw from the world's
+ * An egg in the Hatchery (BASE_DESIGN 7): its id, its element, the seed its baby will have (a stateless draw from the world's
  * seed and the egg's id), the clock it was laid at, and its nest (0-2). It hatches HATCH_DAYS game days after it was
  * laid, once a baby sub-slot is free for the baby (life.ts).
  */
@@ -129,7 +129,7 @@ export interface Dragon {
   seed: number;
   /**
    * The slot it has reserved (heading there) or holds (standing in it): layout.ts Slot, its room's own object. There is
-   * no home room: after a job a dragon keeps its slot until it leaves for another need, or is moved on (3.3).
+   * no home room: after a job a dragon keeps its slot until it leaves for another need, or is moved on (BASE_DESIGN 3, Slots).
    */
   slot: Slot | null;
   /** Why it is moving (null: lingering in its slot), and the job it is going to or being served for (by id). */
@@ -207,7 +207,7 @@ export interface Keeper {
   /** Steps held at the lift bay's edge while the car moves (the bay rule, R1); 0 when not held. */
   bayWait: number;
   /**
-   * Held by the player's hand (control.ts, plan S7): auto-assignment and Rush leave them be. The direction the player
+   * Held by the player's hand (control.ts, BASE_DESIGN 4.10): auto-assignment and Rush leave them be. The direction the player
    * holds (dx -1 left, 1 right; dy -1 up, 1 down), kept until it changes; the steps left of the "?" a keeper shows when
    * E does nothing; and taken while at work: the player's once that job is done.
    */
@@ -230,7 +230,7 @@ export interface Job {
 /** A dragon waiting at a landing for the car: its floor, where it rides to, when it called, and its priority (2 a mission, 1 a rushed job, 0 anything else). */
 export interface LiftCall { dragon: number; f: number; to: number; tick: number; prio: 0 | 1 | 2 }
 /**
- * The Dragon Lift's one car (travel.ts; plan 3.4): its y (a rider's feet), the stop it is at or last left, the stop it
+ * The Dragon Lift's one car (travel.ts): its y (a rider's feet), the stop it is at or last left, the stop it
  * is going to (null: parked), its rider (a dragon id, from the moment the car is sent for it until it walks off),
  * whether it is moving, whether it is closing the bay to walkers (a departure blocked BAY_CLOSE steps), the tick its
  * waiting departure was first blocked (-1: none), and the calls not yet served.
@@ -501,7 +501,7 @@ export class CareSim {
   // ---------- a step ----------
 
   /**
-   * One step (plan S3, S5, S6, S7): the player's commands are applied (control.ts); the needs drain and the acts under way refill theirs (an act done ends here); then life --
+   * One step (BASE_DESIGN 2, 3, 4, 7): the player's commands are applied (control.ts); the needs drain and the acts under way refill theirs (an act done ends here); then life --
    * a hold counts down, a dragon due, settled and with room grows up, an egg due hatches (life.ts) -- after the acts, so a dragon
    * whose nap or job ended this step is caught settled before it can set off; then jobs open under QUEUE (and close only
    * by being done: a need rises through a keeper's act alone), so a hatchling's food job opens the step it hatches; the
@@ -577,7 +577,7 @@ export class CareSim {
   }
 
   /**
-   * A job a keeper can go to (plan S3): its dragon is going for it, to a slot in the need's own room, and is there, or
+   * A job a keeper can go to (BASE_DESIGN 2): its dragon is going for it, to a slot in the need's own room, and is there, or
    * past its lift ride and nearly there (LEAD_PX of route left) -- or, rushed, anywhere past its ride (the keeper runs:
    * they meet about when it arrives); so no keeper stands waiting at a stand spot while the dragon queues for the car.
    * The dragon is awake, not holding still to grow up (life.ts), and no other keeper is on it. A garden resident's job
@@ -819,7 +819,7 @@ export class CareSim {
   // ---------- eggs ----------
 
   /**
-   * Lay an egg of an element in the Hatchery (a mission brings eggs home: S8), in nest `into` if it is free (the one
+   * Lay an egg of an element in the Hatchery (a mission brings eggs home: BASE_DESIGN 5), in nest `into` if it is free (the one
    * the mission reserved) else its lowest free nest, laid at clock `laidAt` (default now; a preset may lay one earlier). Its baby's seed is a stateless draw from the world's seed and
    * the egg's id. Null if every nest holds an egg (or the base has no hatchery): the egg is not taken. #11: the
    * Hatchery is used.

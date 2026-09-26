@@ -1,4 +1,4 @@
-// Hatchlings' names (plan S5): each element has six of its own, and a baby takes the first of its element's that no
+// Hatchlings' names (BASE_DESIGN 7): each element has six of its own, and a baby takes the first of its element's that no
 // dragon has -- in the barn, the garden or away (every dragon the world has) -- else one of them with a number: CINDER2,
 // ASH2, ..., CINDER3. No randomness (a name is the world's to pick, the same in every run), and never over NAME_MAX
 // characters (the job strip's chips and the dragon card are sized for it).

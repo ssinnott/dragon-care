@@ -1,4 +1,4 @@
-// The elder garden (docs/BASE_DESIGN.md 3 "The Garden"; plan S6, D3): the retired elders' home, outside, east of the
+// The elder garden (docs/BASE_DESIGN.md 3 "The Garden"; #10): the retired elders' home, outside, east of the
 // right tower through the Garden Gate. Retiring is the elder's reward (B8, ART_BIBLE D21): a place, not a stage, and
 // nothing in it reads as decline. DOM-free and deterministic: every loop by id, every draw a stateless rngAt(seed,
 // TAG.GARDEN, dragon, tick).
@@ -12,7 +12,7 @@
 // elder's rate (needs.ts GARDEN_RATE), and lives by a small rhythm: it NAPS (1800 to 3600 steps: 30 to 60 s of play at
 // 1x, 4 to 8 game hours of the real day), SITS (600 to 1200 steps: 10 to 20 s, about 1.3 to 2.7 game hours), and from a
 // sit either STROLLS -- walked by its own walk's root motion (gait.ts), to a resting place among the
-// plots beside its own -- or naps again. At night (the one thing in the simulation that reads the day's phase, plan G8:
+// plots beside its own -- or naps again. At night (the one thing in the simulation that reads the day's phase, BASE_DESIGN 7:
 // clock.ts readClock) it only naps: a sit ends at nightfall, a nap that ends at night starts another, and a stroll is
 // never begun that would not end before 20:00. When a job opens it WAITS where it rests (one strolling walks on to its
 // resting place first); its keeper comes out to it -- the one exception to "a need is met in its own room" (#7): the
@@ -46,7 +46,7 @@ export const STROLL_P = 0.6;
 /** Draws a stroll gets to find a clear resting place, the least it walks (px), and how long before 20:00 it must end (steps). */
 const STROLL_TRIES = 8, STROLL_MIN = 24, NIGHT_MARGIN = 60;
 
-/** Whether it is night by the clock (20:00-05:00): a resident's time to nap (the simulation's one reader of the phase, plan G8). */
+/** Whether it is night by the clock (20:00-05:00): a resident's time to nap (the simulation's one reader of the phase, BASE_DESIGN 7). */
 export function isNight(sim: CareSim): boolean { return readClock(sim.clock, sim.dayLen).phase === 'night'; }
 
 /** The clock an elder's retirement falls due at: its elder stage's start (the step it grew into an elder: life.ts) plus RETIRE_DAYS game days. */

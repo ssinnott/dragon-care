@@ -1,6 +1,6 @@
 // The player's barn in the browser (docs/BASE_DESIGN.md 7): the one file that touches localStorage. Only a live page
 // that may save uses it, and only from BaseView.attach() (a frozen page, t=, a preset page, save=0 and every headless
-// check never do: plan G4, G5). A save is save.ts's JSON under one key; one this build can't read -- another
+// check never do: BASE_DESIGN 7, Saves). A save is save.ts's JSON under one key; one this build can't read -- another
 // version, or not a save at all -- is copied to a backup key and a new barn starts, without throwing. Storage that
 // isn't there (a private window, a quota, a blocked origin) reads as no save and writes as a failed write.
 import { SAVE_VERSION } from './save.ts';

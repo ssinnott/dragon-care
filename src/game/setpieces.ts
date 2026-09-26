@@ -1,4 +1,4 @@
-// The challenges met on the road (plan S9's set-piece table; S9a): one set piece per challenge, drawn on the road at
+// The challenges met on the road (BASE_DESIGN 6's set-piece table; ART_BIBLE 5.10): one set piece per challenge, drawn on the road at
 // road x `x` (its middle) with its foot on the feet line `feetY`, in the house style (the engine's cel helpers through
 // cel.ts: a 1 px #1a1018 ink, flat bands lit from the top left, no gradients, no alpha, no mark under 2 px). Its
 // `state`: `ahead` (the problem, as the team walks up), `met` (the problem visibly solved by its counter) or `unmet`

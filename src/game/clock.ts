@@ -1,14 +1,14 @@
 // Game time (docs/BASE_DESIGN.md 7): a day is a fixed number of 60 Hz steps at 1x, and the clock is steps since day
 // 1's midnight (sim.ts: clock0 + tick). Reading it -- the day, the hour and minute, the day's phase and how far the
 // sky has turned into it -- is the view's business alone (the sky, the lights, the HUD's clock): the barn's care
-// simulation never reads the phase (plan G8), so a world started at noon and one started at ten at night, stepped
+// simulation never reads the phase (BASE_DESIGN 7), so a world started at noon and one started at ten at night, stepped
 // alike, are the same barn. Plain data and arithmetic: safe to import from Node.
 
 /** A game day, in steps at 1x: three minutes. Tests pass a shorter SimOptions.dayLen (600: a day in 10 s). */
 export const DAY_STEPS = 10800;
 /** A new game starts at this hour (07:00 on day 1, the day's first hour). */
 export const START_HOUR = 7;
-/** Game days a stage lasts before a dragon grows into the next (S5), an elder's days before it retires (S6), an egg's before it hatches (S5). */
+/** Game days a stage lasts before a dragon grows into the next (#8; BASE_DESIGN 7), an elder's days before it retires (#10; BASE_DESIGN 3, The Garden), an egg's before it hatches (BASE_DESIGN 7). */
 export const STAGE_DAYS = 30, RETIRE_DAYS = 30, HATCH_DAYS = 2;
 
 /** The view's speeds: world steps per frame (0: paused). Speed is the view's, never the world's: a save has none. */

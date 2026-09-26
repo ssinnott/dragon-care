@@ -26,7 +26,7 @@ except what the keepers need from them (four small read-only helpers in `src/car
 miller: `cast.ts` `NPCS`, in `NPC_IDS` and never in `KEEPER_IDS`, drawn only by `src/game/npcs.ts`, ART_BIBLE 5.10), the care acts and the agents they drive
 (`src/care/acts.ts`, `keeper.ts`, `dragon.ts`), the planned walks (`src/care/path.ts`), the yard
 (`src/care/yard.ts`), and the gallery views `keepers`, `care`, `careaudit`, `yard` and `yardaudit`. `npm run check`
-runs the keeper palette gates (233 of 233 pass since the mission road and the grumpy miller, S9a: counted apart from the dragons' 2492) and eight new smoke cases, the
+runs the keeper palette gates (233 of 233 pass, the mission road and the grumpy miller among them: counted apart from the dragons' 2492) and eight new smoke cases, the
 care audits among them (every act on all 28 looks: 112 runs; the same mirrored on two elements: 32; and every act
 the yard plays in two and a half minutes, walks included). `npm run shots` renders the keeper sheets. The
 yard also brings the game side of one care hook: **dusk's `tuckin` is played on a tuck-in** (the bible's status noted
@@ -37,7 +37,7 @@ it is doing; the anim plays with its root motion pinned (`KeeperAgent.pinX`), si
 itself, and a walk or carry plays at the keeper's pace over the look's own walk speed (`KeeperPlayer.setSpeed`: Bea's
 0.55 px a frame walk at 1.82x for the base's 1 px, 1.6x that on a Rush), so the feet no longer skate. A keeper who
 reaches the stand spot before the dragon stands in `watch` until it walks in, and one held at the Dragon Lift's bay
-stands in `idle`. On a mission (`docs/BASE_DESIGN.md` 5) a rider carries a saddle (the mission art kit's `SADDLE`, S9a) from the Tack
+stands in `idle`. On a mission (`docs/BASE_DESIGN.md` 5) a rider carries a saddle (the mission art kit's `SADDLE`: ART_BIBLE 5.10) from the Tack
 Room up to the Aerie and back, and the egg a team brings home down the left tower and up the centre ladder to its nest in the hayloft's Hatchery, in `carry`; takes the saddle down or
 hangs it back in `hold`; and rests in the Bunks in `idle`; away, a rider is not drawn in the barn (the watchable scene
 draws the team on its road, each rider with the saddle in the near hand: ART_BIBLE 5.11). This is a plainer join than

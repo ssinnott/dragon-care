@@ -2,7 +2,7 @@
 // each end, at the game's scale 1. Barn module 2 is the Dragon Lift, from the ground floor up through the roof to the
 // Aerie (floor 5, a deck over the left tower and the barn roof); where the hay hoist was, between modules 2 and 3,
 // is the keepers' centre ladder bay. Rooms are data placed on the grid, each with a purpose (#11), and a dragon room's
-// dragons stand in fixed slots. Outside, east of the right tower, lies the elder garden (plan S6): a row of 176 px
+// dragons stand in fixed slots. Outside, east of the right tower, lies the elder garden (BASE_DESIGN 3, The Garden): a row of 176 px
 // plots, one a resident (and never fewer than two), reached through the Garden Gate, an arch in both walls of the
 // right tower's ground floor -- the one tower door a dragon fits -- so the world's walkable width grows with it
 // (worldWOf). Walking is two nets of floor spans and links: the keepers' (the ladders) and one per dragon stage (the
@@ -36,14 +36,14 @@ export const LIFT_STOPS = [0, 1, 2, 5] as const;
 /** The Aerie: walkable floor 5, one deck from x 8 to 648 (over the left tower, a gantry over the barn roof, the lift head). */
 export const AERIE_F = 5, DECK_X0 = 8, DECK_X1 = LIFT_X1;
 /**
- * The sky bridge (plan S8): the Aerie's floor runs on west off the deck, past the world's edge, to x -200 -- where a
+ * The sky bridge (BASE_DESIGN 5): the Aerie's floor runs on west off the deck, past the world's edge, to x -200 -- where a
  * mission's team walks off (it stands in for `fly`, which rock can't anyway) and lands again (missions.ts).
  */
 export const BRIDGE_X0 = -200;
 /**
  * The deck's west end for a keeper walked by hand (control.ts): the bridge past it is the riders' way off the world,
  * never the hand's -- the camera stops at x 0, so a keeper walked out along it would leave the screen. A keeper's pad
- * (10 px) in from the deck's end, where the deck's span ended before the bridge (S7).
+ * (10 px) in from the deck's end, where the deck's span ends (the bridge past it is the riders').
  */
 export const HAND_DECK_X0 = DECK_X0 + 10;
 /** The gambrel roof over the hayloft (floor 2): its ridge, and the knee where the steep lower slope turns. */
@@ -134,7 +134,7 @@ export interface Room { id: number; kind: RoomKind; part: Part; floor: number; x
 export function underSlope(r: { part: Part; floor: number; x0: number }): boolean { return r.part === 'barn' && r.floor === 2 && r.x0 === BARN_X; }
 
 /**
- * A room's slots (3.3): first one per module at its middle -- one module faces its post, two face each other (+1, -1:
+ * A room's slots (BASE_DESIGN 3, Slots): first one per module at its middle -- one module faces its post, two face each other (+1, -1:
  * their keepers work between them), three face +1, +1, -1 -- then two baby sub-slots per module, 40 px in from each
  * side (facing +1 and -1). A 'baby' room has the sub-slots only (under the hayloft's slope: 60 and 120 px in, both
  * facing +1, tails to the slope: underSlope -- a baby in the first stands in front of the first nest, one in the
@@ -214,7 +214,7 @@ export function nestBase(f: number): number { return floorTop(f) + WALL_H + 3; }
 /** Where an egg lies in its nest on floor f, world y: its ink ring's bottom row (eggs.ts drawEgg's y), 2 px over the floor's band. */
 export function eggBottom(f: number): number { return floorTop(f) + WALL_H - 2; }
 
-// ---------- the elder garden (plan S6) ----------
+// ---------- the elder garden (BASE_DESIGN 3, The Garden) ----------
 
 /**
  * The garden: its west edge (the right tower's outer wall), a plot's width, and the strip past the last plot to the
@@ -274,12 +274,12 @@ export interface Nets { keeper: Net; dragon: Readonly<Record<Stage, Net>> }
 const NETS = new Map<number, Nets>();
 /**
  * The nets for a world whose walkable ground ends at `gardenEnd` (CareSim.worldW: worldWOf its plots), built once per
- * garden size (plan S6: they are rebuilt, and the garden only ever grows east, so a route on the smaller nets is still
+ * garden size (BASE_DESIGN 3, The Garden: they are rebuilt, and the garden only ever grows east, so a route on the smaller nets is still
  * a route on the new ones).
  * - The keepers': the towers open into the barn on the ground and upper floors, so each of those is one span end to
  *   end -- and the ground floor goes on through the Garden Gate to the garden's end; the hayloft is cut off from the
  *   towers by the roof, and above it only the towers go on, up to the Aerie deck (floor 5), reached by the left
- *   tower's ladder, and the deck runs on west over the sky bridge, off the world's edge (BRIDGE_X0: plan S8). The
+ *   tower's ladder, and the deck runs on west over the sky bridge, off the world's edge (BRIDGE_X0: BASE_DESIGN 5). The
  *   three ladders (LADDERS); keepers never ride the lift.
  * - A dragon's, per stage: the barn's ground and upper floors wall to wall, the hayloft between modules 1 and 5 (clear
  *   of the low roof slopes), and the Aerie deck, each kept DRAGON_PAD in from its ends (the deck's west end runs on over
@@ -347,7 +347,7 @@ export function clampToFloor(f: number, x: number, net: Net): number {
 
 /** Where a keeper stands to work with a dragon: this far in front of its body's root, past the snout (2.4). */
 export const REACH: Readonly<Record<Stage, number>> = Object.freeze({ baby: 30, young: 46, adult: 58, elder: 60 });
-/** Where a keeper stands to meet the dragon in a slot (3.3): in front of its snout, kept 10 px inside the room's walls. */
+/** Where a keeper stands to meet the dragon in a slot (BASE_DESIGN 3, Slots): in front of its snout, kept 10 px inside the room's walls. */
 export function standSpot(slot: Slot, stage: Stage, room: Room): Spot {
   return { f: slot.f, x: Math.max(room.x0 + 10, Math.min(room.x1 - 10, slot.x + slot.facing * REACH[stage])) };
 }

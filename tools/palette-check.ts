@@ -43,7 +43,7 @@
 //                   on the floor asleep, and the elder's beard (a sleeping elder's chin rests on it; water's and
 //                   rock's are exempt, inked: bible 5.6 E14, E15) keep >= 25 % luminance from EVERY floor anyone
 //                   stands on (src/game/surfaces.ts FLOORS: the straw of the base's rooms, landings, lift car and
-//                   Aerie deck, and any floor a later slice adds), and each floor's HSV S is < 0.20 (a counted gate:
+//                   Aerie deck, and any floor added to FLOORS), and each floor's HSV S is < 0.20 (a counted gate:
 //                   hue cannot help on a floor, so none may carry one).
 //   (j) identity  : greying never takes a body's hue away: every scale keeps HSV S >= 0.30 at every stage, so gate
 //                   (b)'s B1 and the neutral ceiling (<= 40 % neutral area) keep holding for elders.
@@ -83,7 +83,7 @@
 //                   the nest heap's plain straw (src/game/layout.ts NEST_RX, NEST_RY, eggBottom: a px in from the
 //                   heap's inked edge, over the floor's band, off the strands), never the Hatchery's wall.
 // BADDIES (counted apart, its own RESULT line: BADDIES):
-//   (x) baddies   : (S9a) each fill on a big baddie's silhouette edge (src/game/baddies.ts BADDIE_EDGE) keeps >= 25 %
+//   (x) baddies   : each fill on a big baddie's silhouette edge (src/game/baddies.ts BADDIE_EDGE) keeps >= 25 %
 //                   luminance from the mission road (FLOORS.road) and from every band of its home climate at every
 //                   phase; every fill >= OKL_MIN Oklab L from the ink; the colours that touch inside it pass the ladder.
 //                   Every fill the scene sees a baddie by (src/game/baddies.ts BADDIE_FILLS: the edge fills) keeps
@@ -876,7 +876,7 @@ function lighterBy(a: string, b: string): number {
   // the two stepped mixes toward it, gated like the day's; the sky, hills, clouds and rings have their own phases, and
   // the mission scene's ground is not the barn's: the watch overlay draws ROAD_SCENE as it is at every hour, never
   // through NIGHT (missionview.ts drawRoad), so it needs no night entry and has no night steps -- its night is its
-  // region's climate picture's, S9a's)
+  // region's climate picture's: ART_BIBLE 5.10)
   const phased = (what: string) => /^(sky|hills|clouds|lamp ring|hearth ring|lantern ring) /.test(`${what} `);
   const scene = (what: string) => what.startsWith('road ');
   const nights: [string, string, boolean][] = [];
@@ -924,7 +924,7 @@ function lighterBy(a: string, b: string): number {
     out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${'prop cave mouth'.padEnd(28)} ${CAVE.mouth}  L ${lumOf(CAVE.mouth).toFixed(3)}  least ${pct(least)} apart   (${by})  ${okf(ink)} from ink`);
   }
   // (the fog bank's bands, setpieces.ts SETPIECE_COLOURS.fog: the one set piece drawn as a backdrop BEHIND the team, so
-  // gated like one -- each band lighter than every dark body, and off the ink. S9a review.)
+  // gated like one -- each band lighter than every dark body, and off the ink.)
   SETPIECE_COLOURS.fog.forEach((hex, i) => {
     const what = `set piece fog band ${i}`;
     let least = Infinity, by = '';
@@ -933,7 +933,7 @@ function lighterBy(a: string, b: string): number {
     out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${what.padEnd(28)} ${hex}  L ${lumOf(hex).toFixed(3)}  least ${pct(least)} lighter (${by})  ${okf(ink)} from ink`);
   });
   // (the one night table, whole: every wall, backdrop and prop colour -- WALLS, each colour field of BACKDROPS, PROPS,
-  // and everything gated above -- has its night entry, so a structure a later slice adds fails here until it has one;
+  // and everything gated above -- has its night entry, so a structure added later fails here until it has one;
   // no floor anyone stands on, nor the seams drawn on them, changes at night; the table's keys are the colours as drawn)
   const needs: [string, string][] = [...Object.entries(WALLS).map(([k, h]) => [`WALLS.${k}`, h!] as [string, string]),
     ...Object.entries(BACKDROPS).filter(([, v]) => typeof v === 'string').map(([k, h]) => [`BACKDROPS.${k}`, h as string] as [string, string]),
@@ -989,7 +989,7 @@ for (const e of DRAGON_ELEMENTS) {
 }
 
 // ---------- (x) the big baddies (src/game/baddies.ts, ART_BIBLE 5.10; the watchable scene: src/game/missionview.ts) ----------
-// (S9a) Every fill on a baddie's silhouette edge (BADDIE_EDGE) keeps >= 25 % luminance from the mission road
+// Every fill on a baddie's silhouette edge (BADDIE_EDGE) keeps >= 25 % luminance from the mission road
 // (FLOORS.road) and from every band of its home climate (the three sky bands, the far ridge, the near forms and their
 // second colour) at every phase, so it reads on the road and against its region at any hour; every fill keeps >= 6
 // Oklab L from the ink; and the colours that touch inside it (BADDIE_PAIRS) pass the house ladder.

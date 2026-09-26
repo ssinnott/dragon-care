@@ -27,7 +27,7 @@
 //   view=tails                 the tail-ceiling audit (a fluke never rises over 3 px above the back: 3.0), narrowed the same
 //   view=pour                  the pour-column audit (no breath effect joins the mouth to the floor: 3.8), narrowed the same
 //   view=neutral               the neutral-area recorder (each look's share of HSV S < 0.25 pixels, <= 40 %: 3.1)
-//   view=missionart            the mission art kit (src/game/missionart.ts; plan S9a): sheet=climates (&climate=<c>&phase=<p>:
+//   view=missionart            the mission art kit (src/game/missionart.ts): sheet=climates (&climate=<c>&phase=<p>:
 //                              one climate as a scrolling road scene) | setpieces | baddies | people | icons
 //   view=base                  the base (src/game/base.ts; docs/BASE_DESIGN.md): the barn and towers at 640 x 360 with the
 //                              care simulation running -- need bubbles, keepers, the job strip; live, drag to look around
@@ -45,8 +45,8 @@
 //                              line show); live, a tap on a keeper or their badge takes them, WASD or the arrows walk
 //                              them, E or Space does the chore in reach, Esc lets go; preset=trip&trip=<region>:
 //                              <progress>[:fail] has a team away on the region's hard mission, that far along its road
-//                              at the frozen t (plan S9); panel=map | mission | watch opens the Map Room table's world
-//                              map or a mission's chooser (mission=0..2: which of the board's; plan S8), or the
+//                              at the frozen t (BASE_DESIGN 6); panel=map | mission | watch opens the Map Room table's world
+//                              map or a mission's chooser (mission=0..2: which of the board's), or the
 //                              watchable scene of the team out, over the barn at the first frame
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
@@ -143,8 +143,8 @@ export interface GalleryParams {
   /** view=base: take=<keeper name>, a keeper taken by hand at the first step (null: none). */
   take: string | null;
   /**
-   * view=base: panel=map | mission, the Map Room table's overlay open from the first frame (plan S8), or panel=watch,
-   * the watchable scene (plan S9); mission=<i>, the board's mission the chooser shows (0-2); trip=<region>:<progress>
+   * view=base: panel=map | mission, the Map Room table's overlay open from the first frame (BASE_DESIGN 5), or panel=watch,
+   * the watchable scene (BASE_DESIGN 6); mission=<i>, the board's mission the chooser shows (0-2); trip=<region>:<progress>
    * [:fail], preset=trip's team away.
    */
   panel: 'map' | 'mission' | 'watch' | null;
@@ -1372,7 +1372,7 @@ function makeScene(P: GalleryParams): Scene {
     case 'yard': return yardScene(P);
     case 'yardaudit': return yardAuditScene(P);
     case 'missionart': return missionArtScene(location.search);
-    // (a frozen view never loads or saves (G4), and nor does a preset, a start hour or an overlay asked for (panel=):
+    // (a frozen view never loads or saves (BASE_DESIGN 7, Saves), and nor does a preset, a start hour or an overlay asked for (panel=):
     // loading would hide it, autosaving would put it in place of the player's barn)
     case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset && P.hour == null && !P.panel, hour: P.hour, layers: P.layers,
       take: P.take, panel: P.panel, mission: P.mission, trip: P.trip, at: P.t ?? 0 });

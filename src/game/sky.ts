@@ -1,10 +1,10 @@
 // The sky behind the base (docs/BASE_DESIGN.md 7), drawn every frame in SCREEN space before the building, which is
-// transparent above the ground and around its walls (building.ts): so no canvas grows with the world (plan P11), and
+// transparent above the ground and around its walls (building.ts): so no canvas grows with the world (BASE_DESIGN 3, The Garden), and
 // the day turns without a redraw of anything else. Three flat bands fixed to world y, far hills and clouds at half
 // the camera's pace, and at night the moon and the stars at a fifth of it. The phases change in three stepped mixes over
 // a phase's first hour (surfaces.ts skyBands): no gradient, no alpha. Night is this, the lights (building.ts
 // drawLights) and the walls' own night colours (surfaces.ts NIGHT, at lightsOf's `walls` step): it never tints a dragon
-// or a floor (plan G8).
+// or a floor (BASE_DESIGN 7).
 import type { ClockRead, DayPhase } from './clock.ts';
 import { BACKDROPS, LIGHTS, INK, skyBands, phaseColour } from './surfaces.ts';
 import { GROUND } from './layout.ts';

@@ -1,8 +1,8 @@
-// The three big baddies (plan S9, P14; S9a builds the art, S9 the beat): THE MOLE KING of Old Mine Road, THE STORM ROC of
+// The three big baddies (ART_BIBLE 5.10; BASE_DESIGN 6: the art here, their beat in missionview.ts): THE MOLE KING of Old Mine Road, THE STORM ROC of
 // Highfold and THE FROST GIANT of Frostmere, each 96-140 px, drawn in the house style from the engine's cel helpers
 // (cel.ts: a 1 px #1a1018 ink, flat bands lit from the top left, no gradients, no alpha, no mark under 2 px).
 //
-// Cozy (D4): a baddie is calmed, outwitted or driven off -- never fought, never hurt. The types say so: a Baddie has no
+// Cozy (BASE_DESIGN B8): a baddie is calmed, outwitted or driven off -- never fought, never hurt. The types say so: a Baddie has no
 // hurt, health or defeat field (the compile-time _NoHurt below), its exit is one of exactly three (_Exits), and its face
 // one of four (BaddieFace: neutral, grumpy, surprised, sleepy -- no angry face exists; grumpy is a heavy FLAT brow pulled
 // low onto the eye and a pout, never a V). Its poses: walk, stand, sit, turn (looking back over its shoulder) and leave
@@ -51,7 +51,7 @@ export const BADDIE_ART: Readonly<Record<BaddieId, Baddie>> = Object.freeze({
 });
 
 /**
- * Where each baddie lives (plan S8's regions: Old Mine Road is caves, Highfold peaks, Frostmere ice): its backdrop for
+ * Where each baddie lives (BASE_DESIGN 5.1's regions: Old Mine Road is caves, Highfold peaks, Frostmere ice): its backdrop for
  * gate (x). Read off the regions' own table (regions.ts REGIONS: each region's baddie and climate), so the two never
  * disagree.
  */
@@ -93,7 +93,7 @@ export const BADDIE_EXIT_LOOK: Readonly<Record<BaddieExit, { pose: BaddiePose; f
 });
 
 /**
- * An exit played through, u 0..1 of its part of the beat (S9: the last 40 % of the baddie stop): the pose, face and
+ * An exit played through, u 0..1 of its part of the beat (missionview.ts: the last 40 % of the baddie stop): the pose, face and
  * facing, and how far (px, + to the right) the baddie has gone from where it stood. Calmed: it sits at once and dozes
  * where it is. Outwitted: it turns, surprised, for the first third, then wanders off the wrong way (right), neutral.
  * Driven off: it shuffles off right at once, grumbling.
@@ -156,14 +156,12 @@ function drawFace(g: CanvasRenderingContext2D, f: FaceAt, face: BaddieFace, lid:
 }
 
 /**
- * Three 5 x 6 "z" marks stepping up and out from (x, y), one more every 20 frames (a doze), inked. (The plan said 3 x 3,
- * but a 3 x 3 z -- two bars and a centre pixel -- reads as an "I" or a "=": ART_BIBLE C16's lesson for the dragons' z;
+ * Three 5 x 6 "z" marks stepping up and out from (x, y), one more every 20 frames (a doze), inked. (Not 3 x 3: a 3 x 3 z -- two bars and a centre pixel -- reads as an "I" or a "=": ART_BIBLE C16's lesson for the dragons' z;
  * at 5 x 6 in 2 px strokes the diagonal has two steps and reads as a z at 1x.)
  */
 function zeds(g: CanvasRenderingContext2D, x: number, y: number, t: number): void {
   // (each "z" 5 x 6 in 2 px strokes -- two rows across the top and the bottom, a 2 px diagonal between -- ringed in
-  // ink, 9 px across and 11 up: the mark floor, G6; the S9a+S9 merge took the scene's own "z" into the kit, so the
-  // road scene draws one set)
+  // ink, 9 px across and 11 up: no mark under 2 px, the house style's floor; the scene draws these, never its own)
   // (the baddie is drawn mirrored when it faces -1: the diagonal is then laid the other way in the drawing's own space,
   // so on screen it is always a "z", never a backwards one)
   const n = 1 + (Math.floor(t / 20) % 3), m = g.getTransform().a < 0;
@@ -348,7 +346,7 @@ export function drawBaddie(ctx: CanvasRenderingContext2D, id: BaddieId, x: numbe
 }
 
 /**
- * A baddie's 24 x 24 portrait (the chooser's baddie row, S8): its own small drawing -- the head and its tell (the
+ * A baddie's 24 x 24 portrait (the Map Room chooser's baddie row: BASE_DESIGN 5): its own small drawing -- the head and its tell (the
  * crown and spectacles, the crest and beak, the woolly dome, the nose and scarf) -- in an inked frame, top-left at (x, y).
  */
 export function drawBaddiePortrait(ctx: CanvasRenderingContext2D, id: BaddieId, x: number, y: number): void {

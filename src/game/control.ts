@@ -1,4 +1,4 @@
-// Taking a keeper (docs/BASE_DESIGN.md 4.10; plan S7, D5, #6): the player may take any one keeper by hand. Care stays
+// Taking a keeper (docs/BASE_DESIGN.md 4.10, #6): the player may take any one keeper by hand. Care stays
 // managerial by default (B2) -- the other keepers go on taking jobs on their own -- but the one taken is the player's:
 // walked with WASD or the arrows (and the touch pad), up and down the ladders where they stand at one, and E (Space, or
 // the pad's ACT) does the chore in reach: picks up a supply at its post (the bowl, the ball, the bucket), meets the need
@@ -8,12 +8,12 @@
 //
 // The simulation takes the player's input as commands (CareSim.command), applied in the order they came at the start
 // of the next step (applyCommands) and then cleared, so the same commands at the same steps always make the same world
-// (G1). The Map Room's SEND is one of them too (plan S8: `send`, a team on a board mission -- missions.ts send, which
+// (BASE_DESIGN 7, Seeded). The Map Room's SEND is one of them too (BASE_DESIGN 5: `send`, a team on a board mission -- missions.ts send, which
 // sends it or refuses it with canSend's reason; either way a `send` event says so, for the chooser's toast). The taken keeper is `manual`: auto-assignment skips them, Rush never picks them or takes them off a job, and
 // their `phase` is 'manual' (free under the player's hand), 'pickup' (taking a supply) or 'work' (meeting a need).
 // DOM-free and deterministic like the rest of the simulation.
 //
-// Rules (plan S7):
+// Rules (BASE_DESIGN 4.10):
 // - take(k): refused for a keeper on a mission's trip (mustering, leaving, away, landing: missions.ts onTrip; a
 //   `refused` event says why) -- one resting in the Bunks after a trip may be taken, which ends the rest;
 //   another keeper held by hand is let go first; a keeper at work (a tuck-in, a meal under way) finishes that
@@ -26,7 +26,7 @@
 //   it), so the car is never held by them.
 // - act, in this order: pick up (within 24 px of a post, not already carrying its supply: 40 steps, then carried; a
 //   different supply carried is swapped); serve (an open job whose dragon has arrived at its slot in its need's room --
-//   never one still walking there, D6 -- or a resident waiting; no keeper at work on it; the dragon on this floor with
+//   never one still walking there: BASE_DESIGN 4.6 -- or a resident waiting; no keeper at work on it; the dragon on this floor with
 //   its stand spot within 24 px; for food, play and bath the supply carried): the most pressing such job (the queue's
 //   order), a keeper already sent for it handing it over (stats.handovers), the taken keeper stepping onto the stand
 //   spot and working as any keeper would; put back (carrying a supply within 24 px of its post); else a "?" over the
@@ -46,7 +46,7 @@ import type { Pair } from './trip.ts';
 
 /**
  * The player's input to the simulation, applied at the start of the next step: take a keeper (by id), let go, steer,
- * act; and send a team (its pairs) on a board mission (by id) from the Map Room's table (plan S8).
+ * act; and send a team (its pairs) on a board mission (by id) from the Map Room's table (BASE_DESIGN 5).
  */
 export type Command = { kind: 'take'; keeper: number } | { kind: 'release' } | { kind: 'steer'; dx: -1 | 0 | 1; dy: -1 | 0 | 1 } | { kind: 'act' }
   | { kind: 'send'; mission: number; pairs: readonly Pair[] };
@@ -95,11 +95,11 @@ export function applyCommands(sim: CareSim): void {
   }
 }
 
-/** Take keeper `id` (plan S7's take: see the header). */
+/** Take keeper `id` (the take's rules: see the header). */
 function take(sim: CareSim, id: number): void {
   const k = sim.keepers.find((q) => q.id === id);
   if (!k) return;
-  // (a rider on a mission's trip is the team's until they are home: plan S8)
+  // (a rider on a mission's trip is the team's until they are home: BASE_DESIGN 5)
   if (onTrip(k)) { sim.events.push({ kind: 'refused', keeper: k.id, reason: takeRefusal(k) }); return; }
   for (const o of sim.keepers) if (o !== k && (o.manual || o.pendingTake)) release(sim, o);
   if (k.manual || k.pendingTake) return;
@@ -251,7 +251,7 @@ function atStand(sim: CareSim, k: Keeper, j: Job): boolean {
   return sp.f === k.f && Math.abs(k.x - sp.x) <= REACH_PX;
 }
 
-/** What E would do now for the keeper held by hand (plan S7's order: pick up, serve, put back; else nothing, "on the way", or a ladder to climb here). */
+/** What E would do now for the keeper held by hand (the header's order: pick up, serve, put back; else nothing, "on the way", or a ladder to climb here). */
 export function actionFor(sim: CareSim, k: Keeper): ActionPreview {
   const none = (label = ''): ActionPreview => ({ kind: 'none', label });
   if (!k.manual) return none();
@@ -267,10 +267,10 @@ export function actionFor(sim: CareSim, k: Keeper): ActionPreview {
   if (sup && k.carrying === sup) return { kind: 'putback', label: `E: PUT ${SUPPLY_NAME[sup]} BACK` };
   const want = here.find((j) => ready(sim, j));
   if (want) return none(`${want.dragon.name} WANTS THE ${SUPPLY_NAME[want.need]}`);
-  // (a dragon still walking to this slot can't be met yet, D6)
+  // (a dragon still walking to this slot can't be met yet: BASE_DESIGN 4.6)
   const coming = here.find((j) => j.dragon.goalJob === j.id && !(j.keeper && j.keeper.phase === 'work') && !j.dragon.act);
   if (coming) return { kind: 'wait', label: `${coming.dragon.name} IS ON THE WAY` };
-  // (nothing for E here: a ladder in reach says so -- W or S, the arrows or the pad's -- S7 review)
+  // (nothing for E here: a ladder in reach says so -- W or S, the arrows or the pad's)
   const up = ladderAt(sim, k, -1), down = ladderAt(sim, k, 1);
   if (up || down) return none(up && down ? '↑ ↓: CLIMB' : up ? '↑: CLIMB UP' : '↓: CLIMB DOWN');
   return none();

@@ -60,7 +60,7 @@ const pairs: string[] = [
   'shots/base_aerie.png=view=base&t=60&cam=0,0',
   // the time of day (7): the start frame at night, at dusk and at dawn (t=600 is an hour and twenty minutes on from the
   // hour: 23:20, 19:20, 06:20) -- the dragons' pixels the same as base_t600's; night in the sky, the windows, the lamps
-  // and the moonlit walls and shell (plan S6c: the building's night colours, never a dragon's or a floor's), all the way
+  // and the moonlit walls and shell (BASE_DESIGN 7: the building's night colours, never a dragon's or a floor's), all the way
   // at 19:20, gone again by 06:20 -- the dusk's and the dawn's turns a step at a time (18:20: the walls a third of the
   // way to night, the lamps' inner ring; 05:20: two thirds), the cast alone at night on a flat colour (layers=cast: the
   // no-tint check's picture), and the night seen outside: the sky over the roof (the stars, the moon's blue hour, the
@@ -73,7 +73,7 @@ const pairs: string[] = [
   'shots/base_night_cast.png=view=base&t=600&hour=22&layers=cast',
   'shots/base_night_roof.png=view=base&t=600&hour=22&cam=300,100',
   'shots/base_night_west.png=view=base&t=600&hour=22&cam=0,300',
-  // growing up and eggs (7; plan S5): EMBER six steps into its grow-up (the new elder's silhouette flat in its glow's
+  // growing up and eggs (BASE_DESIGN 7): EMBER six steps into its grow-up (the new elder's silhouette flat in its glow's
   // highlight inside its own ink, the toast), the Hatchery's three eggs (a rock egg just laid, a dusk one with its first
   // crack, a water one with two and its wobble), and a hatch (CINDER standing up in the first nest, its shell's bits
   // flying) -- the Hatchery in the hayloft's west corner, under the roof's slope (BASE_DESIGN 3)
@@ -84,7 +84,7 @@ const pairs: string[] = [
   // door into the hayloft's Hearth Kitchen (the Hatchery's second sub-slot stands in front of the dusk egg's nest too:
   // a hatchling never hides another's egg while a sub-slot is free elsewhere), the rock and dusk eggs in view in theirs
   'shots/base_hatchery_home.png=view=base&preset=eggs&t=2230&cam=168,280',
-  // the elder garden (plan S6): the garden preset's three residents on their plots past the Garden Gate, by day (sitting
+  // the elder garden (BASE_DESIGN 3, The Garden): the garden preset's three residents on their plots past the Garden Gate, by day (sitting
   // and napping by their nest mounds, the hedge, the apple trees, the lanterns, the pale path underfoot) and at night
   // (napping, the lanterns' rings on the hedge, the hedge, lawn, trees and fence moonlit, the path the same); and the retire preset's first elder under the gate's arch, walking out
   // (step 1950: WICK, from the ground floor's Lamp Dorm, npm run sim section 15)
@@ -101,10 +101,10 @@ const pairs: string[] = [
   'shots/base_twelve_east.png=view=base&preset=twelve&t=5400&cam=560,376',
   'shots/base_full.png=view=base&preset=full&t=60&cam=168,280',
   'shots/base_capped.png=view=base&preset=capped&t=60&cam=168,280',
-  // taking a keeper (plan S7): BEA held by hand from the first step -- the mark over her head in her colour, her badge
+  // taking a keeper (BASE_DESIGN 4.10): BEA held by hand from the first step -- the mark over her head in her colour, her badge
   // lit, the line over the pad and the pad at the bottom right, the camera following her
   'shots/base_control.png=view=base&t=120&take=bea',
-  // the watchable scene (plan S9; frozen, preset=trip: a team away on the region's hard mission, that far along its road
+  // the watchable scene (BASE_DESIGN 6; frozen, preset=trip: a team away on the region's hard mission, that far along its road
   // at t=60): on the road past a challenge met (its banner); each big baddie in its beat -- walked in, grumpy (0.906:
   // the beat is 0.900-0.928 of a three-day trip) -- and leaving (0.921: the Mole King dozing, the Storm Roc wandering
   // off the wrong way, up the road; 0.918: the Frost Giant shuffling off up it, before it leaves the screen); the Mole King's two counters' moments (dusk's breath, Bea's
@@ -121,7 +121,7 @@ const pairs: string[] = [
   'shots/base_result.png=view=base&preset=trip&trip=oldmine:1&panel=watch&t=60',
   'shots/base_team_chip.png=view=base&preset=trip&trip=oldmine:0.2&t=60',
   'shots/base_final.png=view=base&t=1800',
-  // the mission art kit (plan S9a; docs/ART_BIBLE.md "Mission art"): the six climates at the four phases (the chooser's
+  // the mission art kit (ART_BIBLE 5.10; docs/ART_BIBLE.md "Mission art"): the six climates at the four phases (the chooser's
   // 300 x 112 pictures), two of them filling a road scene, the eleven set pieces ahead and met (a dragon in the fog,
   // which stands behind it), the three baddies' faces, poses and exits beside an adult dragon, the grumpy miller
   // grumpy and talked round beside the keepers (and their silhouettes), and the icons
@@ -132,7 +132,7 @@ const pairs: string[] = [
   'shots/missionart_baddies.png=view=missionart&sheet=baddies&t=30',
   'shots/missionart_people.png=view=missionart&sheet=people&t=50',
   'shots/missionart_icons.png=view=missionart&sheet=icons&t=0',
-  // missions (plan S8): the Map Room table's world map (the three start regions, the fog hatched over the rest, the
+  // missions (BASE_DESIGN 5): the Map Room table's world map (the three start regions, the fog hatched over the rest, the
   // roads, HOME, the board's three pins) and THE LOST NEST's chooser (the climate picture, the challenges and who at
   // home meets them, the dragons, the odds) -- each over the world stepped a second -- and the muster preset's team all
   // on the Aerie deck, each rider beside its dragon, the last step of the muster (the chip still MUSTER; they walk off at step 2186: npm

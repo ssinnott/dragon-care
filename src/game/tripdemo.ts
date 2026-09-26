@@ -1,4 +1,4 @@
-// The `trip` preset's missions (plan S9: view=base&preset=trip&trip=<region>:<progress>[:fail]): a region's mission
+// The `trip` preset's missions (BASE_DESIGN 6: view=base&preset=trip&trip=<region>:<progress>[:fail]): a region's mission
 // built from the Map Room's own tables (regions.ts REGIONS, CHALLENGES, BADDIES, KEEPER_SKILL), a team of two pairs of
 // the new game's dragons with their riders picked by the missions' own auto-pick (missions.ts autoRider), the odds
 // and the road -- its stops, who meets each, the trip log's lines and the turn-back -- as missions.ts send would make
@@ -11,10 +11,10 @@ import type { Trip, Mission, Pair } from './trip.ts';
 import type { RegionId, ChallengeId, Difficulty } from './missiondata.ts';
 import { rngAt, TAG } from './rand.ts';
 import { REGIONS, BADDIES, REGION_IDS, regionOf } from './regions.ts';
-import { DIFFICULTY, autoRider, oddsOf, roadOf, freeNest } from './missions.ts';
+import { DIFFICULTY, autoRider, oddsOf, roadOf, freeNest, dragonReason } from './missions.ts';
 
 /**
- * The mission a region's board could show at a difficulty (plan S8's table: missions.ts DIFFICULTY): its challenges
+ * The mission a region's board could show at a difficulty (BASE_DESIGN 5.1: missions.ts DIFFICULTY): its challenges
  * drawn from the region's pool without replacement (seeded by rngAt(seed, BOARD, 900, region, n): the preset's own
  * draw, not a day's board), its baddie on a hard one (else a fourth challenge), and a title from the region's.
  */
@@ -39,7 +39,8 @@ function demoMission(sim: CareSim, region: RegionId, difficulty: Difficulty): Mi
  */
 export function demoTrip(sim: CareSim, region: RegionId, difficulty: Difficulty, success: boolean): Trip {
   const m = demoMission(sim, region, difficulty);
-  const able: Dragon[] = sim.dragons.filter((d) => d.place === 'barn' && (d.stage === 'adult' || d.stage === 'elder'));
+  // (who may go, by the Map Room's own rule: missions.ts dragonReason)
+  const able: Dragon[] = sim.dragons.filter((d) => !dragonReason(sim, d, m));
   let best: { pairs: Pair[]; odds: number; meets: boolean } | null = null;
   for (let a = 0; a < able.length; a++) for (let b = a + 1; b < able.length; b++) {
     const pairs: Pair[] = [];

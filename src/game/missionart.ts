@@ -1,9 +1,9 @@
-// view=missionart (src/gallery.ts): the mission art kit laid out on sheets (plan S9a), frozen-time safe -- every
+// view=missionart (src/gallery.ts): the mission art kit laid out on sheets (ART_BIBLE 5.10), frozen-time safe -- every
 // drawing is a pure function of the sheet's own step counter, so `t=` draws the same frame every time.
 //
 //   view=missionart&sheet=climates     the six climates at day, dusk, night and dawn, each at the chooser's 300 x 112
 //   view=missionart&sheet=climates&climate=<c>&phase=<p>
-//                                      one climate filling a 640 x 300 road scene, scrolling with t (S9's parallax),
+//                                      one climate filling a 640 x 300 road scene, scrolling with t (the watchable scene's parallax),
 //                                      the road band (FLOORS.road) at y 292-306
 //   view=missionart&sheet=setpieces    the eleven set pieces on the road, ahead and met side by side (an adult dragon
 //                                      standing in the fog, which is drawn behind it)

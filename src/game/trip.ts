@@ -1,5 +1,5 @@
-// A mission and a team's trip (docs/BASE_DESIGN.md 5; plan S8 and S9): plain data, JSON-safe, every reference an
-// id. missions.ts makes and steps them (S8); the watchable scene (missionview.ts, S9) is a pure function of a Trip
+// A mission and a team's trip (docs/BASE_DESIGN.md 5 and 6): plain data, JSON-safe, every reference an id.
+// missions.ts makes and steps them; the watchable scene (missionview.ts) is a pure function of a Trip
 // and the sim's clock, and never changes one.
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { RegionId, ChallengeId, Difficulty, BaddieId, BaddieExit } from './missiondata.ts';

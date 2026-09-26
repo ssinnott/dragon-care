@@ -1,11 +1,11 @@
-// Missions (docs/BASE_DESIGN.md 5; plan S8): the Map Room table's board, who may go, the odds, sending a team, and
+// Missions (docs/BASE_DESIGN.md 5): the Map Room table's board, who may go, the odds, sending a team, and
 // the trip itself -- the muster on the Aerie, the walk west over the sky bridge, the days away, the landing, the egg
 // carried down to the Hatchery, the saddles hung back in the Tack Room and the riders' rest in the Bunks. DOM-free and
 // deterministic: every draw is a stateless rngAt (the board by its day, a mission's outcome and egg by its id), every
 // loop is in id order, and the whole state is plain data the save keeps (CareSim.missions).
 //
 // The board (rollBoard) is rolled at the world's first step and at every 05:00 (the dawn: the one other place the
-// simulation reads the day's hour, plan G8 -- the board, never the barn's care): the regions a success revealed join
+// simulation reads the day's hour, BASE_DESIGN 7 -- the board, never the barn's care): the regions a success revealed join
 // the explored ones first, then one mission per explored region, in a shuffled order, up to three. Day 1 always has
 // THE LOST NEST (Millbrook, easy: a spring flood and lost things, a sure egg): two of the seven starters can meet it.
 // A region's first success always brings an egg home (if a nest is free).
@@ -70,7 +70,7 @@ export interface MissionsState {
 export type Taken = (sim: CareSim, keeperId: number) => boolean;
 export const isTaken: Taken = (sim, keeperId) => sim.controlled === keeperId;
 
-// ---------- numbers (plan S8) ----------
+// ---------- numbers (BASE_DESIGN 5) ----------
 
 /** The most missions on the board, and each difficulty's chance, challenges, days, coin and egg chance. */
 export const BOARD_MAX = 3;
@@ -92,7 +92,7 @@ export function baddieDay(day: number): boolean { return day >= BADDIE_FROM_DAY 
 export const LOST_NEST = 'THE LOST NEST';
 /** At most this many pairs; and this many keepers always stay home. */
 export const MAX_PAIRS = 2, HOME_KEEPERS = 2;
-/** The odds (plan S8): a base, per challenge met, the baddie met, per pair in good spirits (mood >= GOOD_MOOD), per pair of partners; clamped. */
+/** The odds (BASE_DESIGN 5): a base, per challenge met, the baddie met, per pair in good spirits (mood >= GOOD_MOOD), per pair of partners; clamped. */
 export const ODDS = Object.freeze({ base: 0.2, challenge: 0.15, baddie: 0.15, mood: 0.05, partners: 0.05, min: 0.05, max: 0.95, goodMood: 0.5 });
 /** Where the team gathers on the Aerie deck: the dragons (world x, facing west) and each rider beside, just behind its dragon. */
 export const DECK_SPOTS: readonly number[] = Object.freeze([120, 280]);
@@ -170,7 +170,7 @@ export function rollBoard(sim: CareSim, day: number): void {
 
 /** A keeper's phases on a trip (not free for jobs, nor to be taken by hand): mustering, leaving, away, landing and delivering. */
 export const TRIP_PHASES: ReadonlySet<string> = new Set(['muster', 'depart', 'away', 'deliver']);
-/** Whether a keeper is on a trip (the badge's arrow; S7's take refuses them). */
+/** Whether a keeper is on a trip (the badge's arrow; control.ts take refuses them). */
 export function onTrip(k: Keeper): boolean { return TRIP_PHASES.has(k.phase); }
 
 /** A dragon's partner: the keeper whose specialty is its element's own need (lowest id), or null (water: nobody specialises in baths). */
@@ -220,7 +220,7 @@ export function coverage(sim: CareSim, m: Mission, pairs: readonly Pair[]): { ch
   return { challenges, baddie, covered: challenges.filter((w) => w.length).length };
 }
 
-/** The team's odds of a success (plan S8), clamped to 5-95 %. */
+/** The team's odds of a success (BASE_DESIGN 5), clamped to 5-95 %. */
 export function oddsOf(sim: CareSim, m: Mission, pairs: readonly Pair[]): number {
   if (!pairs.length) return 0;
   const cov = coverage(sim, m, pairs);
@@ -321,7 +321,7 @@ function logLine(stop: Stop, turn: boolean, success: boolean): string {
 }
 
 /**
- * The road a team would meet on mission m (plan S8): each challenge at (i + 1) / (n + 1) of ROAD_SPAN of the way, the
+ * The road a team would meet on mission m (BASE_DESIGN 5): each challenge at (i + 1) / (n + 1) of ROAD_SPAN of the way, the
  * baddie at BADDIE_AT, each with whether the team meets it and who; on a failure, the stop it turns back at (the first
  * one unmet, else the last); and each stop's log line.
  */
@@ -336,7 +336,7 @@ export function roadOf(sim: CareSim, m: Mission, pairs: readonly Pair[], success
 }
 
 /**
- * Send a team on board mission `missionId` (the Map Room table's SEND; plan S8): refused with canSend's reason, else
+ * Send a team on board mission `missionId` (the Map Room table's SEND): refused with canSend's reason, else
  * the whole trip rolled now -- the outcome (rngAt(seed, MISSION, id) under the odds), the nest reserved and the egg
  * (sure on a region's first success, else rngAt(seed, EGG, id) under its chance; its element one of the region's), the
  * road and its turn-back -- the mission taken off the board, the Map Room counted, and the muster begun (musterStart).
@@ -431,7 +431,7 @@ function dragonTo(sim: CareSim, d: Dragon, f: number, x: number): void {
 /** A rider's target on the deck: beside their pair's dragon's spot (the pair's own index until its dragon has one). */
 function riderSpot(sim: CareSim, i: number): number { return RIDER_SPOTS[sim.missions.deck[i] ?? i]; }
 
-/** The muster (plan S8): dragons up to the deck, riders via the Tack Room; all there, facing west, the team departs. */
+/** The muster (BASE_DESIGN 5): dragons up to the deck, riders via the Tack Room; all there, facing west, the team departs. */
 function stepMuster(sim: CareSim, t: Trip): void {
   const ms = sim.missions;
   t.pairs.forEach((p, i) => {

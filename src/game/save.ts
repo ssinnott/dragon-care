@@ -2,7 +2,7 @@
 // so a world saved and loaded (CareSim.fromSave) steps on exactly as the one it came from would have. No RNG state is
 // kept -- after construction every draw is rngAt(seed, ...) (rand.ts) -- so the seed is the only randomness saved.
 // The digest two runs compare (CareSim.digest) is this same JSON, minus the seed; the page's hook shows its hash.
-// This file never touches storage: src/game/storage.ts will (S4), and only from BaseView.attach().
+// This file never touches storage: src/game/storage.ts does, and only from BaseView.attach().
 import type { CareSim, Dragon, Keeper, Job, SimStats, LiftState, Egg } from './sim.ts';
 import type { RoomPlace } from './layout.ts';
 import { releasedState } from './control.ts';
@@ -10,26 +10,15 @@ import { copyMissions } from './missions.ts';
 import type { MissionsState } from './missions.ts';
 
 /**
- * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded.
- * 2 (S2): a dragon's slot (by room id and index) in place of its home room; the rooms' uses (stats.used).
- * 3 (S3): dragons on the move (a slot that may be none, a goal and its job by id, the route, the walk and the turn),
- * a keeper waiting at the bay's edge, the lift (its car, its rider by id, its calls), the travel stats.
- * 4 (S5): the eggs in the Hatchery's nests and the next egg's id; a dragon's `settle` goal (a baby walking to the
- * module slot it will grow up in); the longest stage-up delay (stats.growDelayMax).
- * 5 (S5's review): a dragon's `hold` (steps it holds still where it is, growing up: its cheer, or waiting for room).
- * 6 (S6): the elder garden: its plots; a dragon's place (the barn or the garden), its plot (`home`) and a resident's
- * rhythm (`garden`: its mode, when a nap or a sit ends, its resting place), the `retire` goal; the longest retirement
- * delay (stats.retireDelayMax).
- * 7 (S7): a keeper's hand-held state (`manual`, the direction `held`, the "?" `cue`, `pendingTake` -- always saved
- * released: control.ts releasedState) and the takes, hand-overs and jobs done by hand (stats.taken, handovers, doneBy).
- * (S8 bumped its own base to 7 for the missions, built beside S7; the merge made the two one version, 8.)
- * 8 (S7 + S8): the missions -- the board and its day, the map (explored, to be revealed, first successes), the coin,
- * the trip out (its mission, pairs, outcome, road and times) and each pair's deck spot; a dragon away (place `away`) or
- * with a team (goal `muster`); a keeper's mission phases (muster, depart, away, deliver, rest) and what they carry (a
- * saddle, the egg) -- beside S7's hand-held state.
- * 9 (S7 + S8 + S6b, barn capacity; S6b bumped its own base to 7, built beside S7 and S8): a dragon's `gaitS` (the
- * speed its walk played at on its last step: 1, or the lively step's on and off the car and across the lift bay); each
- * room's own uses (stats.usedRoom, by room id: a need's rooms repeat) -- beside S7's and S8's state.
+ * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded (the
+ * page keeps it aside and starts a new barn: storage.ts). Version 9 (the earlier ones were never shipped) holds the
+ * whole world: the rooms and their uses (stats.used by kind, stats.usedRoom by room id); every dragon -- its slot by
+ * room id and index, its goal and that goal's job by id, its route, its walk and the speed it last played at (`gaitS`),
+ * its turn, its `hold`, its act, its stage and the step it began, its place (barn, garden or away), its plot (`home`)
+ * and a resident's rhythm (`garden`); every keeper -- their station and job by id, route, phase (a mission's phases
+ * too), what they carry, and the hand-held state, always saved released (control.ts releasedState); the open jobs; the
+ * lift (its car, its rider by id, its calls); the eggs in the Hatchery's nests; the garden's plots; the missions (the
+ * board and its day, the map, the coin, the trip out and each pair's deck spot); and the stats.
  */
 export const SAVE_VERSION = 9;
 
@@ -68,7 +57,7 @@ export interface SaveV {
   stats: SimStats;
 }
 
-/** A save this build can't read: another version, or not a save at all. The storage layer (S4) starts a new barn on it. */
+/** A save this build can't read: another version, or not a save at all. The storage layer (storage.ts) starts a new barn on it. */
 export class SaveVersionError extends Error {
   readonly found: unknown;
   constructor(found: unknown) {
@@ -80,11 +69,11 @@ export class SaveVersionError extends Error {
 
 /**
  * The world as JSON-safe data, in the simulation's own order (dragons, keepers and jobs as they sit in its arrays).
- * A keeper held by the player's hand is saved released (plan 3.6: control.ts releasedState -- going home, or finishing
+ * A keeper held by the player's hand is saved released (BASE_DESIGN 7, Saves: control.ts releasedState -- going home, or finishing
  * the job at hand first), exactly the world a release that step would make, so a save never holds a keeper by hand;
  * `exact` keeps them as they are (worldKey: the digest two runs compare sees the hand too).
- * Every field of every dragon, keeper and job is kept -- the top level of each is copied whole, so a field a later
- * slice adds is saved with it -- and the plain objects they hold (needs, the act, the routes' legs, a garden resident's
+ * Every field of every dragon, keeper and job is kept -- the top level of each is copied whole, so a field added later
+ * is saved with it -- and the plain objects they hold (needs, the act, the routes' legs, a garden resident's
  * rhythm, the lift's calls, the eggs, the garden, the rooms' uses by kind and by room) are copied, so the save never changes as the world
  * steps on.
  */
@@ -117,7 +106,7 @@ export function worldKey(sim: CareSim): string {
 /**
  * The barn's own state -- its dragons, keepers, jobs, lift and eggs -- with every field that holds an absolute clock left
  * out (a dragon's stageSince, an egg's laid; the lift's blockedSince and its calls' ticks are world ticks, the same in
- * both), so two worlds started at different hours but stepped alike agree on it (S4's no-tint check). A garden
+ * both), so two worlds started at different hours but stepped alike agree on it (the view's no-tint check: BASE_DESIGN 7). A garden
  * resident's rhythm (`garden`) is left out too: its naps are the one thing that reads the day's phase (garden.ts), so a
  * world with residents is the same barn by day and night only until a resident's rhythm moves one (the check's worlds
  * have none).

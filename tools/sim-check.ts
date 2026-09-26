@@ -268,6 +268,8 @@ if (!MAIN) console.log = (...a: unknown[]) => { LOG.push(a.map(String).join(' ')
 const fails: string[] = [];
 const fail = (m: string) => { if (fails.length < 40) fails.push(m); };
 const newSim = (seed = 1) => new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed });
+/** A copy of v through JSON, as a save goes to storage and back. */
+const through = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 /**
  * Every use of a room or structure (stats.used) over the whole suite, and every room's own (stats.usedRoom, by room id:
  * BASE_DESIGN 3: a need's rooms repeat and each copy must be used): each section notes the worlds it ran (8 checks it). A
@@ -770,7 +772,6 @@ if (MAIN) {
 // ---------- 6. saves: exact, by id, through JSON ----------
 let firstRide = '';
 if (ROLE === 'saves') {
-  const through = <T>(v: T): T => JSON.parse(JSON.stringify(v));
   const a = newSim(1);
   for (let s = 0; s < 5000; s++) a.step();
   const blob = serialize(a);
@@ -866,7 +867,6 @@ if (ROLE === 'saves') {
   // at step 300, one at 900, one at 1200); saved while the eggs incubate, while the baby walks to the module slot it
   // will grow up in, the step an egg hatches and the step a dragon grows up -- each loaded (through JSON) and stepped
   // 5000 on in lockstep with the run it came from, to the same world
-  const through = <T>(v: T): T => JSON.parse(JSON.stringify(v));
   const mk = () => {
     const w = new CareSim(START_ROOMS, [...START_DRAGONS, { name: 'BURR', element: 'spike', stage: 'baby', seed: 45, slot: { room: 'hatchery', i: 0 }, days: STAGE_DAYS - 0.1 }], START_KEEPERS, { seed: 1, dayLen: 600 });
     w.addEgg('rock', w.clock - 900); w.addEgg('dusk', w.clock - 300); w.addEgg('water');
@@ -898,7 +898,6 @@ if (ROLE === 'saves') {
   // met by one come out of the barn) and the retire preset on a short day (elders set off, riding down, passing the
   // Garden Gate, arriving at their plots): each saved the first step it is seen, loaded through JSON and stepped 5000 on
   // in lockstep with the run it came from, to the same world; a resident's rhythm saved as its own copy
-  const through = <T>(v: T): T => JSON.parse(JSON.stringify(v));
   const runs: { what: string; mk: () => CareSim; steps: number; seen: (w: CareSim) => string[] }[] = [
     { what: 'garden', mk: () => buildSim(startSpec('garden'), 1), steps: 40000,
       seen: (w) => w.dragons.flatMap((d) => (d.place !== 'garden' ? [] : d.act ? ['met'] : [d.garden!.mode])) },
@@ -951,7 +950,6 @@ if (ROLE === 'saves') {
   // mustering (a rider on the way up with a saddle), departing over the bridge, away, landing with the egg carried down,
   // a saddle being hung back, and a rider resting in the Bunks -- each loaded through JSON and stepped 5000 on in
   // lockstep with the run it came from, to the same world; and a save whose missions this build can't run throws
-  const through = <T>(v: T): T => JSON.parse(JSON.stringify(v));
   const mk = () => { const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 2, dayLen: 600 }); sendLostNest(w); return w; };
   const ref = mk(), forks: { sim: CareSim; at: number; what: string; used: Uses }[] = [], seen = new Set<string>();
   const want = ['muster', 'depart', 'away', 'egg', 'tack', 'rest'];
@@ -1003,7 +1001,6 @@ if (ROLE === 'saves') {
   // walked back and forth by commands; saved mid-muster (a rider on the way up with a saddle) and mid-away, the save
   // holds nobody by hand, keeps the trip whole, and -- loaded through JSON -- steps 5000 on (through the landing) to the
   // same world as the run given a release that step
-  const through = <T>(v: T): T => JSON.parse(JSON.stringify(v));
   const mk = (until: number) => {
     const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 2, dayLen: 600 });
     sendLostNest(w);
@@ -2523,7 +2520,6 @@ if (ROLE === 'service') {
 if (ROLE === 'saves') {
   // BASE_DESIGN 4.10 (#6): a keeper taken by the player's hand -- walked, climbing the ladders, picking up, serving and putting
   // back by commands (control.ts) -- on seed 1 at the real day, with the section 2 invariants checked every step
-  const through = <T>(v: T): T => JSON.parse(JSON.stringify(v));
   const inv = (w: CareSim, at: string) => {
     for (const d of w.dragons) for (const k of NEEDS) if (!(d.needs[k] >= 0 && d.needs[k] <= 1)) fail(`${at}, step ${w.tick}: ${d.name}'s ${k} is ${d.needs[k]}`);
     for (const j of w.jobs) if (j.keeper && j.keeper.job !== j) fail(`${at}, step ${w.tick}: job ${j.id}'s keeper ${j.keeper.name} is on another job`);

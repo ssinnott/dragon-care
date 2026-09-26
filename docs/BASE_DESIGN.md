@@ -496,7 +496,7 @@ with work a minute, a keeper giving up; the rest as `npm run capacity` prints it
 adult's play 25 s on seed 12 while crawling babies crossed the bay the other way; a baby's under a second on seed 32)
 and 3 convoy stands behind a crawling baby.)
 
-Re-measured on the whole game (the missions, taking a keeper and the watchable scene merged in: nothing sent, nobody
+Re-measured on the whole game (with the missions, taking a keeper and the watchable scene: nothing sent, nobody
 held, so the barn's own care runs as it did alone), `npm run capacity -- --casts=start7,twelve --seeds=1-8`:
 
 | Cast | Dragons | Seeds with a need empty | Empty need-steps | Wait avg s | Wait max s | Jobs done | Rides | Car busy | Landing max s | Bay edge max s | Keepers busy | Eye covered s (longest) | Stalls | Open at end (oldest s) | ms/step |

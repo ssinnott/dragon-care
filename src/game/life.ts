@@ -1,4 +1,4 @@
-// Growing up and hatching (docs/BASE_DESIGN.md 7; plan S5): life's half of every step (sim.ts step), after the needs
+// Growing up and hatching (docs/BASE_DESIGN.md 7): life's half of every step (sim.ts step), after the needs
 // have drained and the acts under way have run -- so a dragon whose nap or job ended this step is caught settled
 // before it can set off -- and before any job opens or anyone moves. A dragon's stage lasts STAGE_DAYS game days (30:
 // baby -> young -> adult -> elder), counted on the world's clock from the step it began (`stageSince`); the stage-up
@@ -14,8 +14,8 @@
 // the stage advances, and every per-stage thing (the drains, the reach, the
 // gait, the pad, the stand spot) follows from that step on; and the dragon CHEERS where it stands, holding for its new
 // stage's `happy` (gait.ts happyLen), so the view's `happy` plays through. A baby in a baby sub-slot first takes a module slot, which its next stage fits (a
-// module holds one grown dragon or two babies: 3.3), and walks there (goal `settle`); it grows once settled there, and
-// waits in its sub-slot while none is free. An elder's next is retirement (plan S6): RETIRE_DAYS (30) game days into
+// module holds one grown dragon or two babies: BASE_DESIGN 3, Slots), and walks there (goal `settle`); it grows once settled there, and
+// waits in its sub-slot while none is free. An elder's next is retirement (BASE_DESIGN 3, The Garden): RETIRE_DAYS (30) game days into
 // the elder stage, as soon as it may be sent somewhere new (not being met, not holding still, not in the lift's hands
 // or its bay: travel.ts redirectable -- a Rush's rule; it keeps its size, so unlike a stage-up it need not stand still),
 // it retires to the garden (garden.ts retire: the elder's reward, never a decline) -- counted from the step it grew into
@@ -42,7 +42,7 @@ import { retire, retireDue } from './garden.ts';
 import type { CareSim, Dragon, Egg } from './sim.ts';
 import type { Slot } from './layout.ts';
 
-/** A new baby's food (plan S5: under QUEUE, so its first job, and its first walk after its sub-slot, is to the kitchen). */
+/** A new baby's food (BASE_DESIGN 7: under QUEUE, so its first job, and its first walk after its sub-slot, is to the kitchen). */
 export const HATCH_FOOD = 0.45;
 
 /**
@@ -56,7 +56,7 @@ export const HATCH_FOOD = 0.45;
 export const BARN_CAP = 12;
 /**
  * The dragons the barn counts against its cap: every one not living in the garden -- the barn's, one away on a mission
- * (S8: its place is kept for it), and an elder still walking out to the garden.
+ * (its place is kept for it: BASE_DESIGN 4.7), and an elder still walking out to the garden.
  */
 export function barnCount(sim: CareSim): number { let n = 0; for (const d of sim.dragons) if (d.place !== 'garden') n++; return n; }
 /** Whether the barn is full: it holds BARN_CAP dragons (or more, only ever because a preset put them there). */
@@ -89,7 +89,7 @@ export function nextStage(st: Stage): Stage | null { return STAGES[STAGES.indexO
 export function stageDue(sim: CareSim, d: Dragon): number { return d.stageSince + STAGE_DAYS * sim.dayLen; }
 
 /**
- * Whether a dragon is settled (plan 3.5): in the barn (not a garden resident, nor an elder on its way there, nor with a
+ * Whether a dragon is settled (BASE_DESIGN 7): in the barn (not a garden resident, nor an elder on its way there, nor with a
  * mission's team: missions.ts), no act
  * (a sleeper has one), no keeper on any of its jobs (on the way, waiting at the stand spot or at work), no route left,
  * standing still (not turning, not waiting at a landing or held at the bay's edge), and not the lift's rider.
@@ -108,7 +108,7 @@ export function settled(sim: CareSim, d: Dragon): boolean {
 export function inTheWayOfGrowing(sim: CareSim, d: Dragon, stage: Stage): string | null {
   const [a, b] = bodySpan(stage, d.facing, d.x);
   // (a keeper held by hand is left out: the player may park them anywhere, for as long as they like, and a dragon due
-  // to grow must not wait on that -- it grows beside them, drawn in front as always: plan S7 review)
+  // to grow must not wait on that -- it grows beside them, drawn in front as always: BASE_DESIGN 4.10)
   const k = sim.keepers.find((q) => !q.manual && !q.climbing && q.f === d.f && q.x + KEEPER_HALF > a && q.x - KEEPER_HALF < b);
   return k ? k.name : null;
 }

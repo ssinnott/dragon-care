@@ -103,7 +103,7 @@ export const RETIRE_AT = RETIRE_DAYS - 0.1;
 export const TRIP_DEFAULT: TripParam = Object.freeze({ region: 'oldmine', progress: 0.5, fail: false });
 
 /**
- * The new game with a team away on a hard mission (plan S9: view=base&preset=trip&trip=<region>:<progress>[:fail]):
+ * The new game with a team away on a hard mission (BASE_DESIGN 6: view=base&preset=trip&trip=<region>:<progress>[:fail]):
  * the region's hard mission (its baddie at the end of the road, if it has one), the best two pairs of the seven with
  * their auto riders and its road (tripdemo.ts demoTrip: the missions' own rider pick, odds and road, missions.ts), the
  * outcome as asked -- a success unless `:fail` -- and the team away as a sent team is once it has left the Aerie

@@ -1,4 +1,4 @@
-// The Hatchery's eggs, drawn (ART_BIBLE 5.9; plan S5): drawing only -- the simulation keeps the eggs (sim.ts Egg,
+// The Hatchery's eggs, drawn (ART_BIBLE 5.9): drawing only -- the simulation keeps the eggs (sim.ts Egg,
 // life.ts). An egg is a 9 x 12 letter sprite drawn by icons.ts drawSprite, so every pixel is ringed in ink (11 x 14
 // with its outline): its shell the element's BABY scale colour (the baby inside is that colour; gated >= 25 % in
 // luminance from the nest's straw, tools/palette-check.ts), lit from the top left in flat cel bands (a highlight row

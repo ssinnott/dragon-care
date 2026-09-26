@@ -1,60 +1,25 @@
-// The base, live (docs/BASE_DESIGN.md 2, 4): the greybox barn and towers at 1x with the care simulation (sim.ts)
-// running underneath -- its dragons on the real rig, its keepers on the engine's paper doll -- the need bubbles, the
-// job strip, and two inputs: drag to look around, and tap a bubble, a job or a dragon to Rush it. A gallery scene
-// (view=base in src/gallery.ts), so the frozen-time contract holds: t= steps the world t times and draws that frame.
-// The world is built from a start (src/game/presets.ts: the new game, or a preset); its dragons are drawn by a cast
-// keyed by dragon id, which follows the simulation as dragons come, go and grow. The simulation walks the dragons to
-// their needs' rooms and rides them on the Dragon Lift (travel.ts); the view puts each pet where its dragon is, plays
-// its walk from the start of every walk bout at the speed the sim walked it -- 1, or the lively step's 2 on and off the
-// car and across its bay (Dragon.gaitS: the sim moved it by that walk's own root motion times that speed, so the paws
-// stay planted: BASE_DESIGN 2) -- narrows it through a paper turn, and draws the lift's car where the car is.
-// Time (7): the sky behind the building turns with the clock, the lights come on at dusk and the building's walls and
-// shell and the garden turn to their moonlit night colours with them, in the same three steps (one building canvas per
-// step) -- never on a dragon or a floor (BASE_DESIGN 7; layers=cast draws the cast alone, the same by day and by
-// night) -- and the view runs
-// 0, 1, 2, 4 or 8 whole world steps a frame (the speed, the view's own: a save has none). The constructor never touches
-// storage: a live page that may save (opts.persist) loads the player's barn in attach() and saves it as it goes, every
-// 600 frames and when the page is hidden or left (storage.ts); a frozen page never calls attach(), so t= is always the
-// new game (or the preset) stepped t times at 1x.
-// Growing up and eggs (7; plan S5): a dragon that grows up is rebuilt at its new stage, drawn flat in its glow's
-// highlight inside its own ink for 12 frames (the grow-up's flash, ART_BIBLE 4.2: the one flash the base draws, never
-// for the time of day; frames shown, not world steps, so it shows as long at 8x) and plays `happy` once -- the
-// simulation holds it where it stands for exactly that long (life.ts: its hold) -- with a toast; toasts of life's news
-// (grow-ups, the dawn's tip) wait their turn, and grow-ups into one stage that come together share one;
-// the Hatchery's eggs lie in their nests (eggs.ts: their cracks and wobble), and one that hatches throws its shell bits
-// as the baby stands up; at 05:00 a tip says who grows up within two days. A tap on a dragon opens its card (its stage
-// and day of it, its needs: hud.ts), on the far side of the screen from it; a tap on one with a job waiting also Rushes
-// that job, as it always has.
-// The elder garden (plan S6): past the right tower, through the Garden Gate, the garden's plots are drawn after the
-// building (gardenArt.ts: only the plots on screen), their lanterns lit with the lights; the camera pans out to the
-// garden's end, which moves east as elders retire to it; a resident naps (`sleep`, then `wake`), sits (`idle`, the
-// elder's variants), strolls (its walk, restarted each bout like any walk) and waits for its keeper (`idle`, or its
-// tells); an elder arriving there is news: "ASH MOVED TO THE GARDEN".
-// Taking a keeper (docs/BASE_DESIGN.md 4.10; plan S7, #6): a tap on a keeper, or on their badge in the top bar (or
-// Tab), makes them the player's (control.ts): WASD or the arrows walk them and climb at a ladder, E or Space does the
-// chore in reach, Esc, a tap on empty space, their badge again or LET GO hands them back. While one is held the camera
-// follows them, a mark in their colour hangs over their head, a line over the pad says what E does, and a touch pad
-// (the four directions, ACT and LET GO) sits at the bottom right; every input goes to the simulation as a command,
-// applied at the start of its next step.
-// Watching a mission (docs/BASE_DESIGN.md 6; plan S9, #5): while a team is out, a TEAM OUT chip under the top bar opens
-// the watch overlay -- the team on its road (missionview.ts), the world stepping on underneath -- and BACK TO BARN (or
-// Esc) closes it. The overlay takes every tap under the top bar before the barn's pad and world; a keeper held by hand
-// stays held but stands still under it, and a badge (or Tab) goes back to the barn to take that keeper.
-// Missions (plan S8): the MAP button (or M, or a tap on the Map Room's table) eases the camera to the Map Room and
-// opens the table's overlays (maptable.ts: the world map, then a mission's chooser); the world waits while one is open.
-// SEND starts the muster and eases the camera to the Aerie; while the team is out a chip under the top bar says how it
-// is doing (a tap opens the watch overlay: plan S9), its dragons and riders are not drawn while away, the keepers'
-// badges show who is away or resting, and the coin they bring home is on the top bar.
-// The overlays (plan S8, S9) share one screen (`ui.screen`: none, map, mission or watch) and one set of input rules:
-// an open overlay takes every tap under the top bar before the pad and the world; the top bar's buttons still work; a
-// badge (or Tab) closes it and does what it does in the barn; Esc closes it; a keeper held by hand stays held but
-// stands still under it (no key or pad reaches them), and no pointer drags the camera under it. The world waits
-// while the Map Room's table is open, and steps on under the watch overlay. The table's SEND is a command (control.ts:
-// the simulation sends the team at its next step, or refuses with the reason, which the toast shows); the TEAM OUT
-// chip opens the watch overlay, where a TRIP LOG button opens the trip's log (maptable.ts drawTripCard).
-// Barn capacity (BASE_DESIGN 4.7): the top bar counts the barn's dragons against its cap (`BARN 9/12`, life.ts
-// BARN_CAP); an egg falling due in a full barn is news ("THE BARN IS FULL"), and a due egg still in its nest shows three
-// dots over it.
+// The base, live (docs/BASE_DESIGN.md): the barn and towers at 1x with the care simulation (sim.ts) running underneath,
+// drawn and driven. A gallery scene (view=base in src/gallery.ts), so the frozen-time contract holds: t= steps the world
+// t times at 1x and draws that frame. The constructor never touches storage: a live page that may save loads the
+// player's barn in attach() and saves it as it goes (storage.ts; BASE_DESIGN 7, Saves), and a frozen page never calls
+// attach(). The world is built from a start (presets.ts: the new game, or a preset). What the view owns:
+// - The camera: dragged, eased to the Map Room, the Aerie or a keeper taken, following the keeper held; out to the
+//   garden's end, which moves east as elders retire (BASE_DESIGN 4.8, 4.10).
+// - The cast: a pet per dragon (by id) on the real rig, rebuilt as it grows, put where its dragon is, playing its walk
+//   at the speed the simulation walked it (the lively step: BASE_DESIGN 2), its paper turn, its act's anim, a
+//   grow-up's flash and `happy` (BASE_DESIGN 7), a resident's naps, sits and strolls (3, The Garden); the keepers as
+//   their characters (people.ts); the lift's car, the eggs and a hatch's shell bits -- drawn y-sorted, the keepers a
+//   step behind the dragons beside them, so nothing covers a dragon's eye (ART_BIBLE 1.4).
+// - Time: 0, 1, 2, 4 or 8 world steps a frame (the speed is the view's own: a save has none); the sky, the lights and
+//   the moonlit walls by the clock, never on a dragon or a floor (BASE_DESIGN 7; layers=cast draws the cast alone).
+// - The HUD (hud.ts): the top bar, the job strip, the bubbles, the hints, the toasts (life's news waits its turn), a
+//   dragon's card, the TEAM OUT chip, and while a keeper is held the pad and the action line (BASE_DESIGN 4.8, 4.10).
+// - The overlays, one `ui.screen` (none, map, mission or watch): the Map Room's table (maptable.ts; the world waits
+//   under it) and the watch overlay (missionview.ts; the world steps on). An open overlay takes every tap under the top
+//   bar before the pad and the world; the top bar's buttons still work; a badge, Tab or Esc goes back to the barn; a
+//   keeper held stays held but stands still under it (BASE_DESIGN 5, 6).
+// - Input: taps (tap: in its order), drags, the keys and the touch pad. Everything that changes the world -- a take, a
+//   steer, E, a send -- goes to the simulation as a command, applied at the start of its next step (control.ts).
 import { drawDragon, rootToScreen } from '../art/dragon/rig.ts';
 import { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
 import { ELEMENT_ANIM_FALLBACK } from '../art/dragon/anims.ts';
@@ -159,8 +124,8 @@ const TIP_DAYS = 2;
  * 296), so their mark and "?" (up to 108 px over the feet) stay clear of the top bar, the floor below stands with its
  * feet by y 308 and its heads (12-52 px over the feet, measured over every stage) clear of the pad's row (y 305) and the
  * line's (339), and the floor two below -- the ground floor, seen from the hayloft -- is off the screen's bottom but
- * for its feet, under the pad (S7 review: G6, nothing over a dragon's eye; plan S7's box of y 90-270 let the hayloft's
- * mark go under the top bar and the ground floor's heads under the pad).
+ * for its feet, under the pad (ART_BIBLE 1.4: nothing over a dragon's eye; a box of y 90-270 let the hayloft's mark go
+ * under the top bar and the ground floor's heads under the pad).
  */
 const FOLLOW = { x0: 160, x1: 480 } as const, FRAME_FEET = 196, FOLLOW_EASE = 8, FOLLOW_PAUSE = 180;
 /** A keeper's tap box (world px, around their feet): 10 px either side, from 78 px over the feet (Pip, the smallest, 58) to 2 under. */
@@ -200,13 +165,13 @@ export interface BaseViewOpts {
   take?: string | null;
   /**
    * 'world': only the building (at the night's step), the lift's car, the cast, the bubbles and the plates -- no sky,
-   * lights, HUD or toasts; 'cast': only the cast and the bubbles, on the page's flat colour (plan S6c's no-tint check:
+   * lights, HUD or toasts; 'cast': only the cast and the bubbles, on the page's flat colour (BASE_DESIGN 7's no-tint check:
    * every dragon pixel the same by day and by night).
    */
   layers?: Layers;
   /**
    * An overlay open from the start (panel=): the Map Room's map, or a mission's chooser -- `mission`, its place on the
-   * board (0-2) -- opened at the first frame (plan S8), or `watch`, the team out watched on its road (plan S9).
+   * board (0-2) -- opened at the first frame (BASE_DESIGN 5), or `watch`, the team out watched on its road (BASE_DESIGN 6).
    */
   panel?: 'map' | 'mission' | 'watch' | null;
   mission?: number | null;
@@ -219,7 +184,7 @@ export interface BaseViewOpts {
 const TABLE: Readonly<Rect> = Object.freeze({ x: 70, y: 172, w: 60, h: 36 });
 /**
  * Where the camera goes for the Map Room's table, and for the Aerie: one frame holds both, the deck with the team's
- * heads clear of the top bar and the Map Room under it (y 20, not the plan's 40: at 40 a rider's hat is under the bar).
+ * heads clear of the top bar and the Map Room under it (y 20, not 40: at 40 a rider's hat is under the bar).
  */
 const MAP_CAM = { x: 0, y: 20 }, AERIE_CAM = { x: 0, y: 20 };
 /** Frames the camera eases toward the Map Room before the map opens (MAP, M). */
@@ -270,7 +235,7 @@ export class BaseView {
   private camAsked: { x: number; y: number } | null = null;
   private keeperAgents!: KeeperAgent[];
   /**
-   * The building drawn at each of the night's steps (plan S6c: 0 the day's, 3 the night's, 1 and 2 the stepped mixes;
+   * The building drawn at each of the night's steps (BASE_DESIGN 7: 0 the day's, 3 the night's, 1 and 2 the stepped mixes;
    * drawBuilding): the day's built with the world, each other the first frame it is needed, then kept -- rebuilt only
    * when the step changes, never a frame.
    */
@@ -320,7 +285,7 @@ export class BaseView {
   /**
    * The overlays (maptable.ts MapUi): the screen on show -- none (the barn), the Map Room table's `map` or `mission`
    * chooser (the world waits), or `watch`, the team out watched on its road (missionview.ts, the world stepping on
-   * underneath: plan S9) -- the mission chosen and the team being put together, the frames before the map opens, and
+   * underneath: BASE_DESIGN 6) -- the mission chosen and the team being put together, the frames before the map opens, and
    * whether the trip's log is open over the watch overlay (`card`); last frame's tap targets on the table, and the TEAM
    * OUT chip's.
    */
@@ -469,7 +434,7 @@ export class BaseView {
   }
 
   /**
-   * What the step's life events look like (plan S5): a dragon grown up -- already rebuilt at its new stage (syncCast) --
+   * What the step's life events look like (BASE_DESIGN 7): a dragon grown up -- already rebuilt at its new stage (syncCast) --
    * flashes flat for GROW_FLASH frames and plays `happy` once (the simulation holds it for that: its hold), and a
    * toast says so (in turn; the step's grow-ups into one stage share one); a hatch throws its egg's shell bits from the
    * nest the baby stands up in; an egg falling due with the barn full (life.ts BARN_CAP) is news too, "THE BARN IS
@@ -546,7 +511,7 @@ export class BaseView {
   }
 
   /**
-   * Point a pet at its dragon (plan S3): where it stands (on the car while riding) and faces; a walk bout's walk,
+   * Point a pet at its dragon (BASE_DESIGN 2): where it stands (on the car while riding) and faces; a walk bout's walk,
    * restarted at speed 1 on the bout's first step (so the anim's root motion is the step's own: gait.ts); a paper
    * turn's narrowing; else its anim (a sleeper wakes before it idles), its bowl at a meal, its mood and charge.
    */
@@ -607,7 +572,7 @@ export class BaseView {
 
   /**
    * The frame, back to front: the sky (screen space), the building (at the night's step: the walls and the shell by
-   * moonlight, plan S6c), the lights, the plates, the lift's car, the cast, the top pass, the bubbles, then the HUD and
+   * moonlight, BASE_DESIGN 7), the lights, the plates, the lift's car, the cast, the top pass, the bubbles, then the HUD and
    * a toast. layers=world leaves out the sky, the lights, the HUD and the toast; layers=cast draws only the cast and the
    * bubbles on the page's flat colour: the same by day and by night (the no-tint check).
    */
@@ -713,7 +678,7 @@ export class BaseView {
   }
 
   /**
-   * The team out, watched (plan S9): the scene over the barn (missionview.ts: the road, its stops, the baddie, the team,
+   * The team out, watched (BASE_DESIGN 6): the scene over the barn (missionview.ts: the road, its stops, the baddie, the team,
    * the banner), the result card once the trip's time is up (until tapped away), the way back to the barn, and the top
    * bar over it all -- the world steps on underneath (the barn's own frame is not drawn meanwhile).
    */
@@ -774,7 +739,7 @@ export class BaseView {
     else if (this.scene?.f.done && !this.resultClosed && hit(RESULT_CARD, sx, sy)) this.resultClosed = true;
   }
 
-  /** The hook (window.__dragonCare.base): the world as of this frame, and the overlay and the scene (plan S9). */
+  /** The hook (window.__dragonCare.base): the world as of this frame, and the overlay and the scene (BASE_DESIGN 6). */
   private publish(read: ClockRead): void {
     if (typeof window !== 'undefined' && window.__dragonCare) {
       const st = this.sim.stats, cx = Math.round(this.camX), cy = Math.round(this.camY), all = this.layers === 'all' && this.ui.screen === 'none', chip = this.chipRect as Rect | null;
@@ -828,7 +793,7 @@ export class BaseView {
       departAt: t.departAt, returnAt: t.returnAt, progress: tripProgress(this.sim, t) };
   }
 
-  /** The scene as the hook reports it (plan S9): the last stop reached, its banner, the baddie on the road, its exit, which way the team faces, how far along it is. */
+  /** The scene as the hook reports it (BASE_DESIGN 6): the last stop reached, its banner, the baddie on the road, its exit, which way the team faces, how far along it is. */
   private sceneHook(): NonNullable<NonNullable<Window['__dragonCare']>['base']>['scene'] {
     if (!this.scene) return null;
     const { trip, f } = this.scene, s = f.last == null ? null : trip.stops[f.last];
@@ -898,7 +863,7 @@ export class BaseView {
   /**
    * The keeper held by hand as the player last asked: the simulation's (control.ts controlledKeeper), with the takes
    * and releases still waiting for the next world step applied -- so a badge, Tab, the pad and the camera answer at
-   * once, paused too (a paused world steps none: S7 review).
+   * once, paused too (a paused world steps none).
    */
   private held(): Keeper | null {
     let id = this.sim.controlled;
@@ -984,7 +949,7 @@ export class BaseView {
     this.say('A NEW BARN');
   }
 
-  // ---------- the Map Room's table (plan S8) ----------
+  // ---------- the Map Room's table (BASE_DESIGN 5) ----------
 
   /** MAP or M: the camera eases to the Map Room and the map opens (MAP_OPEN_FRAMES on); again, and the table closes. */
   private toggleMap(): void {
@@ -1036,13 +1001,13 @@ export class BaseView {
   }
 
   /**
-   * A tap, in this order (plan S7): a top-bar button, or a keeper's badge (taking that keeper -- or letting go of the
+   * A tap, in this order (BASE_DESIGN 4.10): a top-bar button, or a keeper's badge (taking that keeper -- or letting go of the
    * one held -- and easing the camera to them; the rest of the bar takes the tap too: it covers the world there); the
    * pad while a keeper is held (ACT, LET GO); an open dragon card closes (it covers the world there too); a job chip
    * rushes its job and brings its dragon into view; a bubble rushes its job; a keeper is taken; a tap on a dragon opens
-   * its card -- and rushes its job, if one is waiting (plan S5); a tap on empty space lets go of the keeper held. Any
+   * its card -- and rushes its job, if one is waiting (BASE_DESIGN 7); a tap on empty space lets go of the keeper held. Any
    * tap but a button's closes the card (the buttons leave it open: the game can be paused to read it). A team out
-   * (plan S9): the TEAM OUT chip, after the pad, opens the watch overlay; while it is open the buttons still work, a
+   * (BASE_DESIGN 6): the TEAM OUT chip, after the pad, opens the watch overlay; while it is open the buttons still work, a
    * badge goes back to the barn and takes (or lets go of) that keeper, and every tap under the bar is the overlay's --
    * BACK TO BARN, the result card tapped away, anything else swallowed -- before the pad or the world could take it.
    */
@@ -1163,7 +1128,7 @@ export class BaseView {
   /**
    * Live only: size the canvas to the window (whole pixels, or under 1x in a small window); take the pointers -- drag
    * to pan, tap to Rush, take a keeper or press a button, hold the pad -- and the keys (1-4 the speed, p pause, WASD or
-   * the arrows, E or Space, Esc, Tab: plan S7). A page that may save loads the player's barn now (one that didn't
+   * the arrows, E or Space, Esc, Tab: BASE_DESIGN 4.10). A page that may save loads the player's barn now (one that didn't
    * fit -- another version, not a save, or a save whose insides the view can't build, step or draw: load() -- is kept
    * aside at the backup key and the page's new barn plays on, with a toast), saves every 600 frames and when it is
    * hidden or left, and lends the page window.__dragonCare.baseSaveNow.
@@ -1189,9 +1154,9 @@ export class BaseView {
     }
     // (take= asks for a keeper: taken again in a world a load swapped in)
     if (this.takeAsked && !this.sim.commands.some((c) => c.kind === 'take')) this.takeByName(this.takeAsked);
-    // the keys: 1-4 the speed, p pause, m the Map Room's table (plan S8); WASD or the arrows walk the keeper held, E or
+    // the keys: 1-4 the speed, p pause, m the Map Room's table (BASE_DESIGN 5); WASD or the arrows walk the keeper held, E or
     // Space acts (not on a key's repeats), Esc lets go, Tab takes the next keeper (passing over those on a mission's
-    // trip). Over an overlay (the watch overlay, plan S9, and the Map Room's table alike) the speed keys work as ever,
+    // trip). Over an overlay (the watch overlay, BASE_DESIGN 6, and the Map Room's table alike) the speed keys work as ever,
     // the keeper held stands still (steer) and E does nothing, Esc goes back to the barn (the keeper still held), and
     // Tab goes back to the barn and takes the next keeper, as a badge does
     const onKey = (e: KeyboardEvent) => {
@@ -1231,7 +1196,7 @@ export class BaseView {
       this.portrait = innerHeight > innerWidth;
     };
     fit();
-    // the pointers, each tracked on its own (plan S7): a pad direction held down walks until it is let up; ACT and
+    // the pointers, each tracked on its own (BASE_DESIGN 4.10): a pad direction held down walks until it is let up; ACT and
     // LET GO fire on an up that didn't drag; the first pointer not on the pad drags the camera; an up that didn't drag
     // is a tap
     const down = new Map<number, { x: number; y: number; camX: number; camY: number; drag: boolean; pad: PadButton | null }>();

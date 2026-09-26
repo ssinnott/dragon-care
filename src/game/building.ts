@@ -1,7 +1,7 @@
 // The base's building, drawn once (docs/BASE_DESIGN.md 2): the ground, the two stone towers with their window slits,
 // every room with its props, the gambrel roof over the hayloft, the Dragon Lift's shaft from the ground floor up
 // through the roof to its headframe over the Aerie, the keepers' centre ladder bay, and the Aerie deck on its gantry
-// over the roof (its west end running on as the sky bridge a mission's team leaves by: plan S8), and the Garden Gate in the right tower's ground floor (plan S6: an 84 px arch in both its walls, the one
+// over the roof (its west end running on as the sky bridge a mission's team leaves by: BASE_DESIGN 5), and the Garden Gate in the right tower's ground floor (BASE_DESIGN 3, The Garden: an 84 px arch in both its walls, the one
 // tower door a dragon fits, a straw floor straight through it, its gate leaf open against the back wall) -- transparent
 // above the ground and around its walls, where the view draws the sky (sky.ts: in screen space, behind it, so the day
 // turns without redrawing this); the garden beyond the gate is gardenArt.ts's. Greybox:
@@ -12,7 +12,7 @@
 // names go on a separate layer the view draws over the building and under the lift's car and the cast (so a name never
 // covers a face); the car is drawn in the world layer (drawLiftCar). Night (7) is the sky, the lights -- the lit window
 // slits, the dorm lamps' and the hearth's light on their walls, the skylight's night (drawLights, drawn over the
-// building and under the plates) -- and the building's own night (plan S6c): the whole building is drawn again at each
+// building and under the plates) -- and the building's own night (BASE_DESIGN 7): the whole building is drawn again at each
 // of the night's steps, every colour through the one night table (surfaces.ts NIGHT), so its walls, stone, boards,
 // timber, roof and ground are moonlit, cooler and darker, never black; nothing on a floor or a dragon changes colour,
 // and every colour a dragon is seen against -- the walls, the props behind the slots, the light on the walls, by day and
@@ -38,7 +38,7 @@ const RAIL_H = 40, CABLE = '#5a4a40', CABLE_X = [CAR_X0 + 1, CAR_X1 - 2] as cons
 // ---------- the pen ----------
 
 /**
- * The night's step the pen draws at (plan S6c; 0 by day): drawBuilding and drawLiftCar set it while they draw, and
+ * The night's step the pen draws at (BASE_DESIGN 7; 0 by day): drawBuilding and drawLiftCar set it while they draw, and
  * every colour the pen is given goes through the one night table (surfaces.ts NIGHT) at it -- a wall, a board, the
  * roof take their night colours; a floor, the ink or a light are drawn as they are.
  */
@@ -348,7 +348,7 @@ function ladder(g: CanvasRenderingContext2D, l: Link): void {
 }
 
 /**
- * The Garden Gate's arches (plan S6): the right tower's ground floor opened in both walls, 84 px high (a dragon fits;
+ * The Garden Gate's arches (BASE_DESIGN 3, The Garden): the right tower's ground floor opened in both walls, 84 px high (a dragon fits;
  * the towers' other doors are 70, human-sized). The inner arch shows the gate's stone beyond it, the outer one the
  * garden's hedge and lawn; each has an inked lintel and a keystone. A straw floor band runs straight through both walls
  * (dragons walk it: gate i), from the Hatchery's to the garden's path.
@@ -367,7 +367,7 @@ function gateArches(g: CanvasRenderingContext2D): void {
 // ---------- the whole building ----------
 
 /**
- * The building, drawn onto its own WORLD_W x WORLD_H canvas at the night's step `step` (plan S6c: 0 by day, 3 at night,
+ * The building, drawn onto its own WORLD_W x WORLD_H canvas at the night's step `step` (BASE_DESIGN 7: 0 by day, 3 at night,
  * 1 and 2 the stepped mixes: sky.ts lightsOf `walls`): every colour through the one night table (surfaces.ts NIGHT), so
  * the walls and the shell are their night colours and the floors are not. The view keeps one canvas per step.
  */
@@ -478,7 +478,7 @@ function buildingAt(rooms: readonly Room[]): HTMLCanvasElement {
   rect(g, gx0, deck - 20, gx1 - gx0, 4, INK); rect(g, gx0 + 1, deck - 19, gx1 - gx0 - 2, 2, TIMBER);
   rect(g, DECK_X0 - 1, deck - 1, DECK_X1 - DECK_X0 + 2, BAND + SLAB + 1, INK);
   floor(g, DECK_X0, DECK_X1, deck);
-  // (the sky bridge, plan S8: the deck's straw planks run on west past the world's edge -- a mission's team walks off
+  // (the sky bridge, BASE_DESIGN 5: the deck's straw planks run on west past the world's edge -- a mission's team walks off
   // it and lands on it: missions.ts -- with a rope rail on posts, the first one at the deck's end)
   rect(g, 0, deck - 1, DECK_X0, BAND + SLAB + 1, INK);
   floor(g, 0, DECK_X0 + 1, deck);
@@ -544,7 +544,7 @@ function liftCarAt(g: CanvasRenderingContext2D, y: number): void {
 
 /**
  * The lights (docs/BASE_DESIGN.md 7), drawn in the world layer over the building and under the plates, the lift's car
- * and the cast (never over a dragon: G8), in step with the sky (sky.ts lightsOf: the sky turns into a phase over its
+ * and the cast (never over a dragon: BASE_DESIGN 7), in step with the sky (sky.ts lightsOf: the sky turns into a phase over its
  * first hour, and the lights with it, never on the phase's first step). As the dusk's sky turns, and until the dawn's
  * has, the towers' window slits are lit and each dorm lamp throws its stepped rings on its wall (r 10, then r 16 too,
  * the lamp's colour mixed into the wall's at a half and a quarter: flat), clipped to the wall above the band, never on

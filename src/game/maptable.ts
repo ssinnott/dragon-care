@@ -30,7 +30,7 @@ import type { CareSim, Dragon, Keeper } from './sim.ts';
 import { KEEPER_PALETTES } from '../art/keeper/palettes.ts';
 import { DRAGON_PALETTES } from '../art/dragon/palettes.ts';
 
-/** Which overlay is open: none, the map, a mission's chooser, or (plan S9's) the team out watched on its road. */
+/** Which overlay is open: none, the map, a mission's chooser, or the team out watched on its road (BASE_DESIGN 6). */
 export type Screen = 'none' | 'map' | 'mission' | 'watch';
 /**
  * The overlays' own state (the view's, never saved): the screen, the mission chosen (by id), the team being put
@@ -48,7 +48,7 @@ export type UiAct =
 /** A tap target drawn this frame (screen px), with its name for the page's hook (a pin, BACK, BEST TEAM, SEND). */
 export interface Hit { r: Rect; act: UiAct; name?: string }
 
-/** The overlay's panel (plan S8), BACK's button, and the mission chooser's columns and buttons. */
+/** The overlay's panel (BASE_DESIGN 5), BACK's button, and the mission chooser's columns and buttons. */
 export const PANEL: Readonly<Rect> = Object.freeze({ x: 8, y: 18, w: 624, h: 318 });
 export const BACK: Readonly<Rect> = Object.freeze({ x: 560, y: 316, w: 64, h: 16 });
 export const CLIMATE_RECT: Readonly<Rect> = Object.freeze({ x: 16, y: 26, w: 300, h: 112 });
@@ -59,11 +59,11 @@ export const ODDS_BAR: Readonly<Rect> = Object.freeze({ x: 324, y: 270, w: 150, 
 const PAIR_SLOTS: readonly Rect[] = [{ x: 324, y: 40, w: 300, h: 44 }, { x: 324, y: 88, w: 300, h: 44 }];
 const GRID = { x: 324, y: 142, w: 96, h: 18, dx: 102, dy: 21, cols: 3, rows: 5 } as const;
 /**
- * The TEAM OUT chip under the top bar (a tap opens the watch overlay): plan 3.11 put it at the right, x 520, but there
- * it covered the Lamp Dorm's plate at the start camera (the upper floor's plates sit just under the bar there, and the
- * dorm's starts at screen x 513); at x 394 it sits over the lift shaft's and the ladder bay's tops, where no plate or
- * window is, still clear of the buttons over it and of the canvas point (350, 200) (G9). And over the watch overlay,
- * the trip's log (plan S8's progress card: under the scene's banner line, clear of the team's heads and the baddie's)
+ * The TEAM OUT chip under the top bar (a tap opens the watch overlay): at x 520 it covered the Lamp Dorm's plate at the
+ * start camera (the upper floor's plates sit just under the bar there, and the dorm's starts at screen x 513); at x 394
+ * it sits over the lift shaft's and the ladder bay's tops, where no plate or window is, still clear of the buttons over
+ * it and of the canvas point (350, 200) where the smoke test's drag starts. And over the watch overlay, the trip's log
+ * (its stops and the time left: under the scene's banner line, clear of the team's heads and the baddie's)
  * and its TRIP LOG button, beside BACK TO BARN (missionview.ts BACK_BUTTON, x 8-118).
  */
 export const CHIP: Readonly<Rect> = Object.freeze({ x: 394, y: 19, w: 114, h: 15 });
@@ -116,7 +116,7 @@ const MOOD_DOT = (c: string): Sprite => ({ rows: ['.mm.', 'mmmm', 'mmmm', '.mm.'
 
 /**
  * A polygon rasterised as pixel art: a mask over its bounding box of the pixels whose centre lies inside it (even-odd),
- * so a land is whole pixels with no anti-aliased edge (G6: flat fills), and its ink is the mask's own edge.
+ * so a land is whole pixels with no anti-aliased edge (the house style: flat fills), and its ink is the mask's own edge.
  */
 interface Mask { x0: number; y0: number; w: number; h: number; in: Uint8Array }
 function rasterise(pts: readonly number[]): Mask {
@@ -178,7 +178,7 @@ function pin(ctx: CanvasRenderingContext2D, n: number, x: number, y: number): Re
 }
 
 /**
- * The map screen (plan S8): the panel, MAP ROOM, the regions (explored ones in their climate's colours and named, the
+ * The map screen (BASE_DESIGN 5): the panel, MAP ROOM, the regions (explored ones in their climate's colours and named, the
  * rest in hatched fog with a "?"), the roads between neighbours and from HOME to the start regions, a numbered pin per
  * mission on the board (at its region), the team's flag at the region it is out in, and BACK. Returns the tap targets.
  */
@@ -230,7 +230,7 @@ export function eggNotice(sim: CareSim): EggNotice | null {
 export function chosen(sim: CareSim, ui: MapUi): Mission | null { return sim.missions.board.find((m) => m.id === ui.mission) ?? null; }
 
 /**
- * The chooser (plan S8). Left: the climate picture (no dragons in it), the title, the region and its climate, the
+ * The chooser (BASE_DESIGN 5). Left: the climate picture (no dragons in it), the title, the region and its climate, the
  * rewards (days, coin, the egg's chance, sure on a first visit, or the Hatchery full), then a row per challenge -- its
  * icon, name and counter, and GOOD: the home dragons and free keepers who meet it (tap one to add it), a tick once the
  * team does -- and the big baddie's row. Right: the team's two pairs (the dragon, its element, stage and mood, its
@@ -434,8 +434,7 @@ function wrap(s: string, w: number): string[] {
 export function drawLogButton(ctx: CanvasRenderingContext2D, open: boolean): void { button(ctx, LOG_BUTTON, 'TRIP LOG', true, open); }
 
 /**
- * The trip's log (plan S8's progress card, over the watch overlay: plan S9's scene took the chip's tap, and the log
- * opens from it): the mission and its region, each stop (its icon and name, a tick
+ * The trip's log (over the watch overlay, opened by its TRIP LOG button: BASE_DESIGN 6): the mission and its region, each stop (its icon and name, a tick
  * met, a cross unmet, a mark still ahead, a dash past the turn-back), the trip log's latest lines, and the time left.
  */
 export function drawTripCard(ctx: CanvasRenderingContext2D, sim: CareSim, t: Trip): void {

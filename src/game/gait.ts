@@ -1,4 +1,4 @@
-// A dragon's pace, read from its own walk (docs/BASE_DESIGN.md 2, "Moving around"; plan 3.4): the walk anim's frames
+// A dragon's pace, read from its own walk (docs/BASE_DESIGN.md 2, "Moving around"): the walk anim's frames
 // carry their root motion (`move`, px along facing per step), and a planted paw stands still on the floor only while
 // the body moves by exactly that much each step. So the care simulation (travel.ts) moves a walking dragon by its walk's
 // own per-frame `move`, at the anim's speed 1, and the view (base.ts) plays that walk from the start of the same bout at

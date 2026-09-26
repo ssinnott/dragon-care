@@ -1,7 +1,7 @@
-// The world the missions go out into (docs/BASE_DESIGN.md 5; plan S8): six regions, each with its climate, the
+// The world the missions go out into (docs/BASE_DESIGN.md 5): six regions, each with its climate, the
 // challenges its roads hold, the eggs it can give and (three of them) a big baddie at the end of a hard road; the
 // eleven challenges and what meets each (a dragon's element for the land's, a rider's skill for the people's); the
-// baddies' two counters each and their cozy exits (D4, B8: calmed, outwitted or driven off -- never fought, and nobody
+// baddies' two counters each and their cozy exits (BASE_DESIGN B8: calmed, outwitted or driven off -- never fought, and nobody
 // is hurt); the four keepers' rider skills; and the Map Room table's map (each region's land and its pin). Plain data:
 // the words are missiondata.ts's (shared with the mission art and the scene), the rules are missions.ts's.
 import type { DragonElement } from '../art/dragon/palettes.ts';
@@ -12,7 +12,7 @@ import type { RegionId, Climate, ChallengeId, Skill, BaddieId, BaddieExit } from
 export interface Counter { element?: DragonElement; skill?: Skill }
 
 /**
- * The eleven challenges (plan S8's counters table): the land's met by an element, the people's by a rider's skill. `met`
+ * The eleven challenges (BASE_DESIGN 5.3's table): the land's met by an element, the people's by a rider's skill. `met`
  * is the trip log's verb for the one who meets it ("PITCH DARK - WICK LIGHTS THE WAY"); `word`, a short name for a
  * chooser button (15 glyphs a line).
  */
@@ -31,8 +31,8 @@ export const CHALLENGES: Readonly<Record<ChallengeId, { name: string; word: stri
 });
 
 /**
- * The big baddies (plan S8, P14): each needs both of its counters on the team (a dragon's element and a rider's skill),
- * and leaves the road its own cozy way on a success (D4). There is no hurt state anywhere in this data.
+ * The big baddies (BASE_DESIGN 5.3, 6): each needs both of its counters on the team (a dragon's element and a rider's skill),
+ * and leaves the road its own cozy way on a success (BASE_DESIGN B8). There is no hurt state anywhere in this data.
  */
 export const BADDIES: Readonly<Record<BaddieId, { name: string; counters: readonly [Counter, Counter]; exit: BaddieExit; how: string }>> = Object.freeze({
   moleking: { name: 'THE MOLE KING', counters: [{ element: 'dusk' }, { skill: 'charm' }], exit: 'calmed', how: 'CURLS UP AND DOZES' },
@@ -76,7 +76,7 @@ function land(cx: number, cy: number, rx: number, ry: number, k: readonly number
   return { poly, pin: [cx, cy] };
 }
 
-/** The six regions (plan S8's table), in the order they are indexed (a board's difficulty draw keys on the index). */
+/** The six regions (BASE_DESIGN 5.1), in the order they are indexed (a board's difficulty draw keys on the index). */
 export const REGIONS: readonly Region[] = Object.freeze([
   { id: 'millbrook', name: 'MILLBROOK', climate: 'meadow', word: 'MILD MEADOWS', pool: ['flood', 'miller', 'hurt', 'lost'], eggs: ['water', 'spike'], baddie: null,
     neighbours: ['frostmere', 'bramblewood'], start: true, titles: ['THE MILL RACE', 'MEADOW ERRANDS', 'THE BROOK BRIDGE'],
