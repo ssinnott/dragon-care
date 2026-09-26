@@ -2094,6 +2094,28 @@ covers a dragon's eye.
 
 ### S8 — Missions I: the Map Room table, the world map, climate, the team, the Aerie trip, rewards
 
+**PARALLEL CONTRACT (orchestrator; binding for S8 and S9, which are built at the same time in separate sessions
+from the contract commit `af25650`):**
+- Use the shared types in `src/game/missiondata.ts` and `src/game/trip.ts` as they are (extend `Trip`/`Mission`
+  only by adding optional fields, and say so in the handoff). S8's `regions.ts` imports the unions from
+  `missiondata.ts` instead of redefining them.
+- Everything owned by another slice goes through the seams, never around them: `seams.ts` (`currentTrip`,
+  `setPreviewTrip`, `isTaken` for S7's controlled keeper, `barnRoom` for S6b's cap) and `artseams.ts` (all mission
+  art: `drawClimate`, `drawSetPiece`, `drawBaddie`, `drawBaddiePortrait`, `drawMiller`, `CHALLENGE_ICONS`,
+  `SKILL_ICONS`, `SADDLE`). Their bodies are stand-ins now; the merge swaps in S7, S6b and S9a. Do NOT build S7's
+  control, S6b's cap or S9a's art yourself, and do not edit the stand-in bodies except where your slice owns them
+  (S8 replaces `currentTrip`'s body to return its own trip, falling back to the preview trip).
+- S8: `send` is a method/command in your own module (`missions.ts`); S7's `control.ts` (the command queue) does not
+  exist on your base, and the merge routes a `{ kind: 'send' }` command into it. The rider auto-pick skips any
+  keeper for whom `isTaken(sim, k.id)` is true (test it by temporarily stubbing it in sim-check).
+- S9: build against a Trip from `currentTrip(sim)`; your `trip=` preset builds a Trip literal (a real mission from
+  the regions table as S8 specifies it, stops placed as `trip.ts` documents) and calls `setPreviewTrip`. The team's
+  dragons are looked up by id in `sim.dragons`. Skip this slice's "Final integration" docs list (the orchestrator
+  does it after the merge); do update the docs for what you build.
+- Keep edits to shared files (sim.ts, base.ts, save.ts, hud.ts, layout.ts, building.ts, gallery.ts, tools/*,
+  types/globals.d.ts, docs) focused, and name anything the merge must wire in the handoff.
+
+
 **Closes** (#5 items; all under D4):
 
 | Item | Criterion |
@@ -2428,6 +2450,28 @@ are `FLOORS.straw`.
 ---
 
 ### S9 — Missions II: the watchable scene, challenges on the road, big baddies, and the final integration
+
+**PARALLEL CONTRACT (orchestrator; binding for S8 and S9, which are built at the same time in separate sessions
+from the contract commit `af25650`):**
+- Use the shared types in `src/game/missiondata.ts` and `src/game/trip.ts` as they are (extend `Trip`/`Mission`
+  only by adding optional fields, and say so in the handoff). S8's `regions.ts` imports the unions from
+  `missiondata.ts` instead of redefining them.
+- Everything owned by another slice goes through the seams, never around them: `seams.ts` (`currentTrip`,
+  `setPreviewTrip`, `isTaken` for S7's controlled keeper, `barnRoom` for S6b's cap) and `artseams.ts` (all mission
+  art: `drawClimate`, `drawSetPiece`, `drawBaddie`, `drawBaddiePortrait`, `drawMiller`, `CHALLENGE_ICONS`,
+  `SKILL_ICONS`, `SADDLE`). Their bodies are stand-ins now; the merge swaps in S7, S6b and S9a. Do NOT build S7's
+  control, S6b's cap or S9a's art yourself, and do not edit the stand-in bodies except where your slice owns them
+  (S8 replaces `currentTrip`'s body to return its own trip, falling back to the preview trip).
+- S8: `send` is a method/command in your own module (`missions.ts`); S7's `control.ts` (the command queue) does not
+  exist on your base, and the merge routes a `{ kind: 'send' }` command into it. The rider auto-pick skips any
+  keeper for whom `isTaken(sim, k.id)` is true (test it by temporarily stubbing it in sim-check).
+- S9: build against a Trip from `currentTrip(sim)`; your `trip=` preset builds a Trip literal (a real mission from
+  the regions table as S8 specifies it, stops placed as `trip.ts` documents) and calls `setPreviewTrip`. The team's
+  dragons are looked up by id in `sim.dragons`. Skip this slice's "Final integration" docs list (the orchestrator
+  does it after the merge); do update the docs for what you build.
+- Keep edits to shared files (sim.ts, base.ts, save.ts, hud.ts, layout.ts, building.ts, gallery.ts, tools/*,
+  types/globals.d.ts, docs) focused, and name anything the merge must wire in the handoff.
+
 
 **Closes #5.** The remaining criteria:
 

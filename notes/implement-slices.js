@@ -92,13 +92,14 @@ Return the structured result.`, { label: `${tag}:implement`, phase: 'Implement',
     { key: 'correctness', prompt: `LENS: CORRECTNESS AND REPO RULES. Review every change in \`git diff ${base}..HEAD\` (and new files) line by line. Hunt for: real bugs (wrong state transitions, off-by-one, stale references after saves/load, events not cleared, routes that can deadlock or stall, a dragon or keeper that can get stuck, jobs that can never be served); determinism breaks (G1: any Math.random/Date/performance in src/game, iteration not in id order, ties not broken by id, state not in saves (G10), fromSave not relinking); frozen-time contract leaks (G4/G5: storage touched outside attach, smoke live cases without save=0); edits to src/lib (G2); tests that are vacuous, loosened without a measured reason, or not actually exercising the feature; hook/type drift (G9); perf regressions (G14: time BaseView.step if in doubt). Run \`npm run sim\` and \`npm run typecheck\` yourself, and write small throwaway scripts under ${S} to probe suspicious behaviour (e.g. run the sim longer or with other seeds and assert invariants). Only report findings you have evidence for.` },
     { key: 'acceptance', prompt: `LENS: ACCEPTANCE AND PLAYER EXPERIENCE. For every acceptance criterion quoted in the slice section and every traceability row (plan section 5) this slice owns, decide MET or NOT MET from evidence: render the slice's shots (and any others you need, e.g. several consecutive t= frames, other cameras, other hours) with tools/shot.ts into ${S}/shots/${tag}-review/ and LOOK at them; when a criterion is about live input or motion, drive the live page with a small Playwright script (see tools/smoke.ts for how it loads Playwright and starts tools/server.ts). Check the art rules (G6-G8: 1 px ink outline, marks >= 2 px, no gradients, nothing over a dragon's eye, floors pale and gated, night never tints a dragon), HUD layout overlaps at 640x360, readability at 1x, and whether it actually feels like what the user asked for in the issue text. Also check that the docs the slice names were updated truthfully. Only report findings you have evidence for.` },
   ]
-  const reviews = await parallel(LENSES.map(l => () => agent(`${COMMON}
+  const lensesUsed = args.lightReview ? [{ key: 'combined', prompt: `${LENSES[0].prompt}\n\nALSO, IN THE SAME REVIEW: ${LENSES[1].prompt}` }] : LENSES
+  const reviews = await parallel(lensesUsed.map(l => () => agent(`${COMMON}
 
 You are an adversarial REVIEWER of slice ${tag} ("${sl.title}"), just implemented in commits ${base}..HEAD. Read plan.md sections 1-5 and the "${tag}" subsection of section 6, and the handoff log. DO NOT edit any repo file (you may write throwaway files under ${S}).
 ${l.prompt}
 Severity: blocker = an acceptance criterion unmet, a crash, a check that would fail, a determinism/save break, or a hard art rule broken; major = a real bug or a clearly wrong behaviour a player would hit; minor = polish. Return structured findings.`, { label: `${tag}:review:${l.key}`, phase: 'Review', schema: FINDINGS_SCHEMA })))
 
-  const all = reviews.filter(Boolean).flatMap((r, i) => (r.findings || []).map(f => ({ ...f, lens: LENSES[i].key })))
+  const all = reviews.filter(Boolean).flatMap((r, i) => (r.findings || []).map(f => ({ ...f, lens: lensesUsed[i].key })))
   const criteria = reviews.filter(Boolean).flatMap(r => r.criteriaChecked || [])
   log(`${tag}: ${all.length} findings (${all.filter(f => f.severity === 'blocker').length} blockers)`)
 
@@ -106,7 +107,7 @@ Severity: blocker = an acceptance criterion unmet, a crash, a check that would f
 
 You are the FIXER for slice ${tag} ("${sl.title}"), implemented in commits ${base}..HEAD. Read plan.md sections 1-5 and the "${tag}" subsection of section 6, and the handoff log.
 The implementer reported: ${JSON.stringify({ summary: impl.summary, deviations: impl.deviations, gaps: impl.gaps, checkGreen: impl.checkGreen })}
-Two reviewers reported these findings: ${JSON.stringify(all, null, 1)}
+The reviewer(s) reported these findings: ${JSON.stringify(all, null, 1)}
 Their criteria verdicts: ${JSON.stringify(criteria, null, 1)}
 ${extra}
 1. VERIFY each finding against the code before acting (reproduce it where you can). Reject the ones that are not real, with the reason.

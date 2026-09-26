@@ -7,6 +7,8 @@ Shared, read-only inputs for the parallel sessions finishing issues #5-#11 on `c
 - `handoff.md`: what slices S1-S6 actually built (names, signatures, measured numbers, deviations). The code wins
   where they disagree.
 - `implement-slices.js`: the Workflow script the orchestrator runs per slice (implement, two reviewers, verify-and-fix,
-  commit with `npm run check` green). Pass `hold: []`.
+  commit with `npm run check` green). Pass `hold: []`; pass `lightReview: true` for one combined reviewer.
+- The mission contract (`af25650` on `claude/outstanding-issues-contract`): S8 and S9 branch from it; see the
+  "PARALLEL CONTRACT" block at the top of the S8 and S9 sections of `plan.md`.
 
 Nothing on this branch is ever merged into the work branch.
