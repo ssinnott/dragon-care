@@ -46,6 +46,9 @@
 // The mission art kit (plan S9a, view=missionart): every sheet -- the climates (and one as a scrolling road scene), the
 // set pieces, the baddies, the people (the miller beside the keepers) and the icons -- draws every item on it, with
 // no page error, in enough colours.
+// Barn capacity (BASE_DESIGN 4.7): the hook counts the barn's dragons against its cap (7 of 12 in the new game, the twelve
+// preset at the cap, the full preset forced over it with its due egg waiting in its nest, and the capped preset at the
+// cap with its due egg waiting in plain view, nobody in front of its nest).
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -599,6 +602,29 @@ async function baseLoop(page: any): Promise<string[]> {
   return out;
 }
 
+/**
+ * Barn capacity (BASE_DESIGN 4.7): the hook's count of the barn's dragons against its cap (life.ts BARN_CAP, 12) -- every
+ * dragon not living in the garden -- as the top bar's `BARN n/12` shows it.
+ */
+function barnIs(count: number) {
+  return (b: BaseHook): string[] => {
+    const inBarn = b.dragons.filter((d) => d.place !== 'garden').length;
+    return b.barn && b.barn.count === count && b.barn.cap === 12 && inBarn === count ? [] : [`the barn is ${JSON.stringify(b.barn)} with ${inBarn} dragons out of the garden, not ${count} of 12`];
+  };
+}
+/** view=base&preset=full and capped: the due egg still in its nest (the barn at or over its cap: it waits, and its nest shows it). */
+function eggWaits(b: BaseHook): string[] {
+  return b.eggs?.length === 1 && b.eggs[0].progress === 1 ? [] : [`the eggs are ${JSON.stringify(b.eggs)}, not one due and waiting`];
+}
+/**
+ * view=base&preset=capped: nobody stands in front of the waiting egg's nest (the first, world x 228 in the hayloft), so
+ * the egg and its dots show (a baby's body reaches 30 px either way of its root: layout.ts DRAGON_PAD).
+ */
+function nestClear(b: BaseHook): string[] {
+  const by = b.dragons.filter((d) => d.f === 2 && Math.abs(d.x - 228) < 40);
+  return by.length ? [`${by.map((d) => `${d.name} (x ${Math.round(d.x)})`).join(', ')} stands in front of the waiting egg's nest`] : [];
+}
+
 /** The base's dragons include every stage. */
 function everyStage(b: BaseHook): string[] {
   const st = new Set(b.dragons.map((d) => d.stage)), missing = AGE_STAGES.filter((s) => !st.has(s));
@@ -808,7 +834,7 @@ const CASES: Case[] = [
   { query: 'view=yardaudit&t=0', minColours: 2, allScales: false, timeout: 300000, care: 14 },
   // the base: its first seconds (a young adult of every element, #9), every stage (the ages preset), a minute of care
   // (jobs got done), and live input, never saving (a drag pans, a chip tap Rushes, the gallery's keys do nothing)
-  { query: 'view=base&t=600', minColours: 150, allScales: false, check: (b) => [...castIs(7, 'adult')(b), ...travels(b), ...gardenIs(0, 2)(b)] },
+  { query: 'view=base&t=600', minColours: 150, allScales: false, check: (b) => [...castIs(7, 'adult')(b), ...travels(b), ...gardenIs(0, 2)(b), ...barnIs(7)(b)] },
   { query: 'view=base&preset=ages&t=60', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...everyStage(b), ...travels(b)] },
   { query: 'view=base&t=3600', minColours: 150, allScales: false, base: true, check: walkedOver(100) },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseInput },
@@ -833,8 +859,8 @@ const CASES: Case[] = [
   // growing up and eggs (plan S5): EMBER grown an elder, three eggs in the Hatchery's nests, an egg hatched into a baby;
   // live, a dragon's card
   { query: 'view=base&preset=growup&t=60', minColours: 150, allScales: false, check: (b) => [...grownUp(b), ...travels(b)] },
-  { query: 'view=base&preset=eggs&t=600&cam=872,376', minColours: 150, allScales: false, check: (b) => [...eggsIn(b), ...travels(b)] },
-  { query: 'view=base&preset=hatch&t=120&cam=872,376', minColours: 150, allScales: false, check: (b) => [...hatchedOne(b), ...travels(b)] },
+  { query: 'view=base&preset=eggs&t=600&cam=168,280', minColours: 150, allScales: false, check: (b) => [...eggsIn(b), ...travels(b)] },
+  { query: 'view=base&preset=hatch&t=120&cam=168,280', minColours: 150, allScales: false, check: (b) => [...hatchedOne(b), ...travels(b)] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseCard },
   // taking a keeper (plan S7): frozen, BEA held from the first step (the pad, her mark, the line); live, taken and let
   // go by her badge, the keys, a tap on her and the pad
@@ -847,6 +873,13 @@ const CASES: Case[] = [
   // night (napping, the lanterns lit)
   { query: 'view=base&preset=garden&cam=1304,376&t=600', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...travels(b)] },
   { query: 'view=base&preset=garden&cam=1304,376&t=600&hour=22', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...timeFields('night', false, 3)(b)] },
+  // barn capacity (BASE_DESIGN 4.7): the capacity benchmark's twelve, the barn at its cap (BARN 12/12), every element among
+  // them; and the full preset, forced 9 over it (BARN 21/12), its due egg waiting in its nest in the hayloft's corner
+  { query: 'view=base&preset=twelve&t=600', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...travels(b), ...barnIs(12)(b)] },
+  { query: 'view=base&preset=full&t=60&cam=168,280', minColours: 150, allScales: false, check: (b) => [...castIs(21, null)(b), ...barnIs(21)(b), ...eggWaits(b)] },
+  // and the capped preset, the barn at its cap (BARN 12/12), its egg due on the first step waiting in the Hatchery's
+  // first nest with nobody in front of it (the nest's dots in view)
+  { query: 'view=base&preset=capped&t=60&cam=168,280', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...barnIs(12)(b), ...eggWaits(b), ...nestClear(b)] },
   { query: 'view=base&preset=trip&trip=oldmine:0.95&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', baddie: 'moleking', exit: 'calmed', facing: 1 }) },
   { query: 'view=base&preset=trip&trip=oldmine:0.91&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', beat: true, baddie: 'moleking', face: 'surprised' }) },
   { query: 'view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ covered: true, baddie: null, facing: 1 })(b), ...(b.scene?.stop && b.scene.stop !== 'baddie' ? [] : [`the last stop is ${b.scene?.stop}, not a challenge`])] },
@@ -864,7 +897,9 @@ const CASES: Case[] = [
   // preset's team all on the Aerie deck, and live, MAP -> a pin -> BEST TEAM -> SEND
   { query: 'view=base&t=60&panel=map', minColours: 100, maxPanelColours: 40, allScales: false, check: tableIs('map') },
   { query: 'view=base&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: tableIs('mission') },
-  { query: 'view=base&preset=muster&t=2860&cam=0,20', minColours: 150, allScales: false, check: (b) => [...mustered(b), ...travels(b)] },
+  // (and over a full barn: the twelve preset at the cap, the chooser open on THE LOST NEST, its egg to wait)
+  { query: 'view=base&preset=twelve&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: (b) => [...tableIs('mission')(b), ...barnIs(12)(b)] },
+  { query: 'view=base&preset=muster&t=2186&cam=0,20', minColours: 150, allScales: false, check: (b) => [...mustered(b), ...travels(b)] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseMission },
   // the whole loop live (the S8 + S9 merge): MAP -> a pin -> BEST TEAM -> SEND -> the muster on the Aerie -> the TEAM
   // OUT chip -> the watch scene (its trip log) -> BACK

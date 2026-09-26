@@ -73,11 +73,21 @@ export interface RoomInfo {
   /** Where the supply is, or the keepers' post, px from the room's left edge (default: the middle). */
   post?: number;
   /**
+   * The same in a one-module room (a need room repeated on another floor: its props fit one module), where it differs
+   * from `post` (the bathhouse's tub, 226 px in, is past a one-module room's end).
+   */
+  post1?: number;
+  /**
    * Where the room's keepers wait between jobs, px from its left edge (default: the post): clear of the body of a
    * dragon of any stage in any of its slots, so a waiting keeper is never hidden behind one (the post, where a supply
    * is picked up, may lie behind a slot).
    */
   wait?: number;
+  /**
+   * The same in a one-module room: clear of the body of a grown dragon of any stage in its one module slot, past its
+   * snout or its tail (a baby in a sub-slot there may still stand over it: a one-module room has no spot clear of all).
+   */
+  wait1?: number;
   /** A room for people (the towers'); no dragon stands in one. */
   people?: boolean;
   /** Its dragon slots: 'module' (one per module, and two baby sub-slots each), 'baby' (the sub-slots only), or none. */
@@ -85,12 +95,12 @@ export interface RoomInfo {
 }
 /** Every room there is (#11: a room is named and furnished only for a real purpose; the rest of the building is bare). */
 export const ROOM_INFO: Readonly<Record<RoomKind, RoomInfo>> = Object.freeze({
-  kitchen: { name: 'HEARTH KITCHEN', purpose: 'meets food: a keeper feeds the dragon here, with the bowl taken at the hearth', meets: 'food', supplies: 'food', post: 64, wait: 160, slots: 'module' },
-  bath: { name: 'BATHHOUSE', purpose: 'meets bath: a keeper washes the dragon here, with the bucket filled at the tub', meets: 'bath', supplies: 'bath', post: 226, slots: 'module' },
+  kitchen: { name: 'HEARTH KITCHEN', purpose: 'meets food: a keeper feeds the dragon here, with the bowl taken at the hearth', meets: 'food', supplies: 'food', post: 64, wait: 160, wait1: 16, slots: 'module' },
+  bath: { name: 'BATHHOUSE', purpose: 'meets bath: a keeper washes the dragon here, with the bucket filled at the tub', meets: 'bath', supplies: 'bath', post: 226, post1: 80, wait1: 146, slots: 'module' },
   hatchery: { name: 'HATCHERY', purpose: 'eggs lie in its three nests and hatch into babies', slots: 'baby' },
-  romp: { name: 'ROMP ROOM', purpose: 'meets play: a keeper plays with the dragon here, with a ball from the box by the wheel', meets: 'play', supplies: 'play', post: 107, wait: 160, slots: 'module' },
-  groom: { name: 'GROOMING PARLOUR', purpose: 'meets love, the busiest need (the own need of spike, rock and slinkwing): a keeper grooms and pets the dragon here', meets: 'love', post: 120, wait: 320, slots: 'module' },
-  dorm: { name: 'LAMP DORM', purpose: 'meets sleep: a keeper tucks the dragon in here', meets: 'sleep', slots: 'module' },
+  romp: { name: 'ROMP ROOM', purpose: 'meets play: a keeper plays with the dragon here, with a ball from the box by the wheel', meets: 'play', supplies: 'play', post: 107, wait: 160, wait1: 146, slots: 'module' },
+  groom: { name: 'GROOMING PARLOUR', purpose: 'meets love, the busiest need (the own need of spike, rock and slinkwing): a keeper grooms and pets the dragon here', meets: 'love', post: 120, wait: 320, wait1: 146, slots: 'module' },
+  dorm: { name: 'LAMP DORM', purpose: 'meets sleep: a keeper tucks the dragon in here', meets: 'sleep', wait1: 146, slots: 'module' },
   tack: { name: 'TACK ROOM', purpose: 'riders take their saddles here before a mission and hang them back after', people: true },
   bunks: { name: 'BUNKS', purpose: 'riders rest here after a mission', people: true },
   maproom: { name: 'MAP ROOM', purpose: 'the mission table: the world map and the mission chooser', people: true },
@@ -117,15 +127,28 @@ export interface Slot { room: number; i: number; f: number; x: number; facing: 1
 export interface Room { id: number; kind: RoomKind; part: Part; floor: number; x0: number; x1: number; slots: Slot[] }
 
 /**
+ * Whether a room is in the hayloft's west end module, under the gambrel's low slope (x 172-226 of it steep): no grown
+ * dragon fits there, but a baby does, tail to the slope -- the Hatchery's place (plan S6b: the barn's other modules are
+ * need rooms; its babies face into the barn, their sub-slots 60 and 120 px in, its nests 60, 100 and 140 px in).
+ */
+export function underSlope(r: { part: Part; floor: number; x0: number }): boolean { return r.part === 'barn' && r.floor === 2 && r.x0 === BARN_X; }
+
+/**
  * A room's slots (3.3): first one per module at its middle -- one module faces its post, two face each other (+1, -1:
  * their keepers work between them), three face +1, +1, -1 -- then two baby sub-slots per module, 40 px in from each
- * side (facing +1 and -1). A 'baby' room has the sub-slots only.
+ * side (facing +1 and -1). A 'baby' room has the sub-slots only (under the hayloft's slope: 60 and 120 px in, both
+ * facing +1, tails to the slope: underSlope -- a baby in the first stands in front of the first nest, one in the
+ * second in front of the other two: life.ts hatch puts a hatchling where it hides no other egg when it can).
  */
 function slotsOf(id: number, kind: RoomKind, f: number, m: number, w: number, x0: number): Slot[] {
   const info = ROOM_INFO[kind], out: Slot[] = [];
   if (!info.slots) return out;
+  if (info.slots === 'baby' && underSlope({ part: 'barn', floor: f, x0 })) {
+    out.push({ room: id, i: 0, f, x: x0 + 60, facing: 1, baby: true, mod: m }, { room: id, i: 1, f, x: x0 + 120, facing: 1, baby: true, mod: m });
+    return out;
+  }
   if (info.slots === 'module') {
-    const post = x0 + (info.post ?? (w * MOD) / 2);
+    const post = x0 + postIn(kind, w);
     for (let k = 0; k < w; k++) {
       const x = modX(m + k) + MOD / 2;
       const facing: 1 | -1 = w === 1 ? (post >= x ? 1 : -1) : k === w - 1 ? -1 : 1;
@@ -158,18 +181,25 @@ export function placeRooms(places: readonly RoomPlace[]): Room[] {
   return rooms;
 }
 
+/** A room kind's post, px from the left edge of a room `w` modules wide (RoomInfo.post, or post1 in a one-module room; default the middle). */
+function postIn(kind: RoomKind, w: number): number { const i = ROOM_INFO[kind]; return (w === 1 ? i.post1 : undefined) ?? i.post ?? (w * MOD) / 2; }
+/** How many modules a room is wide (a tower room: 1). */
+export function roomMods(r: Room): number { return r.part === 'barn' ? Math.round((r.x1 - r.x0) / MOD) : 1; }
 /** A room's supply spot or post, world x. */
-export function postX(r: Room): number { return r.x0 + (ROOM_INFO[r.kind].post ?? (r.x1 - r.x0) / 2); }
-/** Where a room's keepers wait between jobs, world x (RoomInfo.wait; default the post): clear of every slot's body. */
-export function waitX(r: Room): number { const w = ROOM_INFO[r.kind].wait; return w == null ? postX(r) : r.x0 + w; }
+export function postX(r: Room): number { return r.part === 'barn' ? r.x0 + postIn(r.kind, roomMods(r)) : r.x0 + (ROOM_INFO[r.kind].post ?? (r.x1 - r.x0) / 2); }
+/** Where a room's keepers wait between jobs, world x (RoomInfo.wait, or wait1 in a one-module room; default the post): clear of every grown slot's body. */
+export function waitX(r: Room): number { const i = ROOM_INFO[r.kind], w = (r.part === 'barn' && roomMods(r) === 1 ? i.wait1 : undefined) ?? i.wait; return w == null ? postX(r) : r.x0 + w; }
 
 /** Whether a dragon of this stage fits a slot: a baby takes a sub-slot, anyone older a module slot. */
 export function fitsSlot(slot: Slot, stage: Stage): boolean { return slot.baby === (stage === 'baby'); }
 
-/** The Hatchery's nests (3.2): three, on its floor's band, 30, 80 and 130 px in (x 1062, 1112 and 1162 in the start's hatchery). */
+/**
+ * The Hatchery's nests (3.2): three, on its floor's band -- under the hayloft's west slope (the start's: plan S6b) 60,
+ * 100 and 140 px in (x 228, 268 and 308), in a barn module elsewhere 30, 80 and 130 px in.
+ */
 export const NESTS = 3;
 /** Nest i's middle, world x, in a hatchery room (the egg lies there, and the baby it hatches into stands up there). */
-export function nestX(r: Room, i: number): number { return r.x0 + 30 + 50 * i; }
+export function nestX(r: Room, i: number): number { return underSlope(r) ? r.x0 + 60 + 40 * i : r.x0 + 30 + 50 * i; }
 /**
  * A nest's straw heap (building.ts): a half ellipse NEST_RX wide each way and NEST_RY high over its base (3 px into the
  * floor's band, which covers its foot), inked round, with 4 x 2 strands on its flanks (NEST_STRANDS: each strand's
@@ -275,7 +305,8 @@ export function makeNets(gardenEnd: number): Nets {
   for (const stage of Object.keys(DRAGON_PAD) as Stage[]) {
     const P = DRAGON_PAD[stage], barn: Span = [BARN_X + P, TOWER_R - P];
     dragon[stage] = Object.freeze<Net>({
-      spans: [[[BARN_X + P, gardenEnd - GARDEN_END - P]], [barn], [[modX(1) + P, modX(5) - P]], [], [], [[BRIDGE_X0, DECK_X1 - P]]],
+      // (a baby fits under the hayloft's west slope, tail to it, 60 px in: the Hatchery's corner, BASE_DESIGN 3)
+      spans: [[[BARN_X + P, gardenEnd - GARDEN_END - P]], [barn], [[stage === 'baby' ? BARN_X + 60 : modX(1) + P, modX(5) - P]], [], [], [[BRIDGE_X0, DECK_X1 - P]]],
       links: [{ name: 'lift', x: LIFT_CX, stops: LIFT_STOPS }],
     });
   }

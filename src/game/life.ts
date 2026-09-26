@@ -21,10 +21,14 @@
 // it retires to the garden (garden.ts retire: the elder's reward, never a decline) -- counted from the step it grew into
 // an elder, so a late stage-up never shortens its time as one. An egg (sim.ts addEgg) hatches
 // HATCH_DAYS game days after it was laid, as soon as a baby sub-slot is free (the Hatchery's two first -- one in front
-// of no other egg, then the one nearest its nest; else the nearest): a baby of its element, a new id, the next free
+// of no other egg, then the one nearest its nest; one elsewhere before one that would hide another's egg; else the
+// nearest): a baby of its element, a new id, the next free
 // name of its element's (names.ts), the egg's seed, hungry (it asks for the kitchen at once), standing up in its nest
-// and walking to its sub-slot. With no sub-slot free it waits in its nest, and nothing is lost. DOM-free,
-// deterministic, by id.
+// and walking to its sub-slot. With no sub-slot free it waits in its nest, and nothing is lost. The barn has a cap
+// (plan S6b, BARN_CAP: the largest herd the barn was measured to serve, docs/BASE_DESIGN.md 4.7): an egg never hatches
+// while the barn holds BARN_CAP dragons -- it waits in its nest, and hatches the first step there is room (an elder
+// arriving in the garden frees one; growing up never changes the count) -- and on the step it falls due with the barn
+// full the view is told (SimEvent `full`: "THE BARN IS FULL"). DOM-free, deterministic, by id.
 import { STAGES } from '../art/dragon/stages.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import { STAGE_DAYS, HATCH_DAYS } from './clock.ts';
@@ -39,6 +43,22 @@ import type { Slot } from './layout.ts';
 
 /** A new baby's food (plan S5: under QUEUE, so its first job, and its first walk after its sub-slot, is to the kitchen). */
 export const HATCH_FOOD = 0.45;
+
+/**
+ * The most dragons the barn holds (plan S6b, C2): the largest herd the repeated-room barn was measured to serve to C1's
+ * standard on every mix tried (every 11- and 12-dragon mix; 13 serves most but not all, 14 none: the barn's 13 grown
+ * modules are the cliff, and babies need a module free of grown dragons), a hard cap one dragon short of that cliff.
+ * An egg never hatches while the barn holds this many; a mission (S8) must not offer an egg while it is full, and reads
+ * the cap and the count from here.
+ */
+export const BARN_CAP = 12;
+/**
+ * The dragons the barn counts against its cap: every one not living in the garden -- the barn's, one away on a mission
+ * (S8: its place is kept for it), and an elder still walking out to the garden.
+ */
+export function barnCount(sim: CareSim): number { let n = 0; for (const d of sim.dragons) if (d.place !== 'garden') n++; return n; }
+/** Whether the barn is full: it holds BARN_CAP dragons (or more, only ever because a preset put them there). */
+export function barnFull(sim: CareSim): boolean { return barnCount(sim) >= BARN_CAP; }
 
 /** The stage after `st` (null: the elder's, which retires to the garden instead: garden.ts). */
 export function nextStage(st: Stage): Stage | null { return STAGES[STAGES.indexOf(st) + 1] ?? null; }
@@ -100,18 +120,24 @@ function growUp(sim: CareSim, d: Dragon): void {
 }
 
 /**
- * An egg due to hatch hatches if a baby sub-slot is free for its baby -- the Hatchery's first: one in front of no other
- * egg, then the one nearest its nest (so a hatchling stands in front of its own nest, now empty, or of an empty one --
- * never of another's egg while the other sub-slot is free; ties to the lower) -- else the nearest by its route from
- * the nest: the baby stands up in the nest, facing west, and walks to it; the egg is gone. False: it waits.
+ * An egg due to hatch hatches if the barn has room (under BARN_CAP) and a baby sub-slot is free for its baby -- the
+ * Hatchery's first: one in front of no other egg, then the one nearest its nest (so a hatchling stands in front of its
+ * own nest, now empty, or of an empty one; ties to the lower); if each free one would hide another's egg, the nearest
+ * free sub-slot out of the Hatchery (by its route: a hatchling never hides an egg while one is free anywhere) -- else
+ * the nearest by its route from the nest: the baby stands up in the nest, facing west, and walks to
+ * it; the egg is gone. False: it waits (on the very step it falls due with the barn full, the view is told: `full`).
  */
 function hatch(sim: CareSim, e: Egg): boolean {
   const room = sim.rooms.find((r) => r.kind === 'hatchery');
   if (!room || sim.clock - e.laid < HATCH_DAYS * sim.dayLen) return false;
+  if (barnFull(sim)) {
+    if (sim.clock - e.laid === HATCH_DAYS * sim.dayLen) sim.events.push({ kind: 'full', egg: e.id });
+    return false;
+  }
   const needs = fullNeeds();
   needs.food = HATCH_FOOD;
   const baby: Dragon = { id: sim.nextDragonId, name: hatchName(sim, e.element), element: e.element, stage: 'baby', seed: e.seed, slot: null, goal: null, goalJob: null,
-    f: room.floor, x: nestX(room, e.nest), facing: -1, legs: [], move: 'still', gaitT: 0, walkSeq: 0, turn: -1, waited: 0,
+    f: room.floor, x: nestX(room, e.nest), facing: -1, legs: [], move: 'still', gaitT: 0, gaitS: 1, walkSeq: 0, turn: -1, waited: 0,
     needs, mood: moodOf(e.element, needs), act: null, asleep: 0, stageSince: sim.clock, hold: 0, place: 'barn', home: null, garden: null };
   // (each of the Hatchery's sub-slots stands in front of a nest: a baby there hides that nest's egg, so one in front of
   // no other egg comes first -- the nest-1 egg's hatchling does not stand before a newer egg in nest 0 -- then the one
@@ -126,6 +152,9 @@ function hatch(sim: CareSim, e: Egg): boolean {
     const cost = (hides(s) ? WORLD_W : 0) + Math.abs(s.x - baby.x);
     if (cost < best) { best = cost; slot = s; }
   }
+  // (every free Hatchery sub-slot hiding another egg -- under the hayloft's slope the second stands in front of two
+  // nests, plan S6b -- the nearest free sub-slot elsewhere comes first, if there is one: no hatchling hides an egg)
+  if (slot && hides(slot)) slot = nearestFree(sim, baby, 'baby', ['hatchery']) ?? slot;
   slot ??= nearestFree(sim, baby);
   if (!slot) return false;
   sim.nextDragonId++;
@@ -133,13 +162,14 @@ function hatch(sim: CareSim, e: Egg): boolean {
   sendTo(sim, baby, slot);
   sim.eggs.splice(sim.eggs.indexOf(e), 1);
   sim.events.push({ kind: 'hatch', dragon: baby.id, egg: e.id });
-  sim.use('hatchery');
+  sim.use('hatchery', room);
   return true;
 }
 
 /**
  * Life's half of a step: every hold counts down, every dragon due and settled grows up (by id) -- or holds for room --
- * or, an elder due, retires to the garden; then every egg due hatches (by id) while a sub-slot is free.
+ * or, an elder due, retires to the garden; then every egg due hatches (by id) while the barn has room and a sub-slot is
+ * free.
  */
 export function stepLife(sim: CareSim): void {
   for (const d of sim.dragons) if (d.hold > 0) d.hold--;

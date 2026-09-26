@@ -34,6 +34,7 @@ import { OWN_NEED } from './needs.ts';
 import { readClock, hourSteps, PHASE_HOURS } from './clock.ts';
 import { rngAt, TAG } from './rand.ts';
 import { AERIE_F, NESTS, BRIDGE_X0, nestX, postX, feetY } from './layout.ts';
+import type { Room, RoomKind } from './layout.ts';
 import { routeTo, nearestFree, sendTo, dragonInBay, faceWay, raiseCall } from './travel.ts';
 import { CHALLENGES, BADDIES, REGIONS, KEEPER_SKILL, regionOf } from './regions.ts';
 import type { Counter } from './regions.ts';
@@ -339,7 +340,7 @@ export function send(sim: CareSim, missionId: number, pairs: readonly Pair[], op
   const ms = sim.missions;
   ms.board = ms.board.filter((q) => q.id !== mission.id);
   ms.trip = trip; ms.deck = pairs.map(() => null); ms.sent++;
-  sim.use('maproom');
+  sim.use('maproom', roomOf(sim, 'maproom'));
   musterStart(sim, trip);
   return trip;
 }
@@ -367,10 +368,12 @@ function musterStart(sim: CareSim, t: Trip): void {
   }
 }
 
+/** The riders' room of a kind (the Tack Room, the Bunks, the Map Room: the left tower's, one each), or null if the base has none. */
+function roomOf(sim: CareSim, kind: RoomKind): Room | null { return sim.rooms.find((q) => q.kind === kind) ?? null; }
 /** Where a rider takes a saddle down and hangs it back: the Tack Room's post (the left tower's ground floor). */
-function tackSpot(sim: CareSim): { f: number; x: number } { const r = sim.rooms.find((q) => q.kind === 'tack')!; return { f: r.floor, x: postX(r) }; }
+function tackSpot(sim: CareSim): { f: number; x: number } { const r = roomOf(sim, 'tack')!; return { f: r.floor, x: postX(r) }; }
 /** Where a rider rests after a trip: the Bunks' post. */
-function bunksSpot(sim: CareSim): { f: number; x: number } { const r = sim.rooms.find((q) => q.kind === 'bunks')!; return { f: r.floor, x: postX(r) }; }
+function bunksSpot(sim: CareSim): { f: number; x: number } { const r = roomOf(sim, 'bunks')!; return { f: r.floor, x: postX(r) }; }
 
 /** Whether a dragon may be sent somewhere new now (as travel.ts redirectable, whatever its goal): not being met, awake, not holding, not in the lift's hands or its bay. */
 function mayGo(sim: CareSim, d: Dragon): boolean {
@@ -418,7 +421,7 @@ function stepMuster(sim: CareSim, t: Trip): void {
     if (k.carrying !== 'saddle') {
       // to the Tack Room, and the saddle taken down there
       if (k.legs.length) { sim.move(k); return; }
-      if (++k.t >= SADDLE_STEPS) { k.carrying = 'saddle'; k.t = 0; sim.use('tack'); sim.walkTo(k, { f: AERIE_F, x: riderSpot(sim, i) }); }
+      if (++k.t >= SADDLE_STEPS) { k.carrying = 'saddle'; k.t = 0; sim.use('tack', roomOf(sim, 'tack')); sim.walkTo(k, { f: AERIE_F, x: riderSpot(sim, i) }); }
       return;
     }
     const x = riderSpot(sim, i);
@@ -541,11 +544,11 @@ function stepDeliver(sim: CareSim, t: Trip, k: Keeper): void {
   }
   if (k.carrying === 'saddle') {
     if (++k.t < SADDLE_STEPS) return;
-    k.carrying = null; k.t = 0; sim.use('tack'); sim.walkTo(k, bunksSpot(sim));
+    k.carrying = null; k.t = 0; sim.use('tack', roomOf(sim, 'tack')); sim.walkTo(k, bunksSpot(sim));
     return;
   }
   // at the Bunks: a rest (#11: the Bunks used); a keeper resting may be called to a job
-  sim.use('bunks');
+  sim.use('bunks', roomOf(sim, 'bunks'));
   k.phase = 'rest'; k.t = 0;
 }
 

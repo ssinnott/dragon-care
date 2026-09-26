@@ -8,37 +8,42 @@
 //   node tools/capacity.ts --casts=twelve --seeds=1-3 --min=10
 //   node tools/capacity.ts --casts=start7,7a2y6b --seeds=1,4 --json=out.json --workers=2
 //
-// Flags: --casts=a,b (names below, or any `<n>a<n>y<n>b<n>e` cast: adults, counting the start's seven, then young,
-// babies and elders), --seeds=1-8 (a range, a list, or both: 1-4,9), --min=30 (minutes of play; a fraction is fine),
+// Flags: --casts=a,b (names below, or any `<n>a<n>y<n>b<n>e` cast: adults, counting the start's seven -- fewer than
+// seven take the first of them, a late game's barn with its hatchlings in place of the retired: 0a12b, 2a10b -- then
+// young, babies and elders), --seeds=1-8 (a range, a list, or both: 1-4,9), --min=30 (minutes of play; a fraction is fine),
 // --json=path (every run's numbers as JSON), --workers=3 (runs at once, in worker threads, 1-3).
 //
 // Casts: start7, the new game's seven adults; eight, one more adult (sim-check section 10's EIGHTH: a fire adult in the
-// kitchen's second module); ten, the seven and three babies; twelve, the seven, three young and two babies; fifteen,
+// upper floor's kitchen); ten, the seven and three babies; twelve, the seven, three young and two babies (plan S6b's
+// benchmark, C1: sim-check section 10 runs it on seed 1); thirteen, the seven, three young and three babies; fifteen,
 // the seven, four young and four babies. A cast's dragons past the start's seven are placed as any preset places its
-// dragons (presets.ts: a DragonPlace in a free slot, which CareSim's constructor checks: the slot fits the stage, nobody
-// holds it, and its module holds one grown dragon or two babies) -- grown ones in the free module slots (the kitchen,
-// the romp room, the bathhouse, the lamp dorm, the grooming parlour, in that order: section 10's), babies in the
-// Hatchery's sub-slots first (as a hatchling takes them: life.ts hatch), then the free sub-slots nearest the Hatchery
-// (by a baby's route, a ride counted RIDE_PX more: travel.ts nearestFree) -- each of the next element in turn (fire,
-// water, rock, lightning, spike, dusk, slinkwing; the grown first, then the babies), named as a hatchling is (names.ts
-// hatchName), 0 days into its stage (none grows up within 90 minutes of play at the real day). A cast the barn has no
-// free slot for is reported as not fitting, and not run (the start barn has 11 module slots and the Hatchery's 2
-// sub-slots: 7 adults and 4 young fill every module, leaving 2 sub-slots, so `fifteen` does not fit it).
+// dragons (presets.ts: a DragonPlace in a free slot, the nth room of its kind, which CareSim's constructor checks: the
+// slot fits the stage, nobody holds it, and its module holds one grown dragon or two babies) -- grown ones in the free
+// module slots (the kitchens, the romp rooms, the bathhouses, the lamp dorms, the grooming parlours, in that order, each
+// kind's rooms in START_ROOMS order: section 10's), babies in the Hatchery's sub-slots first (as a hatchling takes them:
+// life.ts hatch), then the free sub-slots nearest the Hatchery (by a baby's route, a ride counted RIDE_PX more:
+// travel.ts nearestFree) -- each of the next element in turn (fire, water, rock, lightning, spike, dusk, slinkwing; the
+// grown first, then the babies), named as a hatchling is (names.ts hatchName), 0 days into its stage (none grows up
+// within 90 minutes of play at the real day). A cast the barn has no free slot for is reported as not fitting, and not
+// run (the start barn has 13 module slots, one a room, and the Hatchery's 2 sub-slots: a module holds one grown dragon
+// or two babies, so 13 grown dragons fill every module, leaving the Hatchery's 2).
 //
 // Measured each run: steps with a need at 0 (dragon-need-steps, sim.stats.emptySteps); the open-to-start wait (its
 // average over the jobs started, and the most); jobs done; lift rides and the car's busy share (a rider, or a stop to
 // go to); the longest a dragon waited at a landing for the car and at the bay's edge; the keepers' busy share (steps
 // with a job); an eye under a standing body (sim-check section 2's measure, the sim's own model -- travel.ts depthOf,
 // eyeSpan, dragonSpan: seconds summed over every pair, and the longest); stalls (S3's rules: a keeper standing still 10 s
-// on the way somewhere, not held at the bay's edge; a dragon standing still 10 s mid-walk, boarding or walking off; the
-// car standing still with work to do for a minute; a keeper giving up on a dragon, WAIT_MAX); breaks of section 2's
+// on the way somewhere, not held at the bay's edge; a dragon mid-walk -- walking, turning, boarding or walking off --
+// getting no more than 4 px on in 10 s, stood still or turned about on one spot; the car standing still with work to do
+// for a minute; a keeper giving up on a dragon, WAIT_MAX); breaks of section 2's
 // invariants (checked every 30 steps as it does, the shaft every step); the jobs still open at the end and the oldest
 // (the average wait counts only jobs started: a starving barn's never-started jobs show here); and ms per sim step (the
 // step alone, measured in the worker; three workers share a 4-core machine).
 //
 // Each run is a whole world stepped alone, so a run's numbers are the same on every machine and in every worker (the
 // ms per step aside). A prototype with more than one car changes `carsOf` (every other measure reads the dragons, the
-// keepers and the stats).
+// keepers and the stats). The barn as built (plan S6b) serves `twelve` on every seed; its cap (life.ts BARN_CAP) is 12:
+// docs/BASE_DESIGN.md 4.7 has the table this tool measured.
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -58,13 +63,13 @@ import type { Stage } from '../src/art/dragon/stages.ts';
 
 // ---------- casts ----------
 
-/** The named casts, as `<n>a<n>y<n>b` (adults counting the start's seven, young, babies). */
-export const CASTS: Readonly<Record<string, string>> = Object.freeze({ start7: '7a', eight: '8a', ten: '7a3b', twelve: '7a3y2b', fifteen: '7a4y4b' });
-/** A cast: how many of each stage (adults count the start's seven). */
+/** The named casts, as `<n>a<n>y<n>b` (adults counting the start's seven, young, babies; placeCast has any other). */
+export const CASTS: Readonly<Record<string, string>> = Object.freeze({ start7: '7a', eight: '8a', ten: '7a3b', twelve: '7a3y2b', thirteen: '7a3y3b', fifteen: '7a4y4b' });
+/** A cast: how many of each stage (adults count the start's seven; fewer than seven are the first of them). */
 export interface CastSpec { adult: number; young: number; baby: number; elder: number }
 /** The elements the dragons past the start's seven take, in turn (the first three section 10's EIGHTH, NINTH and TENTH's). */
 export const EXTRA_ELEMENTS: readonly DragonElement[] = ['fire', 'water', 'rock', 'lightning', 'spike', 'dusk', 'slinkwing'];
-/** The order grown dragons past the start's take the free module slots in (section 10's: the kitchen's, the romp room's, the bathhouse's), then any other room by id. */
+/** The order grown dragons past the start's take the free module slots in (section 10's: the kitchens', the romp rooms', the bathhouses'), each kind's rooms by id, then any other room by id. */
 const GROWN_ROOMS: readonly RoomKind[] = ['kitchen', 'romp', 'bath', 'dorm', 'groom'];
 
 /** A cast by name (CASTS) or pattern (`8a`, `7a3y2b`, `7a1e`); throws on anything else. */
@@ -73,8 +78,7 @@ export function parseCast(name: string): CastSpec {
   const key: Record<string, keyof CastSpec> = { a: 'adult', y: 'young', b: 'baby', e: 'elder' };
   if (!/^(\d+[aybe])+$/.test(pat)) throw new Error(`capacity: no cast "${name}" (the casts: ${Object.keys(CASTS).join(', ')}, or a pattern like 7a3y2b)`);
   for (const m of pat.matchAll(/(\d+)([aybe])/g)) spec[key[m[2]]] += Number(m[1]);
-  const start = START_DRAGONS.length;
-  if (spec.adult < start) throw new Error(`capacity: cast "${name}" has ${spec.adult} adults; every cast starts from the new game's ${start}`);
+  if (!castSize(spec)) throw new Error(`capacity: cast "${name}" has no dragons`);
   return spec;
 }
 
@@ -82,17 +86,19 @@ export function parseCast(name: string): CastSpec {
 export const castSize = (s: CastSpec): number => s.adult + s.young + s.baby + s.elder;
 
 /**
- * A cast's dragons on the start base: the new game's seven, then the rest (grown ones first -- adults, young, elders --
+ * A cast's dragons on the start base: the new game's seven (or its first few), then the rest (grown ones first -- adults, young, elders --
  * then babies), each in the first free slot of its kind (see the header), checked by CareSim's own constructor. `missing`
  * says what did not fit (the dragons placed before it are in `places`).
  */
 export function placeCast(spec: CastSpec): { places: DragonPlace[]; missing: string | null } {
-  const places: DragonPlace[] = [...START_DRAGONS];
+  // (fewer adults than the start's seven: the first of them -- a late game's barn, its hatchlings in place of the retired)
+  const places: DragonPlace[] = START_DRAGONS.slice(0, Math.min(spec.adult, START_DRAGONS.length));
   const rooms = placeRooms(START_ROOMS), hatchery = rooms.find((r) => r.kind === 'hatchery') ?? null;
   const rank = (r: Room) => { const i = GROWN_ROOMS.indexOf(r.kind); return i < 0 ? GROWN_ROOMS.length + r.id : i; };
-  // (a DragonPlace names its room by kind: the first room of that kind)
-  const all = rooms.filter((r) => rooms.find((q) => q.kind === r.kind) === r).flatMap((r) => r.slots.map((s) => ({ r, s })));
-  const grown = all.filter(({ s }) => !s.baby).sort((p, q) => rank(p.r) - rank(q.r) || p.s.i - q.s.i);
+  // (a DragonPlace names its room by kind and its number among the rooms of that kind: `n`, the first by default)
+  const nth = (r: Room) => rooms.filter((q) => q.kind === r.kind).indexOf(r);
+  const all = rooms.flatMap((r) => r.slots.map((s) => ({ r, s })));
+  const grown = all.filter(({ s }) => !s.baby).sort((p, q) => rank(p.r) - rank(q.r) || p.r.id - q.r.id || p.s.i - q.s.i);
   // (babies: the Hatchery's sub-slots, then the rest nearest the Hatchery's first nest by a baby's route there, a ride
   // counted RIDE_PX more -- as a hatchling takes the nearest free one: travel.ts nearestFree)
   const nest = hatchery ? { f: hatchery.floor, x: nestX(hatchery, 0) } : null, net = new CareSim(START_ROOMS, [], []).nets.dragon.baby;
@@ -103,7 +109,7 @@ export function placeCast(spec: CastSpec): { places: DragonPlace[]; missing: str
   };
   const babies = all.filter(({ s }) => s.baby).sort((p, q) => near(p.r, p.s) - near(q.r, q.s) || p.r.id - q.r.id || p.s.i - q.s.i);
   const extra: Stage[] = [
-    ...Array<Stage>(spec.adult - START_DRAGONS.length).fill('adult'), ...Array<Stage>(spec.young).fill('young'),
+    ...Array<Stage>(Math.max(0, spec.adult - START_DRAGONS.length)).fill('adult'), ...Array<Stage>(spec.young).fill('young'),
     ...Array<Stage>(spec.elder).fill('elder'), ...Array<Stage>(spec.baby).fill('baby'),
   ];
   for (const [n, stage] of extra.entries()) {
@@ -111,8 +117,8 @@ export function placeCast(spec: CastSpec): { places: DragonPlace[]; missing: str
     const name = hatchName(new CareSim(START_ROOMS, places, []), element);
     let placed = false;
     for (const { r, s } of stage === 'baby' ? babies : grown) {
-      if (!fitsSlot(s, stage) || places.some((p) => p.slot.room === r.kind && p.slot.i === s.i)) continue;
-      const p: DragonPlace = { name, element, stage, seed: 501 + n, slot: { room: r.kind, i: s.i }, days: 0 };
+      if (!fitsSlot(s, stage) || places.some((p) => p.slot.room === r.kind && (p.slot.n ?? 0) === nth(r) && p.slot.i === s.i)) continue;
+      const p: DragonPlace = { name, element, stage, seed: 501 + n, slot: { room: r.kind, i: s.i, ...(nth(r) ? { n: nth(r) } : {}) }, days: 0 };
       try { new CareSim(START_ROOMS, [...places, p], START_KEEPERS); } catch { continue; }
       places.push(p); placed = true; break;
     }
@@ -143,10 +149,13 @@ export interface Run {
 }
 
 /** A task for a worker: a cast's places and the run's seed and length. */
-interface Task { cast: string; pattern: string; places: DragonPlace[]; seed: number; min: number }
+export interface Task { cast: string; pattern: string; places: DragonPlace[]; seed: number; min: number }
 
-/** Run one cast on one seed for `min` minutes of play, measuring as it goes. */
-export function runOne(t: Task): Run {
+/**
+ * Run one cast on one seed for `min` minutes of play, measuring as it goes; `done`, if given, is handed the world at the
+ * end (sim-check section 10 counts its rooms' uses).
+ */
+export function runOne(t: Task, done?: (sim: CareSim) => void): Run {
   const sim = new CareSim(START_ROOMS, t.places, START_KEEPERS, { seed: t.seed }), steps = Math.round(t.min * 60 * FPS);
   const STALL = 10 * FPS, CAR_STALL = 60 * FPS;
   const stallNotes: string[] = [], breakNotes: string[] = [];
@@ -154,6 +163,7 @@ export function runOne(t: Task): Run {
   const stall = (m: string) => { stalls++; if (stallNotes.length < 4) stallNotes.push(`step ${sim.tick}: ${m}`); };
   const broke = (m: string) => { breaks++; if (breakNotes.length < 4) breakNotes.push(`step ${sim.tick}: ${m}`); };
   const still = new Map<Keeper, { key: string; since: number; told: boolean }>(), stood = new Map<Dragon, { key: string; since: number; told: boolean }>();
+  const going = new Map<Dragon, { f: number; x: number; since: number; told: boolean }>(), GO_PX = 4;
   let carKey = '', carSince = 0, carTold = false, carBusy = 0, keeperBusy = 0;
   let callMax = 0, bayMax = 0, keeperBayMax = 0, heldMax = 0, ms = 0;
   const covers = new Map<string, number>(), cover = { total: 0, longest: 0, worst: '' };
@@ -242,10 +252,19 @@ export function runOne(t: Task): Run {
         if (m.grown > 1 || m.babies > 2 || (m.grown && m.babies)) broke(`module ${d.slot.mod} of the ${sim.rooms[d.slot.room].kind} holds ${m.grown} grown and ${m.babies} babies`);
       }
       if (d.place === 'barn' && d.act && (!d.slot || Math.abs(d.x - d.slot.x) >= 0.5 || sim.rooms[d.slot.room].kind !== NEED_ROOM[d.act.need])) broke(`${d.name} is met for ${d.act.need} away from its slot of the ${NEED_ROOM[d.act.need]}`);
+      // (S5: a dragon moved on never rests in the Hatchery -- its sub-slots are the hatchlings' first places)
+      if (d.goal === 'evict' && d.slot && sim.rooms[d.slot.room].kind === 'hatchery') broke(`${d.name} was moved on to the Hatchery`);
       const y = d.move === 'ride' ? L.y : feetY(d.f), key = `${d.move}@${d.f},${d.x},${y}`, was = stood.get(d);
       if (!was || was.key !== key) stood.set(d, { key, since: sim.tick, told: false });
-      else if (!was.told && ['walk', 'board', 'alight'].includes(d.move) && sim.tick - was.since > STALL) { was.told = true; stall(`${d.name} stood still mid-${d.move} for ${STALL / FPS} s`); }
       else if (d.move === 'ride') heldMax = Math.max(heldMax, sim.tick - was.since);
+      // (a dragon mid-walk -- walking, turning, boarding or walking off, a route left -- that gets no more than GO_PX on
+      // in STALL: stood still mid-walk, or turning about on one spot, walked back and forth by a line that re-sorts it
+      // each step; the two alike a stall. Not one waiting its turn: at a landing, at the bay's edge, or standing to set
+      // off while one walking over it passes first -- its job's wait counts that)
+      const on = d.legs.length > 0 && ['walk', 'turn', 'board', 'alight'].includes(d.move), g = going.get(d);
+      if (!on) going.delete(d);
+      else if (!g || g.f !== d.f || Math.abs(d.x - g.x) > GO_PX) going.set(d, { f: d.f, x: d.x, since: sim.tick, told: false });
+      else if (!g.told && sim.tick - g.since > STALL) { g.told = true; stall(`${d.name} (${d.stage}) got no more than ${GO_PX} px on from f${d.f} x ${g.x.toFixed(1)} in ${STALL / FPS} s (${d.move})`); }
     }
   }
   for (const [k, n] of covers) coverEnd(k, n);
@@ -257,6 +276,7 @@ export function runOne(t: Task): Run {
   const [starved, starvedN] = [...emptyOf].reduce<[Dragon | null, number]>((a, [d, n]) => (n > a[1] ? [d, n] : a), [null, 0]);
   const counted = Object.values(emptyByStage).reduce((a, n) => a + n, 0);
   if (counted !== st.emptySteps) broke(`the need-steps at 0 counted by stage (${counted}) are not the sim's (${st.emptySteps})`);
+  done?.(sim);
   return {
     cast: t.cast, pattern: t.pattern, seed: t.seed, dragons: t.places.length, min: t.min, steps,
     emptySteps: st.emptySteps, opened: st.opened, started: st.started, done: st.done,
@@ -363,7 +383,7 @@ export function report(sums: CastSummary[], runs: Run[], head: { rev: string; mi
     '*Jobs done*, *Rides* and the busy shares: the mean over the seeds (*Car busy*: a rider, or a stop to go to; *Keepers busy*: keeper-steps with a job).',
     '*Landing* and *Bay edge*: the longest a dragon waited at a landing for the car, and held at the bay\'s edge (the most on any seed).',
     '*Eye covered*: sim-check section 2\'s measure, seconds of an eye under a standing body summed over every pair, the mean a run (the longest one moment on any seed).',
-    '*Stalls*: S3\'s rules broken, summed over the seeds (a keeper or a dragon mid-walk standing still 10 s, the car still with work a minute, a keeper giving up); *inv*: section 2\'s invariants broken.',
+    '*Stalls*: S3\'s rules broken, summed over the seeds (a keeper standing still 10 s on the way somewhere, a dragon mid-walk getting no more than 4 px on in 10 s -- stood still or turned about on one spot --, the car still with work a minute, a keeper giving up); *inv*: section 2\'s invariants broken.',
     `*ms/step*: CareSim.step() alone, the mean (${head.workers > 1 ? `${head.workers} worker threads at once` : 'one worker thread'}). Wall time ${f1(head.wallS)} s.`,
   ].join(' '));
   return L.join('\n');

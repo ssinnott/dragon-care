@@ -20,7 +20,7 @@ import { NEEDS, QUEUE, OWN_NEED, GARDEN_NEEDS, drainRate, gardenDrain, hasNeed, 
 import type { NeedKind, Needs } from './needs.ts';
 import { ROOM_INFO, REACH, LIFT_X0, LIFT_X1, NESTS, GARDEN_MIN_PLOTS, GATE_MID, placeRooms, postX, waitX, route, feetY, clampToFloor, standSpot, fitsSlot, makeNets, worldWOf } from './layout.ts';
 import type { Room, RoomPlace, RoomKind, Structure, Leg, Spot, Slot, Nets } from './layout.ts';
-import { NEED_ROOM, LEAD_PX, WAIT_MAX, KEEPER_HALF, stepTravel, arrived, remainingCost, ridesLeft, retarget, raiseCall, bayShut, inBay } from './travel.ts';
+import { NEED_ROOM, LEAD_PX, WAIT_MAX, KEEPER_HALF, LIVELY, stepTravel, arrived, remainingCost, ridesLeft, retarget, raiseCall, bayShut, inBay } from './travel.ts';
 import { stepLife } from './life.ts';
 import { stepGarden, standAtResident } from './garden.ts';
 import { newMissions, firstBoard, stepMissions, checkMissions, TRIP_PHASES } from './missions.ts';
@@ -76,12 +76,13 @@ export interface SimOptions {
 /**
  * What happened in a step, for the view to show (a union later slices extend: a departure, a return...): a dragon grew
  * into `stage` (life.ts), or an egg hatched into a baby, the dragon `dragon`; an elder retired and set off for the
- * garden, or a retiree arrived at its plot there, a resident now (garden.ts); the player's commands (control.ts): a
- * team sent on a mission from the Map Room's table (`reason` null) or refused (missions.ts canSend's reason), and a
- * keeper the player asked for who could not be taken (on a mission's trip).
+ * garden, or a retiree arrived at its plot there, a resident now (garden.ts); an egg fell due with the barn full (life.ts
+ * BARN_CAP: it waits in its nest); the player's commands (control.ts): a team sent on a mission from the Map Room's
+ * table (`reason` null) or refused (missions.ts canSend's reason), and a keeper the player asked for who could not be
+ * taken (on a mission's trip).
  */
 export type SimEvent = { kind: 'grow'; dragon: number; stage: Stage } | { kind: 'hatch'; dragon: number; egg: number }
-  | { kind: 'retire'; dragon: number } | { kind: 'garden'; dragon: number; plot: number }
+  | { kind: 'retire'; dragon: number } | { kind: 'garden'; dragon: number; plot: number } | { kind: 'full'; egg: number }
   | { kind: 'send'; mission: number; reason: string | null } | { kind: 'refused'; keeper: number; reason: string };
 
 /**
@@ -143,6 +144,8 @@ export interface Dragon {
   move: DragonMove;
   /** Steps into the current walk bout (0: not walking); the bout's number (the view restarts its walk on a new one). */
   gaitT: number;
+  /** The speed its walk played at on its last step (travel.ts LIVELY on and off the car and across the bay, else 1): the view plays the walk at it (G13). */
+  gaitS: number;
   walkSeq: number;
   /** Steps into a paper turn (0..TURN_STEPS - 1), or -1. */
   turn: number;
@@ -275,6 +278,12 @@ export interface SimStats {
    * a keeper), and the garden each resident arriving and each resident's job met there.
    */
   used: Record<string, number>;
+  /**
+   * Each room's uses by room id (plan S6b: a need's rooms repeat, so each copy must earn its name too): a need met in
+   * that room's slot, a supply taken at its post, an egg laid or hatched in that Hatchery, a pass through that Garden
+   * Gate. Indexed like `rooms`.
+   */
+  usedRoom: number[];
   /** The longest a stage-up waited, steps, from falling due to being applied (the dragon settled: life.ts). */
   growDelayMax: number;
   /** The longest a retirement waited, steps, from falling due (30 days into the elder stage) to the elder setting off (garden.ts). */
@@ -304,7 +313,7 @@ export class CareSim {
   readonly keepers: Keeper[] = [];
   jobs: Job[] = [];
   readonly stats: SimStats = { opened: 0, done: 0, closed: 0, waitSum: 0, started: 0, waitMax: 0, queueMax: 0, rushes: 0, preempted: 0, emptySteps: 0,
-    dragonWalked: 0, liftRides: 0, liftWaitMax: 0, keeperWaitSum: 0, keeperWaits: 0, waitTimeouts: 0, evictions: 0, slotBumps: 0, used: {}, growDelayMax: 0, retireDelayMax: 0,
+    dragonWalked: 0, liftRides: 0, liftWaitMax: 0, keeperWaitSum: 0, keeperWaits: 0, waitTimeouts: 0, evictions: 0, slotBumps: 0, used: {}, usedRoom: [], growDelayMax: 0, retireDelayMax: 0,
     taken: 0, handovers: 0, doneBy: {} };
   /** The Dragon Lift: its car starts parked at the ground floor. */
   lift: LiftState = { y: feetY(0), f: 0, target: null, rider: null, moving: false, closing: false, blockedSince: -1, calls: [] };
@@ -335,17 +344,18 @@ export class CareSim {
     if (!Number.isInteger(this.clock0)) throw new Error(`clock0 ${this.clock0}: the clock counts whole steps`);
     this.roomPlaces = rooms.map((p) => ({ ...p }));
     this.rooms = placeRooms(rooms);
+    this.stats.usedRoom = this.rooms.map(() => 0);
     const rng = makeRng(this.seed);
-    const roomOf = (kind: string, who: string): Room => {
-      const r = this.rooms.find((q) => q.kind === kind);
-      if (!r) throw new Error(`${who}: no ${kind} in this base`);
+    const roomOf = (kind: string, who: string, n = 0): Room => {
+      const r = this.rooms.filter((q) => q.kind === kind)[n];
+      if (!r) throw new Error(`${who}: no ${n ? `${kind} number ${n + 1}` : kind} in this base`);
       return r;
     };
     // each dragon in its slot: one that fits its stage, free, in a module no one else's size clashes with (a module
     // holds one grown dragon, or up to two babies)
     const held = new Map<string, { grown: number; babies: number }>();
     for (const p of dragons) {
-      const room = roomOf(p.slot.room, p.name);
+      const room = roomOf(p.slot.room, p.name, p.slot.n);
       if (ROOM_INFO[room.kind].people) throw new Error(`${p.name}: the ${room.kind} is a room for people`);
       const slot = room.slots[p.slot.i];
       if (!slot) throw new Error(`${p.name}: the ${room.kind} has no slot ${p.slot.i}`);
@@ -360,15 +370,15 @@ export class CareSim {
       const needs = fullNeeds();
       for (const k of NEEDS) needs[k] = hasNeed(p.element, k) ? rng.range(0.42, 1) : 1;
       this.dragons.push({ id: this.nextDragonId++, name: p.name, element: p.element, stage: p.stage, seed: p.seed, slot, goal: null, goalJob: null,
-        f: slot.f, x: slot.x, facing: slot.facing, legs: [], move: 'still', gaitT: 0, walkSeq: 0, turn: -1, waited: 0,
+        f: slot.f, x: slot.x, facing: slot.facing, legs: [], move: 'still', gaitT: 0, gaitS: 1, walkSeq: 0, turn: -1, waited: 0,
         needs, mood: moodOf(p.element, needs), act: null, asleep: 0, stageSince: this.clock0 - Math.round((p.days ?? 0) * this.dayLen), hold: 0,
         place: 'barn', home: null, garden: null });
     }
     keepers.forEach((p, id) => {
-      const station = roomOf(p.station, p.name);
+      const station = roomOf(p.station, p.name, p.n);
       // a keeper waits at their room's waiting spot (layout.ts waitX: clear of every slot's body, so never hidden behind a
       // dragon), and keepers sharing a station stand side by side there
-      const mates = keepers.filter((q) => q.station === p.station), i = mates.indexOf(p);
+      const mates = keepers.filter((q) => q.station === p.station && (q.n ?? 0) === (p.n ?? 0)), i = mates.indexOf(p);
       const stationX = clampToFloor(station.floor, Math.round(waitX(station) + (i - (mates.length - 1) / 2) * 22), this.nets.keeper);
       this.keepers.push({ id, name: p.name, look: p.look, specialty: p.specialty, station, stationX, f: station.floor, x: stationX, y: feetY(station.floor),
         climbing: false, legs: [], phase: 'idle', t: 0, job: null, carrying: null, rushing: false, facing: 1, walked: 0, bayWait: 0,
@@ -442,6 +452,8 @@ export class CareSim {
     const ms = checkMissions(s.missions, s.dragons, s.keepers);
     for (const d of s.dragons) {
       if (!whole(d.stageSince) || !whole(d.hold, 0)) throw new Error(`save: ${d.name}'s stage began at ${d.stageSince}, its hold ${d.hold}`);
+      // (its walk's speed: 1, or the lively step's -- travel.ts pace; the view plays the walk at it)
+      if (d.gaitS !== 1 && d.gaitS !== LIVELY) throw new Error(`save: ${d.name} walks at ${d.gaitS}, not 1 or ${LIVELY}`);
       const out = d.place === 'garden' || d.goal === 'retire', g = d.garden, team = !!ms.trip?.pairs.some((p) => p.dragon === d.id);
       if ((d.place === 'away' || d.goal === 'muster') && (!team || d.slot || d.home != null || g != null)) throw new Error(`save: ${d.name} is away with no team: ${JSON.stringify({ place: d.place, goal: d.goal })}`);
       if ((d.place !== 'barn' && d.place !== 'garden' && d.place !== 'away') || (out ? d.stage !== 'elder' || d.slot || !whole(d.home, 0) || d.home >= plots || homes.has(d.home) : d.home != null)
@@ -462,7 +474,9 @@ export class CareSim {
     }
     s.jobs.forEach((j, i) => { jobs[i].keeper = j.keeper == null ? null : byId(sim.keepers, j.keeper, 'keeper'); });
     sim.jobs = jobs;
-    Object.assign(sim.stats, s.stats, { used: { ...s.stats.used }, doneBy: { ...s.stats.doneBy } });
+    const ur = s.stats?.usedRoom;
+    if (!Array.isArray(ur) || ur.length !== sim.rooms.length || !ur.every((n) => whole(n, 0))) throw new Error(`save: the rooms' uses (${JSON.stringify(ur)}) are not ${sim.rooms.length} counts`);
+    Object.assign(sim.stats, s.stats, { used: { ...s.stats.used }, usedRoom: [...ur], doneBy: { ...s.stats.doneBy } });
     sim.lift = { ...s.lift, calls: s.lift.calls.map((c) => ({ ...c })) };
     sim.missions = ms;
     return sim;
@@ -626,7 +640,7 @@ export class CareSim {
     // (a rider resting after a mission is called from the Bunks: the rest ends)
     j.keeper = k; k.job = j; k.rushing = j.rushed; k.t = 0;
     if (k.carrying && k.carrying !== j.need) k.carrying = null;
-    const sup = k.carrying === j.need ? null : this.supplyRoom(j.need, this.spotOf(k));
+    const sup = k.carrying === j.need ? null : this.supplyRoom(j.need, this.spotOf(k), this.standAt(j.dragon));
     if (sup) { this.walkTo(k, { f: sup.floor, x: postX(sup) }); k.phase = 'fetch'; }
     else { this.walkTo(k, this.standAt(j.dragon)); k.phase = 'go'; }
   }
@@ -665,9 +679,12 @@ export class CareSim {
     // dragon sent on a mission, moved to the garden -- is the player's there too, as finish() makes one: control.ts)
     if (k.manual) { k.phase = 'manual'; return; }
     if (k.pendingTake) { becomeManual(k); return; }
-    this.walkTo(k, { f: k.station.floor, x: k.stationX });
+    this.goHome(k);
     k.phase = 'home';
   }
+
+  /** A keeper walks back to wait at their station: its room is fixed (start.ts KeeperPlace: the nth room of its kind). */
+  private goHome(k: Keeper): void { this.walkTo(k, { f: k.station.floor, x: k.stationX }); }
 
   private stepKeeper(k: Keeper): void {
     // (a rider on a mission, or resting after one, is the missions' to step: missions.ts; none is ever held by hand --
@@ -683,7 +700,7 @@ export class CareSim {
       case 'pickup':
         if (++k.t >= PICKUP) {
           const need = k.job!.need, sup = this.rooms.find((r) => ROOM_INFO[r.kind].supplies === need && r.floor === k.f && k.x >= r.x0 && k.x <= r.x1);
-          if (sup) this.use(sup.kind);
+          if (sup) this.use(sup.kind, sup);
           k.carrying = need; this.walkTo(k, this.standAt(k.job!.dragon)); k.phase = 'go';
         }
         return;
@@ -730,7 +747,7 @@ export class CareSim {
       if (rest <= sp) { k.walked += rest; k.x = to; if (to === leg.x) k.legs.shift(); }
       else { k.x += Math.sign(dx) * sp; k.walked += sp; }
       // (#11: a pass through the Garden Gate, counted as it crosses the arches' middle)
-      if (k.f === 0 && (x0 < GATE_MID) !== (k.x < GATE_MID)) this.use('gate');
+      if (k.f === 0 && (x0 < GATE_MID) !== (k.x < GATE_MID)) this.use('gate', this.gateRoom());
     }
     return k.legs.length === 0;
   }
@@ -757,7 +774,7 @@ export class CareSim {
     // (#11: a need room is used when its own need is met in it -- always, now: a dragon is met only in its need's room;
     // and the garden when a resident's need is met there, the one room a keeper goes out to)
     if (d.place === 'garden') this.use('garden');
-    else { const room = this.rooms[d.slot!.room]; if (ROOM_INFO[room.kind].meets === j.need) this.use(room.kind); }
+    else { const room = this.rooms[d.slot!.room]; if (ROOM_INFO[room.kind].meets === j.need) this.use(room.kind, room); }
     d.act = { need: j.need, t: 0, len: j.need === 'sleep' ? len + SLEEP_STEPS : len, from: d.needs[j.need] };
   }
 
@@ -774,14 +791,22 @@ export class CareSim {
     // (held by hand, or taken while at it: the player's again where they stand -- control.ts)
     if (k.manual) { this.stats.doneBy[k.name] = (this.stats.doneBy[k.name] ?? 0) + 1; k.phase = 'manual'; k.legs = []; return; }
     if (k.pendingTake) { becomeManual(k); return; }
-    this.walkTo(k, { f: k.station.floor, x: k.stationX });
+    this.goHome(k);
     k.phase = 'home';
   }
 
   private workLen(k: Keeper, need: NeedKind): number { return Math.round(WORK[need] * (k.specialty === need ? SPECIALIST_TIME : 1)); }
 
-  /** Count one use of a room or structure (stats.used, #11): travel.ts counts the lift's rides and the gate's passes here too, life.ts the hatches, garden.ts the arrivals. */
-  use(kind: RoomKind | Structure): void { this.stats.used[kind] = (this.stats.used[kind] ?? 0) + 1; }
+  /**
+   * Count one use of a room or structure (stats.used, #11), and of the room itself (`room`: stats.usedRoom, plan S6b):
+   * travel.ts counts the lift's rides and the gate's passes here too, life.ts the hatches, garden.ts the arrivals.
+   */
+  use(kind: RoomKind | Structure, room: Room | null = null): void {
+    this.stats.used[kind] = (this.stats.used[kind] ?? 0) + 1;
+    if (room) this.stats.usedRoom[room.id]++;
+  }
+  /** The Garden Gate's room (a pass through it is counted: #11), or null if the base has none. */
+  gateRoom(): Room | null { return this.rooms.find((r) => r.kind === 'gate') ?? null; }
 
   // ---------- eggs ----------
 
@@ -792,7 +817,8 @@ export class CareSim {
    * Hatchery is used.
    */
   addEgg(element: DragonElement, laidAt: number = this.clock, into?: number): Egg | null {
-    if (!this.rooms.some((r) => r.kind === 'hatchery')) return null;
+    const room = this.rooms.find((r) => r.kind === 'hatchery');
+    if (!room) return null;
     // (a nest asked for -- the one a mission reserved -- if it is free; else the lowest free one)
     let nest = into != null && into >= 0 && into < NESTS && !this.eggs.some((e) => e.nest === into) ? into : -1;
     for (let i = 0; i < NESTS && nest < 0; i++) if (!this.eggs.some((e) => e.nest === i)) nest = i;
@@ -800,7 +826,7 @@ export class CareSim {
     const id = this.nextEggId++;
     const egg: Egg = { id, element, seed: (mix32(this.seed, TAG.EGG, id) & 0x7fffffff) || 1, laid: laidAt, nest: nest as 0 | 1 | 2 };
     this.eggs.push(egg);
-    this.use('hatchery');
+    this.use('hatchery', room);
     return egg;
   }
 
@@ -821,13 +847,16 @@ export class CareSim {
     return standSpot(d.slot, d.stage, this.rooms[d.slot.room]);
   }
 
-  /** The room a need's supply comes from (the nearest, if there were more than one); null if it needs none. */
-  private supplyRoom(need: NeedKind, from: Spot): Room | null {
+  /**
+   * The room a need's supply comes from (plan S6b: any hearth, tub or ball box serves): the one making the whole trip
+   * shortest -- to it, then on to `stand` (the dragon's stand spot) -- ties to the lower room id; null if it needs none.
+   */
+  private supplyRoom(need: NeedKind, from: Spot, stand: Spot): Room | null {
     let best: Room | null = null, bestCost = Infinity;
     for (const r of this.rooms) {
       if (ROOM_INFO[r.kind].supplies !== need) continue;
-      const rt = route(from, { f: r.floor, x: postX(r) }, this.nets.keeper);
-      if (rt && rt.cost < bestCost) { bestCost = rt.cost; best = r; }
+      const at = { f: r.floor, x: postX(r) }, rt = route(from, at, this.nets.keeper), on = rt && route(at, stand, this.nets.keeper);
+      if (rt && on && rt.cost + on.cost < bestCost) { bestCost = rt.cost + on.cost; best = r; }
     }
     return best;
   }
@@ -835,7 +864,7 @@ export class CareSim {
   /** The walk (and climb) a job would take this keeper, via its supply if they aren't carrying it; Infinity if there's no way. */
   tripCost(k: Keeper, j: Job): number {
     const from = this.spotOf(k), stand = this.standAt(j.dragon);
-    const sup = k.carrying === j.need ? null : this.supplyRoom(j.need, from);
+    const sup = k.carrying === j.need ? null : this.supplyRoom(j.need, from, stand);
     if (!sup) { const r = route(from, stand, this.nets.keeper); return r ? r.cost : Infinity; }
     const at = { f: sup.floor, x: postX(sup) }, a = route(from, at, this.nets.keeper), b = route(at, stand, this.nets.keeper);
     return a && b ? a.cost + b.cost : Infinity;

@@ -150,7 +150,7 @@ export function stepManual(sim: CareSim, k: Keeper): void {
   if (k.phase === 'pickup') {
     if (++k.t >= PICKUP) {
       const r = postNear(sim, k);
-      if (r) { k.carrying = ROOM_INFO[r.kind].supplies!; sim.use(r.kind); }
+      if (r) { k.carrying = ROOM_INFO[r.kind].supplies!; sim.use(r.kind, r); }
       k.phase = 'manual'; k.t = 0;
     }
     return;
@@ -213,7 +213,7 @@ function walk(sim: CareSim, k: Keeper, dir: 1 | -1, inside: boolean): void {
   k.walked += Math.abs(to - x0);
   k.x = to;
   // (#11: a pass through the Garden Gate, counted as it crosses the arches' middle)
-  if (k.f === 0 && (x0 < GATE_MID) !== (k.x < GATE_MID)) sim.use('gate');
+  if (k.f === 0 && (x0 < GATE_MID) !== (k.x < GATE_MID)) sim.use('gate', sim.gateRoom());
 }
 
 // ---------- the action key ----------

@@ -1,7 +1,7 @@
 // The base's screen furniture (docs/BASE_DESIGN.md 4.8, 7): the top bar -- the time of day (a sun or a moon and
 // `DAY 3 14:00`), the open jobs, a badge per keeper (busy, held by hand -- a tap takes them: S7 -- away on a mission,
-// resting after one), the coin the missions
-// have brought home, and the buttons (NEW, pause, speed, MAP: the Map Room's table) with their hit rects -- the
+// resting after one), the coin the missions have brought home, the barn's dragons against its cap (`BARN 9/12`), and
+// the buttons (NEW, pause, speed, MAP: the Map Room's table) with their hit rects -- the
 // toasts over the barn, the hint at the bottom right, and a dragon's card (its name, element, stage, its day of the
 // stage's 30 and its needs: a tap on a dragon with nothing waiting opens it). House style: every box a 1 px #1a1018 outline, flat fills,
 // the engine's 5 x 7 font (it has no dot or arrow glyphs, so those are little inked sprites: icons.ts drawSprite).
@@ -34,6 +34,15 @@ export const BUTTONS: Readonly<Record<ButtonName, Rect>> = Object.freeze({
 export const COIN_X = 334;
 /** The keepers' badges: 46 x 13 each from x 138, 48 apart; a tap on one takes that keeper, or lets go of the one held (S7). */
 export const BADGE_X0 = 138, BADGE_DX = 48, BADGE_W = 46, BADGE_Y = 1, BADGE_H = 13;
+/**
+ * `BARN n/12`, the barn's dragons against its cap (life.ts BARN_CAP; BASE_DESIGN 4.7), at x 392 -- or a space after a
+ * longer `COIN n` (barnAt: from 10 000 coin), never over it. Up to `COIN 9999999` and `BARN 99/12` it ends by x 472,
+ * clear of NEW (x 528); the TEAM OUT chip (maptable.ts CHIP, x 394, y 19) is under the bar. Full, it turns amber.
+ */
+export const BARN_COUNT_X = 392;
+const BARN_FULL_TEXT = '#f2c14e';
+/** Where `BARN n/12` starts after the coin's label (null: no coin shown): x 392, or a space after a longer label. */
+export function barnAt(coinLabel: string | null): number { return coinLabel == null ? BARN_COUNT_X : Math.max(BARN_COUNT_X, COIN_X + measureText(coinLabel) + 7); }
 /** The clock's x, and JOBS's while the clock is short (to day 9). */
 export const CLOCK_X = 16, JOBS_X = 90;
 /**
@@ -82,6 +91,8 @@ export interface TopBar {
   rate: Exclude<Speed, 0>;
   /** NEW has been tapped once and waits for the second. */
   armed: boolean;
+  /** The barn's dragons against its cap (life.ts barnCount, BARN_CAP: BASE_DESIGN 4.7), and whether it is full. */
+  barn: { count: number; cap: number; full: boolean };
 }
 
 const text = (ctx: CanvasRenderingContext2D, s: string, x: number, y: number, color = TEXT, align: 'left' | 'right' | 'center' = 'left') =>
@@ -93,7 +104,7 @@ function button(ctx: CanvasRenderingContext2D, r: Rect, label: string, active: b
   text(ctx, label, r.x + r.w / 2, r.y + 3, TEXT, 'center');
 }
 
-/** The top bar (plan 3.11): the sky icon and the clock, the jobs, the keepers' badges, and the buttons. */
+/** The top bar (BASE_DESIGN 4.8): the sky icon and the clock, the jobs, the keepers' badges, the coin, the barn's count, and the buttons. */
 export function drawTopBar(ctx: CanvasRenderingContext2D, s: TopBar): void {
   ctx.fillStyle = INK; ctx.fillRect(0, 0, ctx.canvas.width, BAR_H);
   // (the sky's own phase, not the clock's: at 20:00 the sky is still the dusk's, and the moon comes with its stars)
@@ -115,7 +126,9 @@ export function drawTopBar(ctx: CanvasRenderingContext2D, s: TopBar): void {
     else if (k.trip === 'rest') drawSprite(ctx, REST, x + 42.5, 7.5);
     else if (k.state === 'busy') drawSprite(ctx, BUSY, x + 43, 7.5);
   });
-  if (s.coin != null) text(ctx, `COIN ${s.coin}`, COIN_X, 4, '#f2d36a');
+  const coin = s.coin != null ? `COIN ${s.coin}` : null;
+  if (coin != null) text(ctx, coin, COIN_X, 4, '#f2d36a');
+  text(ctx, `BARN ${s.barn.count}/${s.barn.cap}`, barnAt(coin), 4, s.barn.full ? BARN_FULL_TEXT : TEXT);
   button(ctx, BUTTONS.new, 'NEW', s.armed);
   button(ctx, BUTTONS.pause, 'II', s.speed === 0);
   button(ctx, BUTTONS.speed, `>${s.rate}X`, s.speed > 1);

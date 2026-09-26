@@ -1,9 +1,9 @@
 // Starts built in code (view=base&preset=<name>): a world other than the new game's, for views and checks that need
-// what a new game has not got yet -- every stage at once, a dragon about to grow up, eggs in the nests (one about to
-// hatch), every baby sub-slot taken, elders in the garden and elders about to retire to it, a team mustering for its
-// mission, and a team away on the road (so far along it). A preset is always code, never a
-// save and never hundreds of thousands of steps, so a frozen view of it (t=) is as quick and as deterministic as the
-// new game's.
+// what a new game has not got yet -- every stage at once, the barn at its cap (the capacity benchmark's twelve, and it
+// with an egg waiting), a dragon about to grow up, eggs in the nests (one about to hatch), every baby sub-slot taken
+// (forced over the cap), elders in the garden and elders about to retire to it, a team mustering for its mission, and a
+// team away on the road (so far along it). A preset is always code, never a save and never hundreds of thousands of
+// steps, so a frozen view of it (t=) is as quick and as deterministic as the new game's.
 import { CareSim } from './sim.ts';
 import type { SimOptions } from './sim.ts';
 import { STAGE_DAYS, HATCH_DAYS, RETIRE_DAYS } from './clock.ts';
@@ -17,7 +17,8 @@ import type { TripParam } from './tripdemo.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from './start.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
-import type { RoomPlace } from './layout.ts';
+import type { RoomPlace, Room } from './layout.ts';
+import { placeRooms } from './layout.ts';
 
 /** What a world is built from: its rooms, dragons and keepers, its options, and a last touch once it's built. */
 export interface StartSpec {
@@ -34,21 +35,39 @@ export interface StartSpec {
  * The base's first cast: twelve dragons, every element and every stage among them (the greybox mockups', docs/base/),
  * each in a slot: the grown ones in their need rooms' module slots, the babies in sub-slots (a module holds one grown
  * dragon or two babies), PEBBLE in the hatchery. The new game starts with seven newly adult dragons instead (start.ts, #9).
+ * (A need's rooms are one module each, repeated on the floors -- plan S6b -- so a slot names the `n`th room of a kind.)
  */
 export const AGES_DRAGONS: readonly DragonPlace[] = [
   { name: 'EMBER', element: 'fire', stage: 'adult', seed: 11, slot: { room: 'kitchen', i: 0 } },
-  { name: 'CINDER', element: 'fire', stage: 'baby', seed: 28, slot: { room: 'kitchen', i: 5 } },
+  { name: 'CINDER', element: 'fire', stage: 'baby', seed: 28, slot: { room: 'kitchen', i: 1, n: 1 } },
   { name: 'PEBBLE', element: 'rock', stage: 'baby', seed: 62, slot: { room: 'hatchery', i: 1 } },
   { name: 'RIPPLE', element: 'water', stage: 'adult', seed: 79, slot: { room: 'bath', i: 0 } },
-  { name: 'ZAP', element: 'lightning', stage: 'young', seed: 113, slot: { room: 'romp', i: 0 } },
-  { name: 'BURR', element: 'spike', stage: 'baby', seed: 45, slot: { room: 'romp', i: 5 } },
-  { name: 'SPLASH', element: 'water', stage: 'young', seed: 147, slot: { room: 'bath', i: 1 } },
+  { name: 'ZAP', element: 'lightning', stage: 'young', seed: 113, slot: { room: 'romp', i: 0, n: 1 } },
+  { name: 'BURR', element: 'spike', stage: 'baby', seed: 45, slot: { room: 'kitchen', i: 2, n: 1 } },
+  { name: 'SPLASH', element: 'water', stage: 'young', seed: 147, slot: { room: 'bath', i: 0, n: 1 } },
   { name: 'BRAMBLE', element: 'spike', stage: 'adult', seed: 164, slot: { room: 'groom', i: 0 } },
   { name: 'WICK', element: 'dusk', stage: 'adult', seed: 181, slot: { room: 'dorm', i: 0 } },
-  { name: 'ASH', element: 'fire', stage: 'elder', seed: 198, slot: { room: 'dorm', i: 1 } },
-  { name: 'COBBLE', element: 'rock', stage: 'elder', seed: 215, slot: { room: 'groom', i: 1 } },
-  { name: 'ECHO', element: 'slinkwing', stage: 'adult', seed: 266, slot: { room: 'groom', i: 2 } },
+  { name: 'ASH', element: 'fire', stage: 'elder', seed: 198, slot: { room: 'dorm', i: 0, n: 1 } },
+  { name: 'COBBLE', element: 'rock', stage: 'elder', seed: 215, slot: { room: 'groom', i: 0, n: 1 } },
+  { name: 'ECHO', element: 'slinkwing', stage: 'adult', seed: 266, slot: { room: 'groom', i: 0, n: 2 } },
 ];
+/**
+ * The capacity benchmark's `twelve` (tools/capacity.ts: the start's seven, three young and two babies, placed as its
+ * placeCast places them): the barn at its cap (life.ts BARN_CAP), for looking at a busy barn (plan S6b).
+ */
+export const TWELVE_EXTRA: readonly DragonPlace[] = [
+  { name: 'CINDER', element: 'fire', stage: 'young', seed: 501, slot: { room: 'kitchen', i: 0, n: 1 }, days: 0 },
+  { name: 'SPLASH', element: 'water', stage: 'young', seed: 502, slot: { room: 'kitchen', i: 0, n: 2 }, days: 0 },
+  { name: 'PEBBLE', element: 'rock', stage: 'young', seed: 503, slot: { room: 'romp', i: 0 }, days: 0 },
+  { name: 'BOLT', element: 'lightning', stage: 'baby', seed: 504, slot: { room: 'hatchery', i: 0 }, days: 0 },
+  { name: 'BURR', element: 'spike', stage: 'baby', seed: 505, slot: { room: 'hatchery', i: 1 }, days: 0 },
+];
+/**
+ * The `capped` preset's two babies: the twelve's, out of the Hatchery -- in the hayloft's Lamp Dorm -- so no baby rests
+ * in front of the nests and the egg waiting at the cap shows (the twelve's and the full preset's babies in the
+ * Hatchery hide every nest).
+ */
+export const CAPPED_BABIES: readonly DragonPlace[] = TWELVE_EXTRA.filter((p) => p.stage === 'baby').map((p, k) => ({ ...p, slot: { room: 'dorm', i: 1 + k, n: 2 } }));
 
 /** The new game: the start's rooms, its seven young adults and the four keepers. */
 function newGame(): StartSpec { return { rooms: START_ROOMS, dragons: START_DRAGONS, keepers: START_KEEPERS }; }
@@ -64,13 +83,15 @@ const hatchLen = (sim: CareSim) => HATCH_DAYS * sim.dayLen;
 
 /**
  * Every baby sub-slot the start leaves free, taken by a baby (a module holds one grown dragon or two babies: the start's
- * seven adults hold seven modules, and the other five -- the kitchen's and the romp room's second, the bathhouse's and
- * the lamp dorm's second, the hatchery -- two babies each), each of an element in turn with its element's first names.
+ * seven adults hold seven modules, and every other module -- and the hatchery -- two babies each), each of an element
+ * in turn with its element's first names.
  */
 const FULL_BABIES: readonly DragonPlace[] = (() => {
-  const where: [DragonPlace['slot']['room'], number][] = [['kitchen', 4], ['kitchen', 5], ['bath', 4], ['bath', 5], ['hatchery', 0], ['hatchery', 1], ['romp', 4], ['romp', 5], ['dorm', 4], ['dorm', 5]];
+  const rooms = placeRooms(START_ROOMS), nth = (r: Room) => rooms.filter((q) => q.kind === r.kind).indexOf(r);
+  const held = new Set(START_DRAGONS.map((p) => { const r = rooms.filter((q) => q.kind === p.slot.room)[p.slot.n ?? 0]; return `${r.id}/${r.slots[p.slot.i].mod}`; }));
+  const where = rooms.flatMap((r) => r.slots.filter((sl) => sl.baby && !held.has(`${r.id}/${sl.mod}`)).map((sl) => ({ room: r.kind, i: sl.i, ...(nth(r) ? { n: nth(r) } : {}) })));
   const els: readonly DragonElement[] = ['fire', 'spike', 'rock', 'lightning', 'water', 'slinkwing', 'dusk'];
-  return where.map(([room, i], n) => { const el = els[n % els.length]; return { name: NAMES[el][Math.floor(n / els.length)], element: el, stage: 'baby', seed: 600 + n, slot: { room, i } }; });
+  return where.map((slot, n) => { const el = els[n % els.length]; return { name: NAMES[el][Math.floor(n / els.length)], element: el, stage: 'baby', seed: 600 + n, slot }; });
 })();
 
 /** The `garden` preset's residents, plot by plot (0, 1, 2): the three love dragons, retired a few days ago. */
@@ -123,6 +144,14 @@ export function sendLostNest(sim: CareSim, opts: { awaySteps?: number } = {}): v
 export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze({
   /** Every stage at once: the base's first twelve-dragon cast. */
   ages: () => ({ rooms: START_ROOMS, dragons: AGES_DRAGONS, keepers: START_KEEPERS }),
+  /** The capacity benchmark's twelve (tools/capacity.ts `twelve`): the new game's seven, three young and two babies. */
+  twelve: () => ({ ...newGame(), dragons: [...START_DRAGONS, ...TWELVE_EXTRA] }),
+  /**
+   * The barn at its cap with an egg waiting (plan S6b, C2): the twelve, its babies in the hayloft's Lamp Dorm
+   * (CAPPED_BABIES), and a fire egg in the first nest falling due on the first step -- with the barn full it waits
+   * ("THE BARN IS FULL" that step), the three dots over it, BARN 12/12 in amber.
+   */
+  capped: () => ({ ...newGame(), dragons: [...START_DRAGONS, ...TWELVE_EXTRA.filter((p) => p.stage !== 'baby'), ...CAPPED_BABIES], after: (sim) => { sim.addEgg('fire', sim.clock + 1 - hatchLen(sim)); } }),
   /**
    * The new game with EMBER due to grow up (adult to elder) GROWUP_IN steps in, every need of its full, so it is settled
    * then (no job, no keeper coming): the grow-up (the flash, `happy`, the toast) at step 30.
@@ -137,8 +166,12 @@ export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze(
   eggs: () => ({ ...newGame(), after: (sim) => { for (const e of EGGS_PRESET) sim.addEgg(e.element, sim.clock - Math.round(e.progress * hatchLen(sim))); } }),
   /** The new game with a fire egg HATCH_IN steps from hatching: CINDER stands up in the first nest at step 60. */
   hatch: () => ({ ...newGame(), after: (sim) => { sim.addEgg('fire', sim.clock + HATCH_IN - hatchLen(sim)); } }),
-  /** The new game with every baby sub-slot taken (ten babies) and a fire egg due: it waits in its nest until a sub-slot frees. */
-  full: () => ({ ...newGame(), dragons: [...START_DRAGONS, ...FULL_BABIES], after: (sim) => { sim.addEgg('fire', sim.clock - hatchLen(sim)); } }),
+  /**
+   * The new game with every baby sub-slot taken (fourteen babies: 21 dragons, forced 9 over the barn's cap) and a fire egg
+   * falling due on the first step: it waits in its nest while the barn is full (life.ts BARN_CAP: "THE BARN IS FULL"
+   * that step) -- and until a sub-slot frees.
+   */
+  full: () => ({ ...newGame(), dragons: [...START_DRAGONS, ...FULL_BABIES], after: (sim) => { sim.addEgg('fire', sim.clock + 1 - hatchLen(sim)); } }),
   /**
    * The elder garden lived in: four adults in the barn (EMBER, ZAP, RIPPLE, WICK) and the three love dragons (BRAMBLE,
    * COBBLE, ECHO) elders retired a few days ago, residents on plots 0-2 (made so directly: garden.ts settleInGarden),

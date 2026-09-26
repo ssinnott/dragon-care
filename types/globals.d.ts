@@ -85,7 +85,10 @@ interface Window {
      * otherwise): the last stop the team reached (`baddie` or its challenge; null before the first), whether it was met,
      * whether its beat is playing, the banner, the baddie on the road (its id, face and pose; null when none is in view),
      * its exit (on a success), the way the team faces (-1 after turning back), how far along the trip is (0..1), and
-     * once its time is up, the result card's title. Gone once the base is detached (the page left it).
+     * once its time is up, the result card's title.
+     * Barn capacity (S6b): the barn's dragons against its cap (`count`: every dragon not living in the garden, those
+     * away on a mission too -- life.ts barnCount -- and `cap`, life.ts BARN_CAP; a preset may hold more than the cap).
+     * Gone once the base is detached (the page left it).
      */
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
       chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[];
@@ -119,7 +122,8 @@ interface Window {
         chip: { x: number; y: number; w: number; h: number } | null; back: { x: number; y: number; w: number; h: number } | null; log: boolean };
       scene: { stop: string | null; covered: boolean | null; beat: boolean; banner: string | null; baddie: 'moleking' | 'stormroc' | 'frostgiant' | null;
         face: 'neutral' | 'grumpy' | 'surprised' | 'sleepy' | null; pose: 'walk' | 'stand' | 'sit' | 'turn' | 'leave' | null;
-        exit: 'calmed' | 'outwitted' | 'drivenOff' | null; facing: 1 | -1; progress: number; done: boolean; result: string | null } | null };
+        exit: 'calmed' | 'outwitted' | 'drivenOff' | null; facing: 1 | -1; progress: number; done: boolean; result: string | null } | null;
+      barn: { count: number; cap: number } };
     /**
      * view=base, live and saving (src/game/base.ts attach, only when the page loads and saves the player's barn): save
      * the barn now, and return the step it was saved at. Gone once the base is detached.

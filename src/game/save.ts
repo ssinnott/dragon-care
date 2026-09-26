@@ -27,8 +27,11 @@ import type { MissionsState } from './missions.ts';
  * the trip out (its mission, pairs, outcome, road and times) and each pair's deck spot; a dragon away (place `away`) or
  * with a team (goal `muster`); a keeper's mission phases (muster, depart, away, deliver, rest) and what they carry (a
  * saddle, the egg) -- beside S7's hand-held state.
+ * 9 (S7 + S8 + S6b, barn capacity; S6b bumped its own base to 7, built beside S7 and S8): a dragon's `gaitS` (the
+ * speed its walk played at on its last step: 1, or the lively step's on and off the car and across the lift bay); each
+ * room's own uses (stats.usedRoom, by room id: a need's rooms repeat) -- beside S7's and S8's state.
  */
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }
@@ -82,7 +85,7 @@ export class SaveVersionError extends Error {
  * `exact` keeps them as they are (worldKey: the digest two runs compare sees the hand too).
  * Every field of every dragon, keeper and job is kept -- the top level of each is copied whole, so a field a later
  * slice adds is saved with it -- and the plain objects they hold (needs, the act, the routes' legs, a garden resident's
- * rhythm, the lift's calls, the eggs, the garden, the rooms' uses) are copied, so the save never changes as the world
+ * rhythm, the lift's calls, the eggs, the garden, the rooms' uses by kind and by room) are copied, so the save never changes as the world
  * steps on.
  */
 export function serialize(sim: CareSim, exact = false): SaveV {
@@ -98,7 +101,7 @@ export function serialize(sim: CareSim, exact = false): SaveV {
     eggs: sim.eggs.map((e) => ({ ...e })),
     garden: { plots: sim.garden.plots },
     missions: copyMissions(sim.missions),
-    stats: { ...sim.stats, used: { ...sim.stats.used }, doneBy: { ...sim.stats.doneBy } },
+    stats: { ...sim.stats, used: { ...sim.stats.used }, usedRoom: [...sim.stats.usedRoom], doneBy: { ...sim.stats.doneBy } },
   };
 }
 

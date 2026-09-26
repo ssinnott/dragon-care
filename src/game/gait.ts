@@ -90,4 +90,4 @@ export function wrapT(g: Gait, t: number): number {
  * the loop wrapping at its length back to its loop start. `DragonAnimPlayer.tick` at speed 1 leaves its `move` at
  * exactly this after its t-th tick.
  */
-export function moveAt(g: Gait, t: number): number { return g.steps[wrapT(g, t)]; }
+export function moveAt(g: Gait, t: number): number { return g.steps[wrapT(g, Math.floor(t))]; }
