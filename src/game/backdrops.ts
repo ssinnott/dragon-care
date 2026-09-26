@@ -19,9 +19,8 @@ import { CLIMATE_BACKDROPS, CAVE, INK, LIGHTS } from './surfaces.ts';
 import type { ClimatePhase } from './surfaces.ts';
 import type { DayPhase } from './clock.ts';
 import type { Climate } from './missiondata.ts';
+import type { Rect } from './icons.ts';
 import { mix32 } from './rand.ts';
-
-export interface PicRect { x: number; y: number; w: number; h: number }
 
 /** The chooser's climate picture size (plan S8: 300 x 112 at (16, 26)). */
 export const CLIMATE_PIC = Object.freeze({ w: 300, h: 112 });
@@ -74,7 +73,7 @@ const mod = (a: number, n: number): number => ((a % n) + n) % n;
  * picture scales with the rect's height (k = h / 112: 1 in the chooser, about 2.7 in a 300 px road scene); the weather
  * marks keep their px sizes. Clipped to the rect, inked round it.
  */
-export function drawClimate(ctx: CanvasRenderingContext2D, climate: Climate, phase: DayPhase, rect: PicRect, scroll = 0): void {
+export function drawClimate(ctx: CanvasRenderingContext2D, climate: Climate, phase: DayPhase, rect: Rect, scroll = 0): void {
   const P = CLIMATE_BACKDROPS[climate][phase];
   const { x, y, w, h } = rect, k = Math.max(0.5, h / CLIMATE_PIC.h);
   ctx.save();

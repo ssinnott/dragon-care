@@ -23,7 +23,7 @@ import { mix } from '../lib/art/palettes.ts';
 import { drawSprite, ICONS } from './icons.ts';
 import { INK, CAVE } from './surfaces.ts';
 import { celTarget } from './cel.ts';
-import type { ChallengeId, SetPieceState } from './missiondata.ts';
+import type { ChallengeId, StopState } from './missiondata.ts';
 
 /** The set pieces' own colours (props: light and mid, never the ink's value; the fog is a backdrop, pale). */
 export const SETPIECE_COLOURS = Object.freeze({
@@ -61,7 +61,7 @@ function bolt(g: CanvasRenderingContext2D, pts: readonly number[]): void {
 }
 
 /** Draw one challenge's set piece on the road. */
-export function drawSetPiece(ctx: CanvasRenderingContext2D, id: ChallengeId, x: number, feetY: number, state: SetPieceState, t: number): void {
+export function drawSetPiece(ctx: CanvasRenderingContext2D, id: ChallengeId, x: number, feetY: number, state: StopState, t: number): void {
   const met = state === 'met', cel = celTarget(1);
   const X = R(x), Y = R(feetY) - 4; // (its foot a little behind the team's feet line, on the road's back half)
   const g = ctx;

@@ -73,7 +73,9 @@
 //   (x) baddies   : each fill on a big baddie's silhouette edge (src/game/baddies.ts BADDIE_EDGE) keeps >= 25 %
 //                   luminance from the mission road (FLOORS.road) and from every band of its home climate at every
 //                   phase; every fill >= OKL_MIN Oklab L from the ink; the colours that touch inside it pass the ladder.
-// The grumpy miller (src/game/npcs.ts) takes the keeper gates inside the KEEPERS section.
+// The grumpy miller (src/art/keeper NPCS.miller, drawn by src/game/npcs.ts) takes the keeper gates with the four keepers
+// in the KEEPERS section: his own pairs (the sack, its twine and the flour), the ramps, the far side, the floors, and his
+// shirt against the four keepers' tops in (Kf).
 // EGGS (counted apart, its own RESULT line: EGGS):
 //   (egg) eggs    : every element's egg (src/game/eggs.ts: its shell is the element's BABY scale colour, inked round)
 //                   keeps >= 25 % luminance from the Hatchery's nest straw it lies in (src/game/surfaces.ts NEST), so a
@@ -95,14 +97,13 @@ import type { DragonElement, DragonPalette, DragonSlot, AgeStage } from '../src/
 import { makeTones } from '../src/lib/art/shading.ts';
 import { KEEPER_PALETTES, KEEPER_SHARED, KEEPER_SKIN_SHADOW, KEEPER_FAR } from '../src/art/keeper/palettes.ts';
 import type { KeeperPalette } from '../src/art/keeper/palettes.ts';
-import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
-import type { KeeperId } from '../src/art/keeper/cast.ts';
+import { KEEPER_IDS, NPC_IDS } from '../src/art/keeper/cast.ts';
+import type { CastId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
 import { SETPIECE_COLOURS } from '../src/game/setpieces.ts';
 import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, CAVE, stepped } from '../src/game/surfaces.ts';
 import { lampPool } from '../src/game/backdrops.ts';
 import { BADDIE_ART, BADDIE_HOME, BADDIE_EDGE, BADDIE_PAIRS, BADDIE_WHITE } from '../src/game/baddies.ts';
-import { MILLER_PALETTE, MILLER_SKIN_SHADOW } from '../src/game/npcs.ts';
 import { CLIMATES, BADDIE_IDS } from '../src/game/missiondata.ts';
 import { NEST_RX, NEST_RY, NEST_STRANDS, WALL_H, floorTop, nestBase, eggBottom } from '../src/game/layout.ts';
 import { SHELL, WOBBLE } from '../src/game/eggs.ts';
@@ -722,6 +723,9 @@ if (!glowClose) out.push('   none');
 //                    protanopia (a player tells the keepers apart across the yard by the top first);
 //   (Kg) at work   : the night keeper's trousers and cardigan pass the ladder against dusk's scale at every stage
 //                    (kneeling at its side for its own tuck-in, her legs lie over its body: slate, they merged).
+// (the mission NPCs on the keeper rig -- the grumpy miller -- are measured with the keepers: his own pairs, and his
+// top against the four keepers' in (Kf), since he stands beside Bea in the scene that meets him)
+const K_CAST: readonly CastId[] = [...KEEPER_IDS, ...NPC_IDS];
 let kGates = 0, kFailures = 0;
 const kFailed: string[] = [];
 function kcount(label: string, ok: boolean): boolean {
@@ -730,11 +734,11 @@ function kcount(label: string, ok: boolean): boolean {
   return ok;
 }
 type KSlot = keyof KeeperPalette | 'white' | 'bowl';
-const kcol = (id: KeeperId, slot: KSlot): string | undefined =>
+const kcol = (id: CastId, slot: KSlot): string | undefined =>
   slot === 'white' ? KEEPER_SHARED.white : slot === 'bowl' ? BOWL : (KEEPER_PALETTES[id] as Record<string, string | undefined>)[slot];
 /** The pairs that touch on a keeper, and where. A pair a keeper lacks a slot for is skipped (only Bea wears an apron). */
-interface KPair { a: KSlot; b: KSlot; where: string; only?: readonly KeeperId[] }
-const kp = (a: KSlot, b: KSlot, where: string, only?: readonly KeeperId[]): KPair => ({ a, b, where, only });
+interface KPair { a: KSlot; b: KSlot; where: string; only?: readonly CastId[] }
+const kp = (a: KSlot, b: KSlot, where: string, only?: readonly CastId[]): KPair => ({ a, b, where, only });
 const K_PAIRS: readonly KPair[] = [
   kp('skin', 'hair', 'hairline, brows on the face'), kp('skin', 'primary', 'the neck on the collar, a forearm over the top'),
   kp('hair', 'primary', 'the hair at the nape on the collar'), kp('primary', 'secondary', 'the top on the trousers at the waist'),
@@ -747,10 +751,12 @@ const K_PAIRS: readonly KPair[] = [
   kp('tool', 'skin', 'the hand on the brush'), kp('tool', 'primary', 'the brush held over the shirt'),
   kp('bristle', 'tool', 'the bristles under the brush\'s back', ['tomas']),
   kp('bowl', 'skin', 'the hands on the bowl', ['bea']), kp('bowl', 'primary', 'the bowl held over the blouse', ['bea']), kp('bowl', 'apron', 'the bowl held over the apron', ['bea']),
+  kp('tool', 'apron', 'the sack hugged over the apron', ['miller']), kp('accent', 'tool', 'the twine on the sack', ['miller']),
+  kp('flour', 'apron', 'the flour on the apron', ['miller']), kp('flour', 'hat', 'the flour on the cap', ['miller']), kp('flour', 'tool', 'the flour on the sack', ['miller']),
 ];
 
 head(`KEEPERS (src/art/keeper/palettes.ts: the house ladder, >= ${LUM_MIN * 100}% luminance or >= ${HUE_MIN}deg hue; far side at ${KEEPER_FAR.shade} / ${KEEPER_FAR.desat})`);
-for (const id of KEEPER_IDS) {
+for (const id of K_CAST) {
   const P = KEEPER_PALETTES[id];
   out.push(` ${id}`);
   // (Ka)
@@ -783,12 +789,17 @@ for (const id of KEEPER_IDS) {
     const d = relDiff(P[slot], floorHex), ok = kcount(`(Ki) ${id} ${slot} / ${floorName} floor`, d >= LUM_MIN);
     out.push(`${ok ? '  ok  ' : '  FAIL'} (Ki) ${(slot === 'dark' ? 'shoes' : 'trousers') + ' / floor'}${' '.repeat(slot === 'dark' ? 5 : 2)} ${pct(d)}  ${P[slot]} on ${floorName} ${floorHex}`);
   }
+  // (the miller's flour sack is set down at his feet: on every floor)
+  if (id === 'miller' && P.tool) for (const [floorName, floorHex] of FLOOR_LIST) {
+    const d = relDiff(P.tool, floorHex), ok = kcount(`(Ki) ${id} sack / ${floorName} floor`, d >= LUM_MIN);
+    out.push(`${ok ? '  ok  ' : '  FAIL'} (Ki) sack / floor      ${pct(d)}  ${P.tool} on ${floorName} ${floorHex}`);
+  }
 }
 // (Kf)
-out.push(' the four tops (RULE_B: as seen, deutan, protan)');
-for (let i = 0; i < KEEPER_IDS.length; i++) {
-  for (let j = i + 1; j < KEEPER_IDS.length; j++) {
-    const a = KEEPER_IDS[i], b = KEEPER_IDS[j], cells: string[] = [];
+out.push(' the tops, the keepers and the mission NPCs (RULE_B: as seen, deutan, protan)');
+for (let i = 0; i < K_CAST.length; i++) {
+  for (let j = i + 1; j < K_CAST.length; j++) {
+    const a = K_CAST[i], b = K_CAST[j], cells: string[] = [];
     let allOk = true;
     for (const [k, f] of [['as seen', (h: string) => h], ['deutan', (h: string) => simulate(h, 'deutan')], ['protan', (h: string) => simulate(h, 'protan')]] as const) {
       const m = ruleB(f(KEEPER_PALETTES[a].primary), f(KEEPER_PALETTES[b].primary));
@@ -809,51 +820,6 @@ for (const slot of ['secondary', 'primary'] as const) {
     cells.push(`${st} ${m.pass ? m.by : 'FAIL'} ${pct(m.lum)}`);
   }
   out.push(`${allOk ? '  ok  ' : '  FAIL'} (Kg) iris ${(slot === 'secondary' ? 'trousers' : 'cardigan').padEnd(9)} ${c} on dusk: ${cells.join('  ')}`);
-}
-
-// the grumpy miller (src/game/npcs.ts, plan S9a): drawn on the keepers' rig, so he takes the keeper gates -- the ladder
-// on the colours that touch on him, the ramps and his skin shadow, the far side, his shoes and trousers on every floor,
-// and his shirt told apart from the four keepers' tops (as seen and under both dichromacies)
-{
-  const P = MILLER_PALETTE as Record<string, string>;
-  out.push(' the grumpy miller (src/game/npcs.ts MILLER_PALETTE)');
-  const mcol = (k: string) => (k === 'white' ? KEEPER_SHARED.white : P[k]);
-  const M_PAIRS: readonly [string, string, string][] = [
-    ['skin', 'hair', 'the brows and moustache on the face'], ['skin', 'primary', 'the neck on the collar, a rolled forearm over the shirt'], ['hair', 'primary', 'the hair at the nape on the collar'],
-    ['primary', 'secondary', 'the shirt on the trousers'], ['secondary', 'dark', 'the trousers on the shoes'], ['skin', 'white', 'the eye whites on the face'], ['glow', 'skin', 'the blush on the cheek'],
-    ['apron', 'primary', 'the apron bib on the shirt'], ['apron', 'secondary', 'the apron on the trousers'], ['apron', 'skin', 'the folded forearms over the apron'],
-    ['hat', 'hair', 'the cap on the hair'], ['hat', 'skin', 'the cap over the brow, the hand on the cap'], ['trim', 'hat', 'the flour on the cap'], ['trim', 'tool', 'the flour on the sack'],
-    ['tool', 'secondary', 'the sack by the trousers'], ['tool', 'dark', 'the sack by the shoes'], ['accent', 'tool', 'the sack\'s tie'],
-  ];
-  for (const [a, b, where] of M_PAIRS) {
-    const m = ladder(mcol(a), mcol(b));
-    kcount(`(Ka) miller ${a}/${b}`, m.pass);
-    out.push(`${m.pass ? '  ok  ' : '  FAIL'} (Ka) ${(a + '/' + b).padEnd(18)} lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by.padEnd(8)} ${mcol(a)} ${mcol(b)}  (${where})`);
-  }
-  for (const [slot, hex] of Object.entries(P)) {
-    const t = makeTones(hex), ok = t.sh !== t.base && t.hi !== t.base && t.sh !== t.hi;
-    if (!kcount(`(Kd) miller ${slot} ramp`, ok)) out.push(`  FAIL (Kd) ${slot} ramp collapses: ${t.sh} ${t.base} ${t.hi}`);
-  }
-  const dSh = relDiff(MILLER_SKIN_SHADOW, P.skin);
-  kcount('(Kd) miller skin shadow', dSh >= LUM_MIN);
-  out.push(`${dSh >= LUM_MIN ? '  ok  ' : '  FAIL'} (Kd) skin shadow      ${pct(dSh)} under the skin  ${MILLER_SKIN_SHADOW} on ${P.skin}`);
-  const far = farPalette(MILLER_PALETTE, KEEPER_FAR.shade, KEEPER_FAR.desat) as Record<string, string>;
-  for (const slot of ['skin', 'primary', 'secondary', 'dark'] as const) {
-    const f = far[slot], dn = relDiff(f, P[slot]), di = relDiff(f, S.outline), dk = okDiff(f, S.outline);
-    const okC = kcount(`(Kc) miller far ${slot}`, dn >= LUM_MIN), okE = kcount(`(Ke) miller far ${slot} / ink`, di >= LUM_MIN && dk >= OKL_MIN);
-    out.push(`${okC && okE ? '  ok  ' : '  FAIL'} (Kc/Ke) far ${slot.padEnd(10)} ${f}  vs near ${pct(dn)}  vs ink ${pct(di)} ${okf(dk)}`);
-  }
-  for (const [floorName, floorHex] of FLOOR_LIST) for (const slot of ['dark', 'secondary', 'tool'] as const) {
-    const d = relDiff(P[slot], floorHex), ok = kcount(`(Ki) miller ${slot} / ${floorName} floor`, d >= LUM_MIN);
-    out.push(`${ok ? '  ok  ' : '  FAIL'} (Ki) ${(slot === 'dark' ? 'shoes' : slot === 'tool' ? 'sack' : 'trousers') + ' / floor'}${' '.repeat(slot === 'secondary' ? 2 : 5)} ${pct(d)}  ${P[slot]} on ${floorName} ${floorHex}`);
-  }
-  const cells: string[] = [];
-  let allOk = true;
-  for (const id of KEEPER_IDS) for (const [k, f] of [['as seen', (h: string) => h], ['deutan', (h: string) => simulate(h, 'deutan')], ['protan', (h: string) => simulate(h, 'protan')]] as const) {
-    const m = ruleB(f(P.primary), f(KEEPER_PALETTES[id].primary));
-    if (!kcount(`(Kf) miller/${id} tops ${k}`, m.pass)) { allOk = false; cells.push(`${id} ${k} FAIL`); }
-  }
-  out.push(`${allOk ? '  ok  ' : '  FAIL'} (Kf) the miller's shirt ${P.primary} against the four keepers' tops, as seen, deutan and protan${cells.length ? ': ' + cells.join(', ') : ''}`);
 }
 
 // ---------- (w) backdrops (src/game/surfaces.ts) ----------

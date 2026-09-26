@@ -2071,17 +2071,25 @@ All in the house style: a 1 px `#1a1018` ink, flat cel bands lit from the top le
   the ink; the colours that touch inside it pass the ladder. Its report is the `(x)` block in 5.8. The thinnest: the
   Storm Roc's beak and legs against Highfold's dusk sky (27 %), the Mole King's crown against Old Mine Road's dusk ridge
   (30 %).
-- **The grumpy miller** (`src/game/npcs.ts` `drawMiller(ctx, x, feetY, facing, state, t)`): a non-player person on the
-  keepers' rig (not in `KEEPER_IDS`): stocky, older and never frail, a flat miller's cap with flour on it, bushy grey
-  brows and a grey moustache, a flour-dusted apron over an ochre shirt with its sleeves rolled, his flour sack at his
-  feet (the flat cap, the barrel of a body and the sack tell him from the four keepers at a third of the size).
-  `grumpy`: heavy flat brows pulled right down onto narrowed eyes, the moustache drooping over a pout, arms folded high
-  across his chest, chin tucked, turned away from the team, a "hmph" snort from his nose now and then (three small stepped flat puffs; one blank oval read as an empty speech bubble).
-  `talkedRound`: brows lifted, eyes creased happy, a blush, a smile at the moustache's ends, facing the team, lifting his
-  cap by its crown with his far hand (its forearm drawn in the far shade up the back of his head, so the hand does not
-  float; the smile and blush are mostly hidden under the moustache at 1x: the arms and the facing carry the read). His palette takes the keeper gates in the KEEPERS section (`KEEPERS: PASS 231 of 231`, his shirt told
-  apart from the four keepers' tops as seen and under both dichromacies; his shoes, trousers and sack on every floor).
-  No mockup was on the notes branch when he was built; he was built from the plan's description.
+- **The grumpy miller** ("Hob"; `src/game/npcs.ts` `drawMiller(ctx, mood, x, feetY, facing, t)`, reached through
+  `artseams.ts`; built from the mockup on the notes branch, `miller_mock.png`): a mission NPC drawn through the real
+  keeper rig -- `src/art/keeper/cast.ts` `NPCS.miller` (in `NPC_IDS`, never in `KEEPER_IDS`: no job, no agent, not in the
+  sim, the saves or the HUD), his colours in `KEEPER_PALETTES.miller`, his parts in `parts.ts` (the flat cap, the rim of
+  hair, bushy brows, the moustache, rolled sleeves, the flour sack) and his anims in `anims.ts` `millerAnims`. Stocky,
+  older and never frail: a flat cap whose stiff peak juts out over his brow, iron-grey hair round the back, bushy grey
+  brows and moustache on a ruddy face, a cream shirt with rolled sleeves, a dark canvas apron dusted with flour over
+  slate trousers, and his hessian flour sack set down at his feet. At a third of the size the flat-topped wedge of the
+  cap and the sack tell him from the four keepers. `facing` is the side the team talks to him from.
+  `grumpy` (READS grumpy at 1x): turned away from the team, arms folded high across his chest (both fists tucked),
+  weight back on his heels, chin tucked; the bushy brows FLAT and pressed down onto half-lidded eyes that side-eye back
+  at them (never a V), a pout under a drooping walrus moustache, and a small "hmph" of two inked puffs at his nose.
+  `talkedRound`: turned to face them, brows lifted clear of the eyes, smiling eyes, a blush on the far cheek, a small
+  smile under the moustache's lifted ends, and a nod, tipping his cap at its peak with his near hand (the elbow out in
+  front, so the forearm and fist pass in front of the face, clear of the eyes and the smile; the cap tips with the
+  hand). A pure function of (mood, x, feetY, facing, t): his 180 f breath loop, no blinks. He takes the keeper gates
+  in the same loop as the four (`KEEPERS: PASS 233 of 233`): his own pairs (the sack, its twine and the flour among
+  them), the ramps and his skin shadow, the far side, his shoes, trousers and sack on every floor, and his shirt told
+  apart from the four keepers' tops as seen and under both dichromacies.
 - **The icons** (`src/game/missionicons.ts`): 9 x 9 icons in the `icons.ts` sprite format (every pixel ringed in ink):
   the eleven challenges (a crescent moon, a boulder, a snowflake, a storm cloud, water, a bramble, a "?", a windmill,
   a sticking plaster, fog bands, two rocks), the four skills (a speech bubble with a heart, a first-aid cross, a compass,

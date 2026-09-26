@@ -217,8 +217,8 @@ function peopleSheet(): ArtScene {
       roadBand(ctx, 0, w, feet1);
       label(ctx, 'THE GRUMPY MILLER AT 1X, BESIDE THE KEEPERS', 8, 4, LABEL, 'left');
       const drawn: string[] = [];
-      if (drew(ctx, 20, 14, 80, feet1 - 14, () => drawMiller(ctx, 60, feet1, 1, 'grumpy', t))) drawn.push('miller:grumpy');
-      if (drew(ctx, 110, 14, 80, feet1 - 14, () => drawMiller(ctx, 150, feet1, 1, 'talkedRound', t))) drawn.push('miller:talkedRound');
+      if (drew(ctx, 20, 14, 80, feet1 - 14, () => drawMiller(ctx, 'grumpy', 60, feet1, 1, t))) drawn.push('miller:grumpy');
+      if (drew(ctx, 110, 14, 80, feet1 - 14, () => drawMiller(ctx, 'talkedRound', 150, feet1, 1, t))) drawn.push('miller:talkedRound');
       label(ctx, 'GRUMPY', 60, feet1 + 14, SUB); label(ctx, 'TALKED ROUND', 150, feet1 + 14, SUB);
       keepers.forEach((k, i) => { if (drew(ctx, k.x - 20, 14, 40, feet1 - 14, () => drawKeeperAgent(ctx, k))) drawn.push(KEEPER_IDS[i]); });
       keepers.forEach((k, i) => label(ctx, KEEPERS[KEEPER_IDS[i]].name.toUpperCase(), 250 + i * 40, feet1 + 14, SUB));
@@ -226,15 +226,15 @@ function peopleSheet(): ArtScene {
       const g = off.getContext('2d')!;
       g.fillStyle = PAGE; g.fillRect(0, 0, off.width, off.height);
       roadBand(g, 0, off.width, 100);
-      drawMiller(g, 55, 100, 1, 'grumpy', t);
-      drawMiller(g, 165, 100, 1, 'talkedRound', t);
+      drawMiller(g, 'grumpy', 55, 100, 1, t);
+      drawMiller(g, 'talkedRound', 165, 100, 1, t);
       ctx.imageSmoothingEnabled = false;
       label(ctx, 'AT 2X', 8, 122, LABEL, 'left');
       ctx.drawImage(off, 0, 0, off.width, off.height, 0, 132, off.width * 2, off.height * 2);
       // the /3 silhouettes: the five drawn flat in ink, then shrunk to a third (and at 1x beside them)
       const s = sil.getContext('2d')!;
       s.clearRect(0, 0, sil.width, sil.height);
-      drawMiller(s, 25, 100, 1, 'grumpy', t, INK);
+      drawMiller(s, 'grumpy', 25, 100, 1, t, INK);
       keepers.forEach((k, i) => { const x = k.x; k.x = 75 + i * 45; k.y = 100; drawKeeperAgent(s, k, { silhouette: INK }); k.x = x; k.y = feet1; });
       label(ctx, 'SILHOUETTES:', 452, 118, LABEL, 'left');
       label(ctx, 'MILLER BEA TOMAS IRIS PIP', 452, 127, SUB, 'left');

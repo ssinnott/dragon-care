@@ -46,7 +46,3 @@ export type MillerMood = 'grumpy' | 'talkedRound';
 
 /** A set piece's state on the road (setpieces.ts): not reached yet, met by the team's counter (the problem visibly solved), or left unmet (they wait it out). */
 export type StopState = 'ahead' | 'met' | 'unmet';
-/** @deprecated Merge-time alias: use MillerMood. */
-export type MillerState = MillerMood;
-/** @deprecated Merge-time alias: use StopState. */
-export type SetPieceState = StopState;

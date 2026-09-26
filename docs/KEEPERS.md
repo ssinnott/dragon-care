@@ -22,10 +22,11 @@ except what the keepers need from them (four small read-only helpers in `src/car
 4. **The pace** (7): needs fill in 36 to 88 s, a feed takes 20 to 40 s from the kitchen and back, and the yard is
    never idle for long. The numbers are one table (`FILL_S`) if it should be calmer or busier.
 
-**Status. Built:** the four keepers (`src/art/keeper/`), the care acts and the agents they drive
+**Status. Built:** the four keepers (`src/art/keeper/`; beside them on the same rig one mission NPC, the grumpy
+miller: `cast.ts` `NPCS`, in `NPC_IDS` and never in `KEEPER_IDS`, drawn only by `src/game/npcs.ts`, ART_BIBLE 5.10), the care acts and the agents they drive
 (`src/care/acts.ts`, `keeper.ts`, `dragon.ts`), the planned walks (`src/care/path.ts`), the yard
 (`src/care/yard.ts`), and the gallery views `keepers`, `care`, `careaudit`, `yard` and `yardaudit`. `npm run check`
-runs the keeper palette gates (231 of 231 pass since the mission road and the grumpy miller, S9a: counted apart from the dragons' 2492) and eight new smoke cases, the
+runs the keeper palette gates (233 of 233 pass since the mission road and the grumpy miller, S9a: counted apart from the dragons' 2492) and eight new smoke cases, the
 care audits among them (every act on all 28 looks: 112 runs; the same mirrored on two elements: 32; and every act
 the yard plays in two and a half minutes, walks included). `npm run shots` renders the keeper sheets. The
 yard also brings the game side of one care hook: **dusk's `tuckin` is played on a tuck-in** (the bible's status noted
@@ -115,8 +116,10 @@ pair with its numbers, after the dragons' report):
 per keeper: 8 to 13 adjacency pairs, every slot's ramp and the skin shadow, 4 far-side colours, shoes and trousers on the floor
 the four tops: 6 pairs, each as seen, under deuteranopia and under protanopia
 the night keeper on dusk: trousers and cardigan, 4 stages each
-the grumpy miller (src/game/npcs.ts, on the keepers' rig): 17 adjacency pairs, ramps and skin shadow, the far side, shoes, trousers and sack on every floor, his shirt against the four tops
-KEEPERS: PASS  231 of 231 gates passed
+the grumpy miller (cast.ts NPCS.miller, drawn by src/game/npcs.ts; measured in the same loop as the four): 19 adjacency pairs
+  (the sack, its twine, the flour among them), ramps and skin shadow, the far side, shoes, trousers and sack on every floor,
+  and his shirt against the four tops in the tops' table (10 pairs)
+KEEPERS: PASS  233 of 233 gates passed
 ```
 
 ## 4. The rig
@@ -257,7 +260,7 @@ station. Pip, waiting at his bench, cheers each happy that thanks a keeper.
 
 | Check | What fails |
 |---|---|
-| `npm run palette`, KEEPERS | any of the 156 keeper gates (3) |
+| `npm run palette`, KEEPERS | any of the 233 keeper gates, the grumpy miller's among them (3) |
 | `view=careaudit` (smoke) | every care act on all 28 looks, 112 runs (Bea feeds, Tomas grooms, Pip pets, Iris tucks in), and mirrored (`facing=-1`) on fire and dusk, 32 more: a keeper covering the dragon's eye box by one pixel at any frame, walking in and out too, a stroking hand more than 2.5 px off its mark, an act that never ends |
 | `view=yardaudit` (smoke) | the same for every act the yard plays in 9000 frames, each keeper checked against every dragon it stands level with or in front of |
 | `view=keepers`, `view=yard` (smoke) | a keeper not drawn (its top colour missing) or a page error |
