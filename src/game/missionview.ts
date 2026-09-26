@@ -20,7 +20,7 @@ import type { Gait } from './gait.ts';
 import { readClock } from './clock.ts';
 import { skyPhase } from './sky.ts';
 import { FLOORS, INK, ROAD_SCENE } from './surfaces.ts';
-import { drawClimate, drawSetPiece, drawBaddie, drawMiller, SADDLE } from './artseams.ts';
+import { drawClimate, drawSetPiece, drawBaddie, drawMiller, exitLook, SADDLE } from './artseams.ts';
 import { regionOf } from './regions.ts';
 import { drawSprite, ICONS } from './icons.ts';
 import { drawEgg } from './eggs.ts';
@@ -68,8 +68,6 @@ const MOMENT_AT = 0.15, RESOLVED_AT = 0.5;
 export const MOMENT_MAX = 240;
 /** The most clock steps the view's team steps on by in one draw; a bigger jump replays a walk from the road's phase. */
 export const SYNC_GAP = 16;
-/** How fast a baddie leaves: the Roc wanders off, the Giant shuffles off (px a step). */
-const WANDER = 0.6, SHUFFLE = 0.45;
 
 // ---------- the walk's distance ----------
 
@@ -187,6 +185,17 @@ export function tripLen(sim: CareSim, trip: Trip): number {
 }
 
 /**
+ * The trip time (E) from which each stop's outcome shows in the scene -- its banner turning from the stop's name to how
+ * it went: a challenge's at its counter's moment (MOMENT_AT of its beat), the baddie's once it has walked in (its
+ * counters' moments begin). The TRIP LOG reads the stops by it (maptable.ts stopStates), so the log never tells what the
+ * scene has not shown yet: the scene is the timer.
+ */
+export function stopShownAt(sim: CareSim, trip: Trip): number[] {
+  const L = tripLen(sim, trip);
+  return trip.stops.map((s) => Math.round(s.at * L) + (s.kind === 'baddie' ? baddieParts(L).enter : Math.ceil(MOMENT_AT * beatLen(L))));
+}
+
+/**
  * The scene at the world's clock (or at `clock`): pure -- the same trip and clock give the same frame, always.
  */
 export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): SceneFrame {
@@ -236,13 +245,18 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
     if (bt < P.enter) baddie = { id, x: bt < walkIn ? from + (x0 - from) * (bt / walkIn) : x0, face: 'grumpy', pose: bt < walkIn ? 'walk' : 'stand', facing: -1, fx: null, t: bt };
     else if (bt < P.enter + P.moments) baddie = { id, x: x0, face: 'surprised', pose: 'stand', facing: -1, fx: null, t: bt };
     else {
-      const et = bt - P.enter - P.moments, turn = Math.round(0.2 * P.exit);
+      // (its exit is the art kit's own, played through its part of the beat -- exitLook: the pose, face and facing, and
+      // how far it has gone; calmed sits and dozes where it stood, outwitted turns and then walks off up the road, ahead
+      // of the team, driven off shuffles off up it -- and one that leaves goes on at its exit's last pace once the beat
+      // is over, until it is off the screen: never back through the team)
+      const et = bt - P.enter - P.moments;
       if (!trip.success || !trip.exit) baddie = { id, x: x0, face: 'grumpy', pose: 'stand', facing: -1, fx: null, t: bt };
-      else if (trip.exit === 'calmed') baddie = { id, x: x0, face: et < turn ? 'surprised' : 'sleepy', pose: 'sit', facing: -1, fx: et < turn ? null : 'z', t: bt };
-      else if (trip.exit === 'outwitted') baddie = et < turn ? { id, x: x0, face: 'surprised', pose: 'turn', facing: -1, fx: null, t: bt }
-        : { id, x: x0 - WANDER * (et - turn), face: 'neutral', pose: 'walk', facing: -1, fx: null, t: bt };
-      else baddie = et < turn ? { id, x: x0, face: 'grumpy', pose: 'turn', facing: 1, fx: null, t: bt }
-        : { id, x: x0 + SHUFFLE * (et - turn), face: 'grumpy', pose: 'leave', facing: 1, fx: 'dust', t: bt };
+      else {
+        const look = exitLook(trip.exit, et / P.exit), end = exitLook(trip.exit, 1), half = exitLook(trip.exit, 0.5);
+        const pace = (end.dx - half.dx) / (0.5 * P.exit), on = Math.max(0, et - P.exit) * pace;
+        const fx = look.pose === 'leave' ? 'dust' : look.pose === 'sit' && look.face === 'sleepy' ? 'z' : null;
+        baddie = { id, x: x0 + look.dx + on, face: look.face, pose: look.pose, facing: look.facing, fx, t: bt };
+      }
     }
     // (gone once it is well off the screen: walked off, or left behind)
     if (baddie && Math.abs(baddie.x - (camX + 320)) > 520) baddie = null;

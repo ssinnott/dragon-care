@@ -94,7 +94,7 @@ const pairs: string[] = [
   // the watchable scene (plan S9; frozen, preset=trip: a team away on the region's hard mission, that far along its road
   // at t=60): on the road past a challenge met (its banner); each big baddie in its beat -- walked in, grumpy (0.906:
   // the beat is 0.900-0.928 of a three-day trip) -- and leaving (0.921: the Mole King dozing, the Storm Roc wandering
-  // off the wrong way, the Frost Giant shuffling off); the Mole King's two counters' moments (dusk's breath, Bea's
+  // off the wrong way, up the road; 0.918: the Frost Giant shuffling off up it, before it leaves the screen); the Mole King's two counters' moments (dusk's breath, Bea's
   // wave); a failure turned back for home; the result card; the TEAM OUT chip over the barn; and the barn at t=1800
   'shots/base_watch.png=view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60',
   'shots/base_baddie_moleking.png=view=base&preset=trip&trip=oldmine:0.906&panel=watch&t=60',
@@ -103,7 +103,7 @@ const pairs: string[] = [
   'shots/base_baddie_moleking_moments.png=view=base&preset=trip&trip=oldmine:0.912&panel=watch&t=60',
   'shots/base_baddie_moleking_exit.png=view=base&preset=trip&trip=oldmine:0.921&panel=watch&t=60',
   'shots/base_baddie_stormroc_exit.png=view=base&preset=trip&trip=highfold:0.921&panel=watch&t=60',
-  'shots/base_baddie_frostgiant_exit.png=view=base&preset=trip&trip=frostmere:0.921&panel=watch&t=60',
+  'shots/base_baddie_frostgiant_exit.png=view=base&preset=trip&trip=frostmere:0.918&panel=watch&t=60',
   'shots/base_turnback.png=view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60',
   'shots/base_result.png=view=base&preset=trip&trip=oldmine:1&panel=watch&t=60',
   'shots/base_team_chip.png=view=base&preset=trip&trip=oldmine:0.2&t=60',

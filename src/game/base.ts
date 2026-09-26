@@ -62,7 +62,7 @@ import type { Dragon, Job, Keeper } from './sim.ts';
 import { startSpec, buildSim, tripStart } from './presets.ts';
 import { currentTrip } from './seams.ts';
 import type { Trip } from './trip.ts';
-import { sceneAt, drawMissionScene, drawBackButton, drawResultCard, ScenePets, BACK_BUTTON, RESULT_CARD } from './missionview.ts';
+import { sceneAt, drawMissionScene, drawBackButton, drawResultCard, ScenePets, BACK_BUTTON, RESULT_CARD, ROAD_BOTTOM } from './missionview.ts';
 import type { SceneFrame } from './missionview.ts';
 import { worldKey, barnKey, fnv1a, serialize } from './save.ts';
 import type { SaveV } from './save.ts';
@@ -207,6 +207,8 @@ const TABLE: Readonly<Rect> = Object.freeze({ x: 70, y: 172, w: 60, h: 36 });
 const MAP_CAM = { x: 0, y: 20 }, AERIE_CAM = { x: 0, y: 20 };
 /** Frames the camera eases toward the Map Room before the map opens (MAP, M). */
 const MAP_OPEN_FRAMES = 30;
+/** A toast over the watch overlay: its text's top, on the verge under the road (y 306), clear of the buttons (y 338). */
+const WATCH_TOAST_Y = ROAD_BOTTOM + 16;
 
 /**
  * One dragon on screen: its pet, playing its wake before it goes back to idle, its eat bowl (found once), the stage it
@@ -685,6 +687,9 @@ export class BaseView {
     // (the top bar as over the barn: the keepers' badges live -- a tap takes that keeper, back in the barn -- the one held
     // lit; the pad and the line are the barn's, not drawn over the scene)
     this.topBar(ctx, read, this.held());
+    // (the toast shows over the scene too -- life's news, a landing, the dawn's tip keep coming while the team is
+    // watched -- low on the verge under the road, clear of the banner, the log, the result card and the buttons)
+    if (this.toast) drawToast(ctx, this.toast.text, WATCH_TOAST_Y);
     this.bubbles = []; this.chips = []; this.heads.clear(); this.lineRect = null; this.chipRect = null;
   }
 

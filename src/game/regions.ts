@@ -31,7 +31,8 @@ export const CHALLENGES: Readonly<Record<ChallengeId, { name: string; word: stri
   fog: { name: 'THICK FOG', word: 'FOG', counter: { skill: 'navigator' }, met: 'FINDS THE WAY' },
   gap: { name: 'NARROW GAP', word: 'GAP', counter: { skill: 'nimble' }, met: 'SLIPS THROUGH' },
 });
-export const CHALLENGE_IDS = Object.freeze(Object.keys(CHALLENGES) as ChallengeId[]);
+/** Every challenge, in the contract's order: missiondata.ts's own list (one source), re-exported for the regions' readers. */
+export { CHALLENGE_IDS } from './missiondata.ts';
 
 /**
  * The big baddies (plan S8, P14): each needs both of its counters on the team (a dragon's element and a rider's skill),

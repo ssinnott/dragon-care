@@ -40,6 +40,12 @@ export const AERIE_F = 5, DECK_X0 = 8, DECK_X1 = LIFT_X1;
  * mission's team walks off (it stands in for `fly`, which rock can't anyway) and lands again (missions.ts).
  */
 export const BRIDGE_X0 = -200;
+/**
+ * The deck's west end for a keeper walked by hand (control.ts): the bridge past it is the riders' way off the world,
+ * never the hand's -- the camera stops at x 0, so a keeper walked out along it would leave the screen. A keeper's pad
+ * (10 px) in from the deck's end, where the deck's span ended before the bridge (S7).
+ */
+export const HAND_DECK_X0 = DECK_X0 + 10;
 /** The gambrel roof over the hayloft (floor 2): its ridge, and the knee where the steep lower slope turns. */
 export const RIDGE_X = BARN_X + BARN_W / 2, RIDGE_Y = 276, KNEE_DX = 58, KNEE_Y = 360;
 

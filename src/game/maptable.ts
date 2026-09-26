@@ -16,6 +16,7 @@ import { drawSprite, ICONS, hit } from './icons.ts';
 import type { Rect, Sprite } from './icons.ts';
 import { drawClimate, drawBaddiePortrait, CHALLENGE_ICONS, SKILL_ICONS } from './artseams.ts';
 import { barnRoom } from './seams.ts';
+import { stopShownAt } from './missionview.ts';
 import { INK } from './surfaces.ts';
 import { REGIONS, CHALLENGES, BADDIES, KEEPER_SKILL, SKILL_NAME, MAP_HOME, MAP_FILL, regionOf } from './regions.ts';
 import type { Counter } from './regions.ts';
@@ -379,12 +380,16 @@ export function tripProgress(sim: CareSim, t: Trip): number {
   return Math.max(0, Math.min(1, (sim.clock - t.departAt) / (t.returnAt - t.departAt)));
 }
 /**
- * Where each stop is: reached and met, reached and unmet, not reached yet, or never (past the turn-back) -- shown only
- * once the team has reached the turn-back stop, so the card never tells a failure before it happens.
+ * Where each stop is at the world's clock (or `clock`): reached and met, reached and unmet, not reached yet, or never
+ * (past the turn-back) -- each told
+ * only once the scene has shown how it went (missionview.ts stopShownAt: the banner's moment, the scene being the
+ * timer), and the stops past the turn-back only once the turn-back stop's has, so the card never tells a stop, or a
+ * failure, before the scene does.
  */
-export function stopStates(sim: CareSim, t: Trip): ('met' | 'unmet' | 'ahead' | 'never')[] {
-  const e = tripProgress(sim, t), turned = t.turnBack != null && e >= t.stops[t.turnBack].at;
-  return t.stops.map((s, i) => (turned && i > t.turnBack! ? 'never' : e >= s.at ? (s.covered ? 'met' : 'unmet') : 'ahead'));
+export function stopStates(sim: CareSim, t: Trip, clock = sim.clock): ('met' | 'unmet' | 'ahead' | 'never')[] {
+  const E = t.state === 'muster' || t.state === 'depart' || t.departAt == null ? -1 : t.state === 'away' ? clock - t.departAt : Infinity;
+  const at = stopShownAt(sim, t), shown = (i: number) => E >= at[i], turned = t.turnBack != null && shown(t.turnBack);
+  return t.stops.map((s, i) => (turned && i > t.turnBack! ? 'never' : shown(i) ? (s.covered ? 'met' : 'unmet') : 'ahead'));
 }
 
 /** The words fitted to a width (cut on a space), as lines. */

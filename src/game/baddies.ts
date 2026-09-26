@@ -21,6 +21,7 @@ import { INK } from './surfaces.ts';
 import { celTarget } from './cel.ts';
 import type { Cel } from './cel.ts';
 import type { BaddieId, BaddieExit, BaddieFace, BaddiePose, Climate } from './missiondata.ts';
+import { REGIONS } from './regions.ts';
 
 export type { BaddieId, BaddieExit, BaddieFace, BaddiePose } from './missiondata.ts';
 
@@ -49,8 +50,14 @@ export const BADDIE_ART: Readonly<Record<BaddieId, Baddie>> = Object.freeze({
   }),
 });
 
-/** Where each baddie lives (plan S8's regions: Old Mine Road is caves, Highfold peaks, Frostmere ice): its backdrop for gate (x). */
-export const BADDIE_HOME: Readonly<Record<BaddieId, Climate>> = Object.freeze({ moleking: 'caves', stormroc: 'peaks', frostgiant: 'ice' });
+/**
+ * Where each baddie lives (plan S8's regions: Old Mine Road is caves, Highfold peaks, Frostmere ice): its backdrop for
+ * gate (x). Read off the regions' own table (regions.ts REGIONS: each region's baddie and climate), so the two never
+ * disagree.
+ */
+export const BADDIE_HOME: Readonly<Record<BaddieId, Climate>> = Object.freeze(Object.fromEntries(
+  REGIONS.flatMap((r) => (r.baddie ? [[r.baddie, r.climate] as const] : [])),
+) as Record<BaddieId, Climate>);
 /** The palette keys on each baddie's silhouette edge (seen against the road and its climate: gate x); the rest lie inside it. */
 export const BADDIE_EDGE: Readonly<Record<BaddieId, readonly string[]>> = Object.freeze({
   moleking: ['velvet', 'paw', 'crown'],

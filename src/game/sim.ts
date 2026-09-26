@@ -653,15 +653,18 @@ export class CareSim {
   }
 
   /**
-   * A keeper gives a job back and walks home (a Rush took the dragon's slot, or the dragon never came: WAIT_MAX). The
-   * job goes back in the queue; the keeper can be given another on the way.
+   * A keeper gives a job back and walks home (a Rush took the dragon's slot, or the dragon never came: WAIT_MAX; or its
+   * dragon left the barn: sent on a mission, moved to the garden). The job goes back in the queue; the keeper can be
+   * given another on the way. One held by hand, or taken at work (pendingTake), is the player's where they stand instead.
    */
   drop(k: Keeper): void {
     const j = k.job;
     if (j) j.keeper = null;
     k.job = null; k.rushing = false; k.t = 0;
-    // (one held by hand stays where they are, the player's)
+    // (one held by hand stays where they are, the player's; and one taken at work, their job gone from under them -- its
+    // dragon sent on a mission, moved to the garden -- is the player's there too, as finish() makes one: control.ts)
     if (k.manual) { k.phase = 'manual'; return; }
+    if (k.pendingTake) { becomeManual(k); return; }
     this.walkTo(k, { f: k.station.floor, x: k.stationX });
     k.phase = 'home';
   }

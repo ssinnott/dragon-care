@@ -6,6 +6,7 @@
 //   drawSetPiece(ctx, id: ChallengeId, x, feetY, state: StopState, t)           setpieces.ts
 //   drawBaddie(ctx, id: BaddieId, x, feetY, facing: 1 | -1, face, pose, t)     baddies.ts
 //   drawBaddiePortrait(ctx, id: BaddieId, x, y)                                 baddies.ts
+//   exitLook(exit: BaddieExit, u) -> pose, face, facing, dx (the exit played)   baddies.ts (the scene's exits: S9)
 //   drawMiller(ctx, mood: MillerMood, x, feetY, facing: 1 | -1, t)              npcs.ts
 //   CHALLENGE_ICONS, SKILL_ICONS (9 x 9 Sprite records), SADDLE (Sprite)        missionicons.ts
 // and the two palette views the watchable scene's gate (x) reads (S9; tools/palette-check.ts): BADDIE_FILLS and
@@ -17,7 +18,7 @@ import { BACKDROPS } from './surfaces.ts';
 
 export { drawClimate } from './backdrops.ts';
 export { drawSetPiece } from './setpieces.ts';
-export { drawBaddie, drawBaddiePortrait } from './baddies.ts';
+export { drawBaddie, drawBaddiePortrait, exitLook } from './baddies.ts';
 export { drawMiller } from './npcs.ts';
 export { CHALLENGE_ICONS, SKILL_ICONS, SADDLE } from './missionicons.ts';
 

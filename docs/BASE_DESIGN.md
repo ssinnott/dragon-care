@@ -417,8 +417,9 @@ be moved on, and in 80 000 steps its egg never finds a sub-slot while needs sit 
   where it covered the Lamp Dorm's plate at the start camera: at 394 it sits over the lift shaft's and the ladder bay's
   tops), while a team is out: MUSTER, TEAM OUT - 14H (game hours to go) or LANDING; a tap opens the watch overlay (6),
   where a TRIP LOG button (124, 338, 64 x 16, beside BACK TO BARN) opens the trip's log (8, 34, 300 x 120: each stop met,
-  unmet, still ahead or never reached -- a stop is shown as never reached only once the team has turned back, so the log
-  never tells a failure early -- the log's latest lines, the time left), and a tap on it (or TRIP LOG again) closes it.
+  unmet, still ahead or never reached -- each stop told only once the scene has shown how it went, at its banner's
+  moment (missionview.ts `stopShownAt`: the scene is the timer), and one never reached only once the turn-back stop's
+  has, so the log never tells a stop, or a failure, early -- the log's latest lines, the time left), and a tap on it (or TRIP LOG again) closes it.
   A toast shown while the table is open goes low in its panel, and one too long to clear the chip goes under it.
 - **Bubbles** over the dragons.
 - **The job strip** along the bottom: the top five jobs in order, numbered, each chip in its tier's colour with a
@@ -505,12 +506,14 @@ this chores ... Uses standard WASD controls - and a button to feed/collect stuff
 managerial (B2): the other keepers go on taking jobs by themselves. But any one keeper can be taken by hand:
 - **Take:** tap the keeper (their body), their badge in the top bar, or press Tab (the next keeper by id). Taking
   another lets go of the one held first. A keeper taken while at work (mid-meal, mid-tuck-in) finishes that job first,
-  then is yours where they stand; otherwise any job they had goes back to the queue, a climb under way is finished,
+  then is yours where they stand (and at once if the job goes from under them: its dragon sent on a mission, or moved
+  to the garden); otherwise any job they had goes back to the queue, a climb under way is finished,
   and whatever they carry stays in their hand. A mark in their own colour hangs over their head, their badge is lit,
   and the camera follows them (it keeps them inside the middle of the screen across, and frames their floor: their
   feet 196 px down the screen, or as near as the world's edge lets it -- so their mark shows under the top bar and the
   floors below them stand clear of the pad; a drag stops it for 3 s).
-- **Walk:** A and D (or the arrows) walk them along the floor at a keeper's pace; W and S at a ladder (within 8 px)
+- **Walk:** A and D (or the arrows) walk them along the floor at a keeper's pace (on the Aerie, the deck alone: the
+  sky bridge west of it, off the screen, is the riders' way off the world, never the hand's); W and S at a ladder (within 8 px)
   climb it one floor. The lift bay's rule holds for them as for anyone (2): they wait at its edge while the car moves
   past their floor, and one let stand in the bay walks on the way they face until they are clear of it (at the Aerie
   deck's end, which lies in the bay, they turn back), so the car is never held by them. Keepers never ride the lift.
@@ -656,14 +659,17 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   walks in from the right to 200 px ahead of the lead, grumpy; turns surprised as its two counters have their moments
   in turn (the dragon's, then the rider's); then, on a success, it takes its exit -- the Mole King **calmed** (sits and
   dozes off, "z"s stepping up), the Storm Roc **outwitted** (turns and wanders off the wrong way) or the Frost Giant
-  **driven off** (shuffles off to colder hills, grumbling, dust at its feet). On a failure it keeps the road, grumpy:
+  **driven off** (shuffles off to colder hills, grumbling, dust at its feet). Each exit is the art kit's own
+  (`exitLook`): the two that leave go up the road ahead of the team, on until they are off the screen's right edge, never
+  back through the team. On a failure it keeps the road, grumpy:
   "THE MOLE KING KEEPS THE ROAD. HOME FOR TEA. NOBODY IS HURT." -- and the team turns back. No knockback, no hurt pose,
   nothing flung (B8, D4).
 - **What you see.** A banner at the top names the stop as it is reached, then how it went (with a check mark when it
   was met), and stays up until the next stop. When the trip's time is up, a **result card**: HOME SAFE! or HOME EARLY,
   the coin (half on a failure) and the egg if one was won, and "NOBODY IS HURT."; a tap puts it away.
 - **Leaving.** The scene is an overlay over the barn (under the top bar, which stays); the world keeps stepping under
-  it at the chosen speed. "← BACK TO BARN" (or Esc) closes it, and the TEAM OUT chip under the top bar (a trip out:
+  it at the chosen speed, and its toasts (life's news, a landing, the dawn's tip) show over the scene too, low on the
+  verge under the road. "← BACK TO BARN" (or Esc) closes it, and the TEAM OUT chip under the top bar (a trip out:
   "TEAM OUT - 14H", game hours to go) opens it again. Every tap under the top bar is the overlay's while it is open.
   A keeper held by hand (4.10) stays held under it but stands still -- no key or pad reaches them, and the pad and its
   line are not drawn -- and walks on as the keys say once the barn is back; a tap on a badge (or Tab) goes back to the

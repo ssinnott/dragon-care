@@ -21,7 +21,7 @@
 //   queue (stats.taken counts every take), a climb under way is finished, and anything carried stays carried.
 // - steer: the held direction, kept until it changes. A climb goes on; W or S within 8 px of a ladder on this floor
 //   that stops at the next floor that way snaps to it and climbs one floor; A or D walks at WALK inside the floor's
-//   span, facing that way. The bay rule holds (R1: never stepping into the lift bay while it is shut, waiting at its
+//   span (on the Aerie, the deck alone: never out along the sky bridge, the riders' way off the world), facing that way. The bay rule holds (R1: never stepping into the lift bay while it is shut, waiting at its
 //   edge) and R4: a keeper let stand in the bay walks on the way they face until clear (turning at a floor's end in
 //   it), so the car is never held by them.
 // - act, in this order: pick up (within 24 px of a post, not already carrying its supply: 40 steps, then carried; a
@@ -37,7 +37,7 @@
 // world a release that step would make.
 import { WALK, CLIMB, PICKUP } from './sim.ts';
 import type { CareSim, Keeper, Job, Carried } from './sim.ts';
-import { ROOM_INFO, LIFT_X0, LIFT_X1, postX, spanOf, route, feetY, bayFloors, GATE_MID } from './layout.ts';
+import { ROOM_INFO, LIFT_X0, LIFT_X1, AERIE_F, HAND_DECK_X0, postX, spanOf, route, feetY, bayFloors, GATE_MID } from './layout.ts';
 import type { Leg, Room } from './layout.ts';
 import { NEED_ROOM, KEEPER_HALF, arrived, bayShut, inBay } from './travel.ts';
 import type { NeedKind } from './needs.ts';
@@ -193,7 +193,9 @@ export function ladderAt(sim: CareSim, k: Keeper, dy: -1 | 1): { x: number; to: 
 function walk(sim: CareSim, k: Keeper, dir: 1 | -1, inside: boolean): void {
   const net = sim.nets.keeper, s = spanOf(k.f, k.x, net);
   if (s < 0) return;
-  const [a, b] = net.spans[k.f][s];
+  const [a0, b] = net.spans[k.f][s];
+  // (on the Aerie, the deck alone: the sky bridge west of it is the riders' way off the world, not the hand's)
+  const a = k.f === AERIE_F ? Math.max(a0, HAND_DECK_X0) : a0;
   const next = (d: number) => Math.max(a, Math.min(b, k.x + d * WALK));
   let to = next(dir);
   // (R4: at a floor's end inside the bay -- the Aerie deck ends in it -- turn and walk out the other way)

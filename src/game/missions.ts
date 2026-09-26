@@ -610,7 +610,9 @@ export function checkMissions(raw: unknown, dragons: readonly { id: number }[], 
     if (!t || typeof t !== 'object' || !mission(t.mission) || !['muster', 'depart', 'away', 'return'].includes(t.state) || !Array.isArray(t.pairs) || !t.pairs.length || t.pairs.length > MAX_PAIRS
       || !t.pairs.every((p) => dragons.some((d) => d.id === p.dragon) && keepers.some((k) => k.id === p.keeper)) || !Array.isArray(t.stops)
       || !Array.isArray(m.deck) || m.deck.length !== t.pairs.length || !m.deck.every((s) => s === null || (whole(s) && s < DECK_SPOTS.length))
-      || (t.state === 'away' && (!whole(t.departAt) || !whole(t.returnAt)))) bad(`trip (${JSON.stringify({ state: t?.state, pairs: t?.pairs })}) is not one this build can run`);
+      // (away: whole clocks, the return after the leaving -- which may be before the world's clock 0: the trip preset's
+      // team left before its world began, missions.ts awayNow)
+      || (t.state === 'away' && (!Number.isInteger(t.departAt) || !Number.isInteger(t.returnAt) || t.returnAt! <= t.departAt!))) bad(`trip (${JSON.stringify({ state: t?.state, pairs: t?.pairs })}) is not one this build can run`);
   }
   // (a keeper on a trip is the trip's rider)
   for (const k of keepers) if (TRIP_PHASES.has(k.phase) && !t?.pairs.some((p) => p.keeper === k.id)) bad(`have keeper ${k.id} ${k.phase} with no team`);

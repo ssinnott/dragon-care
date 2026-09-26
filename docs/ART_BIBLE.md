@@ -2204,7 +2204,7 @@ ask of it, and how each is kept:
 - **Nobody is hurt (D4).** A baddie's face is only ever `neutral`, `grumpy` (a flat brow and a pout, never a V),
   `surprised` or `sleepy` (the type holds it: missiondata.ts `BaddieFace`, missionview.ts `_Faces`); it walks in
   grumpy, turns surprised as its two counters have their moments, and leaves calmed (sits and dozes, three 5 x 6 "z"s
-  in 2 px strokes, ringed in ink, stepping up over its head), outwitted (turns, and wanders off the wrong way behind the team) or driven off
+  in 2 px strokes, ringed in ink, stepping up over its head), outwitted (turns, and wanders off the wrong way: up the road ahead of the team and off the screen, the kit's `exitLook`) or driven off
   (shuffles off grumbling under a flat grumble cloud, 2 px dust puffs stepping back from its heels); on a failure it keeps
   the road, grumpy, and the team turns home. The scene's baddie has no hurt, health or defeat state (`_NoHurt`), and
   its exits are those three alone (`_Exits`): both compile-time checks.

@@ -94,7 +94,8 @@
 // 19. Who may go: no baby, no young dragon on a normal or hard road, no garden resident; a keeper taken by hand is
 //    never an auto rider nor on BEST TEAM, is never given a job, can't be sent (canSend, and a send command refused
 //    with its reason), and a rider on a trip can't be taken by hand (control.ts take: a `refused` event) -- all through
-//    S7's own commands (seams.ts isTaken: the merge); two riders at most, two keepers always home; one team out.
+//    S7's own commands (seams.ts isTaken: the merge); a keeper taken at work whose dragon is then sent is the
+//    player's where they stand, and steerable (CareSim.drop); two riders at most, two keepers always home; one team out.
 // 20. A full trip (#5.4, #5.6, #11): THE LOST NEST with RIPPLE and ECHO -- the Map Room, the Tack Room, the lift up
 //    and the Aerie; the muster in 3600 steps or fewer; away, the team asks for nothing and its needs wait; back at
 //    returnAt exactly, food and sleep down; the egg laid in its reserved nest (and hatched two days on), the saddles
@@ -115,9 +116,12 @@
 //    every stop's beat, turning back at the end of the first uncovered stop's beat on a failure (never on a success),
 //    each travel step moving each dragon by exactly its walk's distance over that step at its speed (no skate: s times
 //    the frame's move, within 1e-9), a baddie's face only one of the four, and its exit (calmed, outwitted, driven off)
-//    shown on a success; the view's team (ScenePets), synced by clock jumps of 1, 8 and 40 and across a 1000-step gap,
+//    shown on a success, the baddie only ever moving the way it faces, and one that walks off (outwitted, driven off:
+//    the art kit's exitLook) ahead of every rider until it is off the screen's right edge; the TRIP LOG telling each
+//    stop (met, unmet, never past a turn-back) at exactly the step the scene's banner has shown it; the view's team (ScenePets), synced by clock jumps of 1, 8 and 40 and across a 1000-step gap,
 //    playing the walk frame the road says on every travel step; the trip preset puts a team exactly that far along at
-//    the frozen step, the world's own trip, away (its dragons off the map, its riders away); the preset's road is the
+//    the frozen step, the world's own trip, away (its dragons off the map, its riders away), its world saved exactly
+//    though its team left before the world's clock 0 (a departAt below 0); the preset's road is the
 //    missions' own (missions.ts roadOf: every stop's log `NAME - WHO WHAT`) and its rider pick too (autoRider), which
 //    passes over a keeper taken by hand (seams.ts isTaken).
 // 25. Taking a keeper (#6: "choose a person - then you will control them and be able to do this chores", "WASD
@@ -129,7 +133,8 @@
 //    chore by hand (feed, bathe, play with, groom, tuck in; a resident met in the garden), supplies taken and put back;
 //    a world saved with a keeper held (walking, climbing, picking up, at work, taken at work) loads with no one held and
 //    steps on exactly as the world given a release that step; R4: let stand in the lift bay she walks on out of it (at
-//    the Aerie deck's end, which lies in the bay, turning back). The section 2 invariants hold every step (the idle one
+//    the Aerie deck's end, which lies in the bay, turning back); walked west along the deck she stops at its west end,
+//    never out along the sky bridge (the riders' way off the world, off the screen). The section 2 invariants hold every step (the idle one
 //    for every keeper not held by hand). The missions' seam (seams.ts isTaken, which S8's rider pick asks) says taken
 //    of the keeper held, or taken at work, and of nobody else; let go, of nobody.
 import { isDeepStrictEqual } from 'node:util';
@@ -173,7 +178,7 @@ import { rngAt, mix32, TAG } from '../src/game/rand.ts';
 import {
   route, spanOf, postX, placeRooms, platesOf, standSpot, fitsSlot, slotBody, feetY, floorTop, nestX, ROOM_INFO, ROOM_KINDS, STRUCTURES,
   makeNets, worldWOf, gardenSpan, plotMid, plotX, GARDEN_X0, GARDEN_PLOT, GARDEN_END, GATE_MID, GATE_X0, GATE_X1,
-  AERIE_F, BARN_X, TOWER_R, TOWER_L, TOWER_W, DECK_X0, DECK_X1, BRIDGE_X0, LIFT_X0, LIFT_X1, LIFT_CX, LIFT_STOPS, CLIMB_COST, WALL_H, DRAGON_PAD, PITCH,
+  AERIE_F, BARN_X, TOWER_R, TOWER_L, TOWER_W, DECK_X0, DECK_X1, BRIDGE_X0, HAND_DECK_X0, LIFT_X0, LIFT_X1, LIFT_CX, LIFT_STOPS, CLIMB_COST, WALL_H, DRAGON_PAD, PITCH,
 } from '../src/game/layout.ts';
 import type { Spot, RoomKind } from '../src/game/layout.ts';
 import { NEEDS, FPS, OWN_NEED, GARDEN_NEEDS, GARDEN_RATE, hasNeed, drainRate, moodOf } from '../src/game/needs.ts';
@@ -183,9 +188,10 @@ import { DRAGON_ELEMENTS } from '../src/art/dragon/palettes.ts';
 import type { DragonElement } from '../src/art/dragon/palettes.ts';
 import type { Stage } from '../src/art/dragon/stages.ts';
 import { STAGES } from '../src/art/dragon/stages.ts';
-import { sceneAt, beatLen, baddieBeatLen, walkDist, frameAt, PAIR_BACK, ScenePets } from '../src/game/missionview.ts';
+import { sceneAt, beatLen, baddieBeatLen, walkDist, frameAt, PAIR_BACK, RIDER_AHEAD, ScenePets } from '../src/game/missionview.ts';
 import type { SceneFrame } from '../src/game/missionview.ts';
 import { demoTrip } from '../src/game/tripdemo.ts';
+import { stopStates } from '../src/game/maptable.ts';
 import { tripStart } from '../src/game/presets.ts';
 import { currentTrip, isTaken } from '../src/game/seams.ts';
 import type { Difficulty } from '../src/game/missiondata.ts';
@@ -1276,7 +1282,8 @@ if (MAIN) {
   // missions.ts, which are not in this list on purpose: plan G8's two exceptions, the residents' naps and the Map Room's
   // board rolled at dawn (05:00); each keeps its state out of barnKey (a world's missions are not the barn's care, and
   // without a trip sent nothing they do touches it), and these modules only call into them)
-  const SIM_FILES = ['sim.ts', 'travel.ts', 'needs.ts', 'layout.ts', 'gait.ts', 'save.ts', 'start.ts', 'presets.ts', 'rand.ts', 'life.ts', 'names.ts'];
+  // (control.ts runs inside CareSim.step -- the hand's commands -- and tripdemo.ts builds the trip preset's team: S7, S9)
+  const SIM_FILES = ['sim.ts', 'travel.ts', 'needs.ts', 'layout.ts', 'gait.ts', 'save.ts', 'start.ts', 'presets.ts', 'rand.ts', 'life.ts', 'names.ts', 'control.ts', 'tripdemo.ts'];
   const reads = SIM_FILES.filter((f) => /\b(readClock|phaseOf|PHASE_HOURS|PHASE_ORDER|DayPhase|skyBands|nightness|dimness|skyPhase|lightsOf)\b/.test(fs.readFileSync(new URL(`../src/game/${f}`, import.meta.url), 'utf8')));
   if (reads.length) fail(`night: ${reads.join(', ')} read the day's phase (only the view may: plan G8)`);
   console.log(`  12 night: a barn started at 07:00 and one at 19:00 (seed 1) agree on barnKey at all ${checked} checks over 20000 steps, through ${[...phases].join(', ')}; ${SIM_FILES.length} simulation modules, none reading the day's phase`);
@@ -1832,7 +1839,35 @@ if (MAIN) {
   for (let s = 0; s < 6000; s++) { tw.step(); if (tBea.job) handJobs++; }
   if (handJobs || !tBea.manual) fail(`team: BEA, held by hand beside a muster, had a job ${handJobs} steps (manual ${tBea.manual})`);
   noteUse(tw);
-  console.log(`  19 team: babies, the young on normal and hard roads and garden residents may not go; with BEA taken (the pick given a stub), ${asked} auto riders (10 days of boards x 7 dragons, alone and beside a pair) and BEST TEAM never chose her; a third pair refused (two keepers stay home: ${home} home with the team out); a second send refused while one is out; BEA taken by hand by S7's command: not free, ${askedHand} auto riders and BEST TEAM never chose her, a send command with her riding refused ("${refusedSend && refusedSend.kind === 'send' ? refusedSend.reason : '?'}"), BEST TEAM sent by command and mustering, ${tRider.name} (riding) refused to the hand ("${refusedTake && refusedTake.kind === 'refused' ? refusedTake.reason : '?'}"), BEA given no job in 6000 steps beside the trip`);
+  // (a keeper taken at work -- finishing the job first -- whose dragon is then sent: the job gone from under them
+  // (missions.ts leaveBarn), they are the player's where they stand, steerable, as a finished job leaves them
+  // (CareSim.drop); never left finishing a job that no longer is, held but not steerable)
+  const pw = newSim(2);
+  let pk: Keeper | null = null;
+  for (let s = 0; s < 20000 && !pk; s++) { pw.step(); pk = pw.keepers.find((k) => k.phase === 'work' && !!k.job && k.job.need !== 'sleep' && k.job.dragon.stage !== 'baby') ?? null; }
+  let pendingLine = 'none found';
+  if (!pk) fail('team: seed 2 had no keeper at work to take within 20000 steps');
+  else {
+    const pd = pk.job!.dragon, need = pk.job!.need, at = pw.tick, pm = pw.missions.board.find((m) => m.title === LOST_NEST)!;
+    pw.command({ kind: 'take', keeper: pk.id }); pw.step();
+    if (!pk.pendingTake || pk.manual || pk.phase !== 'work') fail(`team: ${pk.name}, taken at work: pendingTake ${pk.pendingTake}, manual ${pk.manual}, ${pk.phase}`);
+    const pr = autoRider(pw, pd, pm, []);
+    if (pr == null || pr === pk.id) fail(`team: ${pd.name}'s auto rider with ${pk.name} taken at work: ${pr}`);
+    pw.command({ kind: 'send', mission: pm.id, pairs: [{ dragon: pd.id, keeper: pr ?? 0 }] }); pw.step();
+    const ev = pw.events.find((e) => e.kind === 'send');
+    if (!ev || ev.kind !== 'send' || ev.reason !== null || pw.missions.trip?.state !== 'muster') fail(`team: ${pd.name} sent from under ${pk.name}'s hands: ${JSON.stringify(ev)}`);
+    if (!pk.manual || pk.pendingTake || pk.phase !== 'manual' || pk.job || pw.controlled !== pk.id || pw.free(pk)) fail(`team: ${pk.name}, taken at work on ${pd.name} and it sent: manual ${pk.manual}, pendingTake ${pk.pendingTake}, ${pk.phase}, job ${pk.job?.id ?? null}, controlled ${pw.controlled}`);
+    const x0 = pk.x;
+    pw.command({ kind: 'steer', dx: 1, dy: 0 });
+    for (let s = 0; s < 120; s++) pw.step();
+    const x1 = pk.x;
+    pw.command({ kind: 'steer', dx: -1, dy: 0 });
+    for (let s = 0; s < 120; s++) pw.step();
+    if (x1 === x0 && pk.x === x1) fail(`team: ${pk.name}, the player's after ${pd.name} was sent, did not walk when steered (x ${x0})`);
+    pendingLine = `${pk.name} taken at work (${need}, ${pd.name}; seed 2, step ${at}) and ${pd.name} sent: the player's where they stood, steered ${x0} -> ${x1} -> ${pk.x}`;
+    noteUse(pw);
+  }
+  console.log(`  19 team: babies, the young on normal and hard roads and garden residents may not go; with BEA taken (the pick given a stub), ${asked} auto riders (10 days of boards x 7 dragons, alone and beside a pair) and BEST TEAM never chose her; a third pair refused (two keepers stay home: ${home} home with the team out); a second send refused while one is out; BEA taken by hand by S7's command: not free, ${askedHand} auto riders and BEST TEAM never chose her, a send command with her riding refused ("${refusedSend && refusedSend.kind === 'send' ? refusedSend.reason : '?'}"), BEST TEAM sent by command and mustering, ${tRider.name} (riding) refused to the hand ("${refusedTake && refusedTake.kind === 'refused' ? refusedTake.reason : '?'}"), BEA given no job in 6000 steps beside the trip; ${pendingLine}`);
 }
 
 // ---------- 20. a full trip: THE LOST NEST (#5.4, #5.6, #11) ----------
@@ -2004,7 +2039,9 @@ if (ROLE === 'service') {
     const first = trip.stops.findIndex((q) => !q.covered), b = success ? null : first >= 0 ? first : trip.stops.length - 1;
     if (trip.turnBack !== b) fail(`${what}: turns back at stop ${trip.turnBack}, not the first uncovered (${b})`);
     const starts = trip.stops.map((q) => Math.round(q.at * L)), lens = trip.stops.map((q) => (q.kind === 'baddie' ? baddieBeatLen(L) : beatLen(L)));
-    let prev: SceneFrame | null = null, nb: number | null = null, turnAt: number | null = null, exitSeen: string | null = null;
+    let prev: SceneFrame | null = null, nb: number | null = null, turnAt: number | null = null, exitSeen: string | null = null, lastOff: number | null = null;
+    const lastStop = b ?? trip.stops.length - 1;
+    let logAhead = 0;
     const z = sceneAt(sim, trip, trip.departAt);
     if (z.xs.some((x, i) => x !== -PAIR_BACK * i) || z.n !== 0 || z.done) fail(`${what}: at E = 0 the team is at ${z.xs.join(', ')} (n ${z.n}, done ${z.done}), not at its places`);
     if (!isDeepStrictEqual(sceneAt(sim, trip, trip.departAt + 12345), sceneAt(sim, trip, trip.departAt + 12345))) fail(`${what}: two reads of one clock differ`);
@@ -2014,8 +2051,26 @@ if (ROLE === 'service') {
       if (f.done !== (E >= L)) fail(`${what}: done is ${f.done} at E ${E} of ${L}`);
       if (f.facing === -1 && turnAt == null) { turnAt = E; nb = f.n; }
       if (f.baddie) inFrame++;
+      // (the TRIP LOG tells a stop -- met or unmet, and the stops past a turn-back never -- exactly when the scene has
+      // shown how it went, its banner past the stop's name: maptable.ts stopStates by missionview.ts stopShownAt)
+      const st = stopStates(sim, trip, c), seen = (i: number) => {
+        const head = trip.stops[i].log.split(' - ')[0];
+        return i <= lastStop && f.last != null && (i < f.last || (i === f.last && f.banner !== head && f.banner !== `${head}!`));
+      };
+      for (let i = 0; i < trip.stops.length; i++) {
+        const want = i > lastStop ? (seen(b!) ? 'never' : 'ahead') : seen(i) ? (trip.stops[i].covered ? 'met' : 'unmet') : 'ahead';
+        if (st[i] !== want && logAhead++ < 3) fail(`${what}: the TRIP LOG says stop ${i} is ${st[i]} at E ${E}, the scene ${want} (banner "${f.banner}")`);
+      }
       if (f.baddie && trip.exit && f.baddie.pose === EXIT_LOOK[trip.exit].pose && f.baddie.face === EXIT_LOOK[trip.exit].face) exitSeen = trip.exit;
       if (f.baddie && ((f.baddie.face as string) === 'angry' || !['neutral', 'grumpy', 'surprised', 'sleepy'].includes(f.baddie.face))) fail(`${what}: the baddie's face is ${f.baddie.face}`);
+      // (it moves only the way it faces -- in from the right facing the team, then its exit's way, the art kit's exitLook
+      // -- and one that walks off (outwitted, driven off) stays ahead of every rider until it is off the screen's right
+      // edge: never back through the team)
+      if (f.baddie && prev?.baddie && (f.baddie.x - prev.baddie.x) * f.baddie.facing < -1e-9) fail(`${what}: the baddie moved ${f.baddie.x - prev.baddie.x} facing ${f.baddie.facing} (${f.baddie.pose}) at E ${E}`);
+      if (f.baddie && (trip.exit === 'outwitted' || trip.exit === 'drivenOff')) {
+        if (f.xs.some((x) => x + RIDER_AHEAD >= f.baddie!.x)) fail(`${what}: the baddie (${trip.exit}, ${f.baddie.pose} at x ${f.baddie.x}) is not ahead of the team (${f.xs.map((x) => x + RIDER_AHEAD).join(', ')}) at E ${E}`);
+        lastOff = f.baddie.x - f.camX;
+      }
       if (prev) {
         if (f.n < prev.n) fail(`${what}: n fell from ${prev.n} to ${f.n} at E ${E}`);
         for (let i = 0; i < f.xs.length; i++) {
@@ -2046,9 +2101,10 @@ if (ROLE === 'service') {
     if (success && trip.mission.baddie) {
       if (!trip.exit || !EXITS.includes(trip.exit)) fail(`${what}: the baddie's exit is ${trip.exit}`);
       if (exitSeen !== trip.exit) fail(`${what}: the baddie's exit (${trip.exit}) was never shown`);
+      if (trip.exit !== 'calmed' && (lastOff == null || lastOff <= 640)) fail(`${what}: the baddie (${trip.exit}) was last seen at screen x ${lastOff}, not off the right edge`);
     }
     if (!success && trip.exit != null) fail(`${what}: a failure has an exit (${trip.exit})`);
-    lines.push(`${region} ${diff} ${success ? 'home safe' : `home early (turned at stop ${b}, E ${turnAt})`}${trip.mission.baddie ? `, ${trip.mission.baddie} ${trip.exit ?? 'keeps the road'}` : ''}`);
+    lines.push(`${region} ${diff} ${success ? 'home safe' : `home early (turned at stop ${b}, E ${turnAt})`}${trip.mission.baddie ? `, ${trip.mission.baddie} ${trip.exit ?? 'keeps the road'}${lastOff != null ? ` (off ahead of the team, last seen at screen x ${lastOff.toFixed(0)})` : ''}` : ''}`);
   }
   // (the view keeps to the road: the team's pets, synced by clock jumps of 1, 8 and 40 steps and across a 1000-step gap
   // -- a watch closed and reopened -- play on every travel step the very walk frame the road's walk distance is in)
@@ -2080,6 +2136,7 @@ if (ROLE === 'service') {
   lines.push(`the view's walks on the road's frame at ${petChecks} synced travel steps (jumps of 1, 8, 40 and a 1000-step gap)`);
   // (the preset puts the trip exactly that far along at the frozen step -- the world's own trip, as a sent one is once
   // away: its dragons off the map, its riders away, nobody else's)
+  const presetSaves: string[] = [];
   for (const [q, p] of [['oldmine:0.95', 0.95], ['millbrook:0.3', 0.3]] as const) {
     const w = buildSim(tripStart(q, 60), 1);
     for (let i = 0; i < 60; i++) w.step();
@@ -2087,6 +2144,15 @@ if (ROLE === 'service') {
     if (!f || f.E !== Math.round(p * f.L)) fail(`scene: trip=${q} at t=60 is at E ${f?.E} of ${f?.L}, not ${p}`);
     if (!t || t !== w.missions.trip || t.state !== 'away' || !t.pairs.every((pr) => w.dragons.find((d) => d.id === pr.dragon)?.place === 'away' && w.keepers.find((k) => k.id === pr.keeper)?.phase === 'away')
       || w.dragons.some((d) => d.place === 'away' && !t.pairs.some((pr) => pr.dragon === d.id))) fail(`scene: trip=${q}'s team is not the world's own, away (${JSON.stringify(t?.state)})`);
+    // (and its world is saved exactly, as any: its team left before the world's clock 0 -- departAt below 0 -- and it
+    // loads, steps on (landing) and matches the world it was saved from)
+    let back: CareSim | null = null;
+    try { back = CareSim.fromSave(JSON.parse(JSON.stringify(serialize(w)))); } catch (e) { fail(`scene: trip=${q}'s world (departAt ${t?.departAt}) can't load its own save: ${(e as Error).message}`); }
+    if (back) {
+      for (let i = 0; i < 2000; i++) { w.step(); back.step(); }
+      if (back.digest() !== w.digest()) fail(`scene: trip=${q}'s world, saved and loaded, drifted from the one it was saved from within 2000 steps`);
+    }
+    presetSaves.push(`${q} (departAt ${t?.departAt})`);
   }
   // (the preview's rider pick asks the missions' seam, as S8's must: BEA, a rider of the Old Mine Road's best team,
   // taken by hand first, rides no more)
@@ -2096,7 +2162,7 @@ if (ROLE === 'service') {
     w.command({ kind: 'take', keeper: bea.id }); w.step();
     if (!before || !isTaken(w, bea.id) || rides()) fail(`scene: the rider pick with BEA taken: she rode ${before} before, taken ${isTaken(w, bea.id)}, rides ${rides()}`);
   }
-  console.log(`  24 scene: ${lines.join('; ')}; ${frames} steps read, ${travelSteps} travel steps without a skate, the baddie in view ${inFrame} of them; the scene's types have no hurt state, and exits only calmed, outwitted or driven off; a keeper taken by hand is never picked to ride (seams.ts isTaken)`);
+  console.log(`  24 scene: ${lines.join('; ')}; ${frames} steps read, ${travelSteps} travel steps without a skate, the baddie in view ${inFrame} of them; the scene's types have no hurt state, and exits only calmed, outwitted or driven off; the trip preset's worlds saved exactly (${presetSaves.join(', ')}); a keeper taken by hand is never picked to ride (seams.ts isTaken)`);
 }
 
 // ---------- 25. taking a keeper (#6) ----------
@@ -2341,6 +2407,14 @@ if (ROLE === 'saves') {
       if (inBay(k.x, KEEPER_HALF) || stood) fail(`control: BEA let stand in the lift bay on ${what} (x ${x}) is at x ${k.x} after ${n} steps, ${stood} of them standing`);
       else r4.push(`${what} out in ${n} steps`);
     }
+    // (and walked west along the Aerie deck she stops at its end: the sky bridge on past it, off the screen, is the
+    // riders' way off the world, never the hand's -- S8's bridge merged into the keepers' net)
+    const w = newSim(1), k = w.keepers.find((q) => q.name === 'BEA')!;
+    send(w, { kind: 'take', keeper: k.id }); step(w, at);
+    k.f = AERIE_F; k.x = 60; k.y = feetY(AERIE_F); k.legs = []; k.climbing = false;
+    send(w, { kind: 'steer', dx: -1, dy: 0 }); step(w, at, 400);
+    if (k.f !== AERIE_F || k.x !== HAND_DECK_X0) fail(`control: BEA walked west along the Aerie deck for 400 steps is at floor ${k.f} x ${k.x}, not the deck's end (x ${HAND_DECK_X0})`);
+    else r4.push(`walked west on the Aerie, stopped at the deck's end (x ${k.x}), off the bridge`);
   }
   // 11. a keeper held by hand never holds up a grow-up (S7 review): BEA parked at EMBER's stand spot -- inside its new
   // elder body -- as it falls due (the growup preset) and left there; EMBER grows beside her at once and goes on about
