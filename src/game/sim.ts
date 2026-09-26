@@ -455,7 +455,8 @@ export class CareSim {
       // (its walk's speed: 1, or the lively step's -- travel.ts pace; the view plays the walk at it)
       if (d.gaitS !== 1 && d.gaitS !== LIVELY) throw new Error(`save: ${d.name} walks at ${d.gaitS}, not 1 or ${LIVELY}`);
       const out = d.place === 'garden' || d.goal === 'retire', g = d.garden, team = !!ms.trip?.pairs.some((p) => p.dragon === d.id);
-      if ((d.place === 'away' || d.goal === 'muster') && (!team || d.slot || d.home != null || g != null)) throw new Error(`save: ${d.name} is away with no team: ${JSON.stringify({ place: d.place, goal: d.goal })}`);
+      // (a dragon mustering keeps its slot until it sets off: missions.ts stepMuster)
+      if ((d.place === 'away' || d.goal === 'muster') && (!team || (d.slot && d.place === 'away') || d.home != null || g != null)) throw new Error(`save: ${d.name} is away with no team: ${JSON.stringify({ place: d.place, goal: d.goal })}`);
       if ((d.place !== 'barn' && d.place !== 'garden' && d.place !== 'away') || (out ? d.stage !== 'elder' || d.slot || !whole(d.home, 0) || d.home >= plots || homes.has(d.home) : d.home != null)
         || (d.place === 'garden' ? !g || typeof g !== 'object' || !['nap', 'sit', 'stroll', 'wait'].includes(g.mode) || !whole(g.until, -1) || !Number.isFinite(g.tx) : g != null)) {
         throw new Error(`save: ${d.name} is not where this build can keep it: ${JSON.stringify({ place: d.place, home: d.home, goal: d.goal, garden: d.garden })}`);
@@ -655,12 +656,19 @@ export class CareSim {
 
   /**
    * A keeper lets their job go where they stand, for a mission (missions.ts: a rider off to muster): the job goes back
-   * in the queue, and one under way stops where it got to (a tuck-in excepted: the dragon sleeps on). Not a pre-emption.
+   * in the queue, and one under way stops where it got to -- but a tuck-in under way is done as finish() does one: the
+   * dragon sleeps on through its nap, and its sleep job is closed (never tucked in twice). Not a pre-emption.
    */
   unjob(k: Keeper): void {
     const j = k.job;
     if (j) {
-      if (k.phase === 'work' && j.dragon.act && j.dragon.act.need === j.need && j.need !== 'sleep') j.dragon.act = null;
+      const d = j.dragon, a = d.act, at = k.phase === 'work' && !!a && a.need === j.need;
+      if (at && j.need === 'sleep') {
+        d.asleep = a!.len - a!.t;
+        this.jobs.splice(this.jobs.indexOf(j), 1);
+        this.stats.done++;
+        if (d.goalJob === j.id) { d.goal = null; d.goalJob = null; }
+      } else if (at) d.act = null;
       j.keeper = null;
     }
     k.job = null; k.rushing = false; k.t = 0; k.legs = k.climbing && k.legs.length ? [k.legs[0]] : [];

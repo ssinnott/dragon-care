@@ -40,19 +40,17 @@
 //    the start stands in its rooms and the keepers wait at their fixed stations, clear of every grown dragon's slot (a
 //    resting baby's tail a little in, never its head); and (checked at the end, over the whole suite) every named room,
 //    the lift, the Aerie, the gate and the garden were used (sim.stats.used), and every room itself (stats.usedRoom:
-//    each copy of a need's room), unless their mechanic is still PLANNED -- and a PLANNED one that shows a use fails, so
-//    its entry must go; since the missions nothing is PLANNED (#11: every named, furnished room has a real purpose,
-//    proven used).
+//    each copy of a need's room) -- #11: every named, furnished room has a real purpose, proven used.
 // 9. Gait (#7: dragons walk by their anims' own root motion): every walk's table is the same whatever the seed, it
 //    moves as its anim table's frames and an anim player playing it say (a walk with an intro too, wrapping and caught
 //    up as the view does), played faster by the lively step (BASE_DESIGN 2: on and off the car and across the bay) it moves
-//    its body by exactly the same factor as the player at that speed (G13), and a dragon walked by the simulation across
+//    its body by exactly the same factor as the player at that speed, and a dragon walked by the simulation across
 //    the lift bay moves exactly as far as the anim player playing its walk at the lively step's speeds would carry it;
 //    the paper turn is the yard's.
 // 10. Barn capacity (BASE_DESIGN 4.7): the benchmark cast `twelve` (tools/capacity.ts) for 30 minutes, checked every
 //    step as section 2 -- no need empty, short waits, the car mostly free, no stall, no two in the shaft; eight adults,
 //    ten, and the ages preset's twelve keep their service; the `full` preset, forced 9 over the cap, keeps moving with
-//    its egg waiting; and (the S6b review) a barn of babies -- any mix under the cap -- is served: four babies each
+//    its egg waiting; and a barn of babies -- any mix under the cap -- is served: four babies each
 //    resting in the room another wants are met (a job's wait for its own floor's room ends at SOON), twelve babies
 //    packed from the ground floor up served for 30 minutes, and two walking up to a landing at one spot placed in the
 //    order they stand, never turned back and forth. (It runs in three worker threads beside the other sections, and is
@@ -60,15 +58,15 @@
 // 11. The clock (docs/BASE_DESIGN.md 7) on a real day and a 600-step test day: the day, the hour and the phase at each
 //    phase's start, the sky's three stepped thirds over a phase's first hour, day 2 at midnight, a whole day read step
 //    by step (the phases in order, the turn never going back; the lights, the HUD's sun or moon and the walls' night
-//    step (plan S6c: 0 under the day's sky, 3 under the night's, with the lamps' rings, every step 0-3 over a day) in
+//    step (BASE_DESIGN 7: 0 under the day's sky, 3 under the night's, with the lamps' rings, every step 0-3 over a day) in
 //    step with the sky, never switching on a phase's first step), the label (and the top bar's room for it to day 99 999), and a
 //    world's start hour.
-// 12. Night is not the barn's (plan G8): a world started at 07:00 and one started at 19:00, the same seed, are the same
+// 12. Night is not the barn's (BASE_DESIGN 7): a world started at 07:00 and one started at 19:00, the same seed, are the same
 //    barn (save.ts barnKey: every absolute clock left out) every 1000 steps for 20000 -- so view=base's no-tint check,
-//    day against night, compares one world -- and no simulation module of the barn reads the day's phase (the garden's,
-//    garden.ts, does: its residents nap at night, G8's one exception so far; sim.ts and life.ts call into it, and its
-//    state, the residents' rhythm, is left out of barnKey).
-// 13. Growing up (#8: "a 'month' of game time to have a dragon grow from one age class to another"; plan S5): on a
+//    day against night, compares one world -- and no simulation module of the barn reads the day's phase but the two
+//    that may: garden.ts (its residents nap at night; sim.ts and life.ts call into it, and its state, the residents'
+//    rhythm, is left out of barnKey) and missions.ts (the Map Room's board is rolled at dawn).
+// 13. Growing up (#8: "a 'month' of game time to have a dragon grow from one age class to another"; BASE_DESIGN 7): on a
 //    600-step day, a baby grows young, adult and elder, one grow event each, its stage's start moved on exactly 30 days
 //    each time (the elder stage's, which has no next, the step it grew: its time to the garden is all its own), after
 //    walking from the Hatchery to a module slot, and its drains follow the new stage; a stage-up only
@@ -77,16 +75,18 @@
 //    from falling due is short alone and bounded by an errand in the busy barn; at the real day's length, 30 days less
 //    a minute in, an adult is an elder within a minute of play; and a baby on its way to grow up, Rushed to a need in
 //    the room it is going to, is served in a baby's sub-slot there, never in the module slot.
-// 14. Eggs (#5.4's Hatchery side, under the hayloft's west slope): three eggs fill the three nests and a fourth is not
+// 14. Eggs (#5: "We can get eggs on a mission" -- the Hatchery's side, under the hayloft's west slope): three eggs fill the three nests and a fourth is not
 //    taken; an egg hatches exactly two days after it was laid into a baby with a new id, its element's first free name
 //    and the egg's seed, the Hatchery's sub-slots first (one in front of no other egg, then the one nearest its nest);
 //    the baby asks for food at once and is fed within three minutes; with every baby sub-slot taken (a small barn) an
 //    egg waits in its nest, nothing lost, and hatches as soon as one frees -- but not in a barn over its cap; a baby
 //    moved on never comes to rest in the Hatchery; names never repeat and stay within 8 characters; two runs give the
 //    same names and seeds.
-// 15. Retirement (#10: "dragons who are too old (30 days pass elder) will move to this area"; plan S6): on a 600-step
-//    day, the retire preset's seven elders and the busy barn's (seven adults growing elder mid-errand, late, then
-//    falling due to retire mid-errand) each retire once, never before 30 days into the elder stage -- 30 days after the
+// 15. Retirement (#10: "dragons who are too old (30 days pass elder) will move to this area"; BASE_DESIGN 3, The
+//    Garden): on a 600-step day, the retire preset's seven elders and the busy barn's (seven adults growing elder
+//    mid-errand, late, then falling due to retire mid-errand) each retire once -- all but the barn's last flier, which
+//    stays on until another dragon can fly a mission (a hatchling grown young, then it retires) -- never before 30 days
+//    into the elder stage -- 30 days after the
 //    step it grew into an elder, however late that stage-up was -- and soon after, wait at a landing no longer than
 //    a barn dragon may (in a crowded barn too: ten adults, one elder retiring from a floor up), walk out through the
 //    Garden Gate (counted: #11) to a plot of their own soon enough, and the garden grows to
@@ -100,29 +100,35 @@
 //    met where it rests by a keeper come out of the barn at its snout (the garden used); no resident at rest with its eye
 //    under another's body, nor two at rest lying one over the other (bodies overlapping REST_OVERLAP px at most); the
 //    barn beside them keeps its service; the keeper visits per resident are printed.
-// 17. The Map Room's board (#5.1, #5.2): the same twice for seeds 1-5 and days 1-10; day 1 starts with THE LOST NEST;
-//    three missions at most, one an explored region; no baddie before day 3; each difficulty's road its length, from
+// 17. The Map Room's board (#5: "a world map with different places to explore", "a mission chooser"): the same twice
+//    for seeds 1-5 and days 1-10; day 1 starts with THE LOST NEST; three missions at most, one an explored region; no
+//    baddie before day 3, and a road ending in one on every baddie's day (3, 7, ...); each difficulty's road its length, from
 //    its region's pool; a world rolls it at its start and at every 05:00.
-// 18. The odds (#5.3): a table of hand-computed teams (the plan's two examples, the top clamp, the least a pair has).
+// 18. The odds (#5: challenges met by good solutions): a table of hand-computed teams (BASE_DESIGN 5.4's two examples,
+//    the top clamp, the least a pair has).
 // 19. Who may go: no baby, no young dragon on a normal or hard road, no garden resident; a keeper taken by hand is
 //    never an auto rider nor on BEST TEAM, is never given a job, can't be sent (canSend, and a send command refused
 //    with its reason), and a rider on a trip can't be taken by hand (control.ts take: a `refused` event) -- all through
-//    S7's own commands (seams.ts isTaken: the merge); a keeper taken at work whose dragon is then sent is the
-//    player's where they stand, and steerable (CareSim.drop); two riders at most, two keepers always home; one team out.
-// 20. A full trip (#5.4, #5.6, #11): THE LOST NEST with RIPPLE and ECHO -- the Map Room, the Tack Room, the lift up
+//    the take command itself (missions.ts isTaken); a keeper taken at work whose dragon is then sent finishes the job
+//    (the dragon keeps its slot till then) and is then the player's where they stand, and steerable; two riders at
+//    most, two keepers always home; one team out.
+// 20. A full trip (#5: eggs, launched from the Aerie using the Map Room; #11): THE LOST NEST with RIPPLE and ECHO -- the Map Room, the Tack Room, the lift up
 //    and the Aerie; the muster in 3600 steps or fewer; away, the team asks for nothing and its needs wait; back at
 //    returnAt exactly, food and sleep down; the egg laid in its reserved nest (and hatched two days on), the saddles
 //    back, the Bunks, the riders on duty again, the coin paid, the neighbour revealed at the next dawn. And the step the
 //    muster preset's team stands on the deck (the base_muster shot). And musters sent in the middle of play (BEST TEAM
 //    on a board mission, seeds 1-6, 600 and 1500 steps in): each done within MUSTER_MID_MAX (the lift serves one dragon
-//    at a time, so a car already under way, or a team dragon at work, makes it longer than a fresh world's).
+//    at a time, so a car already under way, or a team dragon at work, makes it longer than a fresh world's). And sends
+//    mid-act (seeds 1-6): a keeper at work with a team dragon finishes the job, the dragon asleep sleeps on, and each
+//    keeps its slot, nobody else in it, until it sets off; a rider taken mid-tuck-in leaves the dragon asleep, its
+//    sleep job done, never tucked in twice.
 // 21. A failure: a low-odds send that fails turns back at its first unmet stop, with half the coin and no egg; a failure
 //    that met every stop turns back at the last and says why (the weather).
 // 22. A trip's outcome is its seed's: the same sends on 20 seeds, twice, the same outcome, egg and road; day 1's LOST
 //    NEST met in full always succeeds (the tutorial: seed 1's roll alone would fail it), BEST TEAM on it included.
-// 23. Care while a team is away (P13: two keepers home are enough): a two-pair team away 30 minutes of the real day;
+// 23. Care while a team is away (BASE_DESIGN 5.2: two keepers home are enough): a two-pair team away 30 minutes of the real day;
 //    no need at home ever empties, and the barn's service holds (the average wait within 25 % of section 2's gate).
-// 24. The watchable scene (#5.3 on the road, #5.5 the big baddie; plan S9): an easy, a normal and a hard mission (Old
+// 24. The watchable scene (#5: the challenges on the road, "end with a big baddie"; BASE_DESIGN 6): an easy, a normal and a hard mission (Old
 //    Mine Road's, Highfold's and Frostmere's, each with its baddie), each way it can end, read from the scene's pure
 //    function at every step of the trip: the team at its places as it leaves and done when its time is up, its travel
 //    time never falling, its dragons never walking back before they turn back nor on after, standing still through
@@ -136,9 +142,9 @@
 //    the frozen step, the world's own trip, away (its dragons off the map, its riders away), its world saved exactly
 //    though its team left before the world's clock 0 (a departAt below 0); the preset's road is the
 //    missions' own (missions.ts roadOf: every stop's log `NAME - WHO WHAT`) and its rider pick too (autoRider), which
-//    passes over a keeper taken by hand (seams.ts isTaken).
+//    passes over a keeper taken by hand (missions.ts isTaken).
 // 25. Taking a keeper (#6: "choose a person - then you will control them and be able to do this chores", "WASD
-//    controls - and a button to feed/collect stuff"; plan S7): BEA taken by a command is held by hand after one step,
+//    controls - and a button to feed/collect stuff"; BASE_DESIGN 4.10): BEA taken by a command is held by hand after one step,
 //    walks to the nearest hearth, takes the bowl (E, 40 steps), feeds EMBER in its kitchen slot from its stand spot
 //    (doneBy), crosses the lift bay under the bay rule, climbs the centre ladder up (W) and down (S) within 200 steps;
 //    held 10 000 steps or more with jobs pending, until 20 Rushes have gone on open jobs, she is never given a job she
@@ -146,30 +152,32 @@
 //    like the others (in a calm barn, home and idle at her station); the same commands give the same world; every
 //    chore by hand (feed, bathe, play with, groom, tuck in; a resident met in the garden), supplies taken and put back;
 //    a world saved with a keeper held (walking, climbing, picking up, at work, taken at work) loads with no one held and
-//    steps on exactly as the world given a release that step; R4: let stand in the lift bay she walks on out of it (at
-//    the Aerie deck's end, which lies in the bay, turning back); walked west along the deck she stops at its west end,
-//    never out along the sky bridge (the riders' way off the world, off the screen). The section 2 invariants hold every step (the idle one
-//    for every keeper not held by hand). The missions' seam (seams.ts isTaken, which S8's rider pick asks) says taken
+//    steps on exactly as the world given a release that step; the bay rule's R4 (BASE_DESIGN 2): let stand in the lift
+//    bay she walks on out of it (at the Aerie deck's end, which lies in the bay, turning back); walked west along the
+//    deck she stops at its west end, never out along the sky bridge (the riders' way off the world, off the screen),
+//    and walked east, short of the lift bay (the car's way up, never the hand's). The section 2 invariants hold every
+//    step (the idle one for every keeper not held by hand). missions.ts isTaken, which the rider pick asks, says taken
 //    of the keeper held, or taken at work, and of nobody else; let go, of nobody.
 // 26. The barn's cap (BASE_DESIGN 4.7; life.ts BARN_CAP): the twelve preset -- the cap's twelve -- with an egg falling
 //    due: it waits in its nest while the barn is full (one `full` event, on its due step), the count never over the cap,
 //    and it hatches within 2 steps of an elder arriving in the garden; a save taken while it waits steps on the same.
 //    And the cap beside the missions: a team sent from a full barn on a road that brings an egg (the chooser says
-//    BARN FULL: THE EGG WILL WAIT -- seams.ts barnRoom 0 -- and sends it all the same), away dragons still counted; the
+//    BARN FULL: THE EGG WILL WAIT -- life.ts barnRoom 0 -- and sends it all the same), away dragons still counted; the
 //    team lands, its rider carries the egg up to the Hatchery by the keepers' ladders and lays it in the reserved nest,
 //    where it waits past its due while the barn is full, and hatches within 2 steps of a retiree arriving in the garden.
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
+import os from 'node:os';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { CareSim, REACH, DAY_STEPS, START_HOUR, PICKUP } from '../src/game/sim.ts';
 import { actionFor } from '../src/game/control.ts';
 import type { Command } from '../src/game/control.ts';
-import { nextStage, stageDue, inTheWayOfGrowing, HATCH_FOOD, BARN_CAP, barnCount, barnFull } from '../src/game/life.ts';
+import { nextStage, stageDue, inTheWayOfGrowing, staysOn, HATCH_FOOD, BARN_CAP, barnCount, barnFull, barnRoom } from '../src/game/life.ts';
 import { CASTS, parseCast, placeCast, runOne } from './capacity.ts';
 import { NAMES, NAME_MAX, hatchName } from '../src/game/names.ts';
 import { GROWUP_IN, HATCH_IN, EGGS_PRESET, RETIRE_AT, sendLostNest } from '../src/game/presets.ts';
 import {
-  boardFor, oddsOf, autoRider, bestTeam, dragonReason, canSend, send, onTrip, roadOf, tutorial, DIFFICULTY, BADDIE_FROM_DAY, BOARD_MAX, LOST_NEST, HOME_KEEPERS,
+  boardFor, oddsOf, autoRider, bestTeam, dragonReason, canSend, send, onTrip, roadOf, tutorial, baddieDay, isTaken, DIFFICULTY, BADDIE_FROM_DAY, BOARD_MAX, LOST_NEST, HOME_KEEPERS,
 } from '../src/game/missions.ts';
 import type { Taken } from '../src/game/missions.ts';
 import { REGIONS, CHALLENGES, BADDIES, regionOf } from '../src/game/regions.ts';
@@ -215,7 +223,6 @@ import type { SceneFrame } from '../src/game/missionview.ts';
 import { demoTrip } from '../src/game/tripdemo.ts';
 import { stopStates } from '../src/game/maptable.ts';
 import { tripStart } from '../src/game/presets.ts';
-import { currentTrip, isTaken, barnRoom } from '../src/game/seams.ts';
 import type { Difficulty } from '../src/game/missiondata.ts';
 
 /**
@@ -243,8 +250,12 @@ const machineBusyS = (): number | null => {
 };
 /** When this thread started (the report's wall times), and the machine's busy CPU time and this process's then (the budget's allowance, at the end). */
 const T0 = performance.now(), BUSY0 = machineBusyS(), CPU0 = process.cpuUsage();
-/** The suite's budget, wall seconds (BASE_DESIGN 8.1), and the other work beside it (CPUs, on average) that excuses going over it. */
-const BUDGET_S = 30, BUSY_CPUS = 0.5;
+/**
+ * The suite's budget, wall seconds (BASE_DESIGN 8.1): 30 on four CPUs or more, scaled up on fewer (the six threads
+ * share what there is: os.availableParallelism, which heeds the process's CPU affinity) -- and the other work beside it
+ * (CPUs, on average) that excuses going over it.
+ */
+const CPUS = Math.max(1, Math.min(4, os.availableParallelism())), BUDGET_S = Math.round(30 * 4 / CPUS), BUSY_CPUS = 0.5;
 const spawn = (role: Role) => new Promise<WorkerResult>((ok, no) => {
   const w = new Worker(new URL(import.meta.url), { workerData: { role } });
   w.once('message', ok); w.once('error', no);
@@ -273,20 +284,17 @@ const noteUse = (w: CareSim, since: Uses | null = null) => {
 };
 /**
  * The service 30 minutes of play must give (section 2, seeds 1-3, and section 4's Rush after Rush, seed 1), measured
- * and frozen with about 20 % headroom (docs/BASE_DESIGN.md 4.7, 4.9, 8.1). The gates a dragon feels most keep the
- * plan's values on every seed: no need ever empties, done >= 120, a keeper's wait at the stand spot <= 20 s, bay waits
- * <= 60 s, a walking dragon never stands still, nor turns about on one spot, 10 s. The waits: with one car between the
- * floors and one dragon at a time in its shaft (the bay rule: BASE_DESIGN 2), S3's barn -- one room per need -- kept
- * the car busy about 95 % of the run, and a job's wait was mostly its dragon's wait for it (83.5 s on average over seeds 1-3, gated
- * at 100 s; 360 s at most). The barn repeats the need rooms on the floors, so a dragon's needs are met on its own
- * floor and the car is nearly idle (1 to 4 rides in 30 minutes): seeds 1-3 wait 28.4 / 21.6 / 26.0 s on average (mean
- * 25.3; 29.1 on seed 1 before the S6b review), 112.3 s at most -- gated at 31 s (the mean over the three) and 135 s. A landing wait, a rider held in the car and Rush after
- * Rush keep S3's gates (they measure far under them now: 13.0 s, 8.0 s). One seed's numbers move by a fifth either way
- * with any change to who goes when, so the average is gated over the three. An eye under the body of a dragon standing
- * over it (the sim's model: DRAGON_BODY and DRAGON_EYE, the worst of every element) is left only at a crowded landing
- * or bay edge: 3.7 s in all over the three runs, 1.5 s at most; the gates stay S3's (the old behaviour, 40.6 s over
- * three runs, fails them). Rush after Rush (one every 30 s): no need empty on seed 1, a rushed job done within
- * GATE.rushedS, keepers standing for rushed dragons under GATE.rushWaitShare of their time.
+ * and frozen with about 20 % headroom (docs/BASE_DESIGN.md 4.7, 4.9, 8.1). The gates a dragon feels most: no need ever
+ * empties, done >= 120, a keeper's wait at the stand spot <= 20 s, bay waits <= 60 s, a walking dragon never stands
+ * still, nor turns about on one spot, 10 s. The waits: the barn repeats the need rooms on the floors, so a dragon's
+ * needs are met on its own floor and the one car is nearly idle (1 to 4 rides in 30 minutes): seeds 1-3 wait 28.4 /
+ * 21.6 / 26.0 s on average (mean 25.3), 112.3 s at most -- gated at 31 s (the mean over the three) and 135 s. A
+ * landing wait, a rider held in the car and Rush after Rush measure far under their gates (13.0 s, 8.0 s). One seed's
+ * numbers move by a fifth either way with any change to who goes when, so the average is gated over the three. An eye
+ * under the body of a dragon standing over it (the sim's model: DRAGON_BODY and DRAGON_EYE, the worst of every
+ * element) is left only at a crowded landing or bay edge: 3.7 s in all over the three runs, 1.5 s at most. Rush after
+ * Rush (one every 30 s): no need empty on seed 1, a rushed job done within GATE.rushedS, keepers standing for rushed
+ * dragons under GATE.rushWaitShare of their time.
  */
 const SERVICE_SEEDS = [1, 2, 3] as const;
 const GATE = { done: 120, waitAvgS: 31, waitMaxS: 135, keeperWaitAvgS: 20, liftWaitS: 124, rideHeldS: 25, bayS: 60, keeperBayS: 30, walkStallS: 10,
@@ -294,19 +302,17 @@ const GATE = { done: 120, waitAvgS: 31, waitMaxS: 135, keeperWaitAvgS: 20, liftW
 /**
  * Section 10 (BASE_DESIGN 4.7): the benchmark cast `twelve` (tools/capacity.ts: the start's seven adults, three young and
  * two babies), seed 1, 30 minutes, checked every step with section 2's invariants and eye model (capacity.ts runOne).
- * Measured (after the S6b review): no need empty; wait avg 40.2 s, max 154.3 s; 266 done; 44 rides (the car 28 % busy);
- * a landing wait 42.1 s, the bay's edge 39.5 s; an eye covered 46.5 s in all, 14.1 s at most; no stall (one held
- * mid-walk, or turned about on one spot), no shaft overlap. Frozen with about 20 % headroom (none looser than the S6b
- * build's: the landing's 47 s kept); `rides` is a ceiling (the property that the car stays mostly free: the need rooms
- * repeat on the floors). (The design's gates -- 42 / 171 s, 217 done, 46 rides, 42 / 37 s, 44 / 17 s -- were frozen on
- * the capacity study's build, whose `babyHome` rule rested a baby moved on in the Hatchery; S5 forbids that -- a resting
- * baby would hide an egg -- and the build drops it. This build meets the design's waits, jobs, rides and longest eye
- * cover; its landing (42.1 s), bay edge (39.5 s) and eye cover in all (46.5 s) are over the design's by 0.1, 2.5 and
- * 2.5 s.)
+ * Measured: no need empty; wait avg 40.2 s, max 154.3 s; 266 done; 44 rides (the car 28 % busy); a landing wait 42.1
+ * s, the bay's edge 39.5 s; an eye covered 46.5 s in all, 14.1 s at most; no stall (one held mid-walk, or turned about
+ * on one spot), no shaft overlap. Frozen with about 20 % headroom (the landing's 47 s kept); `rides` is a ceiling (the
+ * property that the car stays mostly free: the need rooms repeat on the floors). (BASE_DESIGN 4.7's design gates --
+ * 42 / 171 s, 217 done, 46 rides, 42 / 37 s, 44 / 17 s -- were measured with a rule that rested a baby moved on in the
+ * Hatchery, where a resting baby would hide an egg; without it the landing (42.1 s), bay edge (39.5 s) and eye cover in
+ * all (46.5 s) are over the design's by 0.1, 2.5 and 2.5 s, and the rest within.)
  */
 const TWELVE = { waitAvgS: 48, waitMaxS: 185, done: 213, rides: 53, landingS: 47, bayS: 47, coverTotalS: 56, coverS: 17 } as const;
 /**
- * Section 10's other runs (BASE_DESIGN 4.7): S3's ride-throughput guards are gone (the car no longer carries the barn); each
+ * Section 10's other runs (BASE_DESIGN 4.7; the car no longer carries the barn, so there is no ride-throughput gate): each
  * keeps service gates, measured on seed 1 and frozen with about 20 % headroom -- 8 adults for 30 minutes (170 done,
  * 29.1 s average, 112.3 s at most, 3 rides), 10 adults for 10 (78 done, 24.7 s) and the ages preset for 6 (55 done,
  * 49.3 s) -- with no need empty in any, no keeper giving up and the car never standing with work for a minute.
@@ -319,19 +325,11 @@ const CROWD_GATES = [{ done: 136, waitAvgS: 35, waitMaxS: 135 }, { done: 62, wai
  */
 const FULL_DONE = 31;
 /**
- * Section 10 (the S6b review): twelve babies packed from the Hatchery and the ground floor up, seed 1, 30 minutes --
+ * Section 10: twelve babies packed from the Hatchery and the ground floor up, seed 1, 30 minutes --
  * measured 289 jobs done, waits 56.6 s on average and 320.9 s at most (no need at 0, no stall); frozen with about 20 %
  * headroom.
  */
 const BABIES_GATE = { done: 231, waitAvgS: 68, waitMaxS: 385 } as const;
-/**
- * The rooms and structures whose mechanic a later slice builds (plan 3.9): they must show no use yet, and each entry
- * goes when its mechanic lands. The lift's landed in S3 (dragons ride it), the hatchery's in S5 (eggs are laid and hatch
- * in it), and the tack room's, the bunks', the map room's and the Aerie's in S8 (missions: sent from the Map Room's
- * table, saddles from the Tack Room, the team off and back over the Aerie, the riders' rest in the Bunks). None is left:
- * every named, furnished room has a real purpose, proven used (#11).
- */
-const PLANNED: ReadonlySet<string> = new Set([]);
 /** Section 10's adults past the start's seven (the eighth, ninth and tenth), also section 15's crowded barn. */
 const CROWD: readonly DragonPlace[] = [
   // (BASE_DESIGN 3: the need rooms are one module each, repeated on the floors; these are the free module slots in
@@ -341,30 +339,29 @@ const CROWD: readonly DragonPlace[] = [
   { name: 'TENTH', element: 'rock', stage: 'adult', seed: 503, slot: { room: 'romp', i: 0 } },
 ];
 /**
- * Section 13 (plan S5): a stage-up waits until its dragon is settled, so its delay is the rest of whatever the dragon
- * was doing when it fell due (and, settled, a moment more while a keeper walks out of where its new body will be: it
- * holds for that, life.ts). Alone, a baby grows within GROW_ALONE of falling due (the plan's minute; measured 233 to
- * 2920 steps over seeds 1-8). In the busy barn a dragon is on an errand nearly all the time -- walking to a need's
- * room, waiting for the one car, being met (S3's saturated lift, docs/BASE_DESIGN.md 4.7) -- so the plan's minute is
- * out of reach there: a stage-up waits out one errand, measured 4061 to 8665 steps at most (68 to 144 s) over seeds
- * 1-8 in section 13's busy run (seed 1: 8665), gated at GROW_BUSY (a real game day, 3 minutes: a thirtieth of a
- * stage). At the real day's length, 30 days less a minute in, an adult (EMBER, seed 1: 2939 steps) is an elder within
- * 180 + GROW_REAL steps (the plan's).
+ * Section 13 (BASE_DESIGN 7, Growing up): a stage-up waits until its dragon is settled, so its delay is the rest of
+ * whatever the dragon was doing when it fell due (and, settled, a moment more while a keeper walks out of where its new
+ * body will be: it holds for that, life.ts). Alone, a baby grows within GROW_ALONE of falling due (a minute of play;
+ * measured 233 to 2920 steps over seeds 1-8). In the busy barn a dragon is on an errand nearly all the time -- walking
+ * to a need's room, waiting for the one car, being met (docs/BASE_DESIGN.md 4.7) -- so a minute is out of reach there:
+ * a stage-up waits out one errand, measured 4061 to 8665 steps at most (68 to 144 s) over seeds 1-8 in section 13's
+ * busy run (seed 1: 8665), gated at GROW_BUSY (a real game day, 3 minutes: a thirtieth of a stage). At the real day's
+ * length, 30 days less a minute in, an adult (EMBER, seed 1: 2939 steps) is an elder within 180 + GROW_REAL steps.
  */
 const GROW_ALONE = 3600, GROW_BUSY = 10800, GROW_REAL = 3600;
 /**
- * Section 15 (plan S6): how long past its due (30 days after it grew into an elder) an elder may wait to retire -- the
- * plan's minute. It retires as soon as it may be sent somewhere new (not being met, not in the lift's hands or its bay:
- * travel.ts redirectable), so it waits at most the end of a keeper's job at it, or a ride: measured 0-928 steps with
- * the retire preset and 130-1998 in section 15's busy barn (adults grown elder mid-errand, up to 5788 steps late) over
- * seeds 1-8 (seed 1: 0 and 1081).
+ * Section 15 (BASE_DESIGN 3, The Garden): how long past its due (30 days after it grew into an elder) an elder may wait
+ * to retire -- a minute of play. It retires as soon as it may be sent somewhere new (not being met, not in the lift's
+ * hands or its bay: travel.ts redirectable), so it waits at most the end of a keeper's job at it, or a ride: measured
+ * 0-928 steps with the retire preset and 130-1998 in section 15's busy barn (adults grown elder mid-errand, up to 5788
+ * steps late) over seeds 1-8 (seed 1: 0 and 1081). (The barn's last flier, which stays on by design, is left out.)
  */
 const RETIRE_LATE = 3600;
 /**
- * Section 15: how long a retiree may wait at a landing for the car (its one ride, down to the ground floor) -- S3's
- * landing gate (GATE.liftWaitS) -- and take from setting off to arriving at its plot: the longest a barn dragon's job
- * could wait in S3's barn (360 s: the repeated-room barn gates a job's wait tighter, but a retiree's walk out is the barn's
- * whole width and the garden's, at an elder's pace, so it keeps S3's bound). A retiree asks for nothing on its way, so no need of its grows more pressing to raise its
+ * Section 15: how long a retiree may wait at a landing for the car (its one ride, down to the ground floor) -- the
+ * barn's landing gate (GATE.liftWaitS) -- and take from setting off to arriving at its plot: 360 s (a retiree's walk
+ * out is the barn's whole width and the garden's, at an elder's pace, so it is gated looser than a barn job's wait). A
+ * retiree asks for nothing on its way, so no need of its grows more pressing to raise its
  * call as a barn caller's does; its call goes before the tiers once it has waited travel.ts OVERDUE (3600 steps), after
  * the ride in hand and the eye clashes at a crowded landing. Measured at most at a landing: 66-73 s in 15 (c)'s
  * crowded barn (seeds 1-3), 31-117 s in 15 (b)'s busy barn (seeds 1-8: seven retiring within minutes of each other, for
@@ -390,7 +387,7 @@ if (MAIN) {
     if (ROOM_INFO[r.kind].supplies || ROOM_INFO[r.kind].people) targets.push({ what: `the ${r.kind}'s post`, at: { f: r.floor, x: postX(r) } });
   }
   targets.push({ what: 'the Aerie deck', at: { f: AERIE_F, x: 300 } });
-  // (and out through the Garden Gate to a resident on every plot of a seven-plot garden, either way it faces: plan S6)
+  // (and out through the Garden Gate to a resident on every plot of a seven-plot garden, either way it faces: BASE_DESIGN 3, The Garden)
   const big = makeNets(worldWOf(7)), [g0, g1] = gardenSpan(worldWOf(7), null);
   for (let i = 0; i < 7; i++) for (const dir of [-1, 1]) {
     const x = Math.max(g0, Math.min(g1, plotMid(i) + dir * REACH.elder));
@@ -433,7 +430,7 @@ if (MAIN) {
   if (!trip || trip.legs.map(at).join(' / ') !== `f0 x ${LIFT_CX} / f5 x ${LIFT_CX} / f5 x 280`) fail(`the lift from the ground floor to the Aerie: ${trip ? trip.legs.map(at).join(' / ') : 'no route'}, not one ride`);
   // no dragon net reaches a tower but through the Garden Gate: every span of every stage's net lies inside the barn
   // (floors 1-2), the barn and on through the gate to the garden's end (floor 0), or on the deck and its sky bridge off the
-  // world's west edge (floor 5: plan S8, the missions' way out), floors 3 and
+  // world's west edge (floor 5: BASE_DESIGN 5, the missions' way out), floors 3 and
   // 4 have none, and no route reaches another tower room on the floors where the towers open into the barn -- the
   // gate's arches are the one tower door a dragon fits (every stage walks through it); and no keeper rides the lift
   for (const st of STAGES) {
@@ -566,7 +563,7 @@ if (ROLE === 'service') {
     for (const [k, n] of covers) coverEnd(k, n);
     const st = sim.stats, avg = st.waitSum / Math.max(1, st.started) / FPS, max = st.waitMax / FPS, kAvg = st.keeperWaitSum / Math.max(1, st.keeperWaits) / FPS;
     const liftWait = Math.max(st.liftWaitMax, callMax) / FPS;
-    // (each run: the gates a dragon feels most, as the plan set them -- no need empties, done >= 120, a keeper's wait at
+    // (each run: the gates a dragon feels most -- no need empties, done >= 120, a keeper's wait at
     // the stand spot short, waits at the bay's edge short -- and #7: every dragon met in four rooms or more, and moved)
     const busy = sim.keepers.map((k) => k.name).join(' ');
     if (st.done < GATE.done) fail(`${at}only ${st.done} jobs done in ${MIN} minutes (keepers: ${busy})`);
@@ -785,7 +782,7 @@ if (ROLE === 'saves') {
   a.keepers.forEach((k, i) => missing(k, blob.keepers[i], `keeper ${k.name}`));
   a.jobs.forEach((j, i) => missing(j, blob.jobs[i], `job ${j.id}`));
   missing(a.stats, blob.stats, 'stats');
-  // and every field of the world itself: a field a later slice adds to CareSim (a lift, a garden, a board) fails here
+  // and every field of the world itself: a field added to CareSim (as the lift, the garden and the board were) fails here
   // until it is saved, or listed below with the reason it needn't be (the digest is the save, so it can't see one left out)
   const UNSAVED: Readonly<Record<string, string>> = { rooms: 'placed again from roomPlaces', roomPlaces: 'saved as rooms', events: 'one step\'s output, cleared by the next', nets: 'built again from the garden\'s plots (layout.ts makeNets)',
     commands: 'the player\'s input for the next step, not the world (control.ts; a save is the world as released)' };
@@ -865,7 +862,7 @@ if (ROLE === 'saves') {
   console.log(`  6 saves: ${JSON.stringify(blob).length} bytes at step 5000; loaded, it, one at the first call for the car (${firstCall}), one at the first ride (${firstRide}) and ${forks.length} more saves (steps ${forks.map((f) => f.at).join(' ')}: ${[...caught].join(', ')}) step on 5000 to the same world; saves with a room's uses missing or a walk at a speed not the game's throw; v 999 throws ${threw instanceof Error ? threw.name : threw}`);
 }
 if (ROLE === 'saves') {
-  // life (plan S5): on a short day, the new game with a baby about to grow up and three eggs in the nests (one hatching
+  // life (BASE_DESIGN 7): on a short day, the new game with a baby about to grow up and three eggs in the nests (one hatching
   // at step 300, one at 900, one at 1200); saved while the eggs incubate, while the baby walks to the module slot it
   // will grow up in, the step an egg hatches and the step a dragon grows up -- each loaded (through JSON) and stepped
   // 5000 on in lockstep with the run it came from, to the same world
@@ -897,7 +894,7 @@ if (ROLE === 'saves') {
   console.log(`  6 saves (life, a 600-step day): ${forks.map((f) => `step ${f.at} (${f.what.split('+').map((k) => said[k]).join(', ')})`).join(', ')} step on 5000 to the same world`);
 }
 if (ROLE === 'saves') {
-  // the garden (plan S6): the garden preset (residents napping, sitting, strolling, waiting for their keeper and being
+  // the garden (BASE_DESIGN 3, The Garden): the garden preset (residents napping, sitting, strolling, waiting for their keeper and being
   // met by one come out of the barn) and the retire preset on a short day (elders set off, riding down, passing the
   // Garden Gate, arriving at their plots): each saved the first step it is seen, loaded through JSON and stepped 5000 on
   // in lockstep with the run it came from, to the same world; a resident's rhythm saved as its own copy
@@ -950,7 +947,7 @@ if (ROLE === 'saves') {
 }
 
 if (ROLE === 'saves') {
-  // missions (plan S8): THE LOST NEST sent on a short day (seed 2: a success, an egg), saved the first step it is seen
+  // missions (BASE_DESIGN 5): THE LOST NEST sent on a short day (seed 2: a success, an egg), saved the first step it is seen
   // mustering (a rider on the way up with a saddle), departing over the bridge, away, landing with the egg carried down,
   // a saddle being hung back, and a rider resting in the Bunks -- each loaded through JSON and stepped 5000 on in
   // lockstep with the run it came from, to the same world; and a save whose missions this build can't run throws
@@ -1001,8 +998,8 @@ if (ROLE === 'saves') {
   console.log(`  6 saves (missions, a 600-step day): ${forks.map((f) => `step ${f.at} (${f.what})`).join(', ')} step on 5000 to the same world; ${bad.length} saves whose missions can't be run (${bad.map(([w]) => w).join(', ')}) throw`);
 }
 if (ROLE === 'saves') {
-  // missions and a keeper held by hand together (the S7 + S8 merge, plan 3.6: "mid-muster and mid-away", "control
-  // released on load"): THE LOST NEST sent (seed 2, a 600-step day) and a keeper who stays home taken by hand at once,
+  // missions and a keeper held by hand together (BASE_DESIGN 7, Saves: mid-muster and mid-away, the hand let go on
+  // load): THE LOST NEST sent (seed 2, a 600-step day) and a keeper who stays home taken by hand at once,
   // walked back and forth by commands; saved mid-muster (a rider on the way up with a saddle) and mid-away, the save
   // holds nobody by hand, keeps the trip whole, and -- loaded through JSON -- steps 5000 on (through the landing) to the
   // same world as the run given a release that step
@@ -1098,7 +1095,7 @@ if (MAIN) {
   // a keeper waits between jobs clear of the body of a young, adult or elder dragon in any slot on their floor (their
   // extent is x +- 10), so a keeper at rest is never hidden behind a grown dragon; a resting baby's tail may reach a
   // little into it (BASE_DESIGN 3: a one-module room has no spot clear of both its baby sub-slots and of its grown dragon's
-  // slot, and keepers are drawn behind dragons, G6) -- at most KEEPER_BABY_TAIL px, and never with its head (the eye to
+  // slot, and keepers are drawn behind dragons: ART_BIBLE 1.4) -- at most KEEPER_BABY_TAIL px, and never with its head (the eye to
   // the snout); the waiting spot is in the keeper's own room
   const KEEPER_BABY_TAIL = 13;
   let babyTail = 0;
@@ -1210,7 +1207,7 @@ if (MAIN) {
       if (seen.join() !== moves.slice(t - 1, t + 19).join()) { fail(`gait: a pet caught up to anim time ${t} of a walk with an intro plays on out of step`); break; }
     }
   }
-  // the lively step (BASE_DESIGN 2; travel.ts LIVELY): a walk played faster moves the body by exactly the same factor (G13) --
+  // the lively step (BASE_DESIGN 2; travel.ts LIVELY): a walk played faster moves the body by exactly the same factor --
   // every element and stage, a bout at speed 1, then at LIVELY for a cycle (stepping on to the car, across the bay),
   // then at 1 again, as a crosser's does: the gait's s x moveAt(T) each step, T advancing s, is what an anim player
   // playing that walk at those speeds carries a pet by (speed x its move), step for step
@@ -1292,8 +1289,8 @@ if (ROLE === 'capacity') {
   // travel.ts LIVELY, their bodies moved by the same factor: BASE_DESIGN 2, the lively step). The benchmark (4.7): the
   // cast `twelve` (tools/capacity.ts parseCast / placeCast: the start's seven adults, three young and two babies) runs 30 minutes on seed 1, checked every
   // step by capacity.ts runOne with section 2's invariants and eye model -- no need empty, the waits short, the car mostly
-  // free, no stall, no two in the shaft (the 8-seed sweep is `npm run capacity`). Then the crowds S3 measured the one car
-  // against -- eight adults, ten, the ages preset's twelve of every stage -- keep service gates, and the `full` preset,
+  // free, no stall, no two in the shaft (the 8-seed sweep is `npm run capacity`). Then the crowds the one car was
+  // measured against -- eight adults, ten, the ages preset's twelve of every stage -- keep service gates, and the `full` preset,
   // 21 dragons forced 9 over the cap (4.7: every rule holds over it too), keeps moving, its due egg waiting.
   const out: string[] = [];
   const twelve = placeCast(parseCast('twelve'));
@@ -1344,7 +1341,7 @@ if (ROLE === 'full') {
 }
 
 if (ROLE === 'babies') {
-  // (the S6b review) a barn of babies -- the late game's: the start's seven retired to the garden, hatchlings in their
+  // a barn of babies -- the late game's: the start's seven retired to the garden, hatchlings in their
   // places, any mix of BARN_CAP counts -- served, and two on their way to a landing kept in the order they stand; in a
   // worker of its own
   const out: string[] = [];
@@ -1395,8 +1392,8 @@ if (ROLE === 'babies') {
   // sub-slots, then the free ones room by room from the ground floor up, so every room of the ground floor holds two
   // babies. 30 minutes on seed 1, checked every step as the twelve (capacity.ts runOne): no need at 0, no stall -- one
   // held mid-walk, or turned about on one spot -- no invariant broken; the waits and the jobs done frozen with about
-  // 20 % headroom (measured: BABIES_GATE). Before the S6b review the ground floor's babies, each wanting a room another
-  // rested in, stood still: 3.1 M need-steps at 0, 83 jobs done
+  // 20 % headroom (measured: BABIES_GATE). Without a job's wait for its own floor's room ending at SOON (travel.ts), the
+  // ground floor's babies, each wanting a room another rested in, stood still: 3.1 M need-steps at 0, 83 jobs done
   {
     const rooms = placeRooms(START_ROOMS), nth = (r: (typeof rooms)[number]) => rooms.filter((q) => q.kind === r.kind).indexOf(r), places: DragonPlace[] = [];
     for (const r of [...rooms.filter((q) => q.kind === 'hatchery'), ...rooms.filter((q) => q.kind !== 'hatchery')]) for (const sl of r.slots) {
@@ -1481,7 +1478,7 @@ if (MAIN) {
       if (nightness(r) > 0 && !(lit.slits && lit.rings > 0 && lit.hearth && lit.skylight)) fail(`clock: at ${what} the stars are out but the lights are ${JSON.stringify(lit)}`);
       if (bands.join() === BACKDROPS.sky.day.join() && (lit.slits || lit.rings || lit.hearth || lit.skylight || lit.icon !== 'sun')) fail(`clock: at ${what} the sky is the day's but the lights are ${JSON.stringify(lit)}`);
       if ((lit.icon === 'moon') !== (nightness(r) >= 2)) fail(`clock: at ${what} the icon is the ${lit.icon} with the night ${nightness(r)}/3 in the sky`);
-      // (plan S6c: the walls' night step turns with the lamps -- the dorm's rings -- in the same thirds: none under the
+      // (BASE_DESIGN 7: the walls' night step turns with the lamps -- the dorm's rings -- in the same thirds: none under the
       // day's own sky, all the way under the night's own, never behind the stars)
       if (lit.walls < lit.rings || (lit.rings < 2 && lit.walls !== lit.rings)) fail(`clock: at ${what} the walls are at night step ${lit.walls} with the lamps' rings at ${lit.rings}`);
       if (bands.join() === BACKDROPS.sky.day.join() && lit.walls !== 0) fail(`clock: at ${what} the sky is the day's but the walls are at night step ${lit.walls}`);
@@ -1525,13 +1522,13 @@ if (MAIN) {
   const phases = new Set<string>();
   for (let s = 0; s <= 20000; s += 450) phases.add(readClock(eve.clock0 + s).phase);
   // (the simulation's own modules: none reads the phase, the hour or the sky; only the view does -- and garden.ts and
-  // missions.ts, which are not in this list on purpose: plan G8's two exceptions, the residents' naps and the Map Room's
+  // missions.ts, which are not in this list on purpose: the two exceptions (BASE_DESIGN 7), the residents' naps and the Map Room's
   // board rolled at dawn (05:00); each keeps its state out of barnKey (a world's missions are not the barn's care, and
   // without a trip sent nothing they do touches it), and these modules only call into them)
-  // (control.ts runs inside CareSim.step -- the hand's commands -- and tripdemo.ts builds the trip preset's team: S7, S9)
+  // (control.ts runs inside CareSim.step -- the hand's commands -- and tripdemo.ts builds the trip preset's team: BASE_DESIGN 4.10, 6)
   const SIM_FILES = ['sim.ts', 'travel.ts', 'needs.ts', 'layout.ts', 'gait.ts', 'save.ts', 'start.ts', 'presets.ts', 'rand.ts', 'life.ts', 'names.ts', 'control.ts', 'tripdemo.ts'];
   const reads = SIM_FILES.filter((f) => /\b(readClock|phaseOf|PHASE_HOURS|PHASE_ORDER|DayPhase|skyBands|nightness|dimness|skyPhase|lightsOf)\b/.test(fs.readFileSync(new URL(`../src/game/${f}`, import.meta.url), 'utf8')));
-  if (reads.length) fail(`night: ${reads.join(', ')} read the day's phase (only the view may: plan G8)`);
+  if (reads.length) fail(`night: ${reads.join(', ')} read the day's phase (only the view may: BASE_DESIGN 7)`);
   console.log(`  12 night: a barn started at 07:00 and one at 19:00 (seed 1) agree on barnKey at all ${checked} checks over 20000 steps, through ${[...phases].join(', ')}; ${SIM_FILES.length} simulation modules, none reading the day's phase`);
   noteUse(day); noteUse(eve);
 }
@@ -1671,7 +1668,7 @@ if (MAIN) {
   console.log(`  13 growing up: alone (a ${SHORT}-step day), BURR grew ${a.grew.map((g) => `${g.stage} at step ${g.t} (${g.at}, ${g.delay} late)`).join(', ')}, each stage exactly ${LEN} steps after the last, walking out of the Hatchery to a module slot first; ${a.drains + b.drains} needs drained at the new stage's rate the step after; ${a.cheers + b.cheers + c.cheers} grow-ups held for their happy, none moved on or met meanwhile, none with a keeper where it grew; the busy barn (seven adults and BURR falling due 5 s apart), steps late: ${fmt(b)} (at most ${busy.stats.growDelayMax}, gate ${GROW_BUSY}); the real day (${DAY_STEPS} steps), EMBER ${STAGE_DAYS} days less a minute in grew an elder at step ${at} (due at 180); Rushed on its way to grow up (${called}), BURR was served ${served} and grew young in the ${cy?.at ?? '-'}, ${cy?.delay ?? '-'} late`);
 }
 
-// ---------- 14. eggs and hatching (#5.4, the Hatchery) ----------
+// ---------- 14. eggs and hatching (#5: eggs; the Hatchery) ----------
 if (MAIN) {
   const SHORT = 600, H = HATCH_DAYS * SHORT;
   const seedOf = (w: CareSim, id: number) => (mix32(w.seed, TAG.EGG, id) & 0x7fffffff) || 1;
@@ -1724,7 +1721,7 @@ if (MAIN) {
   // every baby sub-slot taken, the barn under its cap (BASE_DESIGN 4.7: in the start barn a sub-slot is always free under the
   // cap -- 13 grown modules -- so a small barn: one kitchen, EMBER in its module slot, and the Hatchery, a baby in each
   // sub-slot; everyone's needs full so nobody moves): the due egg waits in its nest, nothing lost; one baby goes out (as
-  // one will to the garden or on a trip: S6, S8), and the egg hatches into its sub-slot the step it frees
+  // one will to the garden or on a trip), and the egg hatches into its sub-slot the step it frees
   const TINY: readonly RoomPlace[] = [{ kind: 'kitchen', part: 'barn', floor: 0, mod: 0 }, { kind: 'hatchery', part: 'barn', floor: 2, mod: 0 }];
   const tinyCast: DragonPlace[] = [START_DRAGONS[0], ...[0, 1].map((i): DragonPlace => ({ name: ['BURR', 'PEBBLE'][i], element: (['spike', 'rock'] as const)[i], stage: 'baby', seed: 45 + i, slot: { room: 'hatchery', i } }))];
   const full = new CareSim(TINY, tinyCast, [START_KEEPERS[0]], { seed: 1, dayLen: SHORT });
@@ -1863,20 +1860,35 @@ if (MAIN) {
     return { retired, arrived, grew, callMax, walkMax, restMax };
   };
   // (a) the retire preset: all seven starters elders 29.9 days in, on a short day: each retires at its due or after, soon
+  // -- all but the last to be free to go, which stays on as the barn's last flier (life.ts lastFlier: a barn with nobody
+  // left to fly a mission would never have an egg again)
   const spec = startSpec('retire'), pre = new CareSim(spec.rooms, spec.dragons, spec.keepers, { seed: 1, dayLen: SHORT });
-  const a = retireRun(pre, 40000, 'preset');
-  const n = pre.dragons.length, res = pre.dragons.filter((d) => d.place === 'garden').length;
-  if (a.retired.size !== n || a.arrived.size !== n) fail(`retire (preset): ${a.retired.size} of ${n} retired, ${a.arrived.size} arrived`);
+  const n = pre.dragons.length, a = retireRun(pre, 40000, 'preset', n - 1), res = pre.dragons.filter((d) => d.place === 'garden').length;
+  const stays = pre.dragons.filter((d) => d.place === 'barn');
+  if (a.retired.size !== n - 1 || a.arrived.size !== n - 1) fail(`retire (preset): ${a.retired.size} of ${n} retired, ${a.arrived.size} arrived (want all but the last flier)`);
+  if (stays.length !== 1 || !staysOn(pre, stays[0]) || !stays[0].slot || pre.dragons.some((d) => d !== stays[0] && staysOn(pre, d))) fail(`retire (preset): the barn keeps ${stays.map((d) => `${d.name} (stays on ${staysOn(pre, d)}, slot ${!!d.slot})`).join(', ') || 'nobody'}, not one last flier`);
   if (pre.stats.retireDelayMax > RETIRE_LATE) fail(`retire (preset): a retirement waited ${pre.stats.retireDelayMax} steps past its due (want <= ${RETIRE_LATE})`);
-  if ((pre.stats.used.gate ?? 0) < n) fail(`retire (preset): the Garden Gate was passed ${pre.stats.used.gate ?? 0} times, fewer than the ${n} who walked out`);
-  if (pre.garden.plots !== n || res !== n || pre.worldW !== GARDEN_X0 + n * GARDEN_PLOT + GARDEN_END || pre.worldW !== 2568) fail(`retire (preset): ${pre.garden.plots} plots, ${res} residents, the world ${pre.worldW} wide (want 7, 7, 2568)`);
+  if ((pre.stats.used.gate ?? 0) < n - 1) fail(`retire (preset): the Garden Gate was passed ${pre.stats.used.gate ?? 0} times, fewer than the ${n - 1} who walked out`);
+  if (pre.garden.plots !== n - 1 || res !== n - 1 || pre.worldW !== GARDEN_X0 + (n - 1) * GARDEN_PLOT + GARDEN_END || pre.worldW !== 2392) fail(`retire (preset): ${pre.garden.plots} plots, ${res} residents, the world ${pre.worldW} wide (want 6, 6, 2392)`);
+  // ...and it stays on until another dragon can fly one: an egg laid, hatched and grown young, it retires too (a baby
+  // is no flier; a young dragon goes on the easy roads)
+  const flier = stays[0], at6 = `at most ${pre.stats.retireDelayMax}, gate ${RETIRE_LATE}); a retiree at a landing at most ${(a.callMax / FPS).toFixed(1)} s, walking out at most ${(a.walkMax / FPS).toFixed(1)} s; the Garden Gate passed ${pre.stats.used.gate} times; ${pre.garden.plots} plots, ${res} residents, the world ${pre.worldW} wide`;
+  pre.addEgg('fire');
+  let youngAt = -1, leftAt = -1;
+  for (let s = 0; s < (HATCH_DAYS + STAGE_DAYS + 2) * SHORT && leftAt < 0; s++) {
+    pre.step();
+    if (youngAt < 0 && pre.dragons.some((d) => d !== flier && d.stage === 'young')) youngAt = pre.tick;
+    if (flier && flier.goal === 'retire') leftAt = pre.tick;
+    if (flier && youngAt < 0 && flier.goal === 'retire') { fail(`retire (preset): ${flier.name}, the last flier, retired at step ${pre.tick} with only a baby left in the barn`); break; }
+  }
+  if (!flier || youngAt < 0 || leftAt < 0 || leftAt - youngAt > RETIRE_LATE) fail(`retire (preset): the last flier ${flier?.name ?? '-'} ${leftAt < 0 ? 'never retired' : `retired at step ${leftAt}`}, the hatchling grew young at ${youngAt} (want within ${RETIRE_LATE} steps after)`);
   noteUse(pre);
   // (b) the busy barn: the seven adults falling due to grow elder 5 s apart from 10 s in, every one mid-errand (so most
   // grow late: section 13's busy barn), then, 30 days on, due to retire mid-errand; each retires 30 days after the step it
   // grew, never 30 days after it fell due to (the elder stage has no next to keep in step with: life.ts)
   const busy = new CareSim(START_ROOMS, START_DRAGONS.map((p, i) => ({ ...p, days: STAGE_DAYS - (600 + 300 * i) / SHORT })), START_KEEPERS, { seed: 1, dayLen: SHORT });
-  const b = retireRun(busy, 60000, 'busy');
-  if (b.grew.size !== n || b.retired.size !== n || b.arrived.size !== n) fail(`retire (busy): ${b.grew.size} of ${n} grew into elders, ${b.retired.size} retired, ${b.arrived.size} arrived`);
+  const b = retireRun(busy, 60000, 'busy', n - 1);
+  if (b.grew.size !== n || b.retired.size !== n - 1 || b.arrived.size !== n - 1 || busy.dragons.filter((d) => staysOn(busy, d)).length !== 1) fail(`retire (busy): ${b.grew.size} of ${n} grew into elders, ${b.retired.size} retired, ${b.arrived.size} arrived (want ${n}, all but the last flier)`);
   if (![...b.grew.values()].some((g) => g.late > 0)) fail('retire (busy): no elder grew late, so the busy run shows nothing of a late stage-up');
   if (busy.stats.retireDelayMax > RETIRE_LATE) fail(`retire (busy): a retirement waited ${busy.stats.retireDelayMax} steps past its due (want <= ${RETIRE_LATE})`);
   noteUse(busy);
@@ -1897,7 +1909,7 @@ if (MAIN) {
   const fmt = (w: CareSim, r: typeof a) => w.dragons.map((d) => `${d.name} ${r.retired.get(d.id)?.late ?? '-'}/${r.arrived.get(d.id) ?? '-'}`).join(', ');
   const over = (v: number) => (v > 0 ? `overlapping at most ${v.toFixed(1)} px` : `${(-v).toFixed(1)} px apart at least`);
   const spans = [...b.retired.entries()].map(([id, r]) => `${busy.dragons.find((d) => d.id === id)!.name} ${b.grew.get(id)!.late}/${((r.span ?? 0) / SHORT).toFixed(2)}`).join(', ');
-  console.log(`  15 retirement (a ${SHORT}-step day): the retire preset, steps late / arrived: ${fmt(pre, a)} (at most ${pre.stats.retireDelayMax}, gate ${RETIRE_LATE}); a retiree at a landing at most ${(a.callMax / FPS).toFixed(1)} s, walking out at most ${(a.walkMax / FPS).toFixed(1)} s; the Garden Gate passed ${pre.stats.used.gate} times; ${pre.garden.plots} plots, ${res} residents, the world ${pre.worldW} wide, resting bodies ${over(a.restMax)} (gate ${REST_OVERLAP}); the busy barn (seven adults growing elder 5 s apart, mid-errand), steps it grew late / days an elder: ${spans} (each ${RETIRE_DAYS} or more), steps it retired late / arrived: ${fmt(busy, b)} (at most ${busy.stats.retireDelayMax}), a retiree at a landing at most ${(b.callMax / FPS).toFixed(1)} s, walking out at most ${(b.walkMax / FPS).toFixed(1)} s; the crowded barn (ten adults, ECHO retiring): ECHO at a landing ${(cr.callMax / FPS).toFixed(1)} s (gate ${RETIREE_LIFT_S}), walking out ${(cr.walkMax / FPS).toFixed(1)} s (gate ${RETIREE_WALK_S}); the real day, the first under the gate's arch: ${under}`);
+  console.log(`  15 retirement (a ${SHORT}-step day): the retire preset, steps late / arrived: ${fmt(pre, a)} (${at6}, resting bodies ${over(a.restMax)} (gate ${REST_OVERLAP}); ${flier?.name} stayed on as the last flier until a hatchling grew young at step ${youngAt}, and retired at ${leftAt}; the busy barn (seven adults growing elder 5 s apart, mid-errand), steps it grew late / days an elder: ${spans} (each ${RETIRE_DAYS} or more), steps it retired late / arrived: ${fmt(busy, b)} (at most ${busy.stats.retireDelayMax}), a retiree at a landing at most ${(b.callMax / FPS).toFixed(1)} s, walking out at most ${(b.walkMax / FPS).toFixed(1)} s; the crowded barn (ten adults, ECHO retiring): ECHO at a landing ${(cr.callMax / FPS).toFixed(1)} s (gate ${RETIREE_LIFT_S}), walking out ${(cr.walkMax / FPS).toFixed(1)} s (gate ${RETIREE_WALK_S}); the real day, the first under the gate's arch: ${under}`);
 }
 
 // ---------- 16. the garden's residents (#10) ----------
@@ -1958,7 +1970,7 @@ if (MAIN) {
   if (worstDrain === 0 || drains.length < R.length * 2) fail(`residents: the drain was measured on ${drains.length} needs, not every resident's food and love`);
   if (cover) fail(`residents: a resident at rest had its eye under another's body for ${cover} steps`);
   if (restMax > REST_OVERLAP) fail(`residents: two residents at rest lay ${restMax.toFixed(1)} px one over the other (want <= ${REST_OVERLAP})`);
-  // (the barn's service beside them: the S3 gates a dragon feels, per run)
+  // (the barn's service beside them: section 2's gates a dragon feels, per run)
   if (st.emptySteps) fail(`residents: a need sat at 0 for ${st.emptySteps} dragon-steps`);
   if (st.waitTimeouts) fail(`residents: ${st.waitTimeouts} keepers gave up waiting`);
   if (avg > GATE.waitAvgS || max > GATE.waitMaxS || kAvg > GATE.keeperWaitAvgS || st.liftWaitMax / FPS > GATE.liftWaitS) fail(`residents: jobs waited ${avg.toFixed(1)} s on average, ${max.toFixed(1)} s at most, keepers ${kAvg.toFixed(1)} s at the stand spot, a landing ${(st.liftWaitMax / FPS).toFixed(1)} s (want <= ${GATE.waitAvgS}, ${GATE.waitMaxS}, ${GATE.keeperWaitAvgS}, ${GATE.liftWaitS})`);
@@ -1967,13 +1979,14 @@ if (MAIN) {
   console.log(`  16 residents (the garden preset, ${MIN} min of the real day): ${R.map((d) => { const p = per.get(d)!; return `${d.name} napped ${(p.nap / steps * 100).toFixed(0)} % (every one of ${p.night} night steps), strolled ${p.strolls} times, ${p.visits.length} keeper visits (${p.visits.join(', ') || 'none'}; ${perHour(p.visits.length)} an hour)`; }).join('; ')}; jobs for food and love only, draining at a quarter of an elder's (per step x 1e6: ${drains.join(', ')}; within ${(worstDrain * 100).toFixed(3)} %); two at rest overlapping at most ${restMax.toFixed(1)} px (gate ${REST_OVERLAP}); the barn beside them: ${st.done} jobs done, wait avg ${avg.toFixed(1)} s, max ${max.toFixed(1)} s, ${st.emptySteps} steps with a need at 0, the Garden Gate passed ${st.used.gate ?? 0} times`);
 }
 
-// ---------- 17. the Map Room's board (#5.1, #5.2) ----------
+// ---------- 17. the Map Room's board (#5: the mission chooser, the world map) ----------
 if (MAIN) {
   // the board is a pure function of the seed, the day and the map: the same twice; day 1 has THE LOST NEST first; three
-  // missions at most, one a region, each an explored region's; no baddie before day 3; each difficulty's road as long
-  // as it should be, from its region's pool, no challenge twice
+  // missions at most, one a region, each an explored region's; no baddie before day 3, and one on every baddie's day
+  // (3, 7, ...) whose board has a baddie's region; each difficulty's road as long as it should be, from its region's
+  // pool, no challenge twice
   const all = REGIONS.map((r) => r.id), start = REGIONS.filter((r) => r.start).map((r) => r.id);
-  let boards = 0, baddies = 0;
+  let boards = 0, baddies = 0, baddieDays = 0;
   const kinds = new Map<string, number>();
   for (let seed = 1; seed <= 5; seed++) for (let day = 1; day <= 10; day++) for (const map of [start, all]) {
     const a = boardFor(seed, day, map, []), b = boardFor(seed, day, map, []);
@@ -1983,11 +1996,14 @@ if (MAIN) {
     if (a.length > BOARD_MAX || a.length !== Math.min(BOARD_MAX, map.length)) fail(`board: seed ${seed} day ${day} has ${a.length} missions for ${map.length} regions`);
     if (new Set(a.map((m) => m.region)).size !== a.length || a.some((m) => !map.includes(m.region))) fail(`board: seed ${seed} day ${day} has two missions in a region, or one in an unexplored one`);
     if (new Set(a.map((m) => m.id)).size !== a.length) fail(`board: seed ${seed} day ${day}'s missions share an id`);
+    // (a baddie's day: a region with a baddie on the board shows its hard road -- a big baddie to meet from day 3)
+    if (baddieDay(day) && a.some((m) => regionOf(m.region).baddie) && !a.some((m) => m.baddie)) fail(`board: seed ${seed} day ${day}, a baddie's day, has no road ending in a baddie (${a.map((m) => `${m.title} ${m.difficulty}`).join(', ')})`);
     for (const m of a) {
       const D = DIFFICULTY[m.difficulty], pool = regionOf(m.region).pool;
       kinds.set(m.difficulty, (kinds.get(m.difficulty) ?? 0) + 1);
       if (m.baddie) baddies++;
       if (m.baddie && day < BADDIE_FROM_DAY) fail(`board: seed ${seed} day ${day}: ${m.title} ends in a baddie before day ${BADDIE_FROM_DAY}`);
+      if (m.baddie && baddieDay(day)) baddieDays++;
       if (m.baddie && (m.difficulty !== 'hard' || m.baddie !== regionOf(m.region).baddie)) fail(`board: ${m.title}'s baddie ${m.baddie} is not its hard road's`);
       const want = m.difficulty === 'hard' && !m.baddie ? D.challenges + 1 : D.challenges;
       if (m.challenges.length !== want || new Set(m.challenges).size !== want || m.challenges.some((c) => !pool.includes(c))) fail(`board: seed ${seed} day ${day}: ${m.title} (${m.difficulty}) has ${m.challenges.join(', ')}`);
@@ -2005,12 +2021,12 @@ if (MAIN) {
   }
   if (rolls.join() !== '725,1325,1925' || w.missions.day !== 4) fail(`board: rolled at clocks ${rolls.join(', ')} (day ${w.missions.day}), not at each 05:00 (725, 1325, 1925 on a 600-step day from 07:00)`);
   noteUse(w);
-  console.log(`  17 board: ${boards} boards (seeds 1-5, days 1-10, the start's map and the whole) the same rolled twice, day 1's always THE LOST NEST first; ${[...kinds].map(([k, n]) => `${n} ${k}`).join(', ')}, ${baddies} ending in a baddie (none before day ${BADDIE_FROM_DAY}); a world's board rolled at clocks ${rolls.join(' and ')} (each 05:00)`);
+  console.log(`  17 board: ${boards} boards (seeds 1-5, days 1-10, the start's map and the whole) the same rolled twice, day 1's always THE LOST NEST first; ${[...kinds].map(([k, n]) => `${n} ${k}`).join(', ')}, ${baddies} ending in a baddie (none before day ${BADDIE_FROM_DAY}; ${baddieDays} on a baddie's day, one on every such board with a baddie's region); a world's board rolled at clocks ${rolls.join(' and ')} (each 05:00)`);
 }
 
-// ---------- 18. the odds (#5.3: the team meets the road's challenges) ----------
+// ---------- 18. the odds (#5: the team meets the road's challenges; BASE_DESIGN 5.4) ----------
 if (MAIN) {
-  // hand-computed cases (plan S8's formula: 0.20 + 0.15 a challenge met + 0.15 the baddie met + 0.05 a pair in good
+  // hand-computed cases (BASE_DESIGN 5.4's formula: 0.20 + 0.15 a challenge met + 0.15 the baddie met + 0.05 a pair in good
   // spirits + 0.05 a pair of partners, clamped to 0.05-0.95): moods set by hand (every need full: 0.8; one at 0.2: low)
   const w = newSim(1), by = (n: string) => w.dragons.find((d) => d.name === n)!, keeper = (n: string) => w.keepers.find((k) => k.name === n)!.id;
   const mood = (n: string, good: boolean) => { const d = by(n); for (const k of NEEDS) if (hasNeed(d.element, k)) d.needs[k] = 1; if (!good) d.needs.food = 0.2; d.mood = moodOf(d.element, d.needs); };
@@ -2034,14 +2050,14 @@ if (MAIN) {
     rows.push(`${(got * 100).toFixed(0)} %`);
   }
   if (oddsOf(w, nest, []) !== 0) fail('odds: an empty team has odds');
-  console.log(`  18 odds: ${cases.length} hand-computed teams, ${rows.join(', ')} (the plan's two examples 65 % and 40 %; 95 % the top clamp; 20 % the least a pair can have, above the bottom clamp's 5 %)`);
+  console.log(`  18 odds: ${cases.length} hand-computed teams, ${rows.join(', ')} (BASE_DESIGN 5.4's two examples 65 % and 40 %; 95 % the top clamp; 20 % the least a pair can have, above the bottom clamp's 5 %)`);
 }
 
-// ---------- 19. who may go (#5.3: dragons and people as solutions; P13: 2 keepers home) ----------
+// ---------- 19. who may go (#5: dragons and people as solutions; BASE_DESIGN 5.2: 2 keepers home) ----------
 if (MAIN) {
   // a baby, a young dragon on a normal or hard road and a garden resident may not go; a keeper the player has taken is
-  // never an auto rider (seams.ts isTaken: BEA taken, first as a stub -- a Taken the pick is given -- then by S7's own
-  // take command, below), for any mission and any dragon; two riders at most, two keepers always home; one team out at
+  // never an auto rider (missions.ts isTaken: BEA taken, first as a stub -- a Taken the pick is given -- then by the
+  // take command itself, below), for any mission and any dragon; two riders at most, two keepers always home; one team out at
   // a time
   const ages = buildSim(startSpec('ages'), 1), gar = buildSim(startSpec('garden'), 1), easy = ages.missions.board.find((m) => m.difficulty === 'easy')!;
   const hardOf = (m: Mission): Mission => ({ ...m, difficulty: 'hard' }), normalOf = (m: Mission): Mission => ({ ...m, difficulty: 'normal' });
@@ -2078,8 +2094,8 @@ if (MAIN) {
   if (home < HOME_KEEPERS) fail(`team: ${home} keepers home with a team out`);
   if (dragonReason(w, w.dragons.find((d) => d.name === 'RIPPLE')!, other ?? null) !== 'AWAY') fail('team: a dragon on the team out could go again');
   noteUse(w);
-  // S7's take, for real (the merge): BEA taken by hand through the command queue -- isTaken and CareSim.free leave her
-  // out; no auto rider (the same 420 asks, the pick asking the seam itself) nor BEST TEAM chooses her; a team with her
+  // the take, for real: BEA taken by hand through the command queue -- isTaken and CareSim.free leave her out; no auto
+  // rider (the same 420 asks, the pick asking isTaken itself) nor BEST TEAM chooses her; a team with her
   // riding can't be sent (canSend), and a send command with her is refused with that reason (the `send` event); BEST
   // TEAM sent by command goes (its event with no reason) and musters; a rider on that trip can't be taken by hand (a
   // `refused` event; BEA stays held); held for the muster and 3000 steps more, BEA is never given a job
@@ -2110,9 +2126,10 @@ if (MAIN) {
   for (let s = 0; s < 6000; s++) { tw.step(); if (tBea.job) handJobs++; }
   if (handJobs || !tBea.manual) fail(`team: BEA, held by hand beside a muster, had a job ${handJobs} steps (manual ${tBea.manual})`);
   noteUse(tw);
-  // (a keeper taken at work -- finishing the job first -- whose dragon is then sent: the job gone from under them
-  // (missions.ts leaveBarn), they are the player's where they stand, steerable, as a finished job leaves them
-  // (CareSim.drop); never left finishing a job that no longer is, held but not steerable)
+  // (a keeper taken at work -- finishing the job first -- whose dragon is then sent: they finish it (missions.ts
+  // leaveBarn: a keeper at work finishes, the job done then), and the dragon keeps its slot until it sets off; then they
+  // are the player's where they stand, steerable, as a finished job leaves them; never left finishing a job that no
+  // longer is, held but not steerable)
   const pw = newSim(2);
   let pk: Keeper | null = null;
   for (let s = 0; s < 20000 && !pk; s++) { pw.step(); pk = pw.keepers.find((k) => k.phase === 'work' && !!k.job && k.job.need !== 'sleep' && k.job.dragon.stage !== 'baby') ?? null; }
@@ -2127,6 +2144,11 @@ if (MAIN) {
     pw.command({ kind: 'send', mission: pm.id, pairs: [{ dragon: pd.id, keeper: pr ?? 0 }] }); pw.step();
     const ev = pw.events.find((e) => e.kind === 'send');
     if (!ev || ev.kind !== 'send' || ev.reason !== null || pw.missions.trip?.state !== 'muster') fail(`team: ${pd.name} sent from under ${pk.name}'s hands: ${JSON.stringify(ev)}`);
+    const job = pk.job, slot = pd.slot, done0 = pw.stats.done;
+    if (!job || !pk.pendingTake || pk.phase !== 'work' || !pd.act || !slot || pd.goal !== 'muster') fail(`team: ${pk.name}, at work on ${pd.name} when it was sent, stopped: pendingTake ${pk.pendingTake}, ${pk.phase}, job ${job?.id ?? null}, act ${pd.act?.need ?? null}, slot ${!!slot}, goal ${pd.goal}`);
+    let finished = 0;
+    for (let s = 0; s < 400 && pk.pendingTake; s++) { pw.step(); finished++; if (pk.pendingTake && pd.slot !== slot) fail(`team: ${pd.name} let its slot go while ${pk.name} was still at work with it`); }
+    if (pw.stats.done !== done0 + 1 || pw.jobs.some((j) => j === job) || pd.needs[need] !== 1) fail(`team: ${pk.name}'s job on ${pd.name} (${need}) was not done: done ${pw.stats.done - done0}, need ${pd.needs[need].toFixed(3)}`);
     if (!pk.manual || pk.pendingTake || pk.phase !== 'manual' || pk.job || pw.controlled !== pk.id || pw.free(pk)) fail(`team: ${pk.name}, taken at work on ${pd.name} and it sent: manual ${pk.manual}, pendingTake ${pk.pendingTake}, ${pk.phase}, job ${pk.job?.id ?? null}, controlled ${pw.controlled}`);
     const x0 = pk.x;
     pw.command({ kind: 'steer', dx: 1, dy: 0 });
@@ -2135,13 +2157,13 @@ if (MAIN) {
     pw.command({ kind: 'steer', dx: -1, dy: 0 });
     for (let s = 0; s < 120; s++) pw.step();
     if (x1 === x0 && pk.x === x1) fail(`team: ${pk.name}, the player's after ${pd.name} was sent, did not walk when steered (x ${x0})`);
-    pendingLine = `${pk.name} taken at work (${need}, ${pd.name}; seed 2, step ${at}) and ${pd.name} sent: the player's where they stood, steered ${x0} -> ${x1} -> ${pk.x}`;
+    pendingLine = `${pk.name} taken at work (${need}, ${pd.name}; seed 2, step ${at}) and ${pd.name} sent: finished the job ${finished} steps on (${pd.name} in its slot till then), then the player's where they stood, steered ${x0} -> ${x1} -> ${pk.x}`;
     noteUse(pw);
   }
-  console.log(`  19 team: babies, the young on normal and hard roads and garden residents may not go; with BEA taken (the pick given a stub), ${asked} auto riders (10 days of boards x 7 dragons, alone and beside a pair) and BEST TEAM never chose her; a third pair refused (two keepers stay home: ${home} home with the team out); a second send refused while one is out; BEA taken by hand by S7's command: not free, ${askedHand} auto riders and BEST TEAM never chose her, a send command with her riding refused ("${refusedSend && refusedSend.kind === 'send' ? refusedSend.reason : '?'}"), BEST TEAM sent by command and mustering, ${tRider.name} (riding) refused to the hand ("${refusedTake && refusedTake.kind === 'refused' ? refusedTake.reason : '?'}"), BEA given no job in 6000 steps beside the trip; ${pendingLine}`);
+  console.log(`  19 team: babies, the young on normal and hard roads and garden residents may not go; with BEA taken (the pick given a stub), ${asked} auto riders (10 days of boards x 7 dragons, alone and beside a pair) and BEST TEAM never chose her; a third pair refused (two keepers stay home: ${home} home with the team out); a second send refused while one is out; BEA taken by hand by the take command: not free, ${askedHand} auto riders and BEST TEAM never chose her, a send command with her riding refused ("${refusedSend && refusedSend.kind === 'send' ? refusedSend.reason : '?'}"), BEST TEAM sent by command and mustering, ${tRider.name} (riding) refused to the hand ("${refusedTake && refusedTake.kind === 'refused' ? refusedTake.reason : '?'}"), BEA given no job in 6000 steps beside the trip; ${pendingLine}`);
 }
 
-// ---------- 20. a full trip: THE LOST NEST (#5.4, #5.6, #11) ----------
+// ---------- 20. a full trip: THE LOST NEST (#5: eggs, launched from the Aerie using the Map Room; #11) ----------
 let musterAt = 0;
 /** The longest a muster sent in the middle of play may take (2.5 min at 1x; a fresh world's is 2186 steps). */
 const MUSTER_MID_MAX = 9000;
@@ -2228,10 +2250,71 @@ if (MAIN) {
   }
   mids.sort((a, b) => a - b);
   console.log(`  20 trip: mid-play musters (BEST TEAM, seeds 1-6, 600 and 1500 steps in): median ${mids[mids.length >> 1]}, max ${mids[mids.length - 1]} steps (bound ${MUSTER_MID_MAX})`);
+  // (d) sent mid-act (BASE_DESIGN 5: "a keeper at work finishes"), seeds 1-6 on the real day: a dragon a keeper is at
+  // work with (not its rider) -- the keeper finishes, the job done and the need full -- and a dragon asleep: each keeps
+  // its slot, nobody else holding it, until it sets off; and a rider taken mid-tuck-in: the dragon sleeps on, its sleep
+  // job closed (done), and is not tucked in again
+  const midLines: string[] = [];
+  for (const kind of ['work', 'nap', 'tuck'] as const) {
+    let seen = 0, longest = 0;
+    for (let seed = 1; seed <= 6; seed++) {
+      const v = newSim(seed);
+      let d: Dragon | null = null, k: Keeper | null = null, pair: { dragon: number; keeper: number } | null = null, m: Mission | null = null;
+      for (let s = 0; s < 40000 && !pair; s++) {
+        v.step();
+        m = v.missions.board[0] ?? null;
+        if (!m || v.missions.trip) continue;
+        const riderBut = (x: Dragon, not: Keeper | null) => { const r = autoRider(v, x, m!, []); return r != null && r !== not?.id ? r : v.keepers.find((q) => q !== not && !onTrip(q) && !q.job)?.id ?? null; };
+        if (kind === 'work') {
+          k = v.keepers.find((q) => q.phase === 'work' && !!q.job && q.job.need !== 'sleep' && q.t < 20 && !dragonReason(v, q.job.dragon, m!)) ?? null;
+          d = k?.job?.dragon ?? null;
+          const r = d ? riderBut(d, k) : null;
+          if (d && r != null) pair = { dragon: d.id, keeper: r };
+        } else if (kind === 'nap') {
+          d = v.dragons.find((q) => q.asleep > 60 && !v.jobs.some((j) => j.dragon === q && j.keeper) && !dragonReason(v, q, m!)) ?? null;
+          const r = d ? riderBut(d, null) : null;
+          if (d && r != null) pair = { dragon: d.id, keeper: r };
+        } else {
+          k = v.keepers.find((q) => q.phase === 'work' && q.job?.need === 'sleep' && q.t < 30) ?? null;
+          d = k ? k.job!.dragon : null;
+          const go = k ? v.dragons.find((q) => q !== d && !q.act && !dragonReason(v, q, m!)) : null;
+          if (k && go) pair = { dragon: go.id, keeper: k.id };
+        }
+      }
+      if (!pair || !d || !m) { fail(`trip (sent mid-act): seed ${seed} found no ${kind} to send from`); continue; }
+      const slot = d.slot, need = kind === 'work' ? k!.job!.need : 'sleep', done0 = v.stats.done, job = kind === 'work' ? k!.job : null;
+      const r = send(v, m.id, [pair]);
+      if (typeof r === 'string') { fail(`trip (sent mid-act): seed ${seed}'s ${kind} send refused: ${r}`); continue; }
+      v.step();
+      seen++;
+      const what = `seed ${seed}, ${d.name} (${kind})`;
+      if (kind === 'tuck') {
+        if (v.jobs.some((j) => j.dragon === d && j.need === 'sleep') || d.asleep <= 0 || v.stats.done !== done0 + 1) fail(`trip (sent mid-act): ${what}: its rider taken mid-tuck-in left its sleep job open (asleep ${d.asleep}, done ${v.stats.done - done0})`);
+        for (let s = 0; s < 3000; s++) {
+          v.step();
+          if (v.keepers.some((q) => q.job?.dragon === d && q.job.need === 'sleep' && q.phase === 'work' && d!.needs.sleep > 0.9)) { fail(`trip (sent mid-act): ${what} was tucked in again at sleep ${d.needs.sleep.toFixed(3)}`); break; }
+        }
+        continue;
+      }
+      let s = 0;
+      for (; s < 1500 && (d.act || d.asleep > 0 || d.slot); s++) {
+        if ((d.act || d.asleep > 0) && d.slot !== slot) { fail(`trip (sent mid-act): ${what} let its slot go while ${d.act ? `still met for ${d.act.need}` : 'asleep'}`); break; }
+        const o = v.dragons.find((q) => q !== d && q.slot === slot);
+        if (o) { fail(`trip (sent mid-act): ${what}: ${o.name} took its slot while it was still there`); break; }
+        if (kind === 'work' && d.act && d.act.need === need && !v.keepers.some((q) => q.job?.dragon === d && q.phase === 'work')) { fail(`trip (sent mid-act): ${what}'s ${need} rose with nobody at work`); break; }
+        v.step();
+      }
+      longest = Math.max(longest, s);
+      if (d.act || d.asleep > 0 || d.slot || d.goal !== 'muster') fail(`trip (sent mid-act): ${what} never set off (${s} steps: act ${d.act?.need ?? null}, asleep ${d.asleep}, slot ${!!d.slot}, goal ${d.goal})`);
+      if (kind === 'work' && (v.jobs.includes(job!) || v.stats.done < done0 + 1)) fail(`trip (sent mid-act): ${what}: ${k!.name}'s ${need} job was not done (done ${v.stats.done - done0})`);
+    }
+    midLines.push(`${kind} ${seen}/6${kind === 'tuck' ? '' : ` (set off at most ${longest} steps after the send)`}`);
+  }
+  console.log(`  20 trip: sent mid-act (seeds 1-6): a keeper at work finishes, a sleeper keeps its slot, a rider's tuck-in is done: ${midLines.join(', ')}`);
   console.log(`  20 trip: the muster preset (the real day, seed 1) all on the deck at step ${musterAt}; THE LOST NEST (seed 2, a 600-step day) with ${t.pairs.map((p, i) => `${team[i].name} and ${riders[i].name}`).join(', ')}: odds ${(t.odds * 100).toFixed(0)} %, ${t.success ? 'a success' : 'a failure'}, a ${t.egg} egg for nest ${t.nest}; mustered in ${departed} steps (both up by the lift), away at ${awayAt}, landed at ${landedAt} (returnAt, exactly: ${landNeeds}), the egg laid at ${laid}, over at ${overAt}; the Map Room used ${used('maproom')}, the Tack Room ${used('tack')}, the Aerie ${used('aerie')}, the Bunks ${used('bunks')}; coin ${w.missions.coin}; FROSTMERE revealed at the next dawn; ${baby()?.name} hatched`);
 }
 
-// ---------- 21. a failure: turning back (#5.3) ----------
+// ---------- 21. a failure: turning back (#5: challenges on the road) ----------
 if (MAIN) {
   // a low-odds send (RIPPLE alone on THE LOST NEST: nobody meets the lost things) that fails, from seeds 1-200: it turns
   // back at the first unmet stop, brings half the coin and no egg, and reveals nothing
@@ -2289,14 +2372,14 @@ if (MAIN) {
   console.log(`  22 outcome: 20 seeds, three sends each, the same twice: ${wins} successes, ${eggs} eggs (a first success in a region always brings one); the LOST NEST met in full succeeded on all 20 (seed 1's BEST TEAM at ${Math.round(oddsOf(nest1, m1, bestTeam(nest1, m1)) * 100)} %), the day's second mission by BEST TEAM ${rolledWins} of ${rolled}`);
 }
 
-// ---------- 24. the watchable scene (plan S9: #5.3 on the road, #5.5 the big baddie) ----------
+// ---------- 24. the watchable scene (BASE_DESIGN 6; #5: challenges on the road, the big baddie) ----------
 if (ROLE === 'service') {
   // an easy, a normal and a hard mission with its baddie (each of the three), each with both outcomes where it matters:
   // every step of the trip's time read from the scene's pure function, and checked against the last step's
   const runs: [RegionId, Difficulty, boolean][] = [['millbrook', 'easy', true], ['millbrook', 'easy', false], ['bramblewood', 'normal', true], ['bramblewood', 'normal', false],
     ['oldmine', 'hard', true], ['oldmine', 'hard', false], ['highfold', 'hard', true], ['frostmere', 'hard', true]];
   const EXITS: readonly string[] = ['calmed', 'outwitted', 'drivenOff'];
-  // (the outwitted one wanders off at a plain walk: the art kit's exitLook, S9a; 'leave' is the driven-off shuffle)
+  // (the outwitted one wanders off at a plain walk: the art kit's exitLook, baddies.ts; 'leave' is the driven-off shuffle)
   const EXIT_LOOK: Readonly<Record<string, { pose: string; face: string }>> = { calmed: { pose: 'sit', face: 'sleepy' }, outwitted: { pose: 'walk', face: 'neutral' }, drivenOff: { pose: 'leave', face: 'grumpy' } };
   let travelSteps = 0, inFrame = 0, frames = 0;
   const lines: string[] = [];
@@ -2411,7 +2494,7 @@ if (ROLE === 'service') {
   for (const [q, p] of [['oldmine:0.95', 0.95], ['millbrook:0.3', 0.3]] as const) {
     const w = buildSim(tripStart(q, 60), 1);
     for (let i = 0; i < 60; i++) w.step();
-    const t = currentTrip(w), f = t && sceneAt(w, t);
+    const t = w.missions.trip, f = t && sceneAt(w, t);
     if (!f || f.E !== Math.round(p * f.L)) fail(`scene: trip=${q} at t=60 is at E ${f?.E} of ${f?.L}, not ${p}`);
     if (!t || t !== w.missions.trip || t.state !== 'away' || !t.pairs.every((pr) => w.dragons.find((d) => d.id === pr.dragon)?.place === 'away' && w.keepers.find((k) => k.id === pr.keeper)?.phase === 'away')
       || w.dragons.some((d) => d.place === 'away' && !t.pairs.some((pr) => pr.dragon === d.id))) fail(`scene: trip=${q}'s team is not the world's own, away (${JSON.stringify(t?.state)})`);
@@ -2425,7 +2508,7 @@ if (ROLE === 'service') {
     }
     presetSaves.push(`${q} (departAt ${t?.departAt})`);
   }
-  // (the preview's rider pick asks the missions' seam, as S8's must: BEA, a rider of the Old Mine Road's best team,
+  // (the preview's rider pick asks missions.ts isTaken, as the Map Room's does: BEA, a rider of the Old Mine Road's best team,
   // taken by hand first, rides no more)
   {
     const w = newSim(1), bea = w.keepers.find((k) => k.name === 'BEA')!, rides = () => demoTrip(w, 'oldmine', 'hard', true).pairs.some((p) => p.keeper === bea.id);
@@ -2433,12 +2516,12 @@ if (ROLE === 'service') {
     w.command({ kind: 'take', keeper: bea.id }); w.step();
     if (!before || !isTaken(w, bea.id) || rides()) fail(`scene: the rider pick with BEA taken: she rode ${before} before, taken ${isTaken(w, bea.id)}, rides ${rides()}`);
   }
-  console.log(`  24 scene: ${lines.join('; ')}; ${frames} steps read, ${travelSteps} travel steps without a skate, the baddie in view ${inFrame} of them; the scene's types have no hurt state, and exits only calmed, outwitted or driven off; the trip preset's worlds saved exactly (${presetSaves.join(', ')}); a keeper taken by hand is never picked to ride (seams.ts isTaken)`);
+  console.log(`  24 scene: ${lines.join('; ')}; ${frames} steps read, ${travelSteps} travel steps without a skate, the baddie in view ${inFrame} of them; the scene's types have no hurt state, and exits only calmed, outwitted or driven off; the trip preset's worlds saved exactly (${presetSaves.join(', ')}); a keeper taken by hand is never picked to ride (missions.ts isTaken)`);
 }
 
 // ---------- 25. taking a keeper (#6) ----------
 if (ROLE === 'saves') {
-  // plan S7 (D5): a keeper taken by the player's hand -- walked, climbing the ladders, picking up, serving and putting
+  // BASE_DESIGN 4.10 (#6): a keeper taken by the player's hand -- walked, climbing the ladders, picking up, serving and putting
   // back by commands (control.ts) -- on seed 1 at the real day, with the section 2 invariants checked every step
   const through = <T>(v: T): T => JSON.parse(JSON.stringify(v));
   const inv = (w: CareSim, at: string) => {
@@ -2505,7 +2588,7 @@ if (ROLE === 'saves') {
     return best;
   };
   /**
-   * The whole loop by hand, the plan's script: take BEA, feed EMBER (fetching the bowl), climb to f1 and back down,
+   * The whole loop by hand: take BEA, feed EMBER (fetching the bowl), climb to f1 and back down,
    * then up again; 10 000 steps with jobs pending and 20 Rushes; let go. Returns the world and what it saw.
    */
   const script = () => {
@@ -2516,7 +2599,7 @@ if (ROLE === 'saves') {
     ember.needs.food = 0.3;
     send(w, { kind: 'take', keeper: bea.id }); step(w, at);
     if (!bea.manual || bea.phase !== 'manual' || w.controlled !== bea.id) fail(`control: BEA taken is ${bea.phase}, manual ${bea.manual}, controlled ${w.controlled}`);
-    // (the missions' seam says so too -- seams.ts isTaken, which S8's rider pick asks: BEA taken, nobody else)
+    // (missions.ts isTaken, which the rider pick asks, says so too: BEA taken, nobody else)
     if (!isTaken(w, bea.id) || w.keepers.some((k) => k !== bea && isTaken(w, k.id))) fail(`control: BEA taken, isTaken says ${w.keepers.map((k) => `${k.name} ${isTaken(w, k.id)}`).join(', ')}`);
     // 2.-4. EMBER's food at 0.3 (it stands in the ground floor's kitchen); the bowl from the hearth there (the nearest,
     // x 232), then to its stand spot
@@ -2537,7 +2620,7 @@ if (ROLE === 'saves') {
     if (w.stats.doneBy.BEA !== 1 || ember.needs.food !== 1 || bea.phase !== 'manual' || w.jobs.includes(job!)) fail(`control: after the feed doneBy ${JSON.stringify(w.stats.doneBy)}, EMBER's food ${ember.needs.food}, BEA ${bea.phase}`);
     // 5. across the lift bay (the bay rule, R1) to the centre ladder (x 680), up to the upper floor, down, up again
     if (!walkTo(w, bea, LADDER_M_X, at)) fail('control: BEA never reached the centre ladder');
-    // (nothing for E at the foot of a ladder: the line says it climbs -- S7 review)
+    // (nothing for E at the foot of a ladder: the line says it climbs)
     const lad = actionFor(w, bea);
     if (lad.kind !== 'none' || lad.label !== '↑: CLIMB UP') fail(`control: at the centre ladder's foot the line is ${JSON.stringify(lad)}, not a climb up`);
     out.up = climb(w, bea, -1, at);
@@ -2587,7 +2670,7 @@ if (ROLE === 'saves') {
   // 9. the same commands at the same steps, the same world
   if (a.w.digest() !== b.w.digest()) fail('control: the same command script run twice made two worlds');
   noteUse(a.w);
-  // every chore by hand (D5: fetch, feed, bathe, play, groom and tuck in; a garden resident too): the barn calm (every
+  // every chore by hand (BASE_DESIGN 4.10: fetch, feed, bathe, play, groom and tuck in; a garden resident too): the barn calm (every
   // need full), BEA fetches the supply if the need takes one and waits at the dragon's stand spot, its need falls to
   // 0.3, and E meets it -- before any keeper sent for it arrives (handing it over if one was)
   const chores: string[] = [];
@@ -2670,7 +2753,7 @@ if (ROLE === 'saves') {
     for (const [what, mk] of moments) {
       const w = mk(), held = w.keepers.find((k) => k.manual || k.pendingTake);
       if (!held) { fail(`control: no keeper held (${what})`); continue; }
-      // (held by hand or taken at work, the missions' seam says taken -- and of nobody else)
+      // (held by hand or taken at work, missions.ts isTaken says taken -- and of nobody else)
       if (w.keepers.some((k) => isTaken(w, k.id) !== (k === held))) fail(`control: ${held.name} held (${what}), isTaken says ${w.keepers.map((k) => `${k.name} ${isTaken(w, k.id)}`).join(', ')}`);
       const blob = serialize(w), loaded = CareSim.fromSave(through(blob)), lk = loaded.keepers[held.id], was = { phase: held.phase, climbing: held.climbing, loaded: lk.phase };
       if (lk.manual || lk.pendingTake || loaded.controlled != null || lk.phase === 'manual') fail(`control: a world saved with ${held.name} held (${what}) loaded with ${held.name} ${lk.phase}, manual ${lk.manual}`);
@@ -2699,15 +2782,21 @@ if (ROLE === 'saves') {
       else r4.push(`${what} out in ${n} steps`);
     }
     // (and walked west along the Aerie deck she stops at its end: the sky bridge on past it, off the screen, is the
-    // riders' way off the world, never the hand's -- S8's bridge merged into the keepers' net)
+    // riders' way off the world, never the hand's, though it is on the keepers' net)
     const w = newSim(1), k = w.keepers.find((q) => q.name === 'BEA')!;
     send(w, { kind: 'take', keeper: k.id }); step(w, at);
     k.f = AERIE_F; k.x = 60; k.y = feetY(AERIE_F); k.legs = []; k.climbing = false;
     send(w, { kind: 'steer', dx: -1, dy: 0 }); step(w, at, 400);
     if (k.f !== AERIE_F || k.x !== HAND_DECK_X0) fail(`control: BEA walked west along the Aerie deck for 400 steps is at floor ${k.f} x ${k.x}, not the deck's end (x ${HAND_DECK_X0})`);
     else r4.push(`walked west on the Aerie, stopped at the deck's end (x ${k.x}), off the bridge`);
+    // (walked east, she stops short of the lift bay the deck ends in, the car's way up: held there, she would hold it)
+    send(w, { kind: 'steer', dx: 1, dy: 0 });
+    let inIt = 0;
+    for (let s = 0; s < 600; s++) { step(w, at); if (inBay(k.x, KEEPER_HALF)) inIt++; }
+    if (k.f !== AERIE_F || k.x !== LIFT_X0 - KEEPER_HALF || inIt) fail(`control: BEA walked east along the Aerie deck for 600 steps is at floor ${k.f} x ${k.x} (${inIt} steps in the bay), not short of the lift bay (x ${LIFT_X0 - KEEPER_HALF})`);
+    else r4.push(`walked east on the Aerie, stopped short of the lift bay (x ${k.x})`);
   }
-  // 11. a keeper held by hand never holds up a grow-up (S7 review): BEA parked at EMBER's stand spot -- inside its new
+  // 11. a keeper held by hand never holds up a grow-up: BEA parked at EMBER's stand spot -- inside its new
   // elder body -- as it falls due (the growup preset) and left there; EMBER grows beside her at once and goes on about
   // its needs, none of them ever at 0
   let grewIn = -1;
@@ -2724,7 +2813,7 @@ if (ROLE === 'saves') {
     if (w.stats.emptySteps) fail(`control: with BEA parked at EMBER's stand spot a need sat at 0 for ${w.stats.emptySteps} dragon-steps`);
     noteUse(w);
   }
-  console.log(`  25 control: BEA taken, fetched the bowl and fed EMBER by hand (${a.fed} steps at work, doneBy ${JSON.stringify(a.w.stats.doneBy)}, ${a.handovers} handed over), climbed the centre ladder up in ${a.up} steps and down in ${a.down}; ${a.held} steps held with ${a.rushed} Rushes and no job she didn't take; let go, home in ${a.home} steps; the same script twice, the same world; every chore by hand: ${chores.join(', ')}; saved held, loaded released and stepping on as a release makes it: ${saves.join(', ')}; R4: ${r4.join(', ')}; parked at EMBER's stand spot as it fell due, it grew ${grewIn} steps past due, no need ever at 0; the missions' seam (seams.ts isTaken) says taken of the keeper held, or taken at work, and of nobody else`);
+  console.log(`  25 control: BEA taken, fetched the bowl and fed EMBER by hand (${a.fed} steps at work, doneBy ${JSON.stringify(a.w.stats.doneBy)}, ${a.handovers} handed over), climbed the centre ladder up in ${a.up} steps and down in ${a.down}; ${a.held} steps held with ${a.rushed} Rushes and no job she didn't take; let go, home in ${a.home} steps; the same script twice, the same world; every chore by hand: ${chores.join(', ')}; saved held, loaded released and stepping on as a release makes it: ${saves.join(', ')}; R4: ${r4.join(', ')}; parked at EMBER's stand spot as it fell due, it grew ${grewIn} steps past due, no need ever at 0; missions.ts isTaken says taken of the keeper held, or taken at work, and of nobody else`);
 }
 
 // ---------- 26. the barn's cap (BASE_DESIGN 4.7) ----------
@@ -2760,7 +2849,7 @@ if (MAIN) {
   console.log(`  26 the barn's cap (${BARN_CAP}): the twelve preset on a ${SHORT}-step day, its egg due at step ${DUE} with the barn full -- one 'full' event, at step ${fulls[0] ?? '-'}; it waited ${hatched - DUE} steps in its nest, the barn never over ${most}; EMBER, retiring, arrived in the garden at step ${arrived} and the egg hatched at step ${hatched}; a save taken at step ${savedAt}, the egg waiting, stepped on to the same world`);
   // and the cap beside the missions: the twelve preset on a 600-step day, EMBER an elder due to retire at step 9000, sends
   // THE LOST NEST (RIPPLE and ECHO, met in full: a success, and its sure egg) from a full barn -- the chooser's BARN FULL:
-  // THE EGG WILL WAIT (seams.ts barnRoom 0) and no refusal for it; away, its dragons still count (the barn full every
+  // THE EGG WILL WAIT (life.ts barnRoom 0) and no refusal for it; away, its dragons still count (the barn full every
   // step); landed, the egg's rider carries it from the Aerie down the left tower, along the upper floor, up the centre
   // ladder and west along the hayloft to the Hatchery, and lays it in the nest the mission reserved; it falls due with
   // the barn full (one `full` event, on its due step) and waits; EMBER retires and walks out, and the step after it
@@ -2813,7 +2902,7 @@ if (MAIN) {
     took.push(`${role} ${(r.ms / 1000).toFixed(1)} s`);
   }
   const wallS = (performance.now() - T0) / 1000;
-  console.log(`  wall: the main thread's sections ${(mainMs / 1000).toFixed(1)} s, the workers' ${took.join(', ')}; the suite ${wallS.toFixed(1)} s (the budget: ${BUDGET_S} s)`);
+  console.log(`  wall: the main thread's sections ${(mainMs / 1000).toFixed(1)} s, the workers' ${took.join(', ')}; the suite ${wallS.toFixed(1)} s (the budget: ${BUDGET_S} s on ${CPUS} CPUs)`);
   // The budget fails the suite -- unless the machine was busy with other work, which slows every thread here alike: the
   // CPU time the whole machine spent over the suite's wall time (/proc/stat) less this process's own (every thread's:
   // process.cpuUsage), per second of wall time, is the other work's CPUs; half a CPU or more of it excuses the suite.
@@ -2827,21 +2916,16 @@ if (MAIN) {
 
 // ---------- 8 (the whole suite). every named room used (#11) ----------
 if (MAIN) {
-  // every named room in the start, the lift and the Aerie: used somewhere in this suite, unless PLANNED; a PLANNED one unused
+  // every named room in the start, the lift and the Aerie: used somewhere in this suite (#11: a room is named and
+  // furnished only for a real purpose)
   const named = [...new Set([...START_ROOMS.map((r) => r.kind as string), ...Object.keys(STRUCTURES)])];
-  for (const k of named) {
-    const n = USED[k] ?? 0;
-    if (PLANNED.has(k) ? n > 0 : n === 0) fail(PLANNED.has(k) ? `rooms: the ${k} is PLANNED but was used ${n} times: its mechanic has landed, take it off PLANNED` : `rooms: the ${k} is named and furnished but nothing used it (#11)`);
-  }
-  for (const k of PLANNED) if (!named.includes(k)) fail(`rooms: PLANNED names ${k}, which the building hasn't got`);
-  // (every mechanic has landed, so nothing is planned any more -- #11 is closed)
-  if (PLANNED.size !== 0) fail(`rooms: PLANNED still names ${[...PLANNED].join(', ')} (the missions land the last of them)`);
-  // and every room itself (a need's rooms repeat, and each copy must earn its name): every room of the start whose kind
-  // is not PLANNED used at least once (stats.usedRoom: a need met in its slot, a supply taken at its post, an egg laid
-  // or hatched in it, a pass through it)
-  const rooms = placeRooms(START_ROOMS), unused = rooms.filter((r) => !PLANNED.has(r.kind) && !USED_ROOM[r.id]);
+  for (const k of named) if (!(USED[k] ?? 0)) fail(`rooms: the ${k} is named and furnished but nothing used it (#11)`);
+  // and every room itself (a need's rooms repeat, and each copy must earn its name): every room of the start used at
+  // least once (stats.usedRoom: a need met in its slot, a supply taken at its post, an egg laid or hatched in it, a
+  // pass through it)
+  const rooms = placeRooms(START_ROOMS), unused = rooms.filter((r) => !USED_ROOM[r.id]);
   if (unused.length) fail(`rooms: ${unused.map((r) => `room ${r.id} (the ${r.kind} on floor ${r.floor})`).join(', ')} named and furnished but never used (#11)`);
-  console.log(`  8 rooms used over the suite: ${named.filter((k) => !PLANNED.has(k)).map((k) => `${k} ${USED[k] ?? 0}`).join(', ')}; planned: ${[...PLANNED].join(', ') || 'none'}; room by room: ${rooms.filter((r) => !PLANNED.has(r.kind)).map((r) => `${r.id} ${r.kind}${r.part === 'barn' ? ` f${r.floor}` : ''} ${USED_ROOM[r.id]}`).join(', ')}`);
+  console.log(`  8 rooms used over the suite: ${named.map((k) => `${k} ${USED[k] ?? 0}`).join(', ')}; room by room: ${rooms.map((r) => `${r.id} ${r.kind}${r.part === 'barn' ? ` f${r.floor}` : ''} ${USED_ROOM[r.id]}`).join(', ')}`);
 }
 
 if (MAIN) {

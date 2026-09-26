@@ -18,7 +18,7 @@ import { DIFFICULTY, autoRider, oddsOf, roadOf, freeNest } from './missions.ts';
  * drawn from the region's pool without replacement (seeded by rngAt(seed, BOARD, 900, region, n): the preset's own
  * draw, not a day's board), its baddie on a hard one (else a fourth challenge), and a title from the region's.
  */
-export function demoMission(sim: CareSim, region: RegionId, difficulty: Difficulty): Mission {
+function demoMission(sim: CareSim, region: RegionId, difficulty: Difficulty): Mission {
   const R = regionOf(region), D = DIFFICULTY[difficulty], ri = REGION_IDS.indexOf(region);
   const baddie = difficulty === 'hard' ? R.baddie : null, n = difficulty === 'hard' && !baddie ? D.challenges + 1 : D.challenges;
   const pool = [...R.pool], rng = rngAt(sim.seed, TAG.BOARD, 900, ri, D.challenges), out: ChallengeId[] = [];

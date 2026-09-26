@@ -289,19 +289,19 @@ export function nearestFree(sim: CareSim, d: Dragon, stage: Stage = d.stage, not
 }
 
 /**
- * A dragon standing still in its slot with nowhere to be, no act, no keeper coming and not holding still to grow up
- * (evictable, 3.3), for room `room` -- never a baby with a job open: it walks at a third of an adult's pace, so a move
+ * A dragon standing still in its slot with nowhere to be, no act, no keeper coming, not holding still to grow up and
+ * not with a mission's team (evictable, 3.3), for room `room` -- never a baby with a job open: it walks at a third of an adult's pace, so a move
  * would cost it most of a need (BASE_DESIGN 4.7).
  */
 function lingerer(sim: CareSim, o: Dragon, room: Room): boolean {
   const g = o.goalJob == null ? null : sim.jobs.find((j) => j.id === o.goalJob) ?? null;
-  return (!g || NEED_ROOM[g.need] !== room.kind) && !o.act && o.asleep === 0 && o.hold === 0 && !o.legs.length && o.move === 'still'
+  return o.goal !== 'muster' && (!g || NEED_ROOM[g.need] !== room.kind) && !o.act && o.asleep === 0 && o.hold === 0 && !o.legs.length && o.move === 'still'
     && !sim.jobs.some((j) => j.dragon === o && (j.keeper || o.stage === 'baby'));
 }
 
-/** A holder a Rush may move on: no keeper at work with it, not holding still to grow up, and not in the lift's hands or in its bay. */
+/** A holder a Rush may move on: no keeper at work with it, not holding still to grow up, not with a mission's team, and not in the lift's hands or in its bay. */
 function bumpable(sim: CareSim, o: Dragon): boolean {
-  return !o.act && o.asleep === 0 && o.hold === 0 && sim.lift.rider !== o.id && !['call', 'board', 'ride', 'alight', 'bay'].includes(o.move) && !dragonInBay(o);
+  return o.goal !== 'muster' && !o.act && o.asleep === 0 && o.hold === 0 && sim.lift.rider !== o.id && !['call', 'board', 'ride', 'alight', 'bay'].includes(o.move) && !dragonInBay(o);
 }
 
 /**

@@ -193,9 +193,11 @@ export function ladderAt(sim: CareSim, k: Keeper, dy: -1 | 1): { x: number; to: 
 function walk(sim: CareSim, k: Keeper, dir: 1 | -1, inside: boolean): void {
   const net = sim.nets.keeper, s = spanOf(k.f, k.x, net);
   if (s < 0) return;
-  const [a0, b] = net.spans[k.f][s];
-  // (on the Aerie, the deck alone: the sky bridge west of it is the riders' way off the world, not the hand's)
-  const a = k.f === AERIE_F ? Math.max(a0, HAND_DECK_X0) : a0;
+  const [a0, b0] = net.spans[k.f][s];
+  // (on the Aerie, the deck alone: the sky bridge west of it is the riders' way off the world, not the hand's; and short
+  // of the lift bay the deck ends in, where the car comes up -- keepers never ride it, so the hand has no need of it,
+  // and one held there would hold the car -- one already in it walking out west, R4)
+  const aerie = k.f === AERIE_F, a = aerie ? Math.max(a0, HAND_DECK_X0) : a0, b = aerie ? Math.min(b0, Math.max(k.x, LIFT_X0 - KEEPER_HALF)) : b0;
   const next = (d: number) => Math.max(a, Math.min(b, k.x + d * WALK));
   let to = next(dir);
   // (R4: at a floor's end inside the bay -- the Aerie deck ends in it -- turn and walk out the other way)

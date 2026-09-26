@@ -344,14 +344,6 @@ export function clampToFloor(f: number, x: number, net: Net): number {
   for (const [a, b] of net.spans[f] ?? []) { const c = Math.max(a, Math.min(b, x)), e = Math.abs(c - x); if (e < d) { d = e; best = c; } }
   return best;
 }
-/** x clamped into the span of floor f that holds `near` (or, if none does, the span nearest `near`). */
-export function clampToSpan(f: number, x: number, net: Net, near: number): number {
-  const sp = net.spans[f] ?? [];
-  let s = spanOf(f, near, net);
-  if (s < 0) { let d = Infinity; sp.forEach(([a, b], i) => { const e = Math.abs(Math.max(a, Math.min(b, near)) - near); if (e < d) { d = e; s = i; } }); }
-  if (s < 0) return x;
-  return Math.max(sp[s][0], Math.min(sp[s][1], x));
-}
 
 /** Where a keeper stands to work with a dragon: this far in front of its body's root, past the snout (2.4). */
 export const REACH: Readonly<Record<Stage, number>> = Object.freeze({ baby: 30, young: 46, adult: 58, elder: 60 });

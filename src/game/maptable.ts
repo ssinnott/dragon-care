@@ -1,21 +1,23 @@
-// The Map Room's table (docs/BASE_DESIGN.md 5; plan S8): the two overlays a mission is chosen and sent from -- the
+// The Map Room's table (docs/BASE_DESIGN.md 5): the two overlays a mission is chosen and sent from -- the
 // world map (the regions explored and the fog over the rest, the roads, HOME, a numbered pin per mission on the board,
 // the team's flag) and the mission chooser (the region's climate picture, the mission's rewards, its challenges with
 // what meets them and who at home could, the big baddie, the team's pairs and riders, the eligible dragons, the odds,
 // BEST TEAM and SEND FROM THE AERIE) -- and, while a team is out, its TEAM OUT chip under the top bar (a tap opens the
-// watchable scene: plan S9, missionview.ts) and the trip's log, opened over the scene by its TRIP LOG button (each stop
+// watchable scene: BASE_DESIGN 6, missionview.ts) and the trip's log, opened over the scene by its TRIP LOG button (each stop
 // met, unmet or still ahead, the log so far, the time left). Drawing and hit rects only, at the view's 640 x 360:
 // base.ts owns what a tap does (tableTap, watchTap), and
 // missions.ts every rule. House style: 1 px ink outlines, flat fills, the engine's 5 x 7 font (it has no tick, cross or
 // arrow glyphs: those are small inked sprites), no alpha anywhere -- the fog over an unexplored region is hatched, not
-// faded. The mission art (the climate picture, the challenge and skill icons, the baddie's portrait) comes through the
-// art seam (artseams.ts: plan S9a's kit).
+// faded. The mission art (the climate picture, the challenge and skill icons, the baddie's portrait) is the mission art
+// kit's (ART_BIBLE 5.10: backdrops.ts, baddies.ts, missionicons.ts).
 import { drawText, drawTextOutlined, measureText } from '../lib/engine/text.ts';
 import { makeTones } from '../lib/art/shading.ts';
 import { drawSprite, ICONS, hit } from './icons.ts';
 import type { Rect, Sprite } from './icons.ts';
-import { drawClimate, drawBaddiePortrait, CHALLENGE_ICONS, SKILL_ICONS } from './artseams.ts';
-import { barnRoom } from './seams.ts';
+import { drawClimate } from './backdrops.ts';
+import { drawBaddiePortrait } from './baddies.ts';
+import { CHALLENGE_ICONS, SKILL_ICONS } from './missionicons.ts';
+import { barnRoom } from './life.ts';
 import { stopShownAt } from './missionview.ts';
 import { INK } from './surfaces.ts';
 import { REGIONS, CHALLENGES, BADDIES, KEEPER_SKILL, SKILL_NAME, MAP_HOME, MAP_FILL, regionOf } from './regions.ts';
@@ -216,7 +218,7 @@ const meetsK = (c: Counter, k: Keeper) => !!c.skill && KEEPER_SKILL[k.look] === 
 
 /**
  * The chooser's line about the egg, under its rewards: the Hatchery full (every nest holds an egg: no egg reward), or
- * the barn at its cap (life.ts BARN_CAP, read through seams.ts barnRoom: the egg still comes home and waits in its nest,
+ * the barn at its cap (life.ts BARN_CAP, read through life.ts barnRoom: the egg still comes home and waits in its nest,
  * BASE_DESIGN 5.6); null when neither. The hook's `ui.notice` reads it too.
  */
 export type EggNotice = 'HATCHERY FULL: NO EGG' | 'BARN FULL: THE EGG WILL WAIT';
@@ -341,36 +343,52 @@ export function drawMissionScreen(ctx: CanvasRenderingContext2D, sim: CareSim, u
 /**
  * A tap on the chooser's team (base.ts applies the rest): a dragon added (with its auto rider) or, already on the team,
  * taken off; a keeper made the rider of the last pair; a pair's rider cycled to the next free keeper; a pair removed.
+ * Returns what the view says of it (a toast), if anything: a keeper tapped with no dragon on the team yet, or one who
+ * can't ride now, says so; one made a rider says whose.
  */
-export function editTeam(sim: CareSim, ui: MapUi, act: UiAct): void {
+export function editTeam(sim: CareSim, ui: MapUi, act: UiAct): string | null {
   const m = chosen(sim, ui);
-  if (!m) return;
+  if (!m) return null;
   const pairs = ui.pairs;
   if (act.kind === 'dragon') {
     const at = pairs.findIndex((p) => p.dragon === act.dragon), d = sim.dragons.find((q) => q.id === act.dragon);
-    if (at >= 0) { pairs.splice(at, 1); return; }
-    if (!d || dragonReason(sim, d, m) || pairs.length >= MAX_PAIRS) return;
+    if (at >= 0) { pairs.splice(at, 1); return null; }
+    if (!d || dragonReason(sim, d, m) || pairs.length >= MAX_PAIRS) return null;
     const k = autoRider(sim, d, m, pairs);
     if (k != null) pairs.push({ dragon: d.id, keeper: k });
   } else if (act.kind === 'rider') {
     const k = sim.keepers.find((q) => q.id === act.keeper);
-    if (!pairs.length || !k || !freeRider(sim, k) || pairs.some((p) => p.keeper === k.id)) return;
-    pairs[pairs.length - 1].keeper = k.id;
+    if (!k) return null;
+    if (!pairs.length) return `PICK A DRAGON FIRST, THEN ${k.name} CAN RIDE`;
+    if (!freeRider(sim, k)) return `${k.name} CAN'T RIDE NOW`;
+    const last = pairs[pairs.length - 1], rides = (p: { dragon: number }) => `${k.name} RIDES ${sim.dragons.find((q) => q.id === p.dragon)?.name ?? 'WITH THE TEAM'}`;
+    const already = pairs.find((p) => p.keeper === k.id);
+    if (already) return rides(already);
+    last.keeper = k.id;
+    return rides(last);
   } else if (act.kind === 'cycle') {
     const p = pairs[act.pair];
-    if (!p) return;
+    if (!p) return null;
     const ids = sim.keepers.filter((k) => freeRider(sim, k) && !pairs.some((q) => q !== p && q.keeper === k.id)).map((k) => k.id);
     if (ids.length) p.keeper = ids[(ids.indexOf(p.keeper) + 1) % ids.length];
   } else if (act.kind === 'remove') pairs.splice(act.pair, 1);
   else if (act.kind === 'best') ui.pairs = bestTeam(sim, m);
+  return null;
 }
 
 // ---------- the team out ----------
 
-/** The chip's words: MUSTER, TEAM OUT - 14H (game hours to go), or LANDING. */
+/**
+ * The chip's words: MUSTER, TEAM OUT - 14H (game hours to go); landed, LANDING while a dragon of the team is still
+ * coming onto the deck, EGG TO THE NEST while its rider carries the egg down to the Hatchery, then HOME (the riders
+ * hanging their saddles up, until the trip is over).
+ */
 export function chipText(sim: CareSim, t: Trip): string {
   if (t.state === 'muster') return 'MUSTER';
-  if (t.state === 'return' || t.state === 'home') return 'LANDING';
+  if (t.state === 'return' || t.state === 'home') {
+    if (t.pairs.some((p) => sim.dragons.find((d) => d.id === p.dragon)?.goal === 'muster')) return 'LANDING';
+    return t.pairs.some((p) => sim.keepers.find((k) => k.id === p.keeper)?.carrying === 'egg') ? 'EGG TO THE NEST' : 'HOME';
+  }
   return `TEAM OUT - ${t.state === 'away' ? hoursLeft(sim, t) : t.mission.days * 24}H`;
 }
 /** The TEAM OUT chip (a trip is out): its box, the team's flag and its words; returns its tap rect. */

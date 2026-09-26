@@ -20,7 +20,11 @@ import type { Gait } from './gait.ts';
 import { readClock } from './clock.ts';
 import { skyPhase } from './sky.ts';
 import { FLOORS, INK, ROAD_SCENE } from './surfaces.ts';
-import { drawClimate, drawSetPiece, drawBaddie, drawMiller, exitLook, SADDLE } from './artseams.ts';
+import { drawClimate } from './backdrops.ts';
+import { drawSetPiece } from './setpieces.ts';
+import { drawBaddie, exitLook } from './baddies.ts';
+import { drawMiller } from './npcs.ts';
+import { SADDLE } from './missionicons.ts';
 import { regionOf } from './regions.ts';
 import { drawSprite, ICONS } from './icons.ts';
 import { drawEgg } from './eggs.ts';
@@ -154,9 +158,7 @@ export interface SceneFrame {
 // guards and the art's are read, and compiled, together)
 type Assert<T extends true> = T;
 export type _NoHurt = Assert<Extract<keyof BaddieAt | keyof SceneFrame, 'hurt' | 'hp' | 'health' | 'defeated' | 'damage'> extends never ? true : false>;
-export type _Exits = Assert<[BaddieExit] extends ['calmed' | 'outwitted' | 'drivenOff'] ? (['calmed' | 'outwitted' | 'drivenOff'] extends [BaddieExit] ? true : false) : false>;
 export type _Faces = Assert<[BaddieFace] extends ['neutral' | 'grumpy' | 'surprised' | 'sleepy'] ? true : false>;
-export type { _NoHurt as _BaddieNoHurt, _Exits as _BaddieExits } from './baddies.ts';
 
 /** Each element's moment when it meets a challenge (plan S9's table): the breath, rock's happy heave, slinkwing's call. */
 export const DRAGON_MOMENT: Readonly<Record<DragonElement, string>> = Object.freeze({
@@ -186,13 +188,13 @@ export function tripLen(sim: CareSim, trip: Trip): number {
 
 /**
  * The trip time (E) from which each stop's outcome shows in the scene -- its banner turning from the stop's name to how
- * it went: a challenge's at its counter's moment (MOMENT_AT of its beat), the baddie's once it has walked in (its
- * counters' moments begin). The TRIP LOG reads the stops by it (maptable.ts stopStates), so the log never tells what the
- * scene has not shown yet: the scene is the timer.
+ * it went: a challenge's at its counter's moment (MOMENT_AT of its beat), the baddie's once its counters' moments are
+ * over (its exit, or its keeping the road, begins). The TRIP LOG reads the stops by it (maptable.ts stopStates), so the
+ * log never tells what the scene has not shown yet: the scene is the timer.
  */
 export function stopShownAt(sim: CareSim, trip: Trip): number[] {
-  const L = tripLen(sim, trip);
-  return trip.stops.map((s) => Math.round(s.at * L) + (s.kind === 'baddie' ? baddieParts(L).enter : Math.ceil(MOMENT_AT * beatLen(L))));
+  const L = tripLen(sim, trip), P = baddieParts(L);
+  return trip.stops.map((s) => Math.round(s.at * L) + (s.kind === 'baddie' ? P.enter + P.moments : Math.ceil(MOMENT_AT * beatLen(L))));
 }
 
 /**
@@ -226,11 +228,12 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
     pieces.push({ stop: j, x: leadAt(j) + PIECE_AHEAD, state: !resolved ? 'ahead' : stops[j].covered ? 'met' : 'unmet' });
   }
 
-  // the banner: the last stop's (its name alone until its counter's moment, then how it went), up until the next stop
+  // the banner: the last stop's (its name alone until its counter's moment -- a baddie's until its exit begins, so the
+  // ending is never told before it plays -- then how it went), up until the next stop
   let banner: string | null = null, bannerOk = false;
   if (last != null) {
     const s = stops[last], head = s.log.split(' - ')[0], bt = E - starts[last];
-    const shown = s.kind === 'baddie' ? bt >= baddieParts(L).enter : bt >= MOMENT_AT * lens[last];
+    const P = baddieParts(L), shown = s.kind === 'baddie' ? bt >= P.enter + P.moments : bt >= MOMENT_AT * lens[last];
     if (!shown) banner = s.kind === 'baddie' ? `${head}!` : head;
     else if (b === last) banner = s.kind === 'baddie' ? `${head} KEEPS THE ROAD. HOME FOR TEA. NOBODY IS HURT.` : `${head} - ${s.covered ? '' : 'NOBODY COULD HELP: '}THEY TURN BACK FOR HOME`;
     else { banner = s.log; bannerOk = s.covered; }
@@ -415,7 +418,7 @@ function drawRoad(ctx: CanvasRenderingContext2D, green: boolean): void {
 }
 
 /**
- * The scene (plan S9), inside SCENE_RECT: the region's climate (parallax: artseams.ts drawClimate), the road, the set
+ * The scene (BASE_DESIGN 6), inside SCENE_RECT: the region's climate (parallax: backdrops.ts drawClimate), the road, the set
  * pieces the road has reached (each behind the team: the fog bank too), the miller at his mill, the baddie, the team,
  * then the banner. Syncs `cast` to the frame first.
  */
@@ -444,7 +447,9 @@ export function drawMissionScene(ctx: CanvasRenderingContext2D, sim: CareSim, tr
   cast.draw(ctx);
   ctx.restore();
   if (f.banner) {
+    // (on an ink strip, as the barn's hint and action line are: the weather's marks never show between its letters)
     const w = measureText(f.banner) + (f.bannerOk ? 10 : 0), x = Math.round(R.w / 2 - w / 2);
+    ctx.fillStyle = INK; ctx.fillRect(x - 5, 17, w + 10, 17);
     drawTextOutlined(ctx, f.banner, x, 22, { size: 1, color: '#f3e6c8', outline: INK, thickness: 1, shadow: false });
     if (f.bannerOk) drawSprite(ctx, ICONS.check, x + w - 3, 25);
   }

@@ -15,7 +15,30 @@ repeated on the barn's floors, the Dragon Lift, the Aerie and the elder garden; 
 keepers meeting them (4), the clock, day and night, the speed and the barn kept in the browser (7), growing up, eggs and
 hatching and the barn's cap (7, 4.7), taking a keeper by hand (4.10), and missions -- the Map Room's table, the team, the
 trip from the Aerie, the watchable scene (5, 6). Section 8 says what each part is and how it is checked; section 9 what
-is still open, and which part answers each of the issues #5 to #11.
+is still open.
+
+**Issues #5 to #11: what implements each.**
+- **#5 Missions:** the Map Room's table (5.1: the world map with fogged regions revealed by success, the chooser with
+  its climate picture), the team and its riders (5.2), challenges met by elements and rider skills, shown up front and
+  met on the road (5.3), the odds and the seeded outcome (5.4, 5.5), coin and eggs brought home to the Hatchery (5.6),
+  big baddies calmed, outwitted or driven off (5.3, 6; a baddie's road is on the board every fourth day from day 3:
+  5.1), sent from the Aerie (the muster, the sky bridge, the landing),
+  and the watchable scene (6) -- `missions.ts`, `regions.ts`, `maptable.ts`, `missionview.ts` and the mission art kit;
+  `npm run sim` sections 17 to 24 and 26.
+- **#6 Take a keeper:** a tap, a badge or Tab takes one; WASD or the arrows walk and climb; E or Space picks up,
+  serves and puts back; Esc, LET GO or a tap on empty space lets go; a touch pad (4.10) -- `control.ts`; section 25.
+- **#7 Dragons move by needs:** every dragon walks to a room meeting its open need, on its own floor first, riding the
+  Dragon Lift between floors, and a keeper meets it there (2, 3, 4) -- `travel.ts`, `sim.ts`; sections 2, 4, 9, 10.
+- **#8 Growing up, day and night, speed:** a stage is 30 game days (growing up and hatching: 7), the sky, lights and
+  walls turn with the clock (never a dragon), the speed button and pause, and the barn saved in the browser (7) --
+  `clock.ts`, `life.ts`, `sky.ts`, `storage.ts`; sections 11 to 14.
+- **#9 Young adults:** a new game starts with seven dragons, one per element, each on the first day of the adult stage
+  (the Decisions) -- `start.ts`; section 5.
+- **#10 The elder garden:** elders retire 30 days into the stage through the Garden Gate to a garden that grows a plot
+  for each, where they nap, sit and stroll with few needs -- all but the barn's last flier, which stays until another
+  dragon can fly a mission (3, The Garden) -- `garden.ts`, `gardenArt.ts`, `life.ts`; sections 15 and 16.
+- **#11 Rooms with a purpose:** every named, furnished room has one, each copy of a need's room included, and every one
+  is proven used; the rest of the building is bare (3) -- `layout.ts` `ROOM_INFO`; section 8.
 
 ![The whole base, one screen of it outlined: the first greybox mockup, from before the room set was settled](base/barn_cutaway.png)
 
@@ -37,7 +60,7 @@ shows it.*
 | B5 | **Missions are watchable:** an animated side-scrolling scene of the team completing it. **The scene is the timer.** (Built and confirmed, 6: the scene is a pure function of the trip and the world's clock and lasts exactly as long as the trip; its result card shows when the trip's time is up.) | The user wants to see the team at work; the side-view walk the rig already has makes it cheap. |
 | B6 | **Everything runs only while the game is open.** One clock drives care, missions and hatching; closing the game pauses the world. | No coming back to a barn of red bubbles; no offline catch-up to build. Missions therefore last minutes of play, not hours. |
 | B7 | **Humans are assigned automatically:** keepers to jobs, riders to the dragons you send (each pair's rider is filled in for you, and you may swap it: 5.2) -- unless you take one (4.10): the keeper you hold is left out of every automatic pick, riders included, until you let go. | Fewer clicks; the player's choices are *which dragons* and *what to build*. |
-| B8 | **Cozy:** no combat, and nobody is hurt. Missions have hazards, and some end in a big baddie that is outwitted, calmed or driven off, never fought or killed. Old age is never decline (D21); retiring to the garden is the elder's reward, a place and never a farewell (3, The Garden). | The game's face set has no angry face (D18) and the elder is a reward. (Amended in S8, #5: "Some of the missions might end with a big baddie" -- a baddie, but a cozy one.) |
+| B8 | **Cozy:** no combat, and nobody is hurt. Missions have hazards, and some end in a big baddie that is outwitted, calmed or driven off, never fought or killed. Old age is never decline (D21); retiring to the garden is the elder's reward, a place and never a farewell (3, The Garden). | The game's face set has no angry face (D18) and the elder is a reward. (Amended for #5: "Some of the missions might end with a big baddie" -- a baddie, but a cozy one.) |
 
 *Young adult* in the user's request (#9: "start with a young adult dragon of each kind") means a dragon at the very
 start of the adult stage; the stage before adult is called *young* (the art bible's stage names: baby, young, adult,
@@ -179,7 +202,7 @@ the car takes that one first (below). With the need rooms repeated (3) few drago
 start's seven ride it 1 to 4 times in 30 minutes -- so what is left is mostly two dragons held at the bay's edge on one
 floor, one standing over the other while they wait to cross. The model the check counts with is the worst case (the
 longest body and the widest eye of every element, and any body over the eye's x, tail tip included): 3.7 s over three
-30-minute runs of the start (seeds 1 to 3, 1.5 s at most; it was 4.2 s and 2.5 s with S3's one room per need), and
+30-minute runs of the start (seeds 1 to 3, 1.5 s at most; it was 4.2 s and 2.5 s with one room per need), and
 with twelve dragons, the barn's cap (4.7), 31.6 s in 30 minutes on average over seeds 1 to 8, 15.3 s at most (it was
 273.6 s and 117.5 s in the one-room-per-need barn) (4.7, 8.1). Drawn, most of it is a tail or a flank over the other's
 head, and it ends when the bay opens.
@@ -195,19 +218,20 @@ until it has walked clear of the bay (`src/game/travel.ts`). A caller on the far
 while it walks off, nose to tail, its body 8 px behind that one's; a rider turns in the car only once the one walking
 off is clear of its turn. With the need rooms repeated the car is nearly idle: the start's seven ride it 1 to 4 times in
 30 minutes (it was about 110, the car 95 % busy), twelve dragons about 42 times (the car 29 % busy); its riders are
-the hayloft's play and bath, Rushes, a full floor's overflow, elders leaving for the garden, and (S8) the teams.
+the hayloft's play and bath, Rushes, a full floor's overflow, elders leaving for the garden, and the missions' teams.
 
 **The bay rule.** The lift bay (x 488 to 648) is also the way across each barn floor, so one rule keeps a moving car
-clear of everyone and the shaft never showing one dragon over another:
-- nobody (a keeper, or a dragon other than the car's rider) steps into the bay while the car moves past their floor,
+clear of everyone and the shaft never showing one dragon over another (the code cites its parts as R1 to R5):
+- (R1) nobody (a keeper, or a dragon other than the car's rider) steps into the bay while the car moves past their floor,
   but waits at its edge (a keeper at x 478 or 658, a dragon in that side's line); nor, once a rider is walking in,
   on a floor its ride will pass, so the car finds the way clear when it goes;
-- the car sets off only when nobody stands in the bay on any floor from where it is to where it goes; a departure
-  blocked for 4 s closes the bay to newcomers until the car goes; anyone already in the bay walks on out, never
-  stopping there;
-- while the car stands at a floor for its rider there (about to board, walking in, aboard, walking off), no other
-  dragon steps into the bay there -- but a dragon held at the bay's edge 40 s in all goes before the next rider boards;
-- a dragon steps into the bay only if everyone in it walks its way (it follows them, nose to tail, its body 8 px
+- (R2) the car sets off only when nobody stands in the bay on any floor from where it is to where it goes; (R3) a
+  departure blocked for 4 s closes the bay to newcomers until the car goes; (R4) anyone already in the bay walks on
+  out, never stopping there (a keeper held by hand and let stand in it walks on the way they face);
+- (R5, the shaft holds one dragon) while the car stands at a floor for its rider there (about to board, walking in,
+  aboard, walking off), no other dragon steps into the bay there -- but a dragon held at the bay's edge 40 s in all
+  goes before the next rider boards;
+- (R5, the lane) a dragon steps into the bay only if everyone in it walks its way (it follows them, nose to tail, its body 8 px
   behind the one ahead -- and behind one ahead stepping in with it, so two let go from the bay's edge at once go in one
   after the other), never into one coming the other way or standing there; a crosser that has stepped through a line
   toward the bay has the right of way, paused behind one ahead of it too: the car does not set off past its floor, no
@@ -242,9 +266,8 @@ meets it there; nothing else raises a need. (The Decisions' "each need is met in
 4.7.) A place with no purpose is not a room: it is left bare (an empty wall, no props, no name). The code holds each
 purpose (`src/game/layout.ts` `ROOM_INFO`, `STRUCTURES`), and `tools/sim-check.ts` proves every named room is used:
 every mechanic that uses one counts it (`sim.stats.used`, by kind, and `stats.usedRoom`, room by room), and over the
-whole check each kind and **each room itself** must show a use, or be listed as planned for a later slice (and a
-planned one that shows a use fails, so the list is kept honest). Since the missions (S8) nothing is planned: every
-named, furnished room -- each copy of a need's room, the Tack Room, the Bunks and the Map Room too -- is proven used.
+whole check each kind and **each room itself** must show a use: every named, furnished room -- each copy of a need's
+room, the Tack Room, the Bunks and the Map Room too -- is proven used.
 
 **The barn's rooms** (`src/game/start.ts`, one module each; a room's id is its place in this order: the ground floor's
 0-4, the Hatchery 5, the upper floor's 6-10, the hayloft's 11-13):
@@ -255,25 +278,25 @@ named, furnished room -- each copy of a need's room, the Tack Room, the Bunks an
 | Upper floor (1) | Hearth Kitchen (6) | Romp Room (7) | Dragon Lift | Grooming Parlour (8), Bathhouse (9), Lamp Dorm (10) |
 | Ground floor (0) | Hearth Kitchen (0) | Grooming Parlour (1) | Dragon Lift | Bathhouse (2), Romp Room (3), Lamp Dorm (4) |
 
-Three kitchens, three parlours, three dorms, two bathhouses and two romp rooms: 13 grown dragons' module slots (S3's
-barn had 11), and the Hatchery's two baby sub-slots. The ground and upper floors have all five needs' rooms, the hayloft
+Three kitchens, three parlours, three dorms, two bathhouses and two romp rooms: 13 grown dragons' module slots (one room
+per need had 11), and the Hatchery's two baby sub-slots. The ground and upper floors have all five needs' rooms, the hayloft
 food, love and sleep (under its low slopes there is room only for babies, and the west one is the Hatchery's).
 
-| Room | Purpose | Where | Built (the slice that uses it) |
+| Room | Purpose | Where | Proof of use (counted over `npm run sim`: section 8) |
 |---|---|---|---|
-| Hearth Kitchen | meets **food**: a keeper feeds the dragon here, with the bowl taken at the hearth | module 0 of the ground and upper floors, module 1 of the hayloft | S2: food met there, bowls picked up (repeated on the floors: S6b) |
-| Grooming Parlour | meets **love**, the busiest need (the own need of spike, rock and slinkwing): a keeper grooms and pets the dragon here | one a floor | S2: love met there |
-| Bathhouse | meets **bath**: a keeper washes the dragon here, with the bucket filled at the tub | the ground and upper floors | S2: baths met there, buckets filled |
-| Romp Room | meets **play**: a keeper plays with the dragon here, with a ball from the box by the wheel | the ground and upper floors | S2: play met there, balls taken |
-| Lamp Dorm | meets **sleep**: a keeper tucks the dragon in here | one a floor | S2: sleep met there |
-| Hatchery | eggs lie in its three nests and hatch into babies | the hayloft's west corner, under the roof's slope | S5: eggs laid and hatched there (7); S8: a mission's egg carried up to it by its rider |
-| Dragon Lift | carries dragons between the barn's floors and up to the Aerie | module 2, floor to roof | S3: dragons ride it (a ride completed) |
-| Tack Room | riders take their saddles here before a mission and hang them back after | left tower, ground floor | S8: each rider takes a saddle down at the muster and hangs it back after landing (each counted) |
-| Bunks | riders rest here after a mission | left tower, floor 2 | S8: each rider rests here after landing (a rest counted; a job may call them from it) |
-| Map Room | the mission table: the world map and the mission chooser | left tower, floor 4 | S8: missions are chosen and sent from its table (a send counted) |
-| Aerie | teams gather here, leave and land | the roof (floor 5) | S8: the team musters on the deck, walks off west over the sky bridge, and lands on it (each counted) |
-| Garden Gate | the dragons' way out to the garden: an arch in both walls, the one tower door a dragon fits | right tower, ground floor | S6: elders walk out through it, keepers out to the residents and back (a pass counted each way) |
-| Garden | the retired elders' home: they move here 30 days into the elder stage, and it grows a plot for each | outside, east | S6: residents arrive, and their needs are met there |
+| Hearth Kitchen | meets **food**: a keeper feeds the dragon here, with the bowl taken at the hearth | module 0 of the ground and upper floors, module 1 of the hayloft | food met there, bowls picked up |
+| Grooming Parlour | meets **love**, the busiest need (the own need of spike, rock and slinkwing): a keeper grooms and pets the dragon here | one a floor | love met there |
+| Bathhouse | meets **bath**: a keeper washes the dragon here, with the bucket filled at the tub | the ground and upper floors | baths met there, buckets filled |
+| Romp Room | meets **play**: a keeper plays with the dragon here, with a ball from the box by the wheel | the ground and upper floors | play met there, balls taken |
+| Lamp Dorm | meets **sleep**: a keeper tucks the dragon in here | one a floor | sleep met there |
+| Hatchery | eggs lie in its three nests and hatch into babies | the hayloft's west corner, under the roof's slope | eggs laid and hatched there (7), a mission's egg carried up to it by its rider (5) |
+| Dragon Lift | carries dragons between the barn's floors and up to the Aerie | module 2, floor to roof | dragons ride it (a ride completed) |
+| Tack Room | riders take their saddles here before a mission and hang them back after | left tower, ground floor | each rider takes a saddle down at the muster and hangs it back after landing (each counted) |
+| Bunks | riders rest here after a mission | left tower, floor 2 | each rider rests here after landing (a rest counted; a job may call them from it) |
+| Map Room | the mission table: the world map and the mission chooser | left tower, floor 4 | missions are chosen and sent from its table (a send counted) |
+| Aerie | teams gather here, leave and land | the roof (floor 5) | the team musters on the deck, walks off west over the sky bridge, and lands on it (each counted) |
+| Garden Gate | the dragons' way out to the garden: an arch in both walls, the one tower door a dragon fits | right tower, ground floor | elders walk out through it, keepers out to the residents and back (a pass counted each way) |
+| Garden | the retired elders' home: they move here 30 days into the elder stage, and it grows a plot for each | outside, east | residents arrive, and their needs are met there |
 
 **Bare:** the hayloft's module 5 (under the east slope); the left tower's floors 1 and 3; the right tower's floors 1 to
 4. **Dropped:** the Nursery, the Feed Store, the Hay Store and the Attic (nothing used them); the Sun Loft and the Song
@@ -331,7 +354,12 @@ are in leaf with apples on them, and the elders are the same elders, drawn as be
   may be sent somewhere new -- not being met, not in the lift's hands or its bay -- wherever it is (it keeps its size,
   so unlike a stage-up it need not stand settled): its jobs are dropped (a keeper coming for one goes home), its slot
   is let go, and it walks, riding the lift down if it must, through the Garden Gate to the middle of the lowest free
-  plot. There it is a resident, and a toast says so: "ASH MOVED TO THE GARDEN". A retiree asks for nothing on its
+  plot. There it is a resident, and a toast says so: "ASH MOVED TO THE GARDEN". **The last flier stays:** an elder
+  retires only while another dragon that could go on a mission (any but a baby: the young go on the easy roads) is
+  left outside the garden -- eggs come only from missions, so a barn with nobody left to fly one would stay empty for
+  good. The last one stays on in the barn past its time ("WICK STAYS IN THE BARN: NOBODY ELSE CAN FLY A MISSION", once;
+  its card reads `ELDER - THE LAST FLIER`) and retires as soon as another dragon can fly (`life.ts` `lastFlier`; the
+  seven starters all fall due together, so six walk out and one stays). A retiree asks for nothing on its
   way, so no need of its can raise its call for the lift as a barn dragon's does: once its call has waited a minute
   it goes before the barn's (4.9 `OVERDUE`), so it waits at a landing no longer than a barn dragon may (at most 124 s;
   measured 73.7 s in the busy barn and 72.7 s in a crowded one of ten, where it waited 161.9 s before that rule) and
@@ -416,20 +444,20 @@ first. As soon as the dragon is near (4.4's "When"), the nearest keeper runs to 
 - otherwise the keeper on the lowest job, which goes back into the queue.
 
 It costs nothing but the job it bumps. Rushed again and again (one every 30 s for 30 minutes), no need empties and a
-rushed job is done within 43 s (8.1); in S3's barn, where the one car's queue was what a Rush reordered, a dragon not
-rushed could wait long enough for a need to touch empty.
+rushed job is done within 43 s (8.1); with one room per need, where the one car's queue was what a Rush reordered, a
+dragon not rushed could wait long enough for a need to touch empty.
 
 **4.6 Rooms don't heal; keepers do.** A need rises only through a keeper's act, in that need's room (#7): the dragon
-walks there, and the keeper meets it. A room no longer restores the need it meets (the regeneration of the first slices
-is gone), and a job no longer closes by itself: every job opened is either done by a keeper or still open. A keeper
+walks there, and the keeper meets it. A room does not restore the need it meets (the pet game's
+regeneration is gone), and a job no longer closes by itself: every job opened is either done by a keeper or still open. A keeper
 waiting at a stand spot gives the job back after 2 minutes if the dragon never comes (it never happens in the checked
 run).
 
 **4.7 Capacity.** A queue that keeps growing means too few keepers or the wrong rooms: hire, or build. Riders away on
 a mission are not keeping, which is the price of sending a team (5.6).
 
-**The barn serves the herd the game grows** (S6b). Eggs (7) and missions (5) grow the barn past the start's seven.
-With one room per need (S3's barn) the Dragon Lift was its limit: one car, one rider, one dragon at a time in its
+**The barn serves the herd the game grows.** Eggs (7) and missions (5) grow the barn past the start's seven.
+With one room per need the Dragon Lift was its limit: one car, one rider, one dragon at a time in its
 shaft, each ride holding it about 15 s while its rider walked on and off at its own pace, never idle and still behind
 -- seven grown dragons were served (75.6 s on average, the car 95 % busy), nine or more ran needs empty on most seeds,
 and twelve on every one (345.1 s). Now each room meets one need and **a need's rooms repeat on the floors** (3), so a
@@ -492,11 +520,11 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
   served and 12 sit at the edge, and a returning team would push the barn to the cliff) and an elder still walking out
   to the garden. **An egg never hatches while the barn holds 12** (7): it waits in its nest, and hatches the first step
   an elder's arrival in the garden frees a place. A mission still brings its egg home to a full barn: the Map Room's
-  chooser says so (`BARN FULL: THE EGG WILL WAIT`, read through `seams.ts barnRoom`, the cap less the count), the rider
+  chooser says so (`BARN FULL: THE EGG WILL WAIT`, read through `life.ts` `barnRoom`, the cap less the count), the rider
   carries the egg up to its nest, and there it waits (`npm run sim` section 26 sends THE LOST NEST from the twelve at
   the cap: the team away still counted, the egg laid in its reserved nest, due and waiting, hatching the step after a
   retiree reaches the garden). The top bar shows the count against the cap (4.8).
-- **A barn of babies** (the S6b review). A baby with a job open is never moved on, and a job waits for its own floor's
+- **A barn of babies.** A baby with a job open is never moved on, and a job waits for its own floor's
   room: as built, babies each resting in the room another wanted stood still for good -- twelve babies packed from the
   ground floor up starved (11.7 M need-steps at 0 over 4 seeds, 83 to 104 jobs done), and four babies on the upper floor
   resting crosswise froze it from the first second. A job's wait for its own floor now ends when its need falls to its
@@ -508,14 +536,14 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
 - **What the check holds** (`npm run sim` section 10, seed 1, frozen with about 20 % headroom): the twelve with no need
   empty, waits of at most 48 s on average and 185 s at the longest (40.2 and 154.3 measured), 213 jobs done or more
   (266), at most 53 rides (44: the car stays mostly free), a landing and the bay's edge at most 47 s (42.1 and 39.5),
-  an eye covered at most 56 s in all and 17 s at once (46.5 and 14.1), no stall and no two in the shaft; the crowds S3
-  measured the one car against keep service gates instead of ride counts (eight adults: 171 done, 27.7 s; ten: 78 done,
+  an eye covered at most 56 s in all and 17 s at once (46.5 and 14.1), no stall and no two in the shaft; the crowds the one
+  car was measured against keep service gates instead of ride counts (eight adults: 171 done, 27.7 s; ten: 78 done,
   24.7 s; the `ages` preset's twelve of every stage: 55 done, 49.3 s; none with a need empty); and a barn of babies:
   twelve packed from the ground floor up, no need empty, no stall, at least 231 jobs done (289), waits of at most 68 s
   and 385 s (56.6 and 320.9); the four resting crosswise each met, no need empty; and two walking up to one landing at
   one spot placed in the order they stand, neither turned back and forth. (The design's gates for the twelve -- 42 s
   and 171 s, 217 done, 46 rides, a landing 42 s and the bay's edge 37 s, an eye 44 s and 17 s -- were frozen on the
-  capacity study's build, which rested a baby moved on in the Hatchery; S5 keeps babies moved on out of it, so no
+  capacity study's build, which rested a baby moved on in the Hatchery; babies moved on are kept out of it (7), so no
   resting baby hides an egg. This build meets the design's waits, jobs, rides and longest eye cover; its landing, bay
   edge and eye cover in all are 0.1, 2.5 and 2.5 s over the design's, so those gates are frozen on the build.)
 
@@ -539,31 +567,35 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
     never to the world under it.
 - **The Map Room's table** (5.1): the world map and a mission's chooser, over the world (8, 18, 624 x 318) and under
   the top bar; the world waits while it is open. **The TEAM OUT chip** (394, 19, 114 x 15; first drawn at x 520, where it
-  covered a plate at the start camera: at 394 it sits over the lift shaft's and the ladder bay's tops), while a team is out: MUSTER, TEAM OUT - 14H (game hours to go) or LANDING; a tap opens the watch overlay (6),
+  covered a plate at the start camera: at 394 it sits over the lift shaft's and the ladder bay's tops), while a team is out: MUSTER, TEAM OUT - 14H (game hours to go), then LANDING while a team dragon is still coming onto the deck, EGG TO THE NEST while its rider carries the egg down, and HOME until the saddles are hung up; a tap opens the watch overlay (6),
   where a TRIP LOG button (124, 338, 64 x 16, beside BACK TO BARN) opens the trip's log (8, 34, 300 x 120: each stop met,
   unmet, still ahead or never reached -- each stop told only once the scene has shown how it went, at its banner's
   moment (missionview.ts `stopShownAt`: the scene is the timer), and one never reached only once the turn-back stop's
-  has, so the log never tells a stop, or a failure, early -- the log's latest lines, the time left), and a tap on it (or TRIP LOG again) closes it.
+  has, so the log never tells a stop, or a failure, early -- the log's latest lines, the time left), drawn over the result card, and a tap on it (or TRIP LOG again) closes it.
   A toast shown while the table is open goes low in its panel, and one too long to clear the chip goes under it.
 - **Bubbles** over the dragons.
 - **The job strip** along the bottom: the top five jobs in order, numbered, each chip in its tier's colour with a
   check or an hourglass. Tapping a chip pans to that dragon and rushes the job.
 - **A dragon's card** (160 x 76, on the far side of the screen from the dragon tapped: at 8, 20 for one in the right
   half; at 472, 38 for one in the left half, under the TEAM OUT chip -- so the card never opens over its own dragon,
-  nor, for a dragon tapped in the Hatchery at the start camera, over the nests and their eggs): tap a dragon and its
+  nor, for a dragon tapped in the Hatchery at the start camera, over the nests and their eggs -- unless another dragon's
+  head is under that place and none under the other, where it opens instead: `hud.ts` `cardAt`): tap a dragon and its
   card opens (one with a job waiting is Rushed too, as
   ever: a dragon has a job waiting most of the time, 60 to 79 % of it in the start barn, so the card comes with the Rush
   rather than only without one): its name and element, its stage and `DAY d OF 30` (d is the day of its stage, 7), the
   stage's 30 days as a bar, and its needs, each an icon over a bar. A tap on a bubble or a chip Rushes only. A tap on
   the card, or anywhere else in the world, closes it (the top bar's buttons leave it open, so the game can be paused
   to read it).
-- **The hint** (`TAP A BUBBLE: RUSH   TAP A KEEPER: TAKE`) on an ink strip at the bottom right, beside the job strip;
-  it gives way when the strip reaches it, and while a keeper is held (the pad is there then: 4.10).
+- **The hint** on an ink strip at the bottom right, beside the job strip, four in turn, 4 s each: `TAP A BUBBLE: RUSH
+  TAP A KEEPER: TAKE`; `TAP MAP: SEND A TEAM TO THE LOST NEST` (until the first mission is sent; then `... ON A
+  MISSION`, and none while a team is out); `DRAG TO LOOK AROUND THE BARN`; `TAKE A KEEPER: WASD TO WALK, E TO ACT`. It
+  gives way when the strip reaches it, and while a keeper is held (the pad is there then: 4.10).
 - **Toasts**, centred under the top bar for 3 s: "SURE? TAP AGAIN", "A NEW BARN", "NEW BARN: THE OLD SAVE DIDN'T FIT",
   "THE BARN IS FULL" (an egg fell due with the barn at its cap: 7), a grow-up ("EMBER IS AN ELDER NOW!"), a mission
   sent ("THE LOST NEST: THE TEAM MUSTERS ON THE AERIE") or landed ("THE LOST NEST: HOME SAFE WITH 40 COIN AND AN EGG",
-  or "... BACK HOME WITH 20 COIN. NOBODY IS HURT.") and the dawn's tip at 05:00 ("3 DRAGONS GROW UP IN 2 DAYS": the
-  dragons whose stage-up falls due within two game days). Life's news (the grow-ups, the tip, the full barn) waits its turn behind the toast
+  or "... BACK HOME WITH 20 COIN. NOBODY IS HURT.") and the dawn's tip at 05:00 ("3 DRAGONS GROW UP TOMORROW": the
+  soonest of the dragons whose stage-up falls due within two game days, by the day it falls on: TODAY, TOMORROW or IN 2
+  DAYS), and an elder staying on as the barn's last flier (3, The Garden). Life's news (the grow-ups, the tip, the full barn) waits its turn behind the toast
   showing, never cutting it short, and grow-ups into one stage still waiting to be shown share one toast ("EMBER AND
   ZAP ARE ELDERS NOW!", "EMBER, BRAMBLE AND 2 MORE ARE ELDERS NOW!": the new game's seven all fall due at once).
 - **Panning:** drag the barn (while a keeper is held, the camera follows them again 3 s after a drag). **Keys:** 1 to
@@ -587,7 +619,7 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
 
 | | |
 |---|---|
-| Base drain | full to 0.5 in 7.5 minutes of play; a dragon's own need in 3.75 (`HALF_LIFE_S` 450; it was 6 and 3 until S3, see below) |
+| Base drain | full to 0.5 in 7.5 minutes of play; a dragon's own need in 3.75 (`HALF_LIFE_S` 450; the first numbers were 6 and 3, see below) |
 | Keeper pace | 1 px a frame walking, 0.8 climbing, 1.6 times either when rushed |
 | Dragon pace | its walk anim's own: each frame's `move` at the anim's speed 1, 0.28 to 0.54 px a frame for adults (spike 0.28 and slinkwing 0.32 with their pauses, rock 0.30, dusk 0.40, fire and water 0.45, lightning 0.54); no hurrying, even under Rush -- but for the lively step |
 | The lively step (`LIVELY`) | 2: on and off the car and wherever its body is in the lift bay or steps into it, a dragon's walk plays at 2x and its body moves by the same factor (2, the capacity study, 4.7: at 1.5 twelve dragons ran a need empty on 1 seed of 8, lively on the car alone on 3, not lively at all on 2) |
@@ -595,7 +627,7 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
 | A job at the dragon | food 200 frames, love 160, play 200, bath 200; sleep: 90 of tuck-in, then 15 s asleep while it refills |
 | A keeper sets off (`LEAD_PX`) | when the dragon is there, or past its lift ride with 300 px of route left; for a rushed job, as soon as it is past its lift ride |
 | A keeper waits at the stand spot (`WAIT_MAX`) | at most 7200 frames (2 min), then gives the job back |
-| The lift (`LIFT_SPEED`) | 2 px a frame, a floor in 0.93 s (the third of S3's levers, 1 to 1.5, taken to its cap of 2) |
+| The lift (`LIFT_SPEED`) | 2 px a frame, a floor in 0.93 s (first 1, then 1.5, then its cap of 2) |
 | The bay closes (`BAY_CLOSE`) | after a departure is blocked 240 frames (4 s) |
 | A call is overdue (`OVERDUE`) | after 3600 frames (1 min): it is served before the follow-in, the car's own floor and the front of a line; an elder's on its way to the garden, before every tier too (it asks for nothing on the way, so nothing else raises its call) |
 | Waiting at a landing (`LANDING_CLEAR`, `DRAGON_EYE`) | the snout 2 px short of the bay; nose to tail behind the one ahead (the mean of their half-bodies and 16 px: 88 px for adults); no body over an eye (an eye 21 to 38 px ahead of an adult's root) |
@@ -603,24 +635,24 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
 | Walking up to the bay (`APPROACH`) | within 250 px of the bay's edge, a dragon keeps `FOLLOW_GAP` behind one walking up ahead of it the same way |
 | A dragon moved on picks a slot (`RIDE_PX`) | a ride counted 600 px more than its route: one on its own floor first; the same when a dragon picks among a need's rooms (`roomsFor`) |
 | A need's room with no slot free (`EVICT_PX`) | counted 200 px more when a dragon picks among the need's rooms (a lingerer must be moved on first) |
-| A job's wait for its own floor's room ends (`STAY_TIER`) | at tier 1 (the yellow bubble, SOON), with none of its floor's rooms to be had: it takes a slot free a floor away (the S6b review: babies each resting in the room another needs no longer wait for ever, 4.7) |
+| A job's wait for its own floor's room ends (`STAY_TIER`) | at tier 1 (the yellow bubble, SOON), with none of its floor's rooms to be had: it takes a slot free a floor away (so babies each resting in the room another needs never wait for ever, 4.7) |
 | The barn's cap (`BARN_CAP`, `src/game/life.ts`) | 12 dragons (every one not living in the garden): no egg hatches while the barn holds that many (4.7, 7) |
 | A dragon held at the bay's edge (`CROSS_MAX`) | 2400 frames (40 s) in all, and it goes before the next rider on its floor boards |
 
 The changes from the first numbers were measured (`npm run sim`, 30 minutes on the starting base, section 8.1).
-With the dragons walking and one car between the floors, the car was the bottleneck of S3's barn, one room per need
+With the dragons walking and one car between the floors, the car was the bottleneck of the first barn, one room per need
 (4.7: the repeated rooms took that away, below). Served strictly
 oldest call first, it made empty trips: jobs waited 131 s on average, and needs ran empty on five of six seeds.
-Serving a caller on the car's own floor first (with a one-minute overdue rule, so nobody waits on for ever), then the
-third and fourth of S3's levers, a faster car and slower drains (its first two, `LEAD_PX` 450 and `QUEUE` 0.55, did not
+Serving a caller on the car's own floor first (with a one-minute overdue rule, so nobody waits on for ever), then a
+faster car and slower drains (a longer lead, `LEAD_PX` 450, and an earlier queue, `QUEUE` 0.55, did not
 help), brought that to 55 to 74 s as first built. That car let the next rider walk in through the last one walking
 off, and anyone cross the bay through a rider; the shaft now shows one dragon at a time (the bay rule, 2), which costs
 the car that overlap. Some of it came back: the next rider on the far side follows the last one in, nose to tail; a
 landing's front is the snout's length from the bay, not half a body's; a rider's ride closes the floors it will pass
 while it walks in; a dragon picks a job on its own floor first in the same tier, and one moved on takes a slot on its
-own floor first. The car goes at 2 px a frame. With `HALF_LIFE_S` 420, the fourth lever as planned, a need still
+own floor first. The car goes at 2 px a frame. With `HALF_LIFE_S` 420 a need still
 touched empty on some seeds (one of 18 in 30 minutes; within two hours on seed 2); at 450 none did, so it is 450 -- a
-step past that lever, for the one-dragon shaft S3's levers did not count on: waits of 62 to 98 s on average over
+step further, for the one-dragon shaft: waits of 62 to 98 s on average over
 seeds 1 to 18, the longest 185 to 307 s, and no need ever empty. The rules that keep eyes clear at a crowded landing
 (2: walking up behind one ahead, a held crosser stopping short, a lingerer moving over, the car taking one caught over
 an eye first, a waiting dragon keeping its place), the long-held crosser going next, and keepers setting off only once
@@ -630,32 +662,32 @@ against 102, and no need empty on any seed against one), and cut the eye covered
 minutes. Any such change moves one seed's own numbers by a fifth either way (seed 1's average went from 66.6 s to
 87.6 s, seed 4's from 85.7 s to 65.6 s), so `npm run sim` gates the waits on seeds 1 to 3 together: their mean
 average wait at most 100 s (83.5 measured), the longest 360 s (301.2), a landing wait 124 s (103.4), a rider held in
-the car 25 s (20.5). S3's first targets of 60 s, 180 s and 60 s are not reached on any of 48 seeds at this car (4.7);
+the car 25 s (20.5). The first targets of 60 s, 180 s and 60 s were not reached on any of 48 seeds at this car (4.7);
 the gates from the first design stay: no need empty, done >= 120, a keeper's wait at the
 stand spot <= 20 s, the bay's edge <= 60 s.
 
-**Barn capacity (S6b).** None of that moved the one car's ceiling (4.7): it served seven grown dragons, and eggs
+**Barn capacity.** None of that moved the one car's ceiling (4.7): it served seven grown dragons, and eggs
 and missions will grow the barn to 10 to 15. A capacity study measured three designs with `tools/capacity.ts` (a second
-lift; a smarter single car with pairs and top-ups; the need rooms repeated on the floors) and a judge chose the last
+lift; a smarter single car with pairs and top-ups; the need rooms repeated on the floors) and the last was chosen,
 with the lively step (2): repeating the rooms moves the barn's limit from the car to its floors -- the start's seven ride
 the car 1.6 times in 30 minutes, not 107 -- and the lively step pays for the bay's crossings that are left, since every
 floor has need rooms on both sides of it. Measured (`npm run capacity`, 30 minutes, seeds 1 to 8): the start's seven
 wait 23.6 s on average (75.6 s in the one-room-per-need barn), and the benchmark's twelve are served with no need
-empty on any seed (8 of 8 had one before, at 345.1 s). The judge's ablations: the lively step off, twelve NOT served
+empty on any seed (8 of 8 had one before, at 345.1 s). Its ablations: the lively step off, twelve NOT served
 (2 of 8 seeds with a need empty, 69.3 s); at 1.5x 1 of 8 (45.6 s); lively on the car alone 3 of 8; a keeper walking
 home to the nearest room of their station's kind, noise (fixed stations were kept); a keeper fetching a supply by the
 whole trip, not merely the nearest post (kept: without it 41.1 s and a stall); a baby moved on resting in the
-Hatchery, noise (dropped: S5 keeps babies moved on out of the Hatchery, so no resting baby hides an egg -- measured
-here it costs twelve about 3 s of average wait, 42.1 s against 39.3 s, still served on every seed; 41.7 s after the
-S6b review); a baby with a job
+Hatchery, noise (dropped: babies moved on are kept out of the Hatchery, so no resting baby hides an egg -- measured
+here it costs twelve about 3 s of average wait, 42.1 s against 39.3 s, still served on every seed); a baby with a job
 open never moved on, noise (kept); a dragon moved on going to its lowest need's room on any floor before merely the
 nearest slot (kept: without it 7 adults and 5 babies are NOT served, 2 of 8). `npm run sim` gates the start's three
 seeds' waits at a mean of 31 s (25.3 measured) and 135 s at most (112.3), and section 10's twelve on seed 1 (4.7).
-The S6b review added three rules, each measured over the table in 4.7: a job's wait for its own floor's room ends at
+Three more rules were added, each measured over the table in 4.7: a job's wait for its own floor's room ends at
 its yellow bubble (`STAY_TIER`: babies each resting in the room another needs had waited for ever); the rules for
 walking up to the bay hold only a dragon walking up to it -- to cross it or to call the car there -- not one whose walk
-ends at a slot short of it (an adult had stood 12 s over a baby crawling up to the bay: without the change thirteen and
-8a3y2b are not served, 7a5b stands five times over seeds 9 to 32 against two); and a landing's line places two walking
+ends at a slot short of it (an adult had stood 12 s over a baby crawling up to the bay: without the change thirteen, and
+eight adults with three young and two babies, are not served, and seven adults with five babies stand five times over
+seeds 9 to 32 against two); and a landing's line places two walking
 up at one spot in the order they stand (they had passed each other and turned back every few steps, for minutes, or
 for good in a barn of babies).
 
@@ -711,13 +743,15 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
 
 ![The mission table: pick the pairs, counter the challenges, see the odds](base/mission_table.png)
 
-- **5.1 The board** (built: S8; `src/game/missions.ts`, `regions.ts`, `maptable.ts`). The Map Room's table (the left
+- **5.1 The board** (`src/game/missions.ts`, `regions.ts`, `maptable.ts`). The Map Room's table (the left
   tower's floor 4: tap it, or MAP on the top bar, or M) opens the **world map**: six regions, three explored from the
   start (MILLBROOK, OLD MINE ROAD, BRAMBLEWOOD) and three under hatched fog (HIGHFOLD, FROSTMERE, EMBERFELL) until a
   success in a neighbour reveals them at the next dawn, dotted roads between neighbours and from HOME, and a numbered pin
   for each mission on the board. The board is rolled at 05:00 each day (and at a new game's start): one mission for
   each explored region, up to three, each easy (2 challenges, 1 game day, 40 coin), normal (3, 2 days, 80 coin) or
-  hard (3 and the region's big baddie from day 3, else 4; 3 days; 150 coin) -- 3, 6 or 9 minutes of play at 1x. Day 1
+  hard (3 and the region's big baddie from day 3, else 4; 3 days; 150 coin) -- 3, 6 or 9 minutes of play at 1x. On
+  day 3 and every fourth day after (7, 11, ...), the first region on the board that has a baddie shows its hard road,
+  so a big baddie is there to meet early (`missions.ts` `baddieDay`). Day 1
   always has THE LOST NEST (Millbrook, easy: a spring flood and lost things, a sure egg), which two of the seven
   starters meet (RIPPLE and ECHO). A pin opens the **mission chooser**: the region's **climate picture** (a meadow,
   caves, a forest, peaks, a frozen lake or ash hills: the mission art's, drawn without dragons), the rewards, each
@@ -734,7 +768,9 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
 
   A keeper the player has taken by hand is never picked. Babies stay home; the young go only on the easy missions;
   elders go (steadier, never weaker: D21); garden residents stay in the garden. SEND starts the **muster**: the team's
-  dragons leave what they were doing (a keeper at work finishes) and ride the Dragon Lift up to the Aerie, first in the
+  dragons leave what they were doing (a keeper at work finishes the job, and a sleeper wakes first; each keeps its slot
+  until it sets off, so no other dragon walks into it; a rider at work leaves the job where it got to, and one tucking a
+  dragon in leaves it asleep, the job done) and ride the Dragon Lift up to the Aerie, first in the
   car's calls, each to the westmost free spot on the deck (the car still carries one dragon at a time, so the muster
   takes 2186 steps in a fresh barn -- 36 s at 1x -- and longer when the car is under way or a team dragon is being met:
   sends in the middle of play measured median 2460, 90th percentile 3094 and at most 4032 steps over 360 sends -- BEST
@@ -784,7 +820,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   arrive: an egg of one of the region's elements, sure on a region's first success and otherwise 35 % (60 % on a hard
   road). The nest is reserved when the team is sent -- the chooser says HATCHERY FULL: NO EGG when all three hold eggs
   -- and the rider carrying it down lays it there; it hatches 2 game days later, and the baby grows up (7). When the
-  barn is at its cap (4.7, read through `seams.ts barnRoom`: the cap less every dragon not living in the garden, a team
+  barn is at its cap (4.7, read through `life.ts` `barnRoom`: the cap less every dragon not living in the garden, a team
   away among them) the chooser says BARN FULL: THE EGG WILL WAIT: the egg still comes home and waits in its nest, due,
   until a dragon leaves the barn for the garden. Curios,
   blueprints, feed, materials and recruits are not built.
@@ -845,17 +881,17 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   lift down to the nearest free slots and their needs take over, the egg's rider carries it up to the Hatchery, and the
   riders hang their saddles in the Tack Room and rest in the Bunks (5.2); the toast says how it went ("THE LOST NEST: HOME
   SAFE WITH 40 COIN AND AN EGG").
-- **Status (built: S8, S9, S9a).** The scene watches the trip `currentTrip(sim)` returns: the one the Map Room sent
-  (`sim.missions.trip`: 5), from its muster (the team at the road's start) to its landing (the result card). Its dragons
-  are away (place `away`) from the Aerie to the landing and are not drawn in the barn; the scene draws them. The trip's
-  log from S8's progress card is kept over the scene (TRIP LOG). `view=base&preset=trip&trip=<region>:<progress>[:fail]`
+- **Status (built).** The scene watches the trip that is out: the one the Map Room sent (`sim.missions.trip`: 5), from
+  its muster (the team at the road's start) to its landing (the result card). Its dragons are away (place `away`) from
+  the Aerie to the landing and are not drawn in the barn; the scene draws them. The trip's log (its stops and the time
+  left) opens over the scene (TRIP LOG). `view=base&preset=trip&trip=<region>:<progress>[:fail]`
   puts a team of two pairs away on the region's hard mission that far along its road at the frozen step -- the world's
   own trip, as a sent team is once it has left the Aerie, built from the Map Room's own tables and rules
   (`src/game/tripdemo.ts`: `regions.ts`, and `missions.ts` autoRider, oddsOf and roadOf; missions.ts awayNow), the
   outcome as asked -- and `panel=watch` opens the scene. The climates (in parallax: the far ridge at 0.2 of the camera, the near forms at 0.5,
   each climate at its own phase of the day), the set pieces, the three baddies and the grumpy miller (at the `miller`
   stop, grumpy until the Charm rider's moment has talked him round) are the mission art kit's (ART_BIBLE 5.10: `backdrops.ts`,
-  `setpieces.ts`, `baddies.ts`, `npcs.ts`, `missionicons.ts`, drawn through `src/game/artseams.ts`); the riders carry
+  `setpieces.ts`, `baddies.ts`, `npcs.ts`, `missionicons.ts`); the riders carry
   the kit's saddle; the dragons and riders are the real rigs. The scene's ground under its road (`ROAD_SCENE`: the slab,
   the grass strip, the earth) sits between the baddies' dark and mid fills (L 0.19 to 0.27), so palette gate (x) holds
   every baddie's edge fill 25 % from it as well as from the road and its region's climate bands.
@@ -871,8 +907,8 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   (`hour=` starts one at another hour). The phases: **dawn** 05:00 to 07:00, **day** 07:00 to 18:00, **dusk** 18:00 to
   20:00, **night** 20:00 to 05:00. The sky turns into a phase over its first hour, in three stepped thirds (each a flat
   mix of the two phases' colours: no gradient, no alpha).
-- **Night lives in the sky, the lights and the walls; the dragons and the floors never change.** (Plan S6c: before it,
-  night changed about 2 % of the opening frame -- the windows, the dorm lamp and the hearth's glow -- and a player
+- **Night lives in the sky, the lights and the walls; the dragons and the floors never change.** (Before the
+  moonlit walls, night changed about 2 % of the opening frame -- the windows, the dorm lamp and the hearth's glow -- and a player
   looking at the barn could not tell night from day.)
   - The sky is drawn behind the building, in screen space: three flat bands, far hills and clouds at half the camera's
     pace, and at night the moon and 24 stars at a fifth of it (the stars come out a third at a time as the night comes
@@ -890,7 +926,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
     car's rails, the ground -- and the garden's hedge, lawn, trees, bench, lanterns' posts, kerb and fence take their
     **night colours**: each its day colour mixed half way to a mid blue (`src/game/surfaces.ts` `MOONLIGHT` `#5c6a9c`),
     cooler and darker, never black (the walls L 0.20 to 0.31 at night against 0.26 to 0.54 by day). One table maps a
-    day colour to its night colour (`surfaces.ts` `NIGHT`, 43 entries: 40 moonlit -- the sky bridge's rope rail among them, S8 -- 3 the same on purpose); the building (`building.ts`) and the garden
+    day colour to its night colour (`surfaces.ts` `NIGHT`, 43 entries: 40 moonlit -- the sky bridge's rope rail among them -- 3 the same on purpose); the building (`building.ts`) and the garden
     (`gardenArt.ts`) are drawn through it, every fill and the cel tones made from it, onto one canvas per step, built
     the first time the step is needed (about 6 ms) and kept: never a frame's work. The props behind the slots (the
     hearth, the tub, the pallets, the gate's leaf, the Map Room's map) are moonlit too; the lights, the flames, the
@@ -898,9 +934,9 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
     the garden's mounds and the dorm's mattresses (straw, like the floor) and the firebox's and the doorways' dark. The
     watchable scene's ground under and below its road (6: `ROAD_SCENE`, its edge line, slab, grass strip and earth) is
     not in the table: it is not the barn -- the watch overlay draws it as it is at every hour, never through the table
-    nor into the building's canvases -- and its night is its region's climate picture's (the art kit's, S9a).
+    nor into the building's canvases -- and its night is its region's climate picture's (the mission art kit's: ART_BIBLE 5.10).
     The room names on their plates keep theirs. Measured at the opening frame (`view=base&t=600`, noon against 22:00),
-    65.6 % of the pixels change, darker (mean L 0.570 to 0.490 over them) and cooler (blue less red -37.4 to +9.6),
+    66.1 % of the pixels change, darker (mean L 0.569 to 0.489 over them) and cooler (blue less red -37.5 to +9.6),
     and none of the 23 003 floor pixels does (`npm run smoke`, which asks for 35 % or more; 69.1 % of a different frame
     before the need rooms repeated on the floors, 4.7).
   - **Nothing tints a dragon or a floor**: no `tint`, `tintAlpha` or `flash` by time of day, and every `FLOORS` colour
@@ -914,16 +950,17 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
     a slot (the hearth and its dark firebox, the tub, the dorm's pallets) >= 25 % from them either way, day and night,
     and all 6 Oklab L from the ink: 4215 gates, all passing (ART_BIBLE 5.8; 1771 of them the barn's and the garden's,
     52 the watchable scene's ground, gated as it is drawn at every hour, and 2392 the mission art kit's climates at
-    their own four phases, the cave mouth and the fog bank, S9a: each climate has its own night, so none is in the night
+    their own four phases, the cave mouth and the fog bank (ART_BIBLE 5.10): each climate has its own night, so none is in the night
     table). It also fails any wall, backdrop or prop
-    colour (`WALLS`, each colour of `BACKDROPS`, `PROPS`) the night table has no entry for, so a structure a later
-    slice adds is drawn at night only once its colours are in the table and gated.
+    colour (`WALLS`, each colour of `BACKDROPS`, `PROPS`) the night table has no entry for, so a structure added
+    later is drawn at night only once its colours are in the table and gated.
   - The barn's care never reads the day's phase: a barn started at noon and one started at ten at night, stepped alike,
     are the same barn (`npm run sim` section 12), and `view=base&layers=cast` (the cast alone -- the dragons, the
     keepers and the bubbles -- on a flat colour) is the same picture at noon and at ten at night (`npm run smoke`).
     (`layers=world`, the world without the sky, the lights and the HUD, now shows the moonlit walls.) A garden
-    resident's naps read it (they only nap at night: `src/game/garden.ts`, the one simulation module that does; its
-    state, the residents' rhythm, is left out of the barn's key), and the dawn's mission board will (S8).
+    resident's naps read it (they only nap at night: `src/game/garden.ts`; its state, the residents' rhythm, is left out
+    of the barn's key), and so does the Map Room's board, rolled at dawn (`src/game/missions.ts`, 5.1): the two
+    simulation modules that do.
 - **Growing up.** A stage lasts **30 game days** (a month: #8), baby, then young, then adult, then elder; the new game's
   seven start on the adult stage's first day. A dragon's stage-up falls due 30 days after its stage began, and is
   applied as soon as the dragon is **settled**: no act (a sleeper has one), no keeper on any of its jobs (coming, waiting
@@ -943,14 +980,14 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   room. How long a stage-up waits is how long the dragon takes to finish what it was doing: alone, at most a minute
   (seeds 1 to 8 on a short day: 4 s to 49 s); in the busy barn, one errand (the walk to a need's room, the wait for the
   one car, the job: 68 s to 144 s at most over seeds 1 to 8, checked against 3 minutes, a thirtieth of a stage: 4.7)
-  -- measured in S5's barn, one room per need; in the repeated-room barn (4.7), where the needs are met on each dragon's own floor, seed 1
+  -- measured with one room per need; in the repeated-room barn (4.7), where the needs are met on each dragon's own floor, seed 1
   measures 4 s alone and 34 s at most in the busy barn (`npm run sim` section 13).
   A baby on its way to its module slot that a need calls (or a Rush) to the room it is going to is met there in a
   baby's sub-slot, like any baby, and goes on growing up after. An elder's next is the garden (3, The Garden): 30 days
   after the step it grew into an elder it retires -- as soon as it may be sent somewhere new, not settled (it keeps its
   size, so no net or line minds). In the busy barn (seven adults falling due to grow elder mid-errand, seeds 1 to 8)
   they grow up to 5788 steps late and are elders 30.00 to 33.33 days, each retiring at most 130 to 1998 steps past its
-  due (seed 1: 2339 late, 30.00 to 31.80 days, 1081: S6's barn; in the repeated-room barn, seed 1: up to 2062 steps late, 30.00
+  due (seed 1: 2339 late, 30.00 to 31.80 days, 1081, with one room per need; in the repeated-room barn, seed 1: up to 2062 steps late, 30.00
   days each an elder, none retiring late); none is late with the `retire` preset (`npm run sim` section 15).
   **The cheer:** just grown up, a dragon holds where it stands for exactly its new stage's `happy` (61 to 139 steps,
   read from the anim tables: `src/game/gait.ts` `happyLen`; the hold is the dragon's own `hold` and is saved): it takes
@@ -959,7 +996,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   its own ink for 12 frames (the grow-up's flash, the one flash the base draws: never for the time of day; frames
   shown, so it lasts as long at 8x, and holds while paused), then it plays `happy` through and a toast says so
   ("EMBER IS AN ELDER NOW!"); ART_BIBLE 4.2's 240-frame grow-up is not built yet. At 05:00 a toast names how many
-  dragons grow up within two days, and a dragon's card (4.8) shows the day of its stage.
+  dragons grow up soonest within two days, and when (today, tomorrow or in 2 days), and a dragon's card (4.8) shows the day of its stage.
 - **Eggs.** An egg (`CareSim.addEgg`: only a mission brings one, 5.6) lies in the lowest free of the Hatchery's three
   nests, in the hayloft's west corner under the roof's low slope (3: x 228, 268 and 308, 40 px apart, the heat lamp
   over the middle one). It hatches **2 game days** after it was laid, as soon as **the barn has room** and a baby
@@ -1009,7 +1046,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
 
 ## 8. Build order
 
-**What is built** (each part built, reviewed and merged; `npm run check` green on the whole):
+**What is built** (`npm run check` green on the whole):
 
 | Part | Status | Where it is described |
 |---|---|---|
@@ -1030,7 +1067,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    still names it, for the gallery's other debug views): drag to look around, and tap a bubble, a job chip or a
    dragon to Rush it. Each dragon walks to its need's room, riding the Dragon Lift between floors, and a keeper meets
    it there (#7). The four keepers are the named cast of `docs/KEEPERS.md`, each in the anim closest to its job
-   while this slice's own simulation walks it and picks what it's doing (KEEPERS.md's status has the join). The page
+   while the base's own simulation walks it and picks what it's doing (KEEPERS.md's status has the join). The page
    takes `seed=`, `cam=x,y` (where the camera starts, world px), `preset=ages` (a code-built start with every stage:
    the base's first twelve-dragon cast) and `save=0` (a live page that never loads or saves; a preset page never
    does either); `t=` freezes it as in every gallery view. The gallery's own keys (the arrows, Space, E, the digits)
@@ -1047,7 +1084,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    is settled with room to grow (the flash, `happy` held through, a toast), eggs in the Hatchery's nests hatch 2 days
    after they were laid into babies that grow up, the dawn's tip names who grows up soon, and a tap on a dragon opens
    its card (4.8).
-   Only a mission brings an egg (S8), so the presets show them: `preset=growup` (EMBER grows up a half second in),
+   Only a mission brings an egg (5), so the presets show them: `preset=growup` (EMBER grows up a half second in),
    `preset=eggs` (three eggs in the nests, one just laid, one cracked, one about to hatch), `preset=hatch` (an egg
    hatching at step 60) and `preset=full` (every baby sub-slot taken, 21 dragons forced over the barn's cap: a due egg
    waits, its dots over it and `BARN 21/12` in the top bar).
@@ -1110,10 +1147,10 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    | `src/game/gardenArt.ts` | the garden, drawn: a plot's tile (the hedge, the lawn, an apple tree on every other, a nest mound, a lantern, flowers on stalks; the path, the kerb, the ground), drawn only where it is on screen; the fence at the world's end; the lanterns' rings at night, clipped to the hedge's own shape; the GARDEN sign |
    | `src/game/control.ts` | taking a keeper by hand (4.10): the player's commands (take, steer, act, let go; and the Map Room's send), applied at the start of a step; walking and climbing by hand under the bay rule; what E does (pick up, serve, put back) and the line that says so; a keeper held saved as let go; a rider on a mission's trip never taken |
    | `src/game/missionview.ts` | the watchable scene: the scene as a pure function of the trip and the clock (`sceneAt`: the beats, the pace from each walk's own root motion, the turn back, the baddie's beat), the team's characters played to it (the riders with their saddles), and its drawing (the climate, the road, the set pieces, the miller, the baddie, the banner, the result card) |
-   | `src/game/artseams.ts` and the mission art kit (`backdrops.ts`, `setpieces.ts`, `baddies.ts`, `npcs.ts`, `missionicons.ts`, `cel.ts`, `missionart.ts`) | the missions' pictures (ART_BIBLE 5.10): each region's climate at every phase of the day in parallax layers, the eleven set pieces, the three big baddies (their faces, poses and cozy exits) and their portraits, the grumpy miller on the keepers' rig, the challenge and skill icons and the saddle; the gallery's `view=missionart` lays them out. `artseams.ts` is the one door the scene and the Map Room draw them through |
+   | The mission art kit (`src/game/backdrops.ts`, `setpieces.ts`, `baddies.ts`, `npcs.ts`, `missionicons.ts`, `cel.ts`, `missionart.ts`) | the missions' pictures (ART_BIBLE 5.10): each region's climate at every phase of the day in parallax layers, the eleven set pieces, the three big baddies (their faces, poses and cozy exits) and their portraits, the grumpy miller on the keepers' rig, the challenge and skill icons and the saddle; the gallery's `view=missionart` lays them out; the scene and the Map Room draw them from these modules |
    | `src/game/tripdemo.ts` | the `trip` preset's mission and team: a region's mission at a difficulty from `regions.ts`, the best two pairs with the missions' own auto riders, odds and road (`missions.ts`), the outcome asked |
    | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks -- at the lively step's speed too -- turns and rides; a resident's nap and wake) and their anims, the lift's car, the eggs, the grow-up's flash, the garden, the sky and the lights, the speed, the camera (out to the garden's end), the HUD (the dragon card too), the input and the overlays over the barn (one screen, one set of input rules: the Map Room's table, 5; the watch overlay, 6: the TEAM OUT chip opens it, BACK TO BARN closes it); a live page loads and saves the barn |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride and at a call for the car too, with each walk's speed and each room's uses), `rngAt`, the rooms (a purpose each, one room kind per need -- a need's rooms repeat -- the building as its table in 3 says, room by room, the keepers at their fixed stations, and every room used over the check, room by room, unless planned), the gait (the walks against their anim tables and players, a walk with an intro, the lively step moving a body as the anim player at 2x does, every walk, a scripted walk as far as the anim carries it), and barn capacity (section 10: the benchmark's twelve served for 30 minutes, checked every step; eight adults, ten and the `ages` preset's twelve keeping their service; a barn of twelve babies served, two walking up to one landing kept in order; the `full` preset, forced over the cap, keeping moving); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled with room to grow every time, each grow-up held still for its `happy`, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days; a baby Rushed on its way to grow up met in a sub-slot) and eggs (the nests, hatching exactly 2 days on into a new baby, in front of its own nest or an empty one, fed within 3 minutes, a full barn's egg waiting, no baby moved on to the Hatchery, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up; the elder garden (routes out through the Garden Gate to every plot; retiring 30 days after growing into an elder (however late that was) and soon after, a retiree at a landing no longer than a barn dragon, in a crowded barn too, the gate passed, a plot each and the garden grown to hold them, a resident in the garden with no slot; the residents' 30 minutes: food and love only at a quarter of an elder's drain, asleep half their steps or more and every night step, strolling, met where they rest by a keeper come out to them, none at rest under another's body or lying across another, the barn's service beside them; saves taken with residents napping, sitting, strolling, waiting and being met, and with elders on their way out); the missions (sections 17 to 23: the board, the same twice and day 1's LOST NEST first; the odds, hand-computed; who may go -- a keeper taken by hand never an auto rider nor on BEST TEAM, by a stub and by S7's own take command, never given a job, a send command with them refused with its reason, a rider on a trip refused to the hand -- two keepers home, one team out; a full trip -- the Map Room, the Tack Room, the lift up to the Aerie, away with the needs waiting, back at its time exactly, the egg in its nest and hatched, the Bunks, the coin, the neighbour revealed at dawn; a failure turning back; the outcome the seed's; the barn's care with a two-pair team away 30 minutes; saves taken mid-muster, away, landing and resting, and mid-muster and mid-away with a keeper held by hand, loaded as let go); the watchable scene (section 24: eight trips read at every step -- an easy, a normal and three hard missions with their baddies, each way it can end: the team at its places as it leaves, done when its time is up, never walking back before it turns or on after, standing still through every beat, turning back at the first uncovered stop, no dragon skating on a single travel step, the scene's dragons playing the road's walk frame when synced by jumps of 1, 8 and 40 steps and across a 1000-step gap, each baddie's exit shown, every stop's log `NAME - WHO WHAT`; the trip preset's team the world's own trip, away; its rider pick passing over a keeper taken by hand); taking a keeper (section 25: BEA taken, fetching the bowl and feeding EMBER by hand, up and down the centre ladder, 10 000 steps held with Rushes about and never given a job, let go home; every chore by hand, a resident too; saves with a keeper held loaded as let go, stepping on exactly; a keeper let stand in the lift bay walking out; the missions' seam `isTaken` true of the keeper held, or taken at work, and of nobody else); the barn's cap (section 26: an egg falling due in a full barn waits, one `full` event, and hatches when an elder arrives in the garden; a full barn sending a mission that brings an egg -- the chooser's BARN FULL: THE EGG WILL WAIT, away dragons still counted, the egg carried up to the Hatchery and waiting there until a retiree frees room); and every named room used, room by room, nothing planned. Five worker threads run the longest sections beside the rest (section 10's three parts -- the benchmark and the crowds, the `full` preset, the barns of babies -- with 23, the team away; sections 2 and 24; sections 6 and 25), so the whole check keeps to about 24 s (measured on a shared 4-CPU machine, the slowest worker the `full` preset's 21 dragons; the budget is 30 s: the suite prints its wall times and fails over the budget, unless other work beside it kept the machine busy -- half a CPU or more on average, read from /proc/stat) |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: the care simulation, headless, in 26 numbered sections -- routes, 30 minutes of play on three seeds checked every step (the bay rule, one dragon in the shaft, no eye under a standing body but for a moment), determinism, Rush, the start cast, saves (exact, through JSON, taken at every kind of moment), `rngAt`, the rooms (a purpose each, and every room used over the check, room by room), the gait, barn capacity and the cap, the clock and night, growing up, eggs, retirement and the garden, the missions (the board, the odds, who may go, a full trip, sends mid-act, a failure, the outcome, care with a team away), the watchable scene, and taking a keeper. The file's header lists what each section checks, and each prints what it measured. Five worker threads run the longest sections beside the rest, so the whole check keeps to about 25 s on four CPUs (the budget is 30 s on four CPUs or more, scaled up on fewer; the suite fails over it unless other work beside it kept the machine busy -- half a CPU or more on average, read from /proc/stat) |
    | `tools/capacity.ts` | `npm run capacity` (not in `npm run check`): the capacity benchmark -- named casts (`start7`, `eight`, `ten`, `twelve`, `thirteen`, `fifteen`) or any `7a3y2b` mix placed on the start barn (fewer than seven adults too: `0a12b`, a late game's barn of babies), 30 minutes on seeds 1 to 8, every run checked as section 2 is (a dragon mid-walk getting no more than 4 px on in 10 s, stood still or turned about on one spot, a stall) -- printed as a table with a SERVED / NOT SERVED verdict each (4.7) |
 
    Measured by `npm run sim` on the starting base (its seven dragons and four keepers, the need rooms repeated on the
@@ -1138,9 +1175,9 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    (320.9 s at most), 289 jobs done, no stall; four babies each resting in the room another wants all met, none empty;
    and two walking up to one landing at one spot placed in the order they stand. The cap (section 26): with twelve in the barn an egg falling due waits in its nest --
    one "THE BARN IS FULL" -- and hatches the step after an elder retiring from the barn arrives in the garden. Over
-   the whole check every room is used, each copy of a need's room too (section 8). (S3's barn, one room per need, gave
-   136 opened, 128 done, 87.6 s and 301.2 s, 112 rides with the car 95 % busy; S2's, the dragons pinned in their
-   slots and the rooms restoring their needs, 149 opened, 146 done, 14.5 s and 41.0 s. The check wants a mean of 31 s
+   the whole check every room is used, each copy of a need's room too (section 8). (One room per need gave
+   136 opened, 128 done, 87.6 s and 301.2 s, 112 rides with the car 95 % busy; the first barn, the dragons pinned in
+   their slots and the rooms restoring their needs, 149 opened, 146 done, 14.5 s and 41.0 s. The check wants a mean of 31 s
    and 135 s over the three seeds: 4.9 says why.) The elder garden (`npm run sim` sections 15 and 16): with the
    `retire` preset on a 600-step day, the seven retire the step they fall due and arrive over 3710 to 8412 steps (the
    lift carries the three from the upper floor and the hayloft down one at a time), a retiree waiting at a landing
@@ -1193,9 +1230,10 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    away), its egg laid in nest 0 at the hayloft's x 228 falls due at the cap -- one "THE BARN IS FULL" -- and hatches the
    step after EMBER, retiring, reaches the garden (step 11 783). Over the whole check every room is used, room by room
    (section 8: the three kitchens 465, 403 and 138 times, the Hatchery 61, the Tack Room 39, the Bunks 19, the Map Room
-   11, the Garden Gate 71, and every other copy at least 35), nothing is planned, and the suite takes about 24 s (23.9 s
-   in the last `npm run check`, its slowest worker the `full` preset's 23.1 s, other work beside it 0.09 CPUs; the
-   budget is 30 s, and the suite fails over it unless other work kept the machine busy, half a CPU or more).
+   11, the Garden Gate 71, and every other copy at least 35), and the suite takes about 25 s on four CPUs (25.3 s in the
+   last run, its slowest worker the `full` preset's 24.5 s, other work beside it 0.07 CPUs; the budget is 30 s on four
+   CPUs or more, scaled up on fewer -- 60 s on two -- and the suite fails over it unless other work kept the machine
+   busy, half a CPU or more).
 2. **Rooms you build:** place, merge and upgrade rooms; move dragons between them; ~~save and load~~ (built: 7). Not
    built: the one way the barn could grow past its cap (4.7).
 3. **Missions:** ~~the table~~ (built: 5), then ~~the scene~~ (built: 6). Built both.
@@ -1217,14 +1255,14 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   proves every one used, room by room (3).
 - ~~Are missions a menu or a place?~~ Resolved (#5): the Map Room's table in the left tower sends them, the Aerie on the
   roof sees them off and home, eggs come back to the Hatchery, and the scene is the timer (5, 6, B5).
-- ~~The wall gate's exact rule, once the room palette exists.~~ Answered (S4): gate (w) (7) holds every wall, sky
+- ~~The wall gate's exact rule, once the room palette exists.~~ Answered: gate (w) (7) holds every wall, sky
   colour and lamp's light >= 25 % lighter than every dark body, every big prop behind a slot >= 25 % from them either
   way, and all 6 Oklab L from the ink. A prop's cel shadow band and its 1 px lines are marks, not backdrops, and are not
   gated.
-- ~~Night in the start frame is quiet~~ (about 2 % of the frame changed at 23:20 against noon). Answered (S6c):
+- ~~Night in the start frame is quiet~~ (about 2 % of the frame changed at 23:20 against noon). Answered:
   without new furniture (#11), the walls and the building's shell are moonlit at night, stepped with the lamps (7):
   69.2 % of the opening frame changes, and no dragon or floor pixel does.
-- ~~The dragon card covers the Hatchery at the start camera.~~ Answered (the final merge's review): the card opens on
+- ~~The dragon card covers the Hatchery at the start camera.~~ Answered: the card opens on
   the far side of the screen from the dragon tapped (4.8), so a dragon tapped in the Hatchery sees its card at the right.
 
 **Still open** (each a follow-up, none begun):
@@ -1232,7 +1270,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   bridge instead (5.2; rock and the young could not fly anyway). The grow-up is a stand-in (the new silhouette's 12-frame
   flash, then `happy`), not ART_BIBLE 4.2's 240-frame grow-up with its "look at me" -- and whether that moment should be
   the player's to trigger is still asked. The keepers have no climb anim: a climb, by hand or not, shows `idle`.
-- **The night shift.** Deferred (S4): the barn keeps no keeper day and night rhythm (the care never reads the phase:
+- **The night shift.** Deferred: the barn keeps no keeper day and night rhythm (the care never reads the phase:
   7), and a resting keeper stays assignable; dusk as the early sleeper and slinkwing as the night owl (3.7, 3.8) wait
   with it.
 - **Recruits and the rest of the rewards.** Coin and eggs are built (5.6); coin buys nothing yet, and curios,
@@ -1247,25 +1285,3 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   Hearth Kitchens read as filler to the player, though each copy is used (3)? And with the start's seven the Dragon Lift
   is nearly idle (1 to 4 rides in 30 minutes) and the hayloft's rooms nearly empty until the herd passes about ten:
   its regular riders are the hayloft's overflow, Rushes, elders leaving and the mission teams.
-
-**Issues #5 to #11: what implements each.**
-- **#5 Missions:** the Map Room's table (5.1: the world map with fogged regions revealed by success, the chooser with
-  its climate picture), the team and its riders (5.2), challenges met by elements and rider skills, shown up front and
-  met on the road (5.3), the odds and the seeded outcome (5.4, 5.5), coin and eggs brought home to the Hatchery (5.6),
-  big baddies calmed, outwitted or driven off (5.3, 6), sent from the Aerie (the muster, the sky bridge, the landing),
-  and the watchable scene (6) -- `missions.ts`, `regions.ts`, `maptable.ts`, `missionview.ts` and the mission art kit;
-  `npm run sim` sections 17 to 24 and 26.
-- **#6 Take a keeper:** a tap, a badge or Tab takes one; WASD or the arrows walk and climb; E or Space picks up,
-  serves and puts back; Esc, LET GO or a tap on empty space lets go; a touch pad (4.10) -- `control.ts`; section 25.
-- **#7 Dragons move by needs:** every dragon walks to a room meeting its open need, on its own floor first, riding the
-  Dragon Lift between floors, and a keeper meets it there (2, 3, 4) -- `travel.ts`, `sim.ts`; sections 2, 4, 9, 10.
-- **#8 Growing up, day and night, speed:** a stage is 30 game days (growing up and hatching: 7), the sky, lights and
-  walls turn with the clock (never a dragon), the speed button and pause, and the barn saved in the browser (7) --
-  `clock.ts`, `life.ts`, `sky.ts`, `storage.ts`; sections 11 to 14.
-- **#9 Young adults:** a new game starts with seven dragons, one per element, each on the first day of the adult stage
-  (the Decisions) -- `start.ts`; section 5.
-- **#10 The elder garden:** elders retire 30 days into the stage through the Garden Gate to a garden that grows a plot
-  for each, where they nap, sit and stroll with few needs (3, The Garden) -- `garden.ts`, `gardenArt.ts`; sections 15
-  and 16.
-- **#11 Rooms with a purpose:** every named, furnished room has one, each copy of a need's room included, and every one
-  is proven used; the rest of the building is bare (3) -- `layout.ts` `ROOM_INFO`; section 8.

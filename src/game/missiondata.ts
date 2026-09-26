@@ -31,7 +31,6 @@ export const BADDIE_IDS: readonly BaddieId[] = Object.freeze(['moleking', 'storm
 
 /** How a baddie leaves the road, and the only ways it can: calmed (it dozes off), outwitted (it wanders the wrong way), driven off (it shuffles off grumbling). */
 export type BaddieExit = 'calmed' | 'outwitted' | 'drivenOff';
-export const BADDIE_EXITS: readonly BaddieExit[] = Object.freeze(['calmed', 'outwitted', 'drivenOff'] as BaddieExit[]);
 
 /** A baddie's face: no angry one exists (grumpy is a flat, low brow and a pout). */
 export type BaddieFace = 'neutral' | 'grumpy' | 'surprised' | 'sleepy';
@@ -39,7 +38,6 @@ export const BADDIE_FACES: readonly BaddieFace[] = Object.freeze(['neutral', 'gr
 
 /** A baddie's pose: no knockback, no hurt pose, nothing flung. */
 export type BaddiePose = 'walk' | 'stand' | 'sit' | 'turn' | 'leave';
-export const BADDIE_POSES: readonly BaddiePose[] = Object.freeze(['walk', 'stand', 'sit', 'turn', 'leave'] as BaddiePose[]);
 
 /** The grumpy miller's two looks (npcs.ts): grumpy at the mill until a CHARM rider talks him round, then talked round. */
 export type MillerMood = 'grumpy' | 'talkedRound';

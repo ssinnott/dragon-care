@@ -355,8 +355,9 @@ function hatchedOne(b: BaseHook): string[] {
  * dragon on screen that has no job waiting (the hook's `waiting` false, its `head` clear of the top bar, the job strip
  * and every waiting dragon's bubble) opens its card (the hook's `card` is its name) on the far side of the screen from
  * it (`cardBox`: at the right for a dragon in the left half, at 8, 20 for one in the right half -- never over the head
- * tapped) and Rushes nothing; a tap on the card closes it; and a tap on the head of a dragon with a job waiting opens
- * its card too, and Rushes that job (exactly one Rush).
+ * tapped -- or on the near side if another head is under the far one and none under the near) and Rushes nothing; a tap
+ * on the card closes it; and a tap on the head of a dragon with a job waiting opens its card too, and Rushes that job
+ * (exactly one Rush) -- a head drawn in front of a keeper included: the tap is the dragon's, not the keeper's.
  */
 async function baseCard(page: any): Promise<string[]> {
   const out: string[] = [];
@@ -377,9 +378,13 @@ async function baseCard(page: any): Promise<string[]> {
   const c = await st();
   if (c.card !== d.name) out.push(`tapping ${d.name}'s head (nothing waiting) opened ${c.card === null ? 'no card' : `${c.card}'s card`}`);
   if (c.rushes !== rushes) out.push(`tapping ${d.name} (nothing waiting) Rushed a job`);
-  const cb = c.cardBox, h = d.head!;
-  const far = cb && (h.x < 320 ? cb.x === 472 && cb.y === 38 : cb.x === 8 && cb.y === 20) && cb.w === 160 && cb.h === 76;
-  if (!cb || !far || (h.x >= cb.x && h.x <= cb.x + cb.w && h.y >= cb.y && h.y <= cb.y + cb.h)) out.push(`${d.name}'s card (head at ${Math.round(h.x)}, ${Math.round(h.y)}) opened at ${JSON.stringify(cb)}, not on the far side of the screen from it`);
+  // (the far side -- 472, 38 for a head left of x 320, else 8, 20 -- unless a head on screen is under it there and none
+  // is on the near side: hud.ts cardAt, each head's centre kept 10 px clear)
+  const cb = c.cardBox, h = d.head!, heads = b.dragons.flatMap((q) => (q.head ? [q.head] : []));
+  const LEFT = { x: 8, y: 20, w: 160, h: 76 }, RIGHT = { x: 472, y: 38, w: 160, h: 76 }, [farR, nearR] = h.x < 320 ? [RIGHT, LEFT] : [LEFT, RIGHT];
+  const covers = (r: typeof LEFT) => heads.some((q) => q.x > r.x - 10 && q.x < r.x + r.w + 10 && q.y > r.y - 10 && q.y < r.y + r.h + 10);
+  const want = covers(farR) && !covers(nearR) ? nearR : farR, side = want === farR ? 'the far side' : 'the near side (a head under the far side)';
+  if (!cb || cb.x !== want.x || cb.y !== want.y || cb.w !== want.w || cb.h !== want.h || (h.x >= cb.x && h.x <= cb.x + cb.w && h.y >= cb.y && h.y <= cb.y + cb.h)) out.push(`${d.name}'s card (head at ${Math.round(h.x)}, ${Math.round(h.y)}) opened at ${JSON.stringify(cb)}, not at ${JSON.stringify(want)} (${side})`);
   const at = cb ?? { x: 8, y: 20, w: 160, h: 76 };
   await page.mouse.click(box.x + (at.x + at.w / 2) * k, box.y + (at.y + at.h / 2) * k);
   await page.waitForTimeout(150);
@@ -394,7 +399,7 @@ async function baseCard(page: any): Promise<string[]> {
     if (e.rushes !== rushes + 1) out.push(`tapping ${w.name} (a job waiting) made ${e.rushes - rushes} Rushes, not 1`);
   } else out.push(`no dragon with a job waiting has its head on screen clear of the bubbles (${b.dragons.map((q) => `${q.name} ${q.waiting ? 'waiting' : 'free'} ${q.head ? `${Math.round(q.head.x)},${Math.round(q.head.y)}` : 'off'}`).join('; ')})`);
   await page.keyboard.press('p');
-  if (!out.length) console.log(`        card: ${d.name}'s opened by a tap on its head (x ${Math.round(h.x)}: nothing waiting, no Rush) at ${at.x}, ${at.y}, the far side, closed by a tap on it; ${w!.name}'s opened by a tap on its head and its job Rushed`);
+  if (!out.length) console.log(`        card: ${d.name}'s opened by a tap on its head (x ${Math.round(h.x)}: nothing waiting, no Rush) at ${at.x}, ${at.y}, ${side}, closed by a tap on it; ${w!.name}'s opened by a tap on its head and its job Rushed`);
   return out;
 }
 

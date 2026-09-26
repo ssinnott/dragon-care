@@ -127,7 +127,9 @@ interface Window {
       scene: { stop: string | null; covered: boolean | null; beat: boolean; banner: string | null; baddie: 'moleking' | 'stormroc' | 'frostgiant' | null;
         face: 'neutral' | 'grumpy' | 'surprised' | 'sleepy' | null; pose: 'walk' | 'stand' | 'sit' | 'turn' | 'leave' | null;
         exit: 'calmed' | 'outwitted' | 'drivenOff' | null; facing: 1 | -1; progress: number; done: boolean; result: string | null } | null;
-      barn: { count: number; cap: number } };
+      barn: { count: number; cap: number };
+      /** The toast showing now, if any (its text). */
+      toast: string | null };
     /**
      * view=base, live and saving (src/game/base.ts attach, only when the page loads and saves the player's barn): save
      * the barn now, and return the step it was saved at. Gone once the base is detached.

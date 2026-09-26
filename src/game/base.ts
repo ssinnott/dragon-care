@@ -65,7 +65,6 @@ import type { Pet } from './pet.ts';
 import { CareSim } from './sim.ts';
 import type { Dragon, Job, Keeper } from './sim.ts';
 import { startSpec, buildSim, tripStart } from './presets.ts';
-import { currentTrip } from './seams.ts';
 import type { Trip } from './trip.ts';
 import { sceneAt, drawMissionScene, drawBackButton, drawResultCard, ScenePets, BACK_BUTTON, RESULT_CARD, ROAD_BOTTOM } from './missionview.ts';
 import type { SceneFrame } from './missionview.ts';
@@ -74,7 +73,7 @@ import type { SaveV } from './save.ts';
 import { readClock, hourSteps, PHASE_HOURS, HATCH_DAYS } from './clock.ts';
 import type { Speed, ClockRead } from './clock.ts';
 import { drawSky } from './sky.ts';
-import { drawTopBar, drawToast, drawHint, drawCard, buttonAt, badgeAt, padAt, drawPad, drawActionLine, drawPortraitHint, BUTTONS, BAR_H, TOAST_FRAMES, CARD, cardAt, PAD, PAD_DIR,
+import { drawTopBar, drawToast, drawHint, HINT_TAPS, drawCard, buttonAt, badgeAt, padAt, drawPad, drawActionLine, drawPortraitHint, BUTTONS, BAR_H, TOAST_FRAMES, CARD, cardAt, PAD, PAD_DIR,
   BADGE_X0, BADGE_DX, BADGE_W, BADGE_Y, BADGE_H } from './hud.ts';
 import type { ButtonName, PadButton, BadgeState } from './hud.ts';
 import { actionFor, controlledKeeper, takeRefusal, SUPPLY_NAME } from './control.ts';
@@ -86,7 +85,7 @@ import { WORLD_W, WORLD_H, NESTS, feetY, nestX, eggBottom } from './layout.ts';
 import { drawGarden, drawGardenLights, drawGardenPlate } from './gardenArt.ts';
 import { lightsOf } from './sky.ts';
 import { drawEgg, drawShellBits, drawWaiting, BITS_FRAMES } from './eggs.ts';
-import { stageDue, barnCount, barnFull, BARN_CAP } from './life.ts';
+import { stageDue, staysOn, barnCount, barnFull, BARN_CAP } from './life.ts';
 import { walking, feetOf } from './travel.ts';
 import { gaitOf, wrapT } from './gait.ts';
 import { NEEDS, GARDEN_NEEDS, SOON, tierOf, chargeOf, hasNeed } from './needs.ts';
@@ -96,7 +95,7 @@ import { makeKeeperAgent, stepKeeperVisual, drawKeeperVisual } from './people.ts
 import type { KeeperAgent } from '../care/keeper.ts';
 import { drawBubble, drawChip, hit } from './icons.ts';
 import type { Rect } from './icons.ts';
-import { canSend, onTrip } from './missions.ts';
+import { canSend, onTrip, LOST_NEST } from './missions.ts';
 import { newUi, drawMapScreen, drawMissionScreen, editTeam, drawTeamChip, drawTripCard, drawLogButton, hitAt, chosen, eggNotice, tripProgress, TRIP_CARD, PANEL, LOG_BUTTON } from './maptable.ts';
 import type { MapUi, Hit, Screen } from './maptable.ts';
 
@@ -166,6 +165,17 @@ const TIP_DAYS = 2;
 const FOLLOW = { x0: 160, x1: 480 } as const, FRAME_FEET = 196, FOLLOW_EASE = 8, FOLLOW_PAUSE = 180;
 /** A keeper's tap box (world px, around their feet): 10 px either side, from 78 px over the feet (Pip, the smallest, 58) to 2 under. */
 const KEEPER_BOX = { half: 10, top: 78, topSmall: 58, below: 2 } as const;
+/** How long each hint shows before the next (hintText), frames: 4 s. */
+const HINT_FRAMES = 240;
+/**
+ * Where a keeper sorts in the cast's draw order (by the feet, dragons at theirs): a step behind the dragons of their
+ * floor, so a dragon's head is never covered (ART_BIBLE 1.4) -- and one on a ladder behind the dragons of both floors
+ * it climbs between (sorted a step behind the upper floor's), so a head at a landing beside the ladder stays clear.
+ */
+function castKey(k: Keeper): number {
+  if (!k.climbing) return k.y - 3;
+  return k.legs.length ? Math.min(k.y, feetY(Math.max(k.f, k.legs[0].f))) - 3 : k.y;
+}
 /** The keys that walk the keeper held by hand: WASD and the arrows. */
 const DIR_KEYS: Readonly<Record<string, 'up' | 'down' | 'left' | 'right'>> = Object.freeze({
   w: 'up', W: 'up', ArrowUp: 'up', s: 'down', S: 'down', ArrowDown: 'down', a: 'left', A: 'left', ArrowLeft: 'left', d: 'right', D: 'right', ArrowRight: 'right',
@@ -290,6 +300,8 @@ export class BaseView {
   private hatches: { id: number; el: Dragon['element']; x: number; y: number; age: number }[] = [];
   /** Last frame's heads of the dragons drawn (screen px, by dragon id), for the hook. */
   private heads = new Map<number, { x: number; y: number }>();
+  /** The elders already told of as staying on as the barn's last flier (life.ts staysOn): each is said once. */
+  private toldStay = new Set<number>();
   private detachers: (() => void)[] = [];
   /** Each keeper's px walked as of the last world step (the view's: a keeper held by hand walks only while this moves). */
   private walkedWas: number[] = [];
@@ -348,7 +360,7 @@ export class BaseView {
     this.cast.clear();
     for (const [id, v] of cast) this.cast.set(id, v);
     this.keeperAgents = agents; this.buildings = [building, null, null, null]; this.plates = plates;
-    this.bubbles = []; this.chips = []; this.card = null; this.hatches = []; this.heads.clear(); this.news = [];
+    this.bubbles = []; this.chips = []; this.card = null; this.hatches = []; this.heads.clear(); this.news = []; this.toldStay.clear();
     this.walkedWas = sim.keepers.map((k) => k.walked); this.sent = { dx: 0, dy: 0 };
     this.ui = newUi(); this.uiHits = []; this.chipRect = null; this.tripWas = sim.missions.trip?.state ?? null;
     this.watching = null; this.resultClosed = false; this.scene = null;
@@ -503,8 +515,18 @@ export class BaseView {
     }
     this.tripWas = now;
     if (sim.clock % sim.dayLen === PHASE_HOURS.dawn * hourSteps(sim.dayLen)) {
+      // (the soonest of those due within TIP_DAYS, by the day they are due: today, tomorrow, or in 2 days)
+      const inDays = (d: Dragon) => Math.floor(stageDue(sim, d) / sim.dayLen) - Math.floor(sim.clock / sim.dayLen);
       const soon = sim.dragons.filter((d) => d.stage !== 'elder' && stageDue(sim, d) - sim.clock <= TIP_DAYS * sim.dayLen);
-      if (soon.length) this.news.push({ text: soon.length === 1 ? `${soon[0].name} GROWS UP IN ${TIP_DAYS} DAYS` : `${soon.length} DRAGONS GROW UP IN ${TIP_DAYS} DAYS` });
+      const first = Math.min(...soon.map(inDays)), who = soon.filter((d) => inDays(d) === first);
+      const when = first <= 0 ? 'TODAY' : first === 1 ? 'TOMORROW' : `IN ${first} DAYS`;
+      if (who.length) this.news.push({ text: who.length === 1 ? `${who[0].name} GROWS UP ${when}` : `${who.length} DRAGONS GROW UP ${when}` });
+    }
+    // (an elder staying on past its time for the garden, the barn's last flier: said once -- life.ts staysOn)
+    for (const d of sim.dragons) {
+      if (this.toldStay.has(d.id) || !staysOn(sim, d)) continue;
+      this.toldStay.add(d.id);
+      this.news.push({ text: `${d.name} STAYS IN THE BARN: NOBODY ELSE CAN FLY A MISSION` });
     }
   }
 
@@ -592,7 +614,7 @@ export class BaseView {
   draw(ctx: CanvasRenderingContext2D): void {
     const cx = Math.round(this.camX), cy = Math.round(this.camY), all = this.layers === 'all', world = this.layers !== 'cast';
     const read = readClock(this.sim.clock, this.sim.dayLen), lit = lightsOf(read), step = lit.walls;
-    const trip = currentTrip(this.sim);
+    const trip = this.sim.missions.trip;
     this.scene = trip ? { trip, f: sceneAt(this.sim, trip) } : null;
     // (the team watched on its road: the overlay over the barn, the top bar kept; once the trip is over, the barn again)
     if (this.ui.screen === 'watch' && !trip) this.closeWatch();
@@ -637,8 +659,8 @@ export class BaseView {
     for (const [id, v] of this.cast) { const p = v.pet, [a, b] = extentX(p); if (!away.has(id) && seen(a - 24, b + 24, p.y - 110, p.y + 12)) cast.push({ y: p.y, pet: p, view: v, id }); }
     this.sim.keepers.forEach((k, i) => {
       if (k.phase === 'away') return;
-      const y = k.climbing ? k.y : k.y - 3, key = k.climbing && k.legs.length ? Math.min(k.y, feetY(Math.max(k.f, k.legs[0].f))) - 3 : y;
-      if (seen(k.x - 30, k.x + 30, y - 100, y + 8)) cast.push({ y: key, keeper: i });
+      const y = k.climbing ? k.y : k.y - 3;
+      if (seen(k.x - 30, k.x + 30, y - 100, y + 8)) cast.push({ y: castKey(k), keeper: i });
     });
     cast.sort((a, b) => a.y - b.y);
     this.budget.begin(cast.filter((c) => c.pet).length, this.frame);
@@ -700,10 +722,10 @@ export class BaseView {
     ctx.fillStyle = CLEAR; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     if (!this.watching || this.watching.trip !== trip) this.watching = new ScenePets(this.sim, trip);
     drawMissionScene(ctx, this.sim, trip, this.watching, f);
-    // (the trip's log, opened by TRIP LOG -- the stops met, unmet and ahead, the log's latest lines, the time left: plan
-    // S8's progress card, kept here -- then the result card over it)
-    if (this.ui.card) drawTripCard(ctx, this.sim, trip);
+    // (the result card once the trip's time is up; then the trip's log over it, opened by TRIP LOG -- the stops met,
+    // unmet and ahead, the log's latest lines, the time left -- so the log asked for is read whole)
     if (f.done && !this.resultClosed) drawResultCard(ctx, trip, this.sim.tick);
+    if (this.ui.card) drawTripCard(ctx, this.sim, trip);
     drawBackButton(ctx);
     this.uiHits = [{ r: LOG_BUTTON, act: { kind: 'none' }, name: 'log' }];
     drawLogButton(ctx, this.ui.card);
@@ -722,7 +744,7 @@ export class BaseView {
    * say once it closes.
    */
   private openWatch(): void {
-    const trip = currentTrip(this.sim);
+    const trip = this.sim.missions.trip;
     if (!trip) return;
     this.card = null;
     if (!this.watching || this.watching.trip !== trip) { this.watching = null; this.resultClosed = false; this.ui.card = false; }
@@ -744,12 +766,12 @@ export class BaseView {
     else this.closeTable();
   }
 
-  /** A tap on the watch overlay (under the top bar): BACK TO BARN, TRIP LOG, the result card tapped away, the log tapped shut; anything else swallowed. */
+  /** A tap on the watch overlay (under the top bar): BACK TO BARN, TRIP LOG, the log tapped shut (it is drawn on top), the result card tapped away; anything else swallowed. */
   private watchTap(sx: number, sy: number): void {
     if (hit(BACK_BUTTON, sx, sy)) this.closeWatch();
     else if (hit(LOG_BUTTON, sx, sy)) this.ui.card = !this.ui.card;
-    else if (this.scene?.f.done && !this.resultClosed && hit(RESULT_CARD, sx, sy)) this.resultClosed = true;
     else if (this.ui.card && hit(TRIP_CARD, sx, sy)) this.ui.card = false;
+    else if (this.scene?.f.done && !this.resultClosed && hit(RESULT_CARD, sx, sy)) this.resultClosed = true;
   }
 
   /** The hook (window.__dragonCare.base): the world as of this frame, and the overlay and the scene (plan S9). */
@@ -793,7 +815,8 @@ export class BaseView {
           // (the chooser's line about the egg, as drawMissionScreen draws it: only while a mission's chooser is open)
           notice: this.ui.screen === 'mission' && chosen(this.sim, this.ui) ? eggNotice(this.sim) : null },
         scene: this.sceneHook(),
-        barn: { count: barnCount(this.sim), cap: BARN_CAP } };
+        barn: { count: barnCount(this.sim), cap: BARN_CAP },
+        toast: this.toast?.text ?? null };
     }
   }
 
@@ -816,6 +839,17 @@ export class BaseView {
 
   /** How far on an egg is: 0 laid, 1 due (its HATCH_DAYS in the nest; one past it waits for a sub-slot at 1). */
   private progress(e: { laid: number }): number { return Math.max(0, Math.min(1, (this.sim.clock - e.laid) / (HATCH_DAYS * this.sim.dayLen))); }
+
+  /**
+   * The hint at the bottom right, one of these in turn (HINT_FRAMES each, by the view's UI frame, so a frozen t= shows the
+   * same one): the two taps; the Map Room -- THE LOST NEST by name while it waits on the first board, and none while a
+   * team is out; looking around the barn; and the keys for a keeper taken.
+   */
+  private hintText(): string {
+    const ms = this.sim.missions, map = ms.trip ? null : ms.sent === 0 && ms.board.some((m) => m.title === LOST_NEST) ? `TAP MAP: SEND A TEAM TO ${LOST_NEST}` : 'TAP MAP: SEND A TEAM ON A MISSION';
+    const hints = [HINT_TAPS, map, 'DRAG TO LOOK AROUND THE BARN', 'TAKE A KEEPER: WASD TO WALK, E TO ACT'].filter((h): h is string => !!h);
+    return hints[Math.floor(this.uiFrame / HINT_FRAMES) % hints.length];
+  }
 
   /** The dragon whose card is open, if it is still in the world (null: none). */
   private cardDragon(): Dragon | null { return this.card == null ? null : this.sim.dragons.find((d) => d.id === this.card) ?? null; }
@@ -842,7 +876,7 @@ export class BaseView {
       x += 6 * s.length + 7;
     }
     // (the hint gives way to the pad while a keeper is held)
-    if (!held) drawHint(ctx, x);
+    if (!held) drawHint(ctx, x, this.hintText());
     // (a team out -- the Map Room's, or a preview -- its TEAM OUT chip under the top bar, which opens the scene)
     this.chipRect = this.scene && this.ui.screen === 'none' ? drawTeamChip(ctx, this.sim, this.scene.trip, false) : null;
     const d = this.cardDragon();
@@ -850,7 +884,7 @@ export class BaseView {
       // (a garden resident has only food and love: GARDEN_NEEDS)
       const garden = d.place === 'garden';
       const needs = Object.fromEntries(NEEDS.map((k) => [k, hasNeed(d.element, k) && (!garden || GARDEN_NEEDS.includes(k)) ? d.needs[k] : null])) as Record<NeedKind, number | null>;
-      drawCard(ctx, { name: d.name, element: d.element, stage: d.stage, day: Math.floor((this.sim.clock - d.stageSince) / this.sim.dayLen) + 1, needs, garden }, this.cardRect);
+      drawCard(ctx, { name: d.name, element: d.element, stage: d.stage, day: Math.floor((this.sim.clock - d.stageSince) / this.sim.dayLen) + 1, needs, garden, stays: staysOn(this.sim, d) }, this.cardRect);
     }
     this.lineRect = null;
     // (the pad and its line are the barn's: not under the Map Room's table either)
@@ -894,6 +928,26 @@ export class BaseView {
   /** The line under the pad: the keeper held, what they carry, and what E does now ("BEA - BOWL - E: FEED WICK"). */
   private actionLine(k: Keeper): string {
     return [k.name, k.carrying ? SUPPLY_NAME[k.carrying] : null, this.actionText(k) || null].filter(Boolean).join(' - ');
+  }
+
+  /**
+   * The dragon under a world point (its body's box: its width, from the top of its head to its feet), the last by id
+   * first; whether the point is on its head (a box a head's radius and 3 px round its cranium); and where it sorts in
+   * the cast (its feet). Null: none (a dragon away on a mission is not drawn).
+   */
+  private dragonAt(wx: number, wy: number): { d: Dragon; head: boolean; feet: number } | null {
+    const top = { x: 0, y: 0 }, cran = { x: 0, y: 0 };
+    for (let i = this.sim.dragons.length - 1; i >= 0; i--) {
+      const d = this.sim.dragons[i], v = this.cast.get(d.id);
+      if (!v || d.place === 'away') continue;
+      const p = v.pet, [a, b] = extentX(p);
+      rootToScreen(p.rig, p.rig.j.cran.x, p.rig.j.top, top);
+      if (wx < a || wx > b || wy < top.y || wy > p.y + 4) continue;
+      rootToScreen(p.rig, p.rig.j.cran.x, p.rig.j.cran.y, cran);
+      const r = Math.max(4, cran.y - top.y) + 3;
+      return { d, head: Math.abs(wx - cran.x) <= r && wy <= cran.y + r, feet: p.y };
+    }
+    return null;
   }
 
   /** A keeper's tap box (world px): KEEPER_BOX around their feet as drawn. */
@@ -967,7 +1021,7 @@ export class BaseView {
       // (paused, the command waits for the next world step)
       if (this.speed === 0) this.say(`${m.title}: THE TEAM GOES WHEN THE GAME PLAYS`);
       this.camAsked = null; this.camTo = { ...AERIE_CAM };
-    } else if (act.kind !== 'none') editTeam(this.sim, this.ui, act);
+    } else if (act.kind !== 'none') { const said = editTeam(this.sim, this.ui, act); if (said) this.say(said); }
   }
 
   /** Keep the barn (a page that saves: storage.ts). */
@@ -1027,20 +1081,16 @@ export class BaseView {
     const wx = sx + Math.round(this.camX), wy = sy + Math.round(this.camY);
     // (the top-most bubble first: later ones are drawn over earlier ones)
     for (let i = this.bubbles.length - 1; i >= 0; i--) { const b = this.bubbles[i]; if (hit(b.r, wx, wy)) { this.sim.rush(b.job); return; } }
-    // (a keeper: their body's box, the one drawn in front first)
-    const ks = this.sim.keepers.filter((k) => hit(this.keeperBox(k), wx, wy)).sort((a, b) => b.y - a.y);
-    if (ks.length) { if (this.held() !== ks[0]) this.take(ks[0].id); return; }
-    const pt = { x: 0, y: 0 };
-    for (let i = this.sim.dragons.length - 1; i >= 0; i--) {
-      const d = this.sim.dragons[i], v = this.cast.get(d.id);
-      if (!v) continue;
-      const p = v.pet, [a, b] = extentX(p);
-      rootToScreen(p.rig, p.rig.j.cran.x, p.rig.j.top, pt);
-      if (wx < a || wx > b || wy < pt.y || wy > p.y + 4) continue;
-      if (d.place === 'away') continue;
-      const j = this.waitingJob(d);
+    // (a keeper: their body's box, the one drawn in front first -- unless the tap is on the head of a dragon drawn over
+    // them: the cast is drawn y-sorted with keepers a step behind the dragons beside them, so a head seen in front of a
+    // keeper is the dragon's to answer)
+    const ks = this.sim.keepers.filter((k) => hit(this.keeperBox(k), wx, wy)).sort((a, b) => castKey(b) - castKey(a));
+    const on = this.dragonAt(wx, wy);
+    if (ks.length && !(on && on.head && on.feet > castKey(ks[0]))) { if (this.held() !== ks[0]) this.take(ks[0].id); return; }
+    if (on) {
+      const j = this.waitingJob(on.d);
       if (j) this.sim.rush(j);
-      this.card = d.id; this.cardRect = cardAt(sx);
+      this.card = on.d.id; this.cardRect = cardAt(sx, this.heads.values());
       return;
     }
     // (the Map Room's table: a tap on it opens the map at once)

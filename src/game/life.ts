@@ -19,7 +19,8 @@
 // the elder stage, as soon as it may be sent somewhere new (not being met, not holding still, not in the lift's hands
 // or its bay: travel.ts redirectable -- a Rush's rule; it keeps its size, so unlike a stage-up it need not stand still),
 // it retires to the garden (garden.ts retire: the elder's reward, never a decline) -- counted from the step it grew into
-// an elder, so a late stage-up never shortens its time as one. An egg (sim.ts addEgg) hatches
+// an elder, so a late stage-up never shortens its time as one -- unless it is the barn's last flier (lastFlier: no other
+// dragon but babies left outside the garden), which stays on until another can fly a mission. An egg (sim.ts addEgg) hatches
 // HATCH_DAYS game days after it was laid, as soon as a baby sub-slot is free (the Hatchery's two first -- one in front
 // of no other egg, then the one nearest its nest; one elsewhere before one that would hide another's egg; else the
 // nearest): a baby of its element, a new id, the next free
@@ -49,8 +50,8 @@ export const HATCH_FOOD = 0.45;
  * standard on every mix tried (every 11- and 12-dragon mix; 13 serves most but not all, 14 none: the barn's 13 grown
  * modules are the cliff, and babies need a module free of grown dragons), a hard cap one dragon short of that cliff.
  * An egg never hatches while the barn holds this many: it waits in its nest until a dragon leaves for the garden. A
- * mission still brings its egg home to a full barn (BASE_DESIGN 4.7, 5.6): the chooser reads the room left through
- * seams.ts `barnRoom` (the cap less barnCount) and says BARN FULL: THE EGG WILL WAIT, and the egg waits in its nest.
+ * mission still brings its egg home to a full barn (BASE_DESIGN 4.7, 5.6): the chooser reads the room left (barnRoom)
+ * and says BARN FULL: THE EGG WILL WAIT, and the egg waits in its nest.
  */
 export const BARN_CAP = 12;
 /**
@@ -60,6 +61,26 @@ export const BARN_CAP = 12;
 export function barnCount(sim: CareSim): number { let n = 0; for (const d of sim.dragons) if (d.place !== 'garden') n++; return n; }
 /** Whether the barn is full: it holds BARN_CAP dragons (or more, only ever because a preset put them there). */
 export function barnFull(sim: CareSim): boolean { return barnCount(sim) >= BARN_CAP; }
+/**
+ * How many more dragons the barn can take before it is full: the cap less barnCount (a team away on a mission and an
+ * elder still walking out to the garden among them); 0 at the cap, or over it (a preset may force more). The Map Room's
+ * chooser reads it (maptable.ts eggNotice).
+ */
+export function barnRoom(sim: CareSim): number { return Math.max(0, BARN_CAP - barnCount(sim)); }
+
+/**
+ * Whether dragon d is the barn's last flier: no other dragon that could go on a mission -- any but a baby (missions.ts
+ * dragonReason: the young go on the easy roads) -- is left outside the garden, nor on its way there. An elder that is
+ * stays on in the barn past its 30 days as an elder, until another can fly: eggs come only from missions, so a barn
+ * with nobody left to fly one would stay empty for good.
+ */
+export function lastFlier(sim: CareSim, d: Dragon): boolean {
+  return !sim.dragons.some((o) => o !== d && o.stage !== 'baby' && o.place !== 'garden' && o.goal !== 'retire');
+}
+/** Whether an elder is past its time to retire and staying on as the barn's last flier (the view says so once, and its card). */
+export function staysOn(sim: CareSim, d: Dragon): boolean {
+  return d.stage === 'elder' && d.place === 'barn' && d.goal !== 'retire' && sim.clock >= retireDue(sim, d) && lastFlier(sim, d);
+}
 
 /** The stage after `st` (null: the elder's, which retires to the garden instead: garden.ts). */
 export function nextStage(st: Stage): Stage | null { return STAGES[STAGES.indexOf(st) + 1] ?? null; }
@@ -101,8 +122,9 @@ export function inTheWayOfGrowing(sim: CareSim, d: Dragon, stage: Stage): string
 function growUp(sim: CareSim, d: Dragon): void {
   const next = nextStage(d.stage), due = stageDue(sim, d);
   // (an elder's next is the garden: 30 days into its stage, as soon as it may be sent anew -- not being met, not holding
-  // still, not in the lift's hands or the bay -- wherever it is: it does not change size, so no net or line minds)
-  if (!next) { if (sim.clock >= retireDue(sim, d) && redirectable(sim, d)) retire(sim, d); return; }
+  // still, not in the lift's hands or the bay -- wherever it is: it does not change size, so no net or line minds
+  // -- unless it is the barn's last flier: it stays on until another dragon can fly a mission)
+  if (!next) { if (sim.clock >= retireDue(sim, d) && redirectable(sim, d) && !lastFlier(sim, d)) retire(sim, d); return; }
   if (sim.clock < due || !settled(sim, d)) return;
   if (d.slot && !fitsSlot(d.slot, next)) {
     const to = nearestFree(sim, d, next, ['hatchery']);

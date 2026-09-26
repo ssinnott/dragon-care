@@ -69,6 +69,16 @@ function mark(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
 const mod = (a: number, n: number): number => ((a % n) + n) % n;
 
 /**
+ * The backdrop bands a climate is drawn in at a phase (CLIMATE_BACKDROPS[climate][phase]: the three sky bands, the far
+ * ridge, the near forms and their second colour), which palette gate (x) holds every baddie fill apart from. The
+ * weather marks (a 2 px streak, a flake) and the caves' lamp pool are marks, not bands.
+ */
+export function climateBands(climate: Climate, phase: DayPhase): readonly string[] {
+  const P = CLIMATE_BACKDROPS[climate][phase];
+  return [P.sky[0], P.sky[1], P.sky[2], P.ridge, P.near, P.detail];
+}
+
+/**
  * Draw a climate at a phase of the day into `rect` (screen px), the layers slid by `scroll` at their parallax. The
  * picture scales with the rect's height (k = h / 112: 1 in the chooser, about 2.7 in a 300 px road scene); the weather
  * marks keep their px sizes. Clipped to the rect, inked round it.

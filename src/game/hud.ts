@@ -153,12 +153,15 @@ export function drawToast(ctx: CanvasRenderingContext2D, s: string, y = 20): voi
   drawTextOutlined(ctx, s, ctx.canvas.width / 2, y, { size: 1, color: TEXT, outline: INK, thickness: 1, align: 'center', shadow: false });
 }
 
+/** The two taps (Rush, and taking a keeper: BASE_DESIGN 4.10): the first hint, and the one shown when no other is given. */
+export const HINT_TAPS = 'TAP A BUBBLE: RUSH   TAP A KEEPER: TAKE';
 /**
- * The two taps (Rush, and taking a keeper: S7), right-aligned at x 634 on an ink strip level with the job strip's chips (its text on theirs), so it reads over
- * any wall -- unless the strip reaches it (`stripEnd`, screen x): the jobs come first.
+ * A hint (HINT_TAPS, or one of the others base.ts shows in turn), right-aligned at x 634 on an ink strip level with the
+ * job strip's chips (its text on theirs), so it reads over any wall -- unless the strip reaches it (`stripEnd`, screen
+ * x): the jobs come first.
  */
-export function drawHint(ctx: CanvasRenderingContext2D, stripEnd: number): void {
-  const s = 'TAP A BUBBLE: RUSH   TAP A KEEPER: TAKE', w = measureText(s), x = ctx.canvas.width - 6, y = ctx.canvas.height - 21;
+export function drawHint(ctx: CanvasRenderingContext2D, stripEnd: number, s: string = HINT_TAPS): void {
+  const w = measureText(s), x = ctx.canvas.width - 6, y = ctx.canvas.height - 21;
   if (stripEnd + 8 > x - w - 4) return;
   ctx.fillStyle = INK; ctx.fillRect(x - w - 4, y, w + 8, 17);
   text(ctx, s, x, y + 5, HINT, 'right');
@@ -174,13 +177,24 @@ export function drawHint(ctx: CanvasRenderingContext2D, stripEnd: number): void 
  */
 export const CARD: Readonly<Rect> = Object.freeze({ x: 8, y: 20, w: 160, h: 76 });
 export const CARD_RIGHT: Readonly<Rect> = Object.freeze({ x: 472, y: 38, w: 160, h: 76 });
-/** The card's place for a dragon tapped at screen x `sx`: the far side (CARD_RIGHT left of x 320, CARD from it on). */
-export function cardAt(sx: number): Readonly<Rect> { return sx < 320 ? CARD_RIGHT : CARD; }
+/** How far round a head's centre (its cranium) the card keeps clear, px: the head and its eye. */
+export const CARD_HEAD_R = 10;
+/**
+ * The card's place for a dragon tapped at screen x `sx`, given the heads on screen (their centres, screen px; the one
+ * tapped among them): the far side (CARD_RIGHT left of x 320, CARD from it on) -- unless a head is under it there and
+ * none is on the near side, where it opens instead, so it covers no dragon's eye when either place can (ART_BIBLE 1.4).
+ */
+export function cardAt(sx: number, heads: Iterable<{ x: number; y: number }> = []): Readonly<Rect> {
+  const far = sx < 320 ? CARD_RIGHT : CARD, near = far === CARD ? CARD_RIGHT : CARD, hs = [...heads], R = CARD_HEAD_R;
+  const covers = (r: Readonly<Rect>) => hs.some((h) => h.x > r.x - R && h.x < r.x + r.w + R && h.y > r.y - R && h.y < r.y + r.h + R);
+  return covers(far) && !covers(near) ? near : far;
+}
 /**
  * What a dragon's card shows: its name, element and stage, its day of the stage (1..STAGE_DAYS), each need (null: one
- * it hasn't got, or a garden resident's held full), and whether it lives in the garden (plan S6: its stage line says so).
+ * it hasn't got, or a garden resident's held full), whether it lives in the garden, and whether it is an elder staying
+ * on in the barn as its last flier (life.ts staysOn) -- its stage line says so.
  */
-export interface CardInfo { name: string; element: string; stage: string; day: number; needs: Readonly<Record<NeedKind, number | null>>; garden?: boolean }
+export interface CardInfo { name: string; element: string; stage: string; day: number; needs: Readonly<Record<NeedKind, number | null>>; garden?: boolean; stays?: boolean }
 /** A day of the stage's bar: a filled day, a day to come. A need's bar: full enough (over QUEUE), then by its tier (soon, now). */
 const DAY_ON = '#e3b23e', DAY_OFF = '#2e2428', NEED_OK = '#7bbf6a', NEED_TIER = ['#f2d36a', '#e3b23e', '#d8402e'];
 
@@ -196,9 +210,9 @@ export function drawCard(ctx: CanvasRenderingContext2D, c: CardInfo, at: Readonl
   ctx.fillStyle = FACE; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
   drawTextOutlined(ctx, c.name, x + 6, y + 5, { size: 1, color: TEXT, outline: INK, thickness: 1, shadow: false });
   text(ctx, c.element.toUpperCase(), x + w - 6, y + 5, HINT, 'right');
-  // (a garden resident's month is done: its bar full, its stage line where it lives)
-  const day = c.garden ? STAGE_DAYS : Math.max(1, Math.min(STAGE_DAYS, c.day));
-  text(ctx, c.garden ? `${c.stage.toUpperCase()} - IN THE GARDEN` : `${c.stage.toUpperCase()} - DAY ${day} OF ${STAGE_DAYS}`, x + 6, y + 18);
+  // (a garden resident's month is done, and a last flier's: its bar full, its stage line where it lives, or why it stays)
+  const day = c.garden || c.stays ? STAGE_DAYS : Math.max(1, Math.min(STAGE_DAYS, c.day));
+  text(ctx, `${c.stage.toUpperCase()} - ${c.garden ? 'IN THE GARDEN' : c.stays ? 'THE LAST FLIER' : `DAY ${day} OF ${STAGE_DAYS}`}`, x + 6, y + 18);
   // (the stage's 30 days: 4 x 5 segments, 1 px of ink between)
   const bx = x + 5, by = y + 29;
   ctx.fillStyle = INK; ctx.fillRect(bx, by, STAGE_DAYS * 5 + 1, 7);

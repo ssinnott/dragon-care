@@ -86,10 +86,10 @@
 //   (x) baddies   : (S9a) each fill on a big baddie's silhouette edge (src/game/baddies.ts BADDIE_EDGE) keeps >= 25 %
 //                   luminance from the mission road (FLOORS.road) and from every band of its home climate at every
 //                   phase; every fill >= OKL_MIN Oklab L from the ink; the colours that touch inside it pass the ladder.
-//                   (S9) every fill the scene sees a baddie by (src/game/artseams.ts BADDIE_FILLS: the kit's edge fills)
-//                   keeps >= 25 % luminance from the road the team walks in the watchable scene (FLOORS.road), the ground
+//                   Every fill the scene sees a baddie by (src/game/baddies.ts BADDIE_FILLS: the edge fills) keeps
+//                   >= 25 % luminance from the road the team walks in the watchable scene (FLOORS.road), the ground
 //                   under and below it (surfaces.ts ROAD_SCENE), and its region's backdrop bands at every phase
-//                   (artseams.ts climateBands: the kit's BACKDROPS.climate bands), and >= OKL_MIN Oklab L from the ink.
+//                   (backdrops.ts climateBands), and >= OKL_MIN Oklab L from the ink.
 // REPORTED, NOT GATED:
 //   (g) any scale pair that passes (b) on hue alone at the same stage (it would merge in greyscale); any body pair
 //       that passes (f) on simulated value alone under the dark-pair floor (they are told apart by zone); glow colours
@@ -109,9 +109,8 @@ import type { CastId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
 import { SETPIECE_COLOURS } from '../src/game/setpieces.ts';
 import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, STRAW_SEAM, PATH_EDGE, ROAD_SCENE, CAVE, NIGHT, stepped, nightColour } from '../src/game/surfaces.ts';
-import { lampPool } from '../src/game/backdrops.ts';
-import { BADDIE_ART, BADDIE_HOME, BADDIE_EDGE, BADDIE_PAIRS, BADDIE_WHITE } from '../src/game/baddies.ts';
-import { BADDIE_FILLS, climateBands } from '../src/game/artseams.ts';
+import { lampPool, climateBands } from '../src/game/backdrops.ts';
+import { BADDIE_ART, BADDIE_HOME, BADDIE_EDGE, BADDIE_PAIRS, BADDIE_WHITE, BADDIE_FILLS } from '../src/game/baddies.ts';
 import { BADDIES, REGIONS } from '../src/game/regions.ts';
 import { CLIMATES, BADDIE_IDS } from '../src/game/missiondata.ts';
 import type { BaddieId } from '../src/game/missiondata.ts';
@@ -994,12 +993,12 @@ for (const e of DRAGON_ELEMENTS) {
 // (FLOORS.road) and from every band of its home climate (the three sky bands, the far ridge, the near forms and their
 // second colour) at every phase, so it reads on the road and against its region at any hour; every fill keeps >= 6
 // Oklab L from the ink; and the colours that touch inside it (BADDIE_PAIRS) pass the house ladder.
-// (S9) Every fill the scene sees a baddie by (artseams.ts BADDIE_FILLS: the kit's edge fills) keeps >= 25 % luminance
+// Every fill the watchable scene sees a baddie by (baddies.ts BADDIE_FILLS: the edge fills) keeps >= 25 % luminance
 // from what it stands on and in front of: the road (FLOORS.road), the scene's ground under and below it (ROAD_SCENE: its
-// slab, the grass strip, the earth), and its region's backdrop bands at every phase of the day (artseams.ts
-// climateBands: the kit's BACKDROPS.climate bands), and >= 6 Oklab L from the ink. A baddie's face comes only from
+// slab, the grass strip, the earth), and its region's backdrop bands at every phase of the day (backdrops.ts
+// climateBands), and >= 6 Oklab L from the ink. A baddie's face comes only from
 // BaddieFace (neutral, grumpy, surprised, sleepy: no angry one), which the types hold (missiondata.ts; baddies.ts
-// _NoHurt/_Exits; missionview.ts _Faces).
+// _NoHurt/_Exits; missionview.ts _NoHurt/_Faces).
 let xGates = 0, xFailures = 0;
 const xFailed: string[] = [];
 function xcount(label: string, ok: boolean): boolean { xGates++; if (!ok) { xFailures++; xFailed.push(label); } return ok; }
@@ -1028,12 +1027,12 @@ for (const id of BADDIE_IDS) {
 }
 {
   const ground: [string, string][] = [['road', FLOORS.road], ['road slab', ROAD_SCENE.slab], ['road grass', ROAD_SCENE.grass], ['road earth', ROAD_SCENE.earth]];
-  out.push(` in the watchable scene (BASE_DESIGN 6: every fill of artseams.ts BADDIE_FILLS >= ${LUM_MIN * 100}% in luminance from the road ${FLOORS.road}, the scene's ground and its region's backdrop bands at every phase (artseams.ts climateBands); >= ${OKL_MIN} Oklab L from the ink ${INK})`);
+  out.push(` in the watchable scene (BASE_DESIGN 6: every fill of baddies.ts BADDIE_FILLS >= ${LUM_MIN * 100}% in luminance from the road ${FLOORS.road}, the scene's ground and its region's backdrop bands at every phase (backdrops.ts climateBands); >= ${OKL_MIN} Oklab L from the ink ${INK})`);
   for (const id of Object.keys(BADDIE_FILLS) as BaddieId[]) {
     const climate = REGIONS.find((r) => r.baddie === id)!.climate;
     const against: [string, string][] = [...ground];
     let bandsSeen = 0;
-    for (const ph of PHASE_ORDER) { const bands = climateBands(climate, ph); if (bands) bands.forEach((hex, i) => { against.push([`${climate} ${ph} band ${i}`, hex]); bandsSeen++; }); }
+    for (const ph of PHASE_ORDER) climateBands(climate, ph).forEach((hex, i) => { against.push([`${climate} ${ph} band ${i}`, hex]); bandsSeen++; });
     for (const fill of BADDIE_FILLS[id]) {
       let least = Infinity, by = '';
       for (const [what, hex] of against) {
@@ -1045,7 +1044,7 @@ for (const id of BADDIE_IDS) {
       xcount(`(x) scene ${id} ${fill} / ink`, ink >= OKL_MIN);
       out.push(`${least >= LUM_MIN && ink >= OKL_MIN ? '  ok  ' : '  FAIL'} ${BADDIES[id].name.padEnd(16)} ${fill}  L ${lumOf(fill).toFixed(3)}  least ${pct(least)} (${by})  ${okf(ink)} from ink`);
     }
-    out.push(`       ${BADDIES[id].name}: ${bandsSeen ? `${bandsSeen} ${climate} backdrop bands gated` : `no ${climate} band palette on this base (artseams.ts climateBands: the art kit's, S9a) -- the road and its ground gated`}`);
+    out.push(`       ${BADDIES[id].name}: ${bandsSeen} ${climate} backdrop bands gated`);
   }
 }
 

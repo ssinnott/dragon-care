@@ -41,7 +41,8 @@ import type { Counter } from './regions.ts';
 import type { RegionId, ChallengeId, Difficulty } from './missiondata.ts';
 import type { Mission, Pair, Stop, Trip } from './trip.ts';
 import type { CareSim, Dragon, Keeper } from './sim.ts';
-import { isTaken } from './seams.ts';
+// (a value read only while stepping, never as this module loads: sim.ts imports this one)
+import { PICKUP } from './sim.ts';
 
 /** What the save keeps of the missions: the board and the day it was rolled for, the map's regions, the coin, and the trip out (with each pair's deck spot). */
 export interface MissionsState {
@@ -60,8 +61,14 @@ export interface MissionsState {
   sent: number;
 }
 
-/** A rider's skill counts for a challenge; so does a dragon's element. */
+/**
+ * Whether the player has taken a keeper by hand (then no automatic pick may choose them to ride): the keeper held
+ * (`manual`) or taken at work and finishing that job first (`pendingTake`) -- CareSim.controlled, the same keepers
+ * CareSim.free leaves out of every automatic job pick (control.ts). The picks below take it as a parameter, so a test
+ * may hand them its own.
+ */
 export type Taken = (sim: CareSim, keeperId: number) => boolean;
+export const isTaken: Taken = (sim, keeperId) => sim.controlled === keeperId;
 
 // ---------- numbers (plan S8) ----------
 
@@ -74,6 +81,13 @@ export const DIFFICULTY: Readonly<Record<Difficulty, { p: number; challenges: nu
 });
 /** A hard road ends in its region's baddie from this day on (before it, a hard road has a fourth challenge). */
 export const BADDIE_FROM_DAY = 3;
+/**
+ * A baddie's day: BADDIE_FROM_DAY and every BADDIE_EVERY days after it, the first region on the board that has a baddie
+ * shows its hard road, so a big baddie is always to be met early (on the other days a hard road is the roll's chance).
+ */
+export const BADDIE_EVERY = 4;
+/** Whether day `day` is a baddie's day (BADDIE_EVERY). */
+export function baddieDay(day: number): boolean { return day >= BADDIE_FROM_DAY && (day - BADDIE_FROM_DAY) % BADDIE_EVERY === 0; }
 /** Day 1's sure mission. */
 export const LOST_NEST = 'THE LOST NEST';
 /** At most this many pairs; and this many keepers always stay home. */
@@ -89,8 +103,8 @@ export const BRIDGE_X = BRIDGE_X0, DEPART_X = -120;
 export const LAND_LEAD_X = -60;
 /** On landing, the lead pair's rider starts this far behind its dragon (the other rider at the bridge's end, 110 px behind). */
 export const RIDER_LAND_GAP = 30;
-/** Steps a rider takes a saddle down or hangs it back (sim.ts PICKUP's length), and rests in the Bunks after a trip (15 s). */
-export const SADDLE_STEPS = 40, REST_STEPS = 900;
+/** Steps a rider rests in the Bunks after a trip (15 s). A saddle is taken down or hung back in sim.ts PICKUP's steps, as a supply is. */
+export const REST_STEPS = 900;
 /** Needs on landing: food and sleep at most this (a success, a failure): the trip was long. */
 export const LAND_NEEDS = Object.freeze({ success: 0.45, failure: 0.3 });
 /** Where a stop sits on the road: challenge i of n at (i + 1) / (n + 1) of ROAD_SPAN, the baddie at BADDIE_AT. */
@@ -103,10 +117,13 @@ export function newMissions(): MissionsState {
   return { day: 0, board: [], explored: REGIONS.filter((r) => r.start).map((r) => r.id), pendingReveal: [], firstSuccess: [], coin: 0, trip: null, deck: [], sent: 0 };
 }
 
-/** One region's mission for a day (its difficulty, road and title drawn from rngAt(seed, BOARD, day, region index)). */
-function missionFor(seed: number, day: number, slot: number, ri: number, firstSuccess: readonly RegionId[]): Mission {
+/**
+ * One region's mission for a day (its difficulty, road and title drawn from rngAt(seed, BOARD, day, region index)); `hard`:
+ * a hard road whatever the roll (a baddie's day: boardFor).
+ */
+function missionFor(seed: number, day: number, slot: number, ri: number, firstSuccess: readonly RegionId[], hard = false): Mission {
   const region = REGIONS[ri], r = rngAt(seed, TAG.BOARD, day, ri), roll = r.next();
-  const difficulty: Difficulty = roll < DIFFICULTY.easy.p ? 'easy' : roll < DIFFICULTY.easy.p + DIFFICULTY.normal.p ? 'normal' : 'hard';
+  const difficulty: Difficulty = hard ? 'hard' : roll < DIFFICULTY.easy.p ? 'easy' : roll < DIFFICULTY.easy.p + DIFFICULTY.normal.p ? 'normal' : 'hard';
   const D = DIFFICULTY[difficulty];
   const baddie = difficulty === 'hard' && day >= BADDIE_FROM_DAY ? region.baddie : null;
   const n = difficulty === 'hard' && !baddie ? D.challenges + 1 : D.challenges;
@@ -119,18 +136,20 @@ function missionFor(seed: number, day: number, slot: number, ri: number, firstSu
 /**
  * The board for a day (a pure function of the seed, the day and the map): one mission per explored region, in the
  * order rngAt(seed, BOARD, day) shuffles them, up to BOARD_MAX; on day 1 THE LOST NEST first (Millbrook, easy, the
- * flood and lost things, a sure egg). A mission's id is its day x 4 + its place on the board.
+ * flood and lost things, a sure egg); on a baddie's day (baddieDay) the first region on it with a baddie shows its hard
+ * road, ending in the baddie. A mission's id is its day x 4 + its place on the board.
  */
 export function boardFor(seed: number, day: number, explored: readonly RegionId[], firstSuccess: readonly RegionId[]): Mission[] {
   const idx = REGIONS.map((r, i) => (explored.includes(r.id) ? i : -1)).filter((i) => i >= 0), r = rngAt(seed, TAG.BOARD, day);
   for (let i = idx.length - 1; i > 0; i--) { const j = r.int(0, i); [idx[i], idx[j]] = [idx[j], idx[i]]; }
   const mill = REGIONS.findIndex((q) => q.id === 'millbrook');
   if (day === 1 && idx.includes(mill)) { idx.splice(idx.indexOf(mill), 1); idx.unshift(mill); }
-  return idx.slice(0, BOARD_MAX).map((ri, slot) => {
+  const on = idx.slice(0, BOARD_MAX), hard = baddieDay(day) ? on.find((ri) => REGIONS[ri].baddie) : undefined;
+  return on.map((ri, slot) => {
     if (day === 1 && ri === mill) {
       return { id: day * 4 + slot, region: 'millbrook', title: LOST_NEST, difficulty: 'easy', challenges: ['flood', 'lost'], baddie: null, days: 1, coin: DIFFICULTY.easy.coin, eggChance: DIFFICULTY.easy.egg, guaranteedEgg: true };
     }
-    return missionFor(seed, day, slot, ri, firstSuccess);
+    return missionFor(seed, day, slot, ri, firstSuccess, ri === hard);
   });
 }
 
@@ -166,7 +185,7 @@ export function dragonReason(sim: CareSim, d: Dragon, m: Mission | null): string
   return null;
 }
 
-/** Whether a keeper can ride: not on a trip, not taken by hand (seams.ts isTaken: S7's control). */
+/** Whether a keeper can ride: not on a trip, not taken by hand (isTaken: BASE_DESIGN 4.10). */
 export function freeRider(sim: CareSim, k: Keeper, taken: Taken = isTaken): boolean {
   return !onTrip(k) && !taken(sim, k.id) && !sim.missions.trip?.pairs.some((p) => p.keeper === k.id);
 }
@@ -217,8 +236,8 @@ export function oddsOf(sim: CareSim, m: Mission, pairs: readonly Pair[]): number
 /**
  * The rider a dragon gets on mission m, beside the pairs already chosen (`others`): its partner, if free and not
  * riding already; else a free keeper whose skill meets a challenge (or the baddie) the team, this dragon in it, leaves
- * unmet, lowest id first; else any free keeper, lowest id first. Never a keeper taken by hand (`taken`: seams.ts
- * isTaken, S7's control), nor one on a trip; null if nobody is free, or the team would leave fewer than two keepers home.
+ * unmet, lowest id first; else any free keeper, lowest id first. Never a keeper taken by hand (`taken`: isTaken,
+ * BASE_DESIGN 4.10), nor one on a trip; null if nobody is free, or the team would leave fewer than two keepers home.
  */
 export function autoRider(sim: CareSim, d: Dragon, m: Mission, others: readonly Pair[], taken: Taken = isTaken): number | null {
   if (others.length + 1 > sim.keepers.length - HOME_KEEPERS) return null;
@@ -351,21 +370,32 @@ export function send(sim: CareSim, missionId: number, pairs: readonly Pair[], op
 const teamDragons = (sim: CareSim, t: Trip): Dragon[] => t.pairs.map((p) => dragonOf(sim, p.dragon));
 const teamRiders = (sim: CareSim, t: Trip): Keeper[] => t.pairs.map((p) => keeperOf(sim, p.keeper));
 
-/** A dragon's jobs are dropped (a keeper coming for one gives it back and goes home: not a pre-emption) and its slot let go. */
-function leaveBarn(sim: CareSim, d: Dragon): void {
-  for (const k of sim.keepers) if (k.job && k.job.dragon === d) sim.drop(k);
-  sim.jobs = sim.jobs.filter((j) => j.dragon !== d);
-  d.slot = null; d.goalJob = null;
+/**
+ * A dragon's jobs are dropped -- a keeper coming for one gives it back and goes home (not a pre-emption) -- but a keeper
+ * already at work with it finishes (the job is done then, as any is: CareSim.finish, its goalJob cleared here); the
+ * dragon keeps its slot until it sets off (stepMuster), so no other dragon walks into the place it is still met or
+ * sleeping in. `atOnce` (a team sent away at once: awayNow): every keeper gives its job back, and the dragon's act and
+ * nap end where they got to, its slot let go.
+ */
+function leaveBarn(sim: CareSim, d: Dragon, atOnce = false): void {
+  const finishes = (k: Keeper | null) => !atOnce && !!k && k.phase === 'work';
+  for (const k of sim.keepers) if (k.job && k.job.dragon === d && !finishes(k)) sim.drop(k);
+  sim.jobs = sim.jobs.filter((j) => j.dragon !== d || finishes(j.keeper));
+  d.goalJob = null;
+  if (atOnce) { d.act = null; d.asleep = 0; d.slot = null; }
 }
 
-/** The muster begins: each dragon's goal is the muster (it asks for nothing now), and each rider leaves their job for the Tack Room. */
+/**
+ * The muster begins: each rider leaves their job for the Tack Room (one under way stops where it got to, a tuck-in
+ * excepted: CareSim.unjob), then each dragon's goal is the muster (it asks for nothing now: leaveBarn).
+ */
 function musterStart(sim: CareSim, t: Trip): void {
-  for (const d of teamDragons(sim, t)) { leaveBarn(sim, d); d.goal = 'muster'; }
   for (const k of teamRiders(sim, t)) {
     sim.unjob(k);
     k.phase = 'muster'; k.t = 0; k.carrying = null;
     sim.walkTo(k, tackSpot(sim));
   }
+  for (const d of teamDragons(sim, t)) { leaveBarn(sim, d); d.goal = 'muster'; }
 }
 
 /** The riders' room of a kind (the Tack Room, the Bunks, the Map Room: the left tower's, one each), or null if the base has none. */
@@ -412,7 +442,9 @@ function stepMuster(sim: CareSim, t: Trip): void {
       ms.deck[i] = DECK_SPOTS.findIndex((_, s) => !used.has(s));
     }
     // (leftover jobs: none opens for a mustering dragon, but one open at the send may have been re-queued by a Rush)
-    if (sim.jobs.some((j) => j.dragon === d)) leaveBarn(sim, d);
+    if (sim.jobs.some((j) => j.dragon === d && j.keeper?.phase !== 'work')) leaveBarn(sim, d);
+    // (its slot is let go as it sets off: met to the end of a job under way, or asleep, it keeps its place till then)
+    if (d.slot && mayGo(sim, d)) d.slot = null;
     dragonTo(sim, d, AERIE_F, DECK_SPOTS[ms.deck[i] ?? i]);
     if (standsAt(d, AERIE_F, DECK_SPOTS[ms.deck[i] ?? i]) && d.facing !== -1) faceWay(d, -1);
   });
@@ -421,7 +453,7 @@ function stepMuster(sim: CareSim, t: Trip): void {
     if (k.carrying !== 'saddle') {
       // to the Tack Room, and the saddle taken down there
       if (k.legs.length) { sim.move(k); return; }
-      if (++k.t >= SADDLE_STEPS) { k.carrying = 'saddle'; k.t = 0; sim.use('tack', roomOf(sim, 'tack')); sim.walkTo(k, { f: AERIE_F, x: riderSpot(sim, i) }); }
+      if (++k.t >= PICKUP) { k.carrying = 'saddle'; k.t = 0; sim.use('tack', roomOf(sim, 'tack')); sim.walkTo(k, { f: AERIE_F, x: riderSpot(sim, i) }); }
       return;
     }
     const x = riderSpot(sim, i);
@@ -455,7 +487,7 @@ function goAway(sim: CareSim, t: Trip, departAt: number): void {
   t.departAt = departAt;
   t.returnAt = t.departAt + ((t as { awaySteps?: number }).awaySteps ?? t.mission.days * sim.dayLen);
   for (const d of teamDragons(sim, t)) {
-    d.place = 'away'; d.legs = []; d.move = 'still'; d.gaitT = 0; d.turn = -1; d.waited = 0; d.f = AERIE_F; d.x = BRIDGE_X; d.facing = -1;
+    d.place = 'away'; d.slot = null; d.legs = []; d.move = 'still'; d.gaitT = 0; d.turn = -1; d.waited = 0; d.f = AERIE_F; d.x = BRIDGE_X; d.facing = -1;
   }
   for (const k of teamRiders(sim, t)) { k.phase = 'away'; k.legs = []; k.f = AERIE_F; k.x = BRIDGE_X; k.y = feetY(AERIE_F); k.facing = -1; }
 }
@@ -471,8 +503,8 @@ export function awayNow(sim: CareSim, t: Trip, departAt: number): void {
   if (sim.missions.trip) throw new Error('missions: a team is already out');
   const ms = sim.missions;
   ms.trip = t; ms.deck = t.pairs.map((_, i) => i);
-  for (const d of teamDragons(sim, t)) { leaveBarn(sim, d); d.goal = 'muster'; }
   for (const k of teamRiders(sim, t)) { sim.unjob(k); k.t = 0; k.carrying = 'saddle'; k.climbing = false; }
+  for (const d of teamDragons(sim, t)) { leaveBarn(sim, d, true); d.goal = 'muster'; }
   goAway(sim, t, departAt);
 }
 
@@ -543,7 +575,7 @@ function stepDeliver(sim: CareSim, t: Trip, k: Keeper): void {
     return;
   }
   if (k.carrying === 'saddle') {
-    if (++k.t < SADDLE_STEPS) return;
+    if (++k.t < PICKUP) return;
     k.carrying = null; k.t = 0; sim.use('tack', roomOf(sim, 'tack')); sim.walkTo(k, bunksSpot(sim));
     return;
   }

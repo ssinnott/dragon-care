@@ -14,7 +14,7 @@ import { ICONS, drawSprite } from './icons.ts';
 import type { Sprite } from './icons.ts';
 import type { Keeper, Carried } from './sim.ts';
 import { WALK, RUSH } from './sim.ts';
-import { SADDLE } from './artseams.ts';
+import { SADDLE } from './missionicons.ts';
 import { drawEgg } from './eggs.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import { KEEPERS } from '../art/keeper/cast.ts';

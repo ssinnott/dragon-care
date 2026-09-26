@@ -29,7 +29,6 @@ export const FLOORS = Object.freeze({
   /** The mission road the team walks in the watchable scene (plan S9a/S9: pale packed earth; every baddie fill is gated from it, gate x): L 0.673, S 0.11. */
   road: '#dcd6c4',
 });
-export type FloorName = keyof typeof FLOORS;
 
 /** The seams drawn over a straw floor: its top edge, and the towers' boards (a 1 px line, not a surface). */
 export const STRAW_SEAM = '#c9bd9c';
@@ -231,7 +230,7 @@ const NIGHT_MOONLIT: readonly string[] = [
  * gate's contrast; the hearth's firebox and the doorways' dark, already the dark of a mouth. (The mission scene's
  * ground, ROAD_SCENE, is in neither list: it is not the barn -- the watch overlay draws it (missionview.ts) as it is at
  * every hour, never through this table nor into the building's or the garden's canvases, and its night is its region's
- * climate picture's, drawn per phase (artseams.ts drawClimate; the art kit's, S9a). Gate (w) gates it by day only.)
+ * climate picture's, drawn per phase (backdrops.ts drawClimate: ART_BIBLE 5.10). Gate (w) gates it by day only.)
  */
 const NIGHT_KEEPS: readonly string[] = [NEST, PROPS.mattress, PROPS.firebox, '#3a2a26'];
 /**

@@ -8,8 +8,6 @@ import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
 import type { RegionId, Climate, ChallengeId, Skill, BaddieId, BaddieExit } from './missiondata.ts';
 
-export type { RegionId, Climate, ChallengeId, Skill, BaddieId, BaddieExit };
-
 /** What meets a challenge: a team dragon of this element, or a rider with this skill. */
 export interface Counter { element?: DragonElement; skill?: Skill }
 
@@ -31,8 +29,6 @@ export const CHALLENGES: Readonly<Record<ChallengeId, { name: string; word: stri
   fog: { name: 'THICK FOG', word: 'FOG', counter: { skill: 'navigator' }, met: 'FINDS THE WAY' },
   gap: { name: 'NARROW GAP', word: 'GAP', counter: { skill: 'nimble' }, met: 'SLIPS THROUGH' },
 });
-/** Every challenge, in the contract's order: missiondata.ts's own list (one source), re-exported for the regions' readers. */
-export { CHALLENGE_IDS } from './missiondata.ts';
 
 /**
  * The big baddies (plan S8, P14): each needs both of its counters on the team (a dragon's element and a rider's skill),

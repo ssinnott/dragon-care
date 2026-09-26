@@ -64,6 +64,15 @@ export const BADDIE_EDGE: Readonly<Record<BaddieId, readonly string[]>> = Object
   stormroc: ['body', 'wing', 'fluff', 'beak', 'leg'],
   frostgiant: ['wool', 'face', 'scarf', 'stripe', 'nose', 'boot'],
 });
+/**
+ * The fills the watchable scene sees a baddie by, for palette gate (x) (each >= 25 % in luminance from the road, the
+ * scene's ground and its region's backdrop bands, >= 6 okL from ink): its palette's colours on its silhouette edge
+ * (BADDIE_EDGE). The colours inside the silhouette (a belly, a jewel, the spectacle rims) never meet the road or the
+ * sky: gate (x) holds them to the house ladder against what they touch (BADDIE_PAIRS), and every fill to the ink.
+ */
+export const BADDIE_FILLS: Readonly<Record<BaddieId, readonly string[]>> = Object.freeze(Object.fromEntries(
+  (Object.keys(BADDIE_EDGE) as BaddieId[]).map((id) => [id, Object.freeze([...new Set(BADDIE_EDGE[id].map((k) => BADDIE_ART[id].palette[k]))])]),
+) as Record<BaddieId, readonly string[]>);
 /** The pairs of colours that touch inside each baddie (the house ladder, gate x), with where. */
 export const BADDIE_PAIRS: Readonly<Record<BaddieId, readonly (readonly [string, string, string])[]>> = Object.freeze({
   moleking: [['velvet', 'belly', 'the belly on the body'], ['velvet', 'paw', 'the paws and snout on the body'], ['belly', 'paw', 'the paws over the belly'],

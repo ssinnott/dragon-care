@@ -18,8 +18,8 @@ import { drawSprite } from './icons.ts';
 import type { Sprite } from './icons.ts';
 import { INK } from './surfaces.ts';
 
-/** The egg sprite's size (without its ink ring). */
-export const EGG_W = 9, EGG_H = 12;
+/** The egg sprite's height (without its ink ring): it stands on its bottom, drawn centred half this over it. */
+export const EGG_H = 12;
 /** From this far on (0..1 of its time in the nest) an egg shows its first crack, its second, and wobbles. */
 export const CRACK1 = 0.5, CRACK2 = 0.85, WOBBLE_FROM = 0.85;
 /** The wobble: a px offset per 30-step beat of the world's tick. */
