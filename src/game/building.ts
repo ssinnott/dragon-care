@@ -1,8 +1,10 @@
 // The base's building, drawn once (docs/BASE_DESIGN.md 2): the ground, the two stone towers with their window slits,
 // every room with its props, the gambrel roof over the hayloft, the Dragon Lift's shaft from the ground floor up
 // through the roof to its headframe over the Aerie, the keepers' centre ladder bay, and the Aerie deck on its gantry
-// over the roof -- transparent above the ground and around its walls, where the view draws the sky (sky.ts: in screen
-// space, behind it, so the day turns without redrawing this). Greybox:
+// over the roof, and the Garden Gate in the right tower's ground floor (plan S6: an 84 px arch in both its walls, the one
+// tower door a dragon fits, a straw floor straight through it, its gate leaf open against the back wall) -- transparent
+// above the ground and around its walls, where the view draws the sky (sky.ts: in screen space, behind it, so the day
+// turns without redrawing this); the garden beyond the gate is gardenArt.ts's. Greybox:
 // blocks in the house style (a 1 px #1a1018 outline, flat cel bands lit from the top-left, no gradients) standing in
 // for the room art to come. Every surface anyone stands on -- a room's band, a landing, a tower's floor, the deck, the
 // lift car's deck -- is a FLOORS colour (surfaces.ts; gated by tools/palette-check.ts, gates i and Ki). A room's
@@ -17,10 +19,10 @@ import { drawText, measureText } from '../lib/engine/text.ts';
 import {
   WORLD_W, WORLD_H, GROUND, PITCH, MOD, TOWER_W, WALL, WALL_H, BAND, SLAB, TOWER_L, TOWER_R, BARN_X, RIDGE_X, RIDGE_Y,
   KNEE_DX, KNEE_Y, BARN_FLOORS, TOWER_FLOORS, BARN_MODS, LIFT_MOD, LIFT_X0, LIFT_X1, LIFT_STOPS, CAR_X0, CAR_X1, LADDER_BAY_X0,
-  LADDER_BAY_X1, AERIE_F, DECK_X0, DECK_X1, HEAD_Y, PULLEY_Y, KEEPER_NET, NESTS, NEST_RX, NEST_RY, NEST_STRANDS, floorTop, feetY, modX, nestX, nestBase, platesOf,
+  LADDER_BAY_X1, AERIE_F, DECK_X0, DECK_X1, HEAD_Y, PULLEY_Y, LADDERS, NESTS, GATE_X0, GATE_X1, GATE_ARCH, NEST_RX, NEST_RY, NEST_STRANDS, floorTop, feetY, modX, nestX, nestBase, platesOf,
 } from './layout.ts';
 import type { Room, Link } from './layout.ts';
-import { FLOORS, INK, EMPTY_WALL, LIFT_WALL, STONE, STRAW_SEAM, WALLS, PROPS, NEST, LIGHTS, LAMP_RINGS, HEARTH_RING, skyBands } from './surfaces.ts';
+import { FLOORS, INK, EMPTY_WALL, LIFT_WALL, STONE, STRAW_SEAM, WALLS, PROPS, NEST, LIGHTS, LAMP_RINGS, HEARTH_RING, BACKDROPS, skyBands } from './surfaces.ts';
 import type { ClockRead } from './clock.ts';
 import { lightsOf } from './sky.ts';
 
@@ -187,8 +189,13 @@ function lampsOf(r: Room): Lamp[] {
 function lamp(g: CanvasRenderingContext2D, l: Lamp): void { rect(g, l.x, l.cord, 1, l.y - l.cord, INK); box(g, l.x - 4, l.y, 8, 10, LIGHTS.lamp); }
 /** A tower window slit's glass (6 x 10, inked round), one a floor in each tower's outer wall. */
 const SLIT_W = 6, SLIT_H = 10;
-const SLITS: readonly { x: number; y: number }[] = [TOWER_L + 1, TOWER_R + TOWER_W - 1 - SLIT_W].flatMap((x) =>
-  Array.from({ length: TOWER_FLOORS }, (_, f) => ({ x, y: floorTop(f) + 30 })));
+const SLITS: readonly { x: number; y: number; f: number; east: boolean }[] = [TOWER_L + 1, TOWER_R + TOWER_W - 1 - SLIT_W].flatMap((x) =>
+  Array.from({ length: TOWER_FLOORS }, (_, f) => ({ x, y: floorTop(f) + 30, f, east: x > TOWER_R })));
+/** The slits a building has: every one but the right tower's ground floor's once the Garden Gate's outer arch is cut there. */
+function slitsOf(rooms: readonly Room[]): typeof SLITS {
+  const gate = rooms.some((r) => r.kind === 'gate');
+  return SLITS.filter((s) => !(gate && s.east && s.f === 0));
+}
 /**
  * A window in the barn's back wall: its pane (world px), cut out of the building so the sky (sky.ts) shows through it
  * -- by day the day's, at night the night's: the barn's own windows on the time of day, seen from the start frame. Two
@@ -284,6 +291,17 @@ function props(g: CanvasRenderingContext2D, r: Room): void {
       for (const sx of [x + 8, x + 28]) poly(g, [sx, t + 40, sx + 4, t + 30, sx + 14, t + 30, sx + 18, t + 40], '#9a5a3a');
       break;
     case 'bunks': bunk(g, x + (r.part === 'towerL' ? 4 : 28), fl, r.floor % 2 ? '#c86a4a' : '#7bbf6a', r.floor % 2 ? '#5a8ab0' : '#e0a040'); break;
+    case 'gate': {
+      // the gate's leaf, open against the back wall by the outer arch (three planks on two rails, its hinges), and a
+      // lantern on a bracket under the plate
+      const lx = r.x1 - 34, ly = t + WALL_H - 58;
+      box(g, lx, ly, 28, 58, PROPS.gateLeaf);
+      for (const px of [lx + 9, lx + 18]) rect(g, px, ly + 2, 1, 54, '#7a5838');
+      for (const ry of [ly + 10, ly + 40]) { box(g, lx - 1, ry, 30, 5, PROPS.gateLeaf); rect(g, lx + 22, ry + 1, 4, 3, INK); }
+      rect(g, x + 38, t + 26, 8, 2, INK); rect(g, x + 44, t + 26, 2, 6, INK);
+      box(g, x + 40, t + 31, 8, 10, LIGHTS.lantern); rect(g, x + 39, t + 29, 10, 3, INK);
+      break;
+    }
     case 'maproom':
       box(g, x + 6, t + 20, 60, 36, '#e8d8a8');
       line(g, x + 12, t + 30, x + 32, t + 44, '#8a6a4a'); line(g, x + 32, t + 44, x + 54, t + 28, '#8a6a4a');
@@ -307,6 +325,23 @@ function ladder(g: CanvasRenderingContext2D, l: Link): void {
   for (let y = y0 + 4; y < y1; y += 8) rect(g, x, y, 12, 2, '#7a5838');
 }
 
+/**
+ * The Garden Gate's arches (plan S6): the right tower's ground floor opened in both walls, 84 px high (a dragon fits;
+ * the towers' other doors are 70, human-sized). The inner arch shows the gate's stone beyond it, the outer one the
+ * garden's hedge and lawn; each has an inked lintel and a keystone. A straw floor band runs straight through both walls
+ * (dragons walk it: gate i), from the Hatchery's to the garden's path.
+ */
+function gateArches(g: CanvasRenderingContext2D): void {
+  const fl = floorTop(0) + WALL_H, top = fl - GATE_ARCH;
+  for (const x0 of [GATE_X0, GATE_X1 - WALL]) {
+    if (x0 === GATE_X0) rect(g, x0, top, WALL, fl - top, STONE);
+    else { rect(g, x0, top, WALL, fl - top, BACKDROPS.hedge); rect(g, x0, fl - 48, WALL, 48, BACKDROPS.lawn); }
+    rect(g, x0 - 1, top - 3, WALL + 2, 3, INK);
+    box(g, x0 + 1, top - 8, WALL - 2, 6, '#a49c90', false);
+  }
+  floor(g, GATE_X0, GATE_X1, fl);
+}
+
 // ---------- the whole building ----------
 
 /** The building, drawn once onto its own WORLD_W x WORLD_H canvas. */
@@ -328,7 +363,7 @@ export function drawBuilding(rooms: readonly Room[]): HTMLCanvasElement {
     rect(g, tx, top, 1, GROUND - top, INK); rect(g, tx + TOWER_W - 1, top, 1, GROUND - top, INK);
   }
   // their window slits, one a floor in each outer wall: day glass (drawLights lights them at dusk and night)
-  for (const s of SLITS) { rect(g, s.x - 1, s.y - 1, SLIT_W + 2, SLIT_H + 2, INK); rect(g, s.x, s.y, SLIT_W, SLIT_H, LIGHTS.glass); }
+  for (const s of slitsOf(rooms)) { rect(g, s.x - 1, s.y - 1, SLIT_W + 2, SLIT_H + 2, INK); rect(g, s.x, s.y, SLIT_W, SLIT_H, LIGHTS.glass); }
 
   const barnRoom = (r: Room, top?: number) => { barnWall(g, r.x0, r.x1, r.floor, WALLS[r.kind] ?? EMPTY_WALL, top); props(g, r); };
   const barn = rooms.filter((r) => r.part === 'barn');
@@ -386,6 +421,7 @@ export function drawBuilding(rooms: readonly Room[]): HTMLCanvasElement {
     }
     for (const f of [0, 1]) {
       const fl = floorTop(f) + WALL_H, dx = tx === TOWER_L ? TOWER_L + TOWER_W - WALL : TOWER_R;
+      if (tx === TOWER_R && f === 0 && rooms.some((q) => q.kind === 'gate')) { gateArches(g); continue; }
       rect(g, dx, fl - 70, WALL, 70, '#3a2a26'); rect(g, dx, fl - 72, WALL, 2, INK);
     }
   }
@@ -422,7 +458,7 @@ export function drawBuilding(rooms: readonly Room[]): HTMLCanvasElement {
   for (const px of PULLEY_X) { disc(g, px, PULLEY_Y, PULLEY_R, '#8c847a'); disc(g, px, PULLEY_Y, 1, INK, false); }
 
   // the ladders: up each tower (the left one on to the Aerie) and the centre ladder bay's through the barn
-  for (const l of KEEPER_NET.links) ladder(g, l);
+  for (const l of LADDERS) ladder(g, l);
   return c;
 }
 
@@ -435,7 +471,8 @@ export function drawPlates(rooms: readonly Room[]): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = WORLD_W; c.height = WORLD_H;
   const g = c.getContext('2d')!;
-  for (const p of platesOf(rooms)) plate(g, p.text, p.x, p.y);
+  // (the garden's hangs on its sign past this canvas's east edge: the view draws it, gardenArt.ts drawGardenPlate)
+  for (const p of platesOf(rooms)) if (p.names !== 'garden') plate(g, p.text, p.x, p.y);
   return c;
 }
 
@@ -477,7 +514,7 @@ export function drawLiftCar(g: CanvasRenderingContext2D, y: number): void {
  */
 export function drawLights(g: CanvasRenderingContext2D, rooms: readonly Room[], c: ClockRead): void {
   const lit = lightsOf(c);
-  if (lit.slits) for (const s of SLITS) rect(g, s.x, s.y, SLIT_W, SLIT_H, LIGHTS.slit);
+  if (lit.slits) for (const s of slitsOf(rooms)) rect(g, s.x, s.y, SLIT_W, SLIT_H, LIGHTS.slit);
   for (const r of rooms) {
     const t = floorTop(r.floor), band = t + WALL_H;
     if (r.kind === 'dorm' && lit.rings > 0) {

@@ -54,14 +54,18 @@
 //   (w) backdrops : everything a dragon is seen against (src/game/surfaces.ts: the sky's three bands, the far hills and
 //                   the clouds at every phase of the day AND the two stepped mixes between each phase and the next --
 //                   the sky turns in thirds, so a mix is on screen for a third of an hour --, every room wall, the bare
-//                   and lift-shaft walls, the towers' stone, the big props right behind a slot, and the light the dorm
-//                   lamps and the hearth throw on their walls at night) keeps >= 25 % luminance from every DARK body
+//                   and lift-shaft walls, the towers' stone, the big props right behind a slot (the Garden Gate's open
+//                   leaf too), the light the dorm lamps and the hearth throw on their walls at night, and the elder
+//                   garden behind its residents: the hedge, the lawn, the trees' trunks and the bench, the fence, the
+//                   nest mounds and the lanterns' rings on the hedge) keeps >= 25 % luminance from every DARK body
 //                   (an element's scale under L 0.15 at a stage: lightning, dusk and slinkwing at every stage), and
 //                   >= OKL_MIN Oklab L from the outline. The sky, the hills, the clouds, the walls, the stone and the
 //                   lamps' light must be that much LIGHTER than each dark body (L >= about 0.16: a colour darker than
 //                   slinkwing is as far from it by relDiff, and black), so night stays mid-value (the blue hour, never
 //                   black: a dark dragon on the Aerie at night still shows) and a wall is never the colour of a dark
 //                   body; a big prop may lie either way (the hearth's firebox is a dark mouth behind kitchen slot 0).
+//                   (The garden's green is the hedge and the lawn behind the path, the grass strip below it: never a
+//                   floor. Its path is FLOORS.path, gated by (i) and (Ki) with the straw.)
 // EGGS (counted apart, its own RESULT line: EGGS):
 //   (egg) eggs    : every element's egg (src/game/eggs.ts: its shell is the element's BABY scale colour, inked round)
 //                   keeps >= 25 % luminance from the Hatchery's nest straw it lies in (src/game/surfaces.ts NEST), so a
@@ -86,7 +90,7 @@ import type { KeeperPalette } from '../src/art/keeper/palettes.ts';
 import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
 import type { KeeperId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
-import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, stepped } from '../src/game/surfaces.ts';
+import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, stepped } from '../src/game/surfaces.ts';
 import { NEST_RX, NEST_RY, NEST_STRANDS, WALL_H, floorTop, nestBase, eggBottom } from '../src/game/layout.ts';
 import { SHELL, WOBBLE } from '../src/game/eggs.ts';
 import { PHASE_ORDER } from '../src/game/clock.ts';
@@ -827,6 +831,10 @@ function lighterBy(a: string, b: string): number {
   list.push(['lift wall', BACKDROPS.liftWall], ['bare wall', BACKDROPS.emptyWall], ['tower stone', BACKDROPS.stone]);
   for (const [k, hex] of Object.entries(WALLS)) list.push([`${k} wall`, hex]);
   list.push(['lamp ring inner', LAMP_RINGS[0]], ['lamp ring outer', LAMP_RINGS[1]], ['hearth ring', HEARTH_RING]);
+  // (the elder garden, behind its residents: the hedge and the trees' crowns, the lawn, the trunks, bench and posts,
+  // the fence, the nest mounds' straw, and the lanterns' rings on the hedge at night)
+  list.push(['garden hedge', BACKDROPS.hedge], ['garden lawn', BACKDROPS.lawn], ['garden trunk', BACKDROPS.trunk], ['garden fence', BACKDROPS.fence], ['garden mound', NEST],
+    ['lantern ring inner', LANTERN_RINGS[0]], ['lantern ring outer', LANTERN_RINGS[1]]);
   const props: [string, string][] = Object.entries(PROPS).map(([k, hex]) => [`prop ${k}`, hex]);
   head(`(w) BACKDROPS  (everything a dragon is seen against: the sky, hills, clouds, walls, stone and lamps' light each >= ${LUM_MIN * 100}% LIGHTER in luminance than every dark body (scale L < ${W_DARK}: ${dark.length} element-stages), so L >= ${floorL.toFixed(3)}, never black; a big prop behind a slot >= ${LUM_MIN * 100}% from them either way; all >= ${OKL_MIN} Oklab L from the ink ${INK})`);
   for (const [what, hex, apart] of [...list.map(([w, h]) => [w, h, false] as const), ...props.map(([w, h]) => [w, h, true] as const)]) {

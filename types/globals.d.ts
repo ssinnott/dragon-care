@@ -52,12 +52,14 @@ interface Window {
      * a tap on it Rushes that job, where a tap on one not waiting opens its card) and `head` (the middle of its head in
      * canvas px as last drawn, or null when it was not drawn: off screen); the eggs in the Hatchery's nests (each one's
      * element, its nest 0-2 and how far on it is, 0 laid to 1 due); and the name of the dragon whose card is open, or
-     * null. Gone once the base is detached (the page left it).
+     * null. The elder garden (S6): each dragon's `place` (`barn`, or retired, `garden`), and the garden's residents, its
+     * plots (one a resident or a retiree, at least two) and the world's walkable width out to its end (world px: 1688
+     * with two plots, 176 more a plot). Gone once the base is detached (the page left it).
      */
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
       chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[];
       digest: string;
-      dragons: { id: number; name: string; element: string; stage: string; f: number; x: number; move: string; room: string | null; slot: string | null;
+      dragons: { id: number; name: string; element: string; stage: string; place: 'barn' | 'garden'; f: number; x: number; move: string; room: string | null; slot: string | null;
         waiting: boolean; head: { x: number; y: number } | null }[];
       lift: { y: number; rider: number | null };
       walked: number;
@@ -67,7 +69,8 @@ interface Window {
       persist: boolean;
       buttons: Record<string, { x: number; y: number; w: number; h: number }>;
       eggs: { element: string; nest: number; progress: number }[];
-      card: string | null };
+      card: string | null;
+      garden: { residents: number; plots: number; worldW: number } };
     /**
      * view=base, live and saving (src/game/base.ts attach, only when the page loads and saves the player's barn): save
      * the barn now, and return the step it was saved at. Gone once the base is detached.

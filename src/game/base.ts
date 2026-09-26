@@ -21,6 +21,11 @@
 // the Hatchery's eggs lie in their nests (eggs.ts: their cracks and wobble), and one that hatches throws its shell bits
 // as the baby stands up; at 05:00 a tip says who grows up within two days. A tap on a dragon opens its card (its stage
 // and day of it, its needs: hud.ts); a tap on one with a job waiting also Rushes that job, as it always has.
+// The elder garden (plan S6): past the right tower, through the Garden Gate, the garden's plots are drawn after the
+// building (gardenArt.ts: only the plots on screen), their lanterns lit with the lights; the camera pans out to the
+// garden's end, which moves east as elders retire to it; a resident naps (`sleep`, then `wake`), sits (`idle`, the
+// elder's variants), strolls (its walk, restarted each bout like any walk) and waits for its keeper (`idle`, or its
+// tells); an elder arriving there is news: "ASH MOVED TO THE GARDEN".
 import { drawDragon, rootToScreen } from '../art/dragon/rig.ts';
 import { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
 import { ELEMENT_ANIM_FALLBACK } from '../art/dragon/anims.ts';
@@ -42,11 +47,13 @@ import { loadSave, writeSave, clearSave, backupSave } from './storage.ts';
 import { freshSeed } from '../lib/engine/rng.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import { WORLD_W, WORLD_H, feetY, nestX, eggBottom } from './layout.ts';
+import { drawGarden, drawGardenLights, drawGardenPlate } from './gardenArt.ts';
+import { lightsOf } from './sky.ts';
 import { drawEgg, drawShellBits, BITS_FRAMES } from './eggs.ts';
 import { stageDue } from './life.ts';
 import { walking, feetOf } from './travel.ts';
 import { gaitOf, wrapT } from './gait.ts';
-import { NEEDS, SOON, tierOf, chargeOf, hasNeed } from './needs.ts';
+import { NEEDS, GARDEN_NEEDS, SOON, tierOf, chargeOf, hasNeed } from './needs.ts';
 import type { NeedKind } from './needs.ts';
 import { drawBuilding, drawPlates, drawLiftCar, drawLights } from './building.ts';
 import { makeKeeperAgent, stepKeeperVisual, drawKeeperVisual } from './people.ts';
@@ -91,14 +98,17 @@ const GROW_FLASH = 12;
 /** What a grow-up's toast calls the new stage, for one dragon and for more: "EMBER IS AN ELDER NOW!", "EMBER AND ZAP ARE ELDERS NOW!". */
 const STAGE_NOW: Readonly<Record<Stage, string>> = Object.freeze({ baby: 'A BABY', young: 'YOUNG', adult: 'AN ADULT', elder: 'AN ELDER' });
 const STAGES_NOW: Readonly<Record<Stage, string>> = Object.freeze({ baby: 'BABIES', young: 'YOUNG', adult: 'ADULTS', elder: 'ELDERS' });
-/** Life's news waiting for the toast: dragons that grew into a stage (together), or a line (the dawn's tip). */
-type News = { stage: Stage; names: string[] } | { text: string };
-/** The toast's line for a piece of news: one dragon grown up, two, or two named and how many more. */
+/**
+ * Life's news waiting for the toast: dragons that grew into a stage (together), elders who moved to the garden
+ * (together), or a line (the dawn's tip).
+ */
+type News = { stage: Stage; names: string[] } | { garden: true; names: string[] } | { text: string };
+/** The toast's line for a piece of news: one dragon grown up (or moved to the garden), two, or two named and how many more. */
 function newsText(n: News): string {
   if ('text' in n) return n.text;
-  const [a, b] = n.names;
-  return n.names.length === 1 ? `${a} IS ${STAGE_NOW[n.stage]} NOW!`
-    : `${n.names.length === 2 ? `${a} AND ${b}` : `${a}, ${b} AND ${n.names.length - 2} MORE`} ARE ${STAGES_NOW[n.stage]} NOW!`;
+  const [a, b] = n.names, who = n.names.length === 1 ? a : n.names.length === 2 ? `${a} AND ${b}` : `${a}, ${b} AND ${n.names.length - 2} MORE`;
+  if ('garden' in n) return `${who} MOVED TO THE GARDEN`;
+  return n.names.length === 1 ? `${a} IS ${STAGE_NOW[n.stage]} NOW!` : `${who} ARE ${STAGES_NOW[n.stage]} NOW!`;
 }
 /** The dawn's tip looks this many game days ahead for stage-ups. */
 const TIP_DAYS = 2;
@@ -155,6 +165,11 @@ export class BaseView {
   camY = START_CAM.y;
   /** Where the camera is easing to after a job chip was tapped (null: it stays put). */
   private camTo: { x: number; y: number } | null = null;
+  /**
+   * The camera the page asked for (cam=), kept while nobody has moved the camera since: the world widens as elders
+   * retire (the garden grows), so a camera asked for past the start's garden end moves out to it as it grows.
+   */
+  private camAsked: { x: number; y: number } | null = null;
   private keeperAgents!: KeeperAgent[];
   private building!: HTMLCanvasElement;
   private plates!: HTMLCanvasElement;
@@ -186,8 +201,8 @@ export class BaseView {
   constructor(opts: BaseViewOpts) {
     this.persist = !!opts.persist;
     this.layers = opts.layers === 'world' ? 'world' : 'all';
-    if (opts.cam) this.setCam(opts.cam.x, opts.cam.y);
     this.use(buildSim(startSpec(opts.preset), opts.seed, opts.hour));
+    if (opts.cam) { this.camAsked = { ...opts.cam }; this.setCam(opts.cam.x, opts.cam.y); }
   }
 
   /**
@@ -204,6 +219,8 @@ export class BaseView {
     for (const [id, v] of cast) this.cast.set(id, v);
     this.keeperAgents = agents; this.building = building; this.plates = plates;
     this.bubbles = []; this.chips = []; this.card = null; this.hatches = []; this.heads.clear(); this.news = [];
+    // (a world with a smaller garden: the camera inside its end)
+    this.setCam(this.camX, this.camY);
   }
 
   /**
@@ -273,6 +290,8 @@ export class BaseView {
     // (a grow-up's flash counts the frames shown that step the world: as long at 8x as at 1x, and held while paused)
     if (this.speed > 0) for (const v of this.cast.values()) if (v.flash > 0) v.flash--;
     for (let n = this.speed; n > 0; n--) this.worldStep();
+    // (the camera asked for, as the garden widens under it)
+    if (this.camAsked && (this.camX !== this.camAsked.x || this.camY !== this.camAsked.y)) this.setCam(this.camAsked.x, this.camAsked.y);
     if (this.camTo) {
       this.setCam(this.camX + (this.camTo.x - this.camX) / 6, this.camY + (this.camTo.y - this.camY) / 6);
       if (Math.abs(this.camTo.x - this.camX) < 0.5 && Math.abs(this.camTo.y - this.camY) < 0.5) { this.setCam(this.camTo.x, this.camTo.y); this.camTo = null; }
@@ -317,9 +336,13 @@ export class BaseView {
         // takes this name too)
         const same = this.news.find((n): n is { stage: Stage; names: string[] } => 'stage' in n && n.stage === e.stage);
         if (same) same.names.push(d.name); else this.news.push({ stage: e.stage, names: [d.name] });
-      } else {
+      } else if (e.kind === 'hatch') {
         const room = sim.rooms.find((r) => r.kind === 'hatchery');
         if (room) this.hatches.push({ id: d.id, el: d.element, x: nestX(room, Math.max(0, Math.min(2, Math.round((d.x - nestX(room, 0)) / 50)))), y: eggBottom(room.floor), age: 0 });
+      } else if (e.kind === 'garden') {
+        // (an elder arrived at its plot, a resident now: the garden's news, shared by those who arrive together)
+        const same = this.news.find((n): n is { garden: true; names: string[] } => 'garden' in n);
+        if (same) same.names.push(d.name); else this.news.push({ garden: true, names: [d.name] });
       }
     }
     if (sim.clock % sim.dayLen === PHASE_HOURS.dawn * hourSteps(sim.dayLen)) {
@@ -334,6 +357,8 @@ export class BaseView {
    */
   private animFor(d: Dragon): string {
     if (d.act) return d.act.need === 'sleep' && d.element === 'dusk' ? 'tuckin' : ACT_ANIM[d.act.need];
+    // (a garden resident napping sleeps: garden.ts)
+    if (d.garden?.mode === 'nap') return 'sleep';
     const j = this.waitingJob(d);
     // the hungry tell (4.2), and slinkwing's lonely call (3.7)
     if (j && j.need === 'food' && d.needs.food < SOON && d.move !== 'turn') return 'beg';
@@ -367,8 +392,10 @@ export class BaseView {
       if (v.cheering && (p.player.done || p.player.name !== 'happy' || d.act)) v.cheering = false;
       const want = v.cheering ? 'happy' : this.animFor(d);
       if (v.waking && p.player.done) { v.waking = false; p.player.play('idle', { blend: 8 }); p.anim = 'idle'; }
-      if (want !== p.anim && !(v.waking && want === 'idle')) {
-        if ((p.anim === 'sleep' || p.anim === 'tuckin') && want === 'idle') { p.player.play('wake', { blend: 8 }); p.anim = 'wake'; v.waking = true; }
+      // (a garden resident wakes from its nap whatever it wakes to: its keeper coming, a sit)
+      const woke = want === 'idle' || (d.place === 'garden' && want !== 'sleep');
+      if (want !== p.anim && !(v.waking && woke)) {
+        if ((p.anim === 'sleep' || p.anim === 'tuckin') && woke) { p.player.play('wake', { blend: 8 }); p.anim = 'wake'; v.waking = true; }
         else { p.player.play(want, { blend: d.move === 'turn' ? 4 : 8, fallback: ELEMENT_ANIM_FALLBACK[want] }); p.anim = want; v.waking = false; }
         p.hold = 0;
       }
@@ -401,17 +428,22 @@ export class BaseView {
     const seen = (x0: number, x1: number, y0: number, y1: number) => x1 >= cx && x0 <= cx + VIEW_W && y1 >= cy && y0 <= cy + VIEW_H;
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = CLEAR; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    if (all) drawSky(ctx, read, this.camX, this.camY, WORLD_W);
-    ctx.drawImage(this.building, cx, cy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
+    if (all) drawSky(ctx, read, this.camX, this.camY, this.sim.worldW);
+    // (the building's canvas ends at WORLD_W: the garden lies past it)
+    const bw = Math.min(VIEW_W, WORLD_W - cx), span = [cx, cx + VIEW_W] as const;
+    if (bw > 0) ctx.drawImage(this.building, cx, cy, bw, VIEW_H, 0, 0, bw, VIEW_H);
     ctx.save();
     ctx.translate(-cx, -cy);
-    if (all) drawLights(ctx, this.sim.rooms, read);
+    // the garden past the right tower (its plots on screen), then the lights -- the lanterns' rings with them
+    drawGarden(ctx, this.sim.garden.plots, this.sim.worldW, span);
+    if (all) { drawLights(ctx, this.sim.rooms, read); drawGardenLights(ctx, this.sim.garden.plots, lightsOf(read), span); }
     ctx.restore();
     // the names are on the walls: under the lift's car and the cast, so a name never covers a face (a keeper passing
     // under the Lamp Dorm's plate hides part of it for a moment instead)
-    ctx.drawImage(this.plates, cx, cy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
+    if (bw > 0) ctx.drawImage(this.plates, cx, cy, bw, VIEW_H, 0, 0, bw, VIEW_H);
     ctx.save();
     ctx.translate(-cx, -cy);
+    drawGardenPlate(ctx, span);
     drawLiftCar(ctx, this.sim.lift.y);
     // the eggs in their nests (on the building, under the cast), and a hatch's shell bits bursting from behind the baby
     // standing up in the nest (under the cast too: never over a dragon, or an eye)
@@ -476,14 +508,15 @@ export class BaseView {
         speed: this.speed,
         persist: this.persist,
         buttons: { ...BUTTONS },
-        dragons: this.sim.dragons.map((d) => ({ id: d.id, name: d.name, element: d.element, stage: d.stage, f: d.f, x: d.x, move: d.move,
+        dragons: this.sim.dragons.map((d) => ({ id: d.id, name: d.name, element: d.element, stage: d.stage, place: d.place, f: d.f, x: d.x, move: d.move,
           room: this.sim.rooms.find((r) => r.floor === d.f && d.x >= r.x0 && d.x <= r.x1)?.kind ?? null,
           slot: d.slot ? `${this.sim.rooms[d.slot.room].kind}:${d.slot.i}` : null,
           waiting: !!this.waitingJob(d), head: this.heads.get(d.id) ?? null })),
         lift: { y: this.sim.lift.y, rider: this.sim.lift.rider },
         walked: st.dragonWalked,
         eggs: this.sim.eggs.map((e) => ({ element: e.element, nest: e.nest, progress: this.progress(e) })),
-        card: this.cardDragon()?.name ?? null };
+        card: this.cardDragon()?.name ?? null,
+        garden: { residents: this.sim.dragons.filter((d) => d.place === 'garden').length, plots: this.sim.garden.plots, worldW: this.sim.worldW } };
     }
   }
 
@@ -517,8 +550,10 @@ export class BaseView {
     drawHint(ctx, x);
     const d = this.cardDragon();
     if (d) {
-      const needs = Object.fromEntries(NEEDS.map((k) => [k, hasNeed(d.element, k) ? d.needs[k] : null])) as Record<NeedKind, number | null>;
-      drawCard(ctx, { name: d.name, element: d.element, stage: d.stage, day: Math.floor((this.sim.clock - d.stageSince) / this.sim.dayLen) + 1, needs });
+      // (a garden resident has only food and love: GARDEN_NEEDS)
+      const garden = d.place === 'garden';
+      const needs = Object.fromEntries(NEEDS.map((k) => [k, hasNeed(d.element, k) && (!garden || GARDEN_NEEDS.includes(k)) ? d.needs[k] : null])) as Record<NeedKind, number | null>;
+      drawCard(ctx, { name: d.name, element: d.element, stage: d.stage, day: Math.floor((this.sim.clock - d.stageSince) / this.sim.dayLen) + 1, needs, garden });
     }
   }
 
@@ -554,8 +589,9 @@ export class BaseView {
 
   // ---------- input ----------
 
+  /** The camera, kept inside the world: out to the garden's end (sim.worldW, which grows as elders retire). */
   private setCam(x: number, y: number): void {
-    this.camX = clamp(x, 0, WORLD_W - VIEW_W);
+    this.camX = clamp(x, 0, this.sim.worldW - VIEW_W);
     this.camY = clamp(y, 0, WORLD_H - VIEW_H);
   }
 
@@ -594,7 +630,8 @@ export class BaseView {
 
   /** Ease the camera to a dragon. */
   private focus(d: Dragon): void {
-    this.camTo = { x: clamp(d.x - VIEW_W / 2, 0, WORLD_W - VIEW_W), y: clamp(this.feet(d) - VIEW_H * 0.6, 0, WORLD_H - VIEW_H) };
+    this.camAsked = null;
+    this.camTo = { x: clamp(d.x - VIEW_W / 2, 0, this.sim.worldW - VIEW_W), y: clamp(this.feet(d) - VIEW_H * 0.6, 0, WORLD_H - VIEW_H) };
   }
 
   /**
@@ -643,7 +680,7 @@ export class BaseView {
       const r = canvas.getBoundingClientRect();
       return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height };
     };
-    const onDown = (e: PointerEvent) => { down = { ...at(e), camX: this.camX, camY: this.camY, drag: false }; this.camTo = null; canvas.setPointerCapture(e.pointerId); };
+    const onDown = (e: PointerEvent) => { down = { ...at(e), camX: this.camX, camY: this.camY, drag: false }; this.camTo = null; this.camAsked = null; canvas.setPointerCapture(e.pointerId); };
     const onMove = (e: PointerEvent) => {
       if (!down) return;
       const p = at(e);

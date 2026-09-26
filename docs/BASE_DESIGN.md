@@ -33,7 +33,7 @@ shows it.*
 | B5 | **Missions are watchable:** an animated side-scrolling scene of the team completing it. **The scene is the timer.** | The user wants to see the team at work; the side-view walk the rig already has makes it cheap. |
 | B6 | **Everything runs only while the game is open.** One clock drives care, missions and hatching; closing the game pauses the world. | No coming back to a barn of red bubbles; no offline catch-up to build. Missions therefore last minutes of play, not hours. |
 | B7 | **Humans are assigned automatically:** keepers to jobs, riders to the dragons you send. | Fewer clicks; the player's choices are *which dragons* and *what to build*. |
-| B8 | **Cozy:** no combat. Missions have hazards, not enemies; nobody is hurt; old age is never decline (D21). | The game's face set has no angry face (D18) and the elder is a reward. |
+| B8 | **Cozy:** no combat. Missions have hazards, not enemies; nobody is hurt; old age is never decline (D21): retiring to the garden is the elder's reward (D21), a place and never a farewell (3, The Garden). | The game's face set has no angry face (D18) and the elder is a reward. |
 
 *Young adult* in the user's request (#9: "start with a young adult dragon of each kind") means a dragon at the very
 start of the adult stage; the stage before adult is called *young* (the art bible's stage names: baby, young, adult,
@@ -88,7 +88,9 @@ picture.*
   dragons are to walk across the middle of the barn: its dark shaft (`#5a4436`, L 0.07) failed the floor gate (1),
   and a car passing through floors that dragons stand on would clash with them.
 - **The towers** (the people): one at each end of the barn, five floors, a ladder up each. Their doors into the barn
-  are human-sized, on the ground and upper floors: dragons don't fit, which is the reason for the split.
+  are human-sized, on the ground and upper floors: dragons don't fit, which is the reason for the split -- except the
+  **Garden Gate's arch**: the right tower's ground floor is the Garden Gate (3), an 84 px arch in both its walls (the
+  towers' other doors are 70) with a straw floor straight through, the dragons' way out to the garden.
 - **Windows.** The ladder bay has a window each side of its ladder on every floor, and each bare hayloft module has
   one: panes cut out of the back wall, so the sky shows through them (7: by day the day's, at night the night's; the
   ground floor's look out on the far hills). The towers have a window slit a floor in their outer walls, lit at dusk
@@ -97,11 +99,12 @@ picture.*
 - **The Aerie** is walkable **floor 5** (feet at y 136): one straw deck from x 8 to 648, over the left tower's top,
   then a gantry over the barn roof (x 168 to 488: a railing along its back, two trestles down to the roof and a knee
   brace to the tower), then the lift's head. The left tower's ladder climbs on to it. Teams will leave and land here (5).
-- **Every floor is straw.** Every surface a dragon or a keeper stands on (a room's band, the landings, the ladder bay,
-  the towers' boards, the lift car's deck, the Aerie deck) is a `FLOORS` colour in `src/game/surfaces.ts`, and
-  `tools/palette-check.ts` gates every entry before anything stands on it: gate (i) against every dragon colour at every
-  stage, gate (Ki) against the keepers' shoes and trousers, and HSV saturation under 0.20. There is one entry so far,
-  straw `#e0d6b8` (L 0.674, S 0.18).
+- **Every floor is pale.** Every surface a dragon or a keeper stands on (a room's band, the landings, the ladder bay,
+  the towers' boards, the lift car's deck, the Aerie deck, the Garden Gate's floor, the garden's path) is a `FLOORS`
+  colour in `src/game/surfaces.ts`, and `tools/palette-check.ts` gates every entry before anything stands on it: gate
+  (i) against every dragon colour at every stage, gate (Ki) against the keepers' shoes and trousers, and HSV saturation
+  under 0.20. There are two: straw `#e0d6b8` (L 0.674, S 0.18), and the elder garden's path, a pale gravel `#dcd6c0`
+  (L 0.671, S 0.13: no green underfoot).
 
 | Measure (px, at scale 1) | Value | Why |
 |---|---|---|
@@ -111,13 +114,16 @@ picture.*
 | Ladder bay | 64 wide | a keeper's ladder, and straw across it |
 | Tower | 112 wide, 96 inside | a human is 72 to 76 tall and about 30 wide |
 | Aerie | floor 5: x 8 to 648, feet at y 136 | one deck over the left tower, the roof and the lift's head |
-| World | 1360 x 760, ground at y 712 | about 2 x 2 screens; the player pans |
+| World | the building 1360 x 760, ground at y 712; the walkable ground runs on east through the garden, 1688 wide with its first two plots and 176 more a plot (2568 with seven) | about 2 x 2 screens, then the garden; the player pans |
 
 **Moving around.** Keepers walk a floor and climb the three ladders: up each tower (the left one on to the Aerie) and
 the centre ladder bay's through the barn; the towers and the barn meet on the ground and upper floors only. Dragons
 have ways of their own, a net per stage: the barn's floors kept half a body's length from the walls (30, 56, 72 and 76
 px, baby to elder: the measured extents), the hayloft between modules 1 and 5 only (clear of the low roof slopes), the
-Aerie deck, and the lift between them; never a tower.
+Aerie deck, and the lift between them; never a tower, but the ground floor goes on through the Garden Gate's arches to
+the garden's end (3): an elder retiring walks out that way, and the residents stroll there. Keepers walk out to the
+garden's end on the ground floor too. The nets are rebuilt as the garden grows (only ever east, so a route under way
+stays a route).
 
 **A dragon with an open need walks to that need's room** (#7), riding the Dragon Lift between floors, and a keeper
 meets it there (section 3's slots, 4.4). It walks by its walk anim's own root motion, frame by frame (`src/game/gait.ts`:
@@ -210,11 +216,10 @@ be listed as planned for a later slice (and a planned one that shows a use fails
 | Left tower, floor 2 | Bunks | riders rest here after a mission | S8 |
 | Left tower, floor 4 | Map Room | the mission table: the world map and the mission chooser | S8 |
 | The roof (floor 5) | Aerie | teams gather here, leave and land | S8 |
-| Right tower, ground floor | Garden Gate | the dragons' way out to the garden | S6 |
-| Outside, east | Garden | the retired elders' home | S6 |
+| Right tower, ground floor | Garden Gate | the dragons' way out to the garden: an arch in both walls, the one tower door a dragon fits | S6: elders walk out through it, keepers out to the residents and back (a pass counted each way) |
+| Outside, east | Garden | the retired elders' home: they move here 30 days into the elder stage, and it grows a plot for each | S6: residents arrive, and their needs are met there |
 
-**Bare:** the hayloft's modules 0, 1 and 5; the left tower's floors 1 and 3; the right tower's five floors (its ground
-floor becomes the Garden Gate in S6). **Dropped:** the Nursery, the Feed Store, the Hay Store and the Attic (nothing
+**Bare:** the hayloft's modules 0, 1 and 5; the left tower's floors 1 and 3; the right tower's floors 1 to 4. **Dropped:** the Nursery, the Feed Store, the Hay Store and the Attic (nothing
 used them); the Sun Loft and the Song Roost (love is met in one room, the Grooming Parlour); the Mess Hall, the
 Library, the Workshop, the Infirmary and the Lookout (no mechanic); and two of the three Bunks.
 
@@ -236,6 +241,37 @@ and the Lamp Dorm; the Grooming Parlour's between its second and third slots), s
 behind a dragon; the supplies are still taken at the hearth, the ball box and the tub. The room names hang on the
 walls, drawn behind the dragons and keepers, so a name never covers a face.
 
+**The Garden** (#10; `src/game/garden.ts`, `gardenArt.ts`). Outside, east of the right tower, through the Garden Gate:
+the retired elders' home -- the elder's reward, **a place, not a stage** (B8, ART_BIBLE D21). Nothing in it reads as
+decline: no graves, no wilting or autumn plants, no farewell or sunset, no sleepy lid on an awake resident; the trees
+are in leaf with apples on them, and the elders are the same elders, drawn as before.
+- **Where, and how big.** A row of plots, 176 px each, from the tower's outer wall (x 1304) east: one for each resident
+  (or elder on its way there), never fewer than two, so the garden is there from day 1 with two empty plots waiting.
+  The walkable world ends at the garden's end, 1304 + 176 a plot + 32 (1688 at the start, 2568 with seven residents);
+  the ground floor's nets run out to it, and a picket fence stands 40 px in from it, moving out as the garden grows.
+  Its floor is a pale gravel path (2); its green is the hedge and the lawn behind the path and the grass strip below
+  it, never underfoot. Each plot has a straw nest mound, a lantern (lit at dusk and night: two stepped rings on the
+  hedge, never on the path) and flowers in the lawn; every other plot an apple tree; plot 0 a bench and the GARDEN sign.
+- **Retiring.** 30 game days into its elder stage (counted from the stage's start, 7), an elder retires as soon as it
+  may be sent somewhere new -- not being met, not in the lift's hands or its bay -- wherever it is (it keeps its size,
+  so unlike a stage-up it need not stand settled): its jobs are dropped (a keeper coming for one goes home), its slot
+  is let go, and it walks, riding the lift down if it must, through the Garden Gate to the middle of the lowest free
+  plot. There it is a resident, and a toast says so: "ASH MOVED TO THE GARDEN".
+- **What residents do.** They **nap** (30 to 60 minutes of game time), **sit** (10 to 20: the elder's idle and its
+  variants), and from a sit **stroll** (six times in ten) to a resting place among their own plot and the two beside
+  it, walked by their own walk like any dragon, or nap again. At night they only nap: a sit ends at nightfall, a nap
+  that ends at night starts another, and no stroll starts that would not end before 20:00 -- the one thing in the
+  simulation that reads the day's phase (7). Every resident's resting place, and every plot's middle waiting for a
+  newcomer, are kept clear of each other's eyes (ART_BIBLE 1.4), so a stroll goes only to a clear place; passing
+  another on the way is a moment's overlap, as in the barn. Measured over 30 minutes (`npm run sim` section 16): asleep
+  70 to 77 % of their steps, every night step, and each strolled 8 to 10 times.
+- **Few needs** (4.1): food and love only, at a quarter of an elder's drain; sleep, play and bath are held full. A
+  resident asks for a keeper about four times an hour of play, where a barn dragon asks about 36.
+- **Keepers come to them: the one exception to "each need is met in its own room".** The garden is the residents'
+  room. When a job opens, the resident wakes (or stops sitting; one strolling walks on to its resting place first) and
+  waits where it is; a keeper fetches the bowl from the hearth as usual (4.4), walks out through the gate, and meets it
+  at its snout, inside the garden. After the job it sits (or naps, at night).
+
 **Neighbours** (later; all from traits the rig already has): slinkwing's shriek and lonely call carry one room over,
 and dusk's `hush` calms the rooms around it; the hearth warms its neighbours; spike's wary latch (5.4) already
 measures crowding, so spike wants a roomy room.
@@ -249,6 +285,11 @@ measures crowding, so spike wants a roomy room.
   love for spike, rock and slinkwing.
 - **Fire has no bath need**: it hates baths.
 - Stage scales every drain: baby 1.25, young 1.1, adult 1, elder 0.8.
+- **A garden resident** (3, The Garden) has only **food and love**, draining at a quarter of an elder's rate (0.25 x
+  0.8 of the base, its own need still twice the rest); sleep, play and bath are held full, and it asks for nothing
+  else. An elder's food then falls from full to 0.5 in about 37 minutes of play (fire's, its own, in about 19), and so
+  does its love (spike's, rock's and slinkwing's own: 19). An elder on its way to the garden already drains as one,
+  and asks for nothing until it is there.
 
 **4.2 Bubbles and moods.** Below **0.5** a need opens a job and the dragon shows a white bubble; below **0.25** the
 bubble turns yellow; below **0.1** red, with a "!". A dragon shows one bubble, its most pressing job's, with a green
@@ -481,7 +522,7 @@ stand spot <= 20 s, the bay's edge <= 60 s.
 ## 7. Time
 
 - **One clock.** One simulation clock, fixed 60 Hz steps, running only while the game is open (B6). Care, missions,
-  hatching and growing up all read it (growing up and hatching count game days on it; neither reads the day's phase). It counts game time, in steps since day 1's midnight (`src/game/clock.ts`; the
+  hatching, growing up and retiring all read it (they count game days on it; none reads the day's phase). It counts game time, in steps since day 1's midnight (`src/game/clock.ts`; the
   simulation keeps `clock0 + tick`).
 - **The day.** A game day is **10 800 steps: 3 minutes at 1x** (23 s at 8x). A new game starts at 07:00 on day 1
   (`hour=` starts one at another hour). The phases: **dawn** 05:00 to 07:00, **day** 07:00 to 18:00, **dusk** 18:00 to
@@ -505,8 +546,9 @@ stand spot <= 20 s, the bay's edge <= 60 s.
     way, and all 6 Oklab L from the ink: 1001 gates, all passing (ART_BIBLE 5.8).
   - The barn's care never reads the day's phase: a barn started at noon and one started at ten at night, stepped alike,
     are the same barn (`npm run sim` section 12), and `view=base&layers=world` (the world alone: the building, the car,
-    the cast, the bubbles and the plates) is the same picture at noon and at ten at night (`npm run smoke`). Only a
-    garden resident's naps (S6) and the dawn's mission board (S8) will read it.
+    the cast, the bubbles and the plates) is the same picture at noon and at ten at night (`npm run smoke`). A garden
+    resident's naps read it (they only nap at night: `src/game/garden.ts`, the one simulation module that does; its
+    state, the residents' rhythm, is left out of the barn's key), and the dawn's mission board will (S8).
 - **Growing up.** A stage lasts **30 game days** (a month: #8), baby, then young, then adult, then elder; the new game's
   seven start on the adult stage's first day. A dragon's stage-up falls due 30 days after its stage began, and is
   applied as soon as the dragon is **settled**: no act (a sleeper has one), no keeper on any of its jobs (coming, waiting
@@ -524,7 +566,10 @@ stand spot <= 20 s, the bay's edge <= 60 s.
   (seeds 1 to 8 on a short day: 4 s to 49 s); in the busy barn, one errand (the walk to a need's room, the wait for the
   one car, the job: 68 s to 144 s at most over seeds 1 to 8, checked against 3 minutes, a thirtieth of a stage: 4.7).
   A baby on its way to its module slot that a need calls (or a Rush) to the room it is going to is met there in a
-  baby's sub-slot, like any baby, and goes on growing up after. An elder's next is retirement to the garden (S6).
+  baby's sub-slot, like any baby, and goes on growing up after. An elder's next is the garden (3, The Garden): 30 days
+  into the elder stage, counted from its start like a stage-up, it retires -- as soon as it may be sent somewhere new,
+  not settled (it keeps its size, so no net or line minds) -- at most 683 steps late in the busy barn (seed 1; 408 to
+  1092 over seeds 1 to 8), none late with the `retire` preset (`npm run sim` section 15).
   **The cheer:** just grown up, a dragon holds where it stands for exactly its new stage's `happy` (61 to 139 steps,
   read from the anim tables: `src/game/gait.ts` `happyLen`; the hold is the dragon's own `hold` and is saved): it takes
   no errand, no keeper comes for it and no one moves it on, so nothing cuts the cheer short (`npm run sim` section 13
@@ -555,7 +600,8 @@ stand spot <= 20 s, the bay's edge <= 60 s.
   (`src/game/save.ts`). **NEW** (tap twice) starts a new barn on a fresh seed, and it replaces the old one. A save this
   build can't read (another version, not a save at all, or one whose insides it can't build, step once and draw: an
   element, a stage or a keeper it doesn't know; or whose eggs it couldn't hatch or draw days later: an unknown element,
-  a nest that isn't one, two in one nest) starts a new barn, with a toast ("NEW BARN: THE OLD SAVE DIDN'T
+  a nest that isn't one, two in one nest; or a garden it couldn't keep: a dragon in a place this build hasn't got, a
+  resident that isn't an elder or has a slot, two on one plot, fewer plots than residents) starts a new barn, with a toast ("NEW BARN: THE OLD SAVE DIDN'T
   FIT"), and the old save is kept aside at `dragon-care/base.bak`; nothing of it is swapped in until the whole trial
   has passed, so a broken save never freezes the page or is written back. **The tests and `t=` are exempt:** a frozen
   page (`t=`), a preset page, a page given `hour=`, `save=0` and every headless check never read or write it, so `t=`
@@ -590,6 +636,13 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    Only a mission brings an egg (S8), so the presets show them: `preset=growup` (EMBER grows up a half second in),
    `preset=eggs` (three eggs in the nests, one just laid, one cracked, one about to hatch), `preset=hatch` (an egg
    hatching at step 60) and `preset=full` (every baby sub-slot taken: a due egg waits).
+   **The elder garden is built too** (3, The Garden; #10): the Garden Gate in the right tower's ground floor, the garden
+   past it (a plot a resident, two from day 1: pan right from the start to see it), elders retiring to it 30 days into
+   their stage, and its residents napping, sitting and strolling, needing only food and love, met where they rest by a
+   keeper come out of the barn. A new game's elders are 60 game days off (the start's adults grow into elders in 30), so
+   two presets show it: `preset=garden` (three residents on their plots -- BRAMBLE, COBBLE and ECHO -- and four adults in
+   the barn) and `preset=retire` (the seven starters, elders a tenth of a day from retiring: they walk out one by one,
+   and the garden widens to seven plots).
 
    ![The built slice, 49 s in, in the start frame: RIPPLE walks off the Dragon Lift's car at the upper floor to the Romp Room, and Pip, sent for it now it is past its ride, goes for a ball at the box by the wheel; ZAP waits at the ground floor's east landing for the car up to the Lamp Dorm, back to back with COBBLE walking into the Bathhouse's first slot (Tomas brings the bucket, out of frame); WICK waits at the hayloft's east landing for the car down to the Romp Room; ECHO walks past BRAMBLE in the Grooming Parlour on its way down to the Bathhouse; Bea waits in the Hearth Kitchen; the job strip](base/base_live.png)
 
@@ -597,25 +650,27 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    |---|---|
    | `src/game/pet.ts` | the pet code, moved out of `src/gallery.ts` unchanged (the gallery renders pixel for pixel as before), and the paper turn the base's dragons turn with |
    | `src/game/needs.ts` | the five needs, the drains, the tiers, mood and lightning's charge |
-   | `src/game/layout.ts` | the grid; the rooms, each with its purpose (#11), and their dragon slots and stand spots; the Dragon Lift and the Aerie; the keepers' net (the ladders) and a dragon net per stage (the lift); routes between any two spots on a net; the name plates' places |
-   | `src/game/surfaces.ts` | every floor anyone stands on (`FLOORS`: straw), and everything a dragon is seen against (the walls, the sky's colours at every phase, the big props behind a slot, the lamps' light), each gated by `tools/palette-check.ts` (i, Ki, w) |
+   | `src/game/layout.ts` | the grid; the rooms, each with its purpose (#11), and their dragon slots and stand spots; the Dragon Lift and the Aerie; the garden's plots and the world's width for a garden of so many; the keepers' net (the ladders) and a dragon net per stage (the lift), built for the garden's end; routes between any two spots on a net; the name plates' places |
+   | `src/game/surfaces.ts` | every floor anyone stands on (`FLOORS`: straw, the garden's path), and everything a dragon is seen against (the walls, the sky's colours at every phase, the big props behind a slot, the lamps' and lanterns' light, the garden's hedge, lawn, wood and fence), each gated by `tools/palette-check.ts` (i, Ki, w) |
    | `src/game/clock.ts` | the day's length and phases, the speeds, reading the clock (the day, the time, the phase and the sky's stepped turn) |
    | `src/game/sky.ts` | the sky behind the building, in screen space: the bands, the far hills and clouds, the moon and the stars |
    | `src/game/hud.ts` | the top bar (the clock, the jobs, the keepers' badges, NEW, pause, the speed), the toasts and the hint |
    | `src/game/storage.ts` | the only code that touches the browser's storage: load the barn (or set aside one that doesn't fit), save it, forget it |
    | `src/game/start.ts` | the starting base: the rooms of section 3, seven newly adult dragons (one per element, 0 days into adulthood), each in a slot of its own need's room, and the four named keepers |
-   | `src/game/presets.ts` | code-built starts for views that need what a new game hasn't got (`ages`: every stage) |
+   | `src/game/presets.ts` | code-built starts for views that need what a new game hasn't got (`ages`: every stage; `growup`, `eggs`, `hatch`, `full`; `garden`: three residents; `retire`: seven elders about to retire) |
    | `src/game/sim.ts` | the care simulation: the queue, the keepers' trips and jobs (fetch, go, wait at the stand spot, work), and Rush; no drawing, seeded, deterministic; dragons with stable ids, a clock, and its options (seed, day length, start time) |
    | `src/game/travel.ts` | the dragons on the move: each chooses its need's room and takes a slot there (moving a lingerer on, or bumping a holder for a Rush), walks and turns, waits in a landing's line where it covers no eye, and rides the Dragon Lift; the lift's car and its calls; the bay rule, and one dragon at a time in the shaft; how deep each dragon is drawn |
    | `src/game/gait.ts` | each element's walk at each stage as a table of per-frame root motion, the pace the simulation walks a dragon at |
    | `src/game/save.ts` | the save format: the whole world as JSON, every reference an id, loaded back exactly (`CareSim.fromSave`); the digest two runs compare |
    | `src/game/rand.ts` | stateless draws (`rngAt(seed, tag, ...keys)`): no RNG state is ever kept or saved |
-   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building (its rooms, the lift's shaft, car and headframe, the ladder bay, the windows, the Aerie's deck and gantry) and its lights by night, the keepers on the named cast's rig (`docs/KEEPERS.md`), their walks played at their pace, the bubbles and chips |
+   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building (its rooms, the lift's shaft, car and headframe, the ladder bay, the windows, the Aerie's deck and gantry, the Garden Gate's arches) and its lights by night, the keepers on the named cast's rig (`docs/KEEPERS.md`), their walks played at their pace, the bubbles and chips |
    | `src/game/life.ts` | growing up (a stage-up 30 days into a stage, applied once the dragon is settled, exact; a baby first moving to a module slot) and hatching (an egg 2 days after it was laid, into a free baby sub-slot) |
    | `src/game/names.ts` | the hatchlings' names, six per element, the first free one taken |
    | `src/game/eggs.ts` | the eggs, drawn: the shell, its cracks and wobble, the hatch's shell bits |
-   | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks, turns and rides) and their anims, the lift's car, the eggs, the grow-up's flash, the sky and the lights, the speed, the camera, the HUD (the dragon card too) and the input; a live page loads and saves the barn |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled with room to grow every time, each grow-up held still for its `happy`, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days; a baby Rushed on its way to grow up met in a sub-slot) and eggs (the nests, hatching exactly 2 days on into a new baby, in front of its own nest or an empty one, fed within 3 minutes, a full barn's egg waiting, no baby moved on to the Hatchery, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up |
+   | `src/game/garden.ts` | the elder garden: retiring (30 days into the elder stage), the plots it grows, the residents' nap, sit and stroll (napping only at night: the one simulation module that reads the day's phase), their resting places kept clear of each other's eyes, their jobs met where they rest |
+   | `src/game/gardenArt.ts` | the garden, drawn: a plot's tile (the hedge, the lawn, an apple tree on every other, a nest mound, a lantern, flowers; the path, the kerb, the ground), drawn only where it is on screen; the fence at the world's end; the lanterns' rings at night; the GARDEN sign |
+   | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks, turns and rides; a resident's nap and wake) and their anims, the lift's car, the eggs, the grow-up's flash, the garden, the sky and the lights, the speed, the camera (out to the garden's end), the HUD (the dragon card too) and the input; a live page loads and saves the barn |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled with room to grow every time, each grow-up held still for its `happy`, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days; a baby Rushed on its way to grow up met in a sub-slot) and eggs (the nests, hatching exactly 2 days on into a new baby, in front of its own nest or an empty one, fed within 3 minutes, a full barn's egg waiting, no baby moved on to the Hatchery, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up; the elder garden (routes out through the Garden Gate to every plot; retiring 30 days into the elder stage and soon after, the gate passed, a plot each and the garden grown to hold them, a resident in the garden with no slot; the residents' 30 minutes: food and love only at a quarter of an elder's drain, asleep half their steps or more and every night step, strolling, met where they rest by a keeper come out to them, none at rest under another's body, the barn's service beside them; saves taken with residents napping, sitting, strolling, waiting and being met, and with elders on their way out). Section 10 (the capacity runs, about 9 s) runs in a worker thread beside the rest, so the whole check keeps to about 21 s |
 
    Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play (seed
    1), 136 jobs opened and 128 were done, every one by a keeper (none closed on its own). A keeper started on a job
@@ -637,7 +692,14 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    hour on seeds 1 to 6 a need touched empty on one (1533 steps). Eight adults (seed 1): waits of 113 s on average, no
    need empty; nine or more empty needs (4.7). (With the dragons in their slots and the rooms restoring their needs,
    S2's building gave 149 opened, 146 done, 14.5 s and 41.0 s; its checks wanted 30 s and 120 s, and this slice's want
-   a mean of 100 s and 360 s over three seeds: 4.9 says why.) Not in this slice:
+   a mean of 100 s and 360 s over three seeds: 4.9 says why.) The elder garden (`npm run sim` sections 15 and 16): with
+   the `retire` preset on a 600-step day, the seven retire the step they fall due and arrive over 3895 to 13 143 steps
+   (the lift carries the five upstairs down one at a time), the gate passed 7 times, the garden grown to 7 plots and
+   the world 2568 wide; in the busy barn, falling due mid-errand, each retires at most 683 steps late. The `garden`
+   preset, 30 minutes of the real day: its three residents asleep 70 to 77 % of their steps (every night step), each
+   strolling 8 to 10 times and visited by a keeper twice (4 an hour: Tomas for love five times, Bea for food once),
+   their food and love draining at exactly a quarter of an elder's rate; the barn's four adults beside them waited 33.1
+   s on average (88.8 s at most), no need empty. Not in this slice:
    - the seven span more than one screen, so the start camera shows some of them and a drag shows the rest; they
      no longer stay put;
    - nothing uses the riders' rooms or the Aerie yet (section 3's table says which slice does), so no dragon rides the
@@ -649,6 +711,11 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    - a dragon walking past one waiting at a landing (an alighter walking off toward it, a crosser through a line)
      covers it for the moment it takes to pass, and a landing crowded past its room leaves one over another's eye
      until the car takes it (section 2);
+   - dragons walking pass through each other in the garden as in the barn: two elders walking out together can walk
+     nose over tail for a while, and a resident strolling past another covers it for a moment (only resting places
+     are kept clear);
+   - a new game has no elder for 30 game days and none retires for 60, so the garden stays empty in play until then
+     (the presets show it);
    - the base is the fixed starting one (or a preset); it is kept in the browser (7), but there is one barn, with no
      save slots;
    - no building of rooms (the rooms are section 3's fixed set), and no missions.

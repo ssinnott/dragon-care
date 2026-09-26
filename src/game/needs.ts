@@ -40,6 +40,20 @@ export function drainRate(el: DragonElement, stage: Stage, k: NeedKind): number 
   return BASE_DRAIN * STAGE_RATE[stage] * (OWN_NEED[el] === k ? OWN_RATE : 1);
 }
 
+/**
+ * A garden resident's needs (plan S6, D3: "not a lot of needs"): only food and love drain, at GARDEN_RATE of an elder's
+ * own drains (its element's own need still twice the rest); sleep, play and bath are held full (it naps as it likes,
+ * and potters about). So a resident's food takes about 37 minutes of play to reach QUEUE (fire's, its own, about 19),
+ * and love as long (spike's, rock's and slinkwing's own, about 19): a keeper visits a resident a few times an hour,
+ * where a barn dragon calls one every minute and a half.
+ */
+export const GARDEN_NEEDS: readonly NeedKind[] = Object.freeze(['food', 'love'] as NeedKind[]);
+export const GARDEN_RATE = 0.25;
+/** How much a need of a garden resident (or an elder on its way there) drains in one step: 0 for one held full. */
+export function gardenDrain(el: DragonElement, k: NeedKind): number {
+  return GARDEN_NEEDS.includes(k) ? GARDEN_RATE * drainRate(el, 'elder', k) : 0;
+}
+
 /** Under QUEUE a need opens a job (a white bubble); under SOON the bubble is yellow; under NOW, red with a "!". */
 export const QUEUE = 0.5, SOON = 0.25, NOW = 0.1;
 /** A need's tier: 0 queued, 1 soon, 2 now. */

@@ -2,9 +2,12 @@
 // each end, at the game's scale 1. Barn module 2 is the Dragon Lift, from the ground floor up through the roof to the
 // Aerie (floor 5, a deck over the left tower and the barn roof); where the hay hoist was, between modules 2 and 3,
 // is the keepers' centre ladder bay. Rooms are data placed on the grid, each with a purpose (#11), and a dragon room's
-// dragons stand in fixed slots. Walking is two nets of floor spans and links: the keepers' (the ladders) and one per
-// dragon stage (the lift, the spans kept a body's length clear of the walls). Geometry and data only: building.ts
-// draws it, sim.ts walks it.
+// dragons stand in fixed slots. Outside, east of the right tower, lies the elder garden (plan S6): a row of 176 px
+// plots, one a resident (and never fewer than two), reached through the Garden Gate, an arch in both walls of the
+// right tower's ground floor -- the one tower door a dragon fits -- so the world's walkable width grows with it
+// (worldWOf). Walking is two nets of floor spans and links: the keepers' (the ladders) and one per dragon stage (the
+// lift, the spans kept a body's length clear of the walls), rebuilt from the garden's end whenever it grows (makeNets).
+// Geometry and data only: building.ts and gardenArt.ts draw it, sim.ts walks it.
 import type { NeedKind } from './needs.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import { measureText } from '../lib/engine/text.ts';
@@ -17,7 +20,10 @@ export const MOD = 160, PITCH = 112, LADDER_BAY_W = 64, TOWER_W = 112;
 export const WALL_H = 88, BAND = 14, SLAB = 10;
 /** The towers' walls (the barn's two ends are the towers' inner walls). */
 export const WALL = 8;
-/** The world: about 2 x 2 screens, the ground at y 712. */
+/**
+ * The building's canvas (about 2 x 2 screens, the ground at y 712): the barn and its towers. The world a dragon or a
+ * keeper can walk is wider, out to the garden's end: CareSim.worldW (worldWOf).
+ */
 export const WORLD_W = 1360, WORLD_H = 760, GROUND = 712;
 export const TOWER_L = 56, BARN_X = TOWER_L + TOWER_W, BARN_MODS = 6, BARN_W = BARN_MODS * MOD + LADDER_BAY_W, TOWER_R = BARN_X + BARN_W;
 export const BARN_FLOORS = 3, TOWER_FLOORS = 5;
@@ -43,7 +49,7 @@ export const HEAD_Y = floorTop(AERIE_F), PULLEY_Y = HEAD_Y + 4;
 
 // ---------- rooms ----------
 
-export type RoomKind = 'kitchen' | 'bath' | 'hatchery' | 'romp' | 'groom' | 'dorm' | 'tack' | 'bunks' | 'maproom';
+export type RoomKind = 'kitchen' | 'bath' | 'hatchery' | 'romp' | 'groom' | 'dorm' | 'tack' | 'bunks' | 'maproom' | 'gate';
 
 export interface RoomInfo {
   name: string;
@@ -77,13 +83,15 @@ export const ROOM_INFO: Readonly<Record<RoomKind, RoomInfo>> = Object.freeze({
   tack: { name: 'TACK ROOM', purpose: 'riders take their saddles here before a mission and hang them back after', people: true },
   bunks: { name: 'BUNKS', purpose: 'riders rest here after a mission', people: true },
   maproom: { name: 'MAP ROOM', purpose: 'the mission table: the world map and the mission chooser', people: true },
+  gate: { name: 'GARDEN GATE', purpose: 'the dragons\' way out to the garden: an arch in both walls, the one tower door a dragon fits' },
 });
 export const ROOM_KINDS = Object.freeze(Object.keys(ROOM_INFO) as RoomKind[]);
-/** The named parts of the building that are not rooms, with their purposes too: the lift and the Aerie deck. */
-export type Structure = 'lift' | 'aerie';
+/** The named parts of the base that are not rooms, with their purposes too: the lift, the Aerie deck and the garden. */
+export type Structure = 'lift' | 'aerie' | 'garden';
 export const STRUCTURES: Readonly<Record<Structure, { name: string; purpose: string }>> = Object.freeze({
   lift: { name: 'LIFT', purpose: 'carries dragons between the barn\'s floors and up to the Aerie' },
   aerie: { name: 'AERIE', purpose: 'teams gather here, leave and land' },
+  garden: { name: 'GARDEN', purpose: 'the retired elders\' home: they move here 30 days into the elder stage, and it grows a plot for each' },
 });
 
 export type Part = 'barn' | 'towerL' | 'towerR';
@@ -165,6 +173,24 @@ export function nestBase(f: number): number { return floorTop(f) + WALL_H + 3; }
 /** Where an egg lies in its nest on floor f, world y: its ink ring's bottom row (eggs.ts drawEgg's y), 2 px over the floor's band. */
 export function eggBottom(f: number): number { return floorTop(f) + WALL_H - 2; }
 
+// ---------- the elder garden (plan S6) ----------
+
+/**
+ * The garden: its west edge (the right tower's outer wall), a plot's width, and the strip past the last plot to the
+ * world's end (the fence stands in it, 40 px in from the end). Plot i runs GARDEN_X0 + i * GARDEN_PLOT on.
+ */
+export const GARDEN_X0 = TOWER_R + TOWER_W, GARDEN_PLOT = 176, GARDEN_END = 32;
+/** The fewest plots the garden ever has: it is there from day 1, two plots waiting. */
+export const GARDEN_MIN_PLOTS = 2;
+/** The Garden Gate: the right tower's ground floor (x 1192-1304), its arches 84 px tall, and its middle (a pass through it is counted there). */
+export const GATE_X0 = TOWER_R, GATE_X1 = GARDEN_X0, GATE_ARCH = 84, GATE_MID = (TOWER_R + GARDEN_X0) / 2;
+/** The world's walkable width for a garden of `plots` plots: its east end (1688 for the first two, 2568 for seven). */
+export function worldWOf(plots: number): number { return GARDEN_X0 + plots * GARDEN_PLOT + GARDEN_END; }
+/** Plot i's west and east edges, world x. */
+export function plotX(i: number): readonly [number, number] { const x0 = GARDEN_X0 + i * GARDEN_PLOT; return [x0, x0 + GARDEN_PLOT]; }
+/** Plot i's middle: where its resident arrives (and its nest mound lies). */
+export function plotMid(i: number): number { return GARDEN_X0 + i * GARDEN_PLOT + GARDEN_PLOT / 2; }
+
 // ---------- walking: nets of floor spans and links, routes ----------
 
 /** A floor's walkable stretch, [x0, x1]. */
@@ -178,27 +204,14 @@ export interface Net { spans: readonly (readonly Span[])[]; links: readonly Link
 const PAD = 10;
 const TL: Span = [TOWER_L + WALL + PAD, TOWER_L + TOWER_W - WALL - PAD];
 const TR: Span = [TOWER_R + WALL + PAD, TOWER_R + TOWER_W - WALL - PAD];
-/**
- * The keepers' net. The towers open into the barn on the ground and upper floors, so each of those is one span end to
- * end; the hayloft is cut off from the towers by the roof, and above it only the towers go on, up to the Aerie deck
- * (floor 5), reached by the left tower's ladder. Three ladders: one up each tower, and the centre ladder bay's through
- * the barn's three floors. Keepers never ride the lift.
- */
-export const KEEPER_NET: Net = Object.freeze<Net>({
-  spans: [
-    [[TL[0], TR[1]]],
-    [[TL[0], TR[1]]],
-    [TL, [BARN_X + 16, TOWER_R - 16], TR],
-    [TL, TR],
-    [TL, TR],
-    [[DECK_X0 + PAD, DECK_X1 - PAD]],
-  ],
-  links: [
-    { name: 'ladderL', x: TOWER_L + 84, stops: [0, 1, 2, 3, 4, AERIE_F] },
-    { name: 'ladderR', x: TOWER_R + TOWER_W - 84, stops: [0, 1, 2, 3, 4] },
-    { name: 'ladderM', x: LADDER_M_X, stops: [0, 1, 2] },
-  ],
-});
+/** The keepers' three ladders: one up each tower (the left one on to the Aerie deck), and the centre ladder bay's through the barn's three floors. */
+export const LADDERS: readonly Link[] = Object.freeze([
+  { name: 'ladderL', x: TOWER_L + 84, stops: [0, 1, 2, 3, 4, AERIE_F] },
+  { name: 'ladderR', x: TOWER_R + TOWER_W - 84, stops: [0, 1, 2, 3, 4] },
+  { name: 'ladderM', x: LADDER_M_X, stops: [0, 1, 2] },
+] as Link[]);
+/** How far in from the world's east end a keeper's feet (the garden's end: GARDEN_END + PAD) and a dragon's body (GARDEN_END) come. */
+export const KEEPER_END = GARDEN_END + PAD;
 
 /**
  * A dragon's body behind and ahead of its root x, by stage: the most over every element and seed (measured headless
@@ -214,22 +227,55 @@ export function slotBody(slot: Slot, stage: Stage): Span {
 }
 /** Half a dragon's body, by stage, from the measured extents (DRAGON_BODY's larger side, rounded up). */
 export const DRAGON_PAD: Readonly<Record<Stage, number>> = Object.freeze({ baby: 30, young: 56, adult: 72, elder: 76 });
-const DRAGON_NETS = new Map<Stage, Net>();
+
+/** Who can go where in a world whose garden ends at a given x: the keepers' net and a dragon net per stage. */
+export interface Nets { keeper: Net; dragon: Readonly<Record<Stage, Net>> }
+const NETS = new Map<number, Nets>();
 /**
- * A dragon's net at a stage: the barn's ground and upper floors wall to wall, the hayloft between modules 1 and 5
- * (clear of the low roof slopes), and the Aerie deck, each kept DRAGON_PAD in from its ends; the one link is the lift.
- * No tower span: a tower's doors are human-sized. Built once per stage.
+ * The nets for a world whose walkable ground ends at `gardenEnd` (CareSim.worldW: worldWOf its plots), built once per
+ * garden size (plan S6: they are rebuilt, and the garden only ever grows east, so a route on the smaller nets is still
+ * a route on the new ones).
+ * - The keepers': the towers open into the barn on the ground and upper floors, so each of those is one span end to
+ *   end -- and the ground floor goes on through the Garden Gate to the garden's end; the hayloft is cut off from the
+ *   towers by the roof, and above it only the towers go on, up to the Aerie deck (floor 5), reached by the left
+ *   tower's ladder. The three ladders (LADDERS); keepers never ride the lift.
+ * - A dragon's, per stage: the barn's ground and upper floors wall to wall, the hayloft between modules 1 and 5 (clear
+ *   of the low roof slopes), and the Aerie deck, each kept DRAGON_PAD in from its ends; the ground floor goes on through
+ *   the Garden Gate's arches (the one tower door a dragon fits) to the garden's end. No other tower span: the towers'
+ *   other doors are human-sized. The one link is the lift.
  */
-export function dragonNet(stage: Stage): Net {
-  const had = DRAGON_NETS.get(stage);
+export function makeNets(gardenEnd: number): Nets {
+  const had = NETS.get(gardenEnd);
   if (had) return had;
-  const P = DRAGON_PAD[stage], barn: Span = [BARN_X + P, TOWER_R - P];
-  const n = Object.freeze<Net>({
-    spans: [[barn], [barn], [[modX(1) + P, modX(5) - P]], [], [], [[DECK_X0 + P, DECK_X1 - P]]],
-    links: [{ name: 'lift', x: LIFT_CX, stops: LIFT_STOPS }],
+  const keeper = Object.freeze<Net>({
+    spans: [
+      [[TL[0], gardenEnd - KEEPER_END]],
+      [[TL[0], TR[1]]],
+      [TL, [BARN_X + 16, TOWER_R - 16], TR],
+      [TL, TR],
+      [TL, TR],
+      [[DECK_X0 + PAD, DECK_X1 - PAD]],
+    ],
+    links: LADDERS,
   });
-  DRAGON_NETS.set(stage, n);
+  const dragon = {} as Record<Stage, Net>;
+  for (const stage of Object.keys(DRAGON_PAD) as Stage[]) {
+    const P = DRAGON_PAD[stage], barn: Span = [BARN_X + P, TOWER_R - P];
+    dragon[stage] = Object.freeze<Net>({
+      spans: [[[BARN_X + P, gardenEnd - GARDEN_END - P]], [barn], [[modX(1) + P, modX(5) - P]], [], [], [[DECK_X0 + P, DECK_X1 - P]]],
+      links: [{ name: 'lift', x: LIFT_CX, stops: LIFT_STOPS }],
+    });
+  }
+  const n: Nets = Object.freeze({ keeper, dragon: Object.freeze(dragon) });
+  NETS.set(gardenEnd, n);
   return n;
+}
+/**
+ * The garden's walkable stretch of the ground floor, [x0, x1]: for a dragon of pad `pad` (DRAGON_PAD: its body clear
+ * of the tower's outer wall and of the world's end), or a keeper (pad 0: KEEPER_END from the end, 10 px from the wall).
+ */
+export function gardenSpan(gardenEnd: number, pad: number | null): Span {
+  return pad == null ? [GARDEN_X0 + PAD, gardenEnd - KEEPER_END] : [GARDEN_X0 + pad, gardenEnd - GARDEN_END - pad];
 }
 /** The floors the lift bay is walked on (and the bay rule holds on): the lift's stops. */
 export function bayFloors(): readonly number[] { return LIFT_STOPS; }
@@ -242,14 +288,14 @@ export interface Spot { f: number; x: number }
 export type Leg = Spot;
 
 /** The span of floor f holding x in a net (-1: none). */
-export function spanOf(f: number, x: number, net: Net = KEEPER_NET): number {
+export function spanOf(f: number, x: number, net: Net): number {
   const sp = net.spans[f];
   if (!sp) return -1;
   for (let i = 0; i < sp.length; i++) if (x >= sp[i][0] - 0.5 && x <= sp[i][1] + 0.5) return i;
   return -1;
 }
 /** x clamped into the span of floor f nearest it. */
-export function clampToFloor(f: number, x: number, net: Net = KEEPER_NET): number {
+export function clampToFloor(f: number, x: number, net: Net): number {
   let best = x, d = Infinity;
   for (const [a, b] of net.spans[f] ?? []) { const c = Math.max(a, Math.min(b, x)), e = Math.abs(c - x); if (e < d) { d = e; best = c; } }
   return best;
@@ -271,14 +317,14 @@ export function standSpot(slot: Slot, stage: Stage, room: Room): Spot {
 }
 
 /**
- * The cheapest route between two spots on a net (the keepers' by default), as legs, with its cost in walked px; null
+ * The cheapest route between two spots on a net (a world's: CareSim.nets), as legs, with its cost in walked px; null
  * if there is none. Dijkstra over one node per link and stop: along a link, each stop to the next costs its rise x
  * CLIMB_COST (the lift's 2 -> 5 is one edge), and along a floor, nodes in the same span of that net are joined.
  * Ties go to the lower node index, so a route is the same every run. A ride on the lift is always one leg, from the
  * stop it boards at straight to the one it alights at (the stops passed on the way are dropped: a rider never gets
  * off between); a ladder climb stays one leg per floor, so a keeper sent elsewhere mid-climb can stop at the next.
  */
-export function route(from: Spot, to: Spot, net: Net = KEEPER_NET): { legs: Leg[]; cost: number } | null {
+export function route(from: Spot, to: Spot, net: Net): { legs: Leg[]; cost: number } | null {
   const fs = spanOf(from.f, from.x, net), ts = spanOf(to.f, to.x, net);
   if (fs < 0 || ts < 0) return null;
   if (from.f === to.f && fs === ts) return { legs: [{ f: to.f, x: to.x }], cost: Math.abs(to.x - from.x) };
@@ -318,21 +364,25 @@ export function route(from: Spot, to: Spot, net: Net = KEEPER_NET): { legs: Leg[
 /** A name plate: its text, box (world px) and what it names -- a room (by id) or a structure. */
 export interface Plate { text: string; x: number; y: number; w: number; h: number; names: RoomKind | Structure; room: number | null }
 export const PLATE_H = 11;
+/** Where the GARDEN plate hangs, on its signboard over plot 0 (gardenArt.ts draws the board and its posts). */
+export const GARDEN_PLATE = { x: GARDEN_X0 + 20, y: floorTop(0) - 20 } as const;
 /**
- * Every plate the building shows: one per room (#11: a named room, and nothing on a bare slot), the lift's on its
- * ground-floor bay, and the Aerie's over the deck's west end.
+ * Every plate the base shows: one per room (#11: a named room, and nothing on a bare slot), the lift's on its
+ * ground-floor bay, the Aerie's over the deck's west end, and the garden's on its board over plot 0.
  */
 export function platesOf(rooms: readonly Room[]): Plate[] {
   const mk = (text: string, x: number, y: number, names: RoomKind | Structure, room: number | null): Plate => ({ text, x, y, w: measureText(text, 1) + 6, h: PLATE_H, names, room });
   const out = rooms.map((r) => {
-    const t = floorTop(r.floor), barn = r.part === 'barn';
+    const t = floorTop(r.floor), barn = r.part === 'barn', text = ROOM_INFO[r.kind].name;
     // (a hayloft plate hangs lower, clear of the HUD's top bar when the start camera shows the hayloft's floor; one at
     // the barn's west end moves 44 px in: in the hayloft clear of the roof's slope, and on every floor whole in the
-    // opening frame, whose left edge is at x 204: base.ts START_CAM)
-    const loft = barn && r.floor === 2, x = barn && r.x0 === BARN_X ? r.x0 + 44 : r.x0 + (barn ? 5 : 3);
-    return mk(ROOM_INFO[r.kind].name, x, loft ? t + 20 : t + 3, r.kind, r.id);
+    // opening frame, whose left edge is at x 204: base.ts START_CAM; the Garden Gate's hangs against its east wall,
+    // right of the tower's ladder)
+    const loft = barn && r.floor === 2, x = barn && r.x0 === BARN_X ? r.x0 + 44 : r.kind === 'gate' ? r.x1 - measureText(text, 1) - 6 : r.x0 + (barn ? 5 : 3);
+    return mk(text, x, loft ? t + 20 : t + 3, r.kind, r.id);
   });
   out.push(mk(STRUCTURES.lift.name, LIFT_X0 + 7, floorTop(0) + 3, 'lift', null));
   out.push(mk(STRUCTURES.aerie.name, 12, feetY(AERIE_F) - 24, 'aerie', null));
+  out.push(mk(STRUCTURES.garden.name, GARDEN_PLATE.x, GARDEN_PLATE.y, 'garden', null));
   return out;
 }

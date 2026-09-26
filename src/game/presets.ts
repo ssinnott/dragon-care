@@ -1,13 +1,15 @@
 // Starts built in code (view=base&preset=<name>): a world other than the new game's, for views and checks that need
 // what a new game has not got yet -- every stage at once, a dragon about to grow up, eggs in the nests (one about to
-// hatch), every baby sub-slot taken, and later (each slice adds its own) a team away. A preset is always code, never a
+// hatch), every baby sub-slot taken, elders in the garden and elders about to retire to it, and later (each slice
+// adds its own) a team away. A preset is always code, never a
 // save and never hundreds of thousands of steps, so a frozen view of it (t=) is as quick and as deterministic as the
 // new game's.
 import { CareSim } from './sim.ts';
 import type { SimOptions } from './sim.ts';
-import { STAGE_DAYS, HATCH_DAYS } from './clock.ts';
+import { STAGE_DAYS, HATCH_DAYS, RETIRE_DAYS } from './clock.ts';
 import { NEEDS, hasNeed, moodOf } from './needs.ts';
 import { NAMES } from './names.ts';
+import { settleInGarden } from './garden.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from './start.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
@@ -67,6 +69,11 @@ const FULL_BABIES: readonly DragonPlace[] = (() => {
   return where.map(([room, i], n) => { const el = els[n % els.length]; return { name: NAMES[el][Math.floor(n / els.length)], element: el, stage: 'baby', seed: 600 + n, slot: { room, i } }; });
 })();
 
+/** The `garden` preset's residents, plot by plot (0, 1, 2): the three love dragons, retired a few days ago. */
+export const GARDEN_RESIDENTS: readonly string[] = Object.freeze(['BRAMBLE', 'COBBLE', 'ECHO']);
+/** How far into its elder stage each of the `retire` preset's elders is: RETIRE_DAYS less a tenth of a day (18 s at 1x, 60 steps on a 600-step day). */
+export const RETIRE_AT = RETIRE_DAYS - 0.1;
+
 /** The presets by name (view=base&preset=<name>). */
 export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze({
   /** Every stage at once: the base's first twelve-dragon cast. */
@@ -87,6 +94,21 @@ export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze(
   hatch: () => ({ ...newGame(), after: (sim) => { sim.addEgg('fire', sim.clock + HATCH_IN - hatchLen(sim)); } }),
   /** The new game with every baby sub-slot taken (ten babies) and a fire egg due: it waits in its nest until a sub-slot frees. */
   full: () => ({ ...newGame(), dragons: [...START_DRAGONS, ...FULL_BABIES], after: (sim) => { sim.addEgg('fire', sim.clock - hatchLen(sim)); } }),
+  /**
+   * The elder garden lived in: four adults in the barn (EMBER, ZAP, RIPPLE, WICK) and the three love dragons (BRAMBLE,
+   * COBBLE, ECHO) elders retired a few days ago, residents on plots 0-2 (made so directly: garden.ts settleInGarden),
+   * each sitting (napping, at night) at its plot's middle; the Grooming Parlour empty.
+   */
+  garden: () => ({ ...newGame(), after: (sim) => {
+    GARDEN_RESIDENTS.forEach((name, plot) => {
+      const d = sim.dragons.find((q) => q.name === name)!;
+      d.stage = 'elder';
+      d.stageSince = sim.clock - (RETIRE_DAYS + 2 + plot) * sim.dayLen;
+      settleInGarden(sim, d, plot, true);
+    });
+  } }),
+  /** All seven starters elders RETIRE_AT days into the stage: each retires once settled, a tenth of a day in, and walks out to the garden. */
+  retire: () => ({ ...newGame(), dragons: START_DRAGONS.map((p): DragonPlace => ({ ...p, stage: 'elder', days: RETIRE_AT })) }),
 });
 
 /** A preset's start by name; no name, or one no preset has, is the new game. */

@@ -36,7 +36,8 @@
 // error, keeps the old save aside, and never writes it back. Growing up and eggs (plan S5): the growup preset's EMBER
 // is an elder a second in, the eggs preset shows its three eggs in the Hatchery's nests, the hatch preset's egg has
 // hatched into a baby by t=120; live, a tap on the head of a dragon with nothing waiting opens its card, and a tap on
-// the card closes it.
+// the card closes it. The elder garden (plan S6): the new game's garden has its two empty plots; the garden preset's
+// three residents live on three plots, by day and by night (each dragon says where it lives: the barn or the garden).
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -202,7 +203,8 @@ const OLD_SAVE = JSON.stringify({ ...JSON.parse(PLANTED), v: 999, tick: 9999 });
  * Saves of this version that parse but that the view can't build (a dragon of an element no one knows, a keeper no one
  * knows) or draw (a job for a need no one knows: it builds, and only the load's trial draw finds it), or whose egg this
  * build can't hatch (an element no one knows, a nest there isn't: the egg lies unstepped and off the start's camera for
- * days, so only CareSim.fromSave's own checks find it), each with the text that marks it in a save.
+ * days, so only CareSim.fromSave's own checks find it), or whose dragon lives somewhere this build hasn't got (plan S6:
+ * CareSim.fromSave's garden checks), each with the text that marks it in a save.
  */
 const BROKEN = (mark: string, f: (s: any) => void): { blob: string; mark: string } => { const s = JSON.parse(PLANTED); f(s); return { blob: JSON.stringify(s), mark }; };
 const EGG = (s: any, e: object) => { s.eggs = [{ id: 0, element: 'fire', seed: 77, laid: s.clock0 + s.tick, nest: 0, ...e }]; s.nextEggId = 1; };
@@ -212,6 +214,8 @@ const BROKEN_SAVES = [
   BROKEN('"dance"', (s) => { s.jobs[0].need = 'dance'; }),
   BROKEN('"lava"', (s) => EGG(s, { element: 'lava' })),
   BROKEN('"nest":7', (s) => EGG(s, { nest: 7 })),
+  // (a dragon somewhere this build has no place for: the elder garden's saves, plan S6)
+  BROKEN('"moon"', (s) => { s.dragons[0].place = 'moon'; }),
 ];
 
 /**
@@ -339,6 +343,21 @@ async function baseCard(page: any): Promise<string[]> {
   await page.keyboard.press('p');
   if (!out.length) console.log(`        card: ${d.name}'s opened by a tap on its head (nothing waiting, no Rush), closed by a tap on it; ${w!.name}'s opened by a tap on its head and its job Rushed`);
   return out;
+}
+
+/**
+ * The elder garden (plan S6): this many residents on this many plots, the world as wide as that garden makes it
+ * (1304 + 176 a plot + 32), every dragon saying where it lives -- each resident an elder, in the garden.
+ */
+function gardenIs(residents: number, plots: number) {
+  return (b: BaseHook): string[] => {
+    const out: string[] = [], g = b.garden;
+    if (!g || g.residents !== residents || g.plots !== plots || g.worldW !== 1304 + 176 * plots + 32) out.push(`the garden is ${JSON.stringify(g)}, not ${residents} residents on ${plots} plots`);
+    const inGarden = b.dragons.filter((d) => d.place === 'garden');
+    if (b.dragons.some((d) => d.place !== 'barn' && d.place !== 'garden')) out.push(`a dragon lives nowhere: ${b.dragons.map((d) => `${d.name} ${d.place}`).join(', ')}`);
+    if (inGarden.length !== residents || inGarden.some((d) => d.stage !== 'elder' || d.f !== 0 || d.x < 1304 || d.slot !== null)) out.push(`the garden's dragons are ${inGarden.map((d) => `${d.name} (${d.stage}, f${d.f} x ${Math.round(d.x)}, slot ${d.slot})`).join(', ') || 'none'}`);
+    return out;
+  };
 }
 
 /** The base's dragons include every stage. */
@@ -474,7 +493,7 @@ const CASES: Case[] = [
   { query: 'view=yardaudit&t=0', minColours: 2, allScales: false, timeout: 300000, care: 14 },
   // the base: its first seconds (a young adult of every element, #9), every stage (the ages preset), a minute of care
   // (jobs got done), and live input, never saving (a drag pans, a chip tap Rushes, the gallery's keys do nothing)
-  { query: 'view=base&t=600', minColours: 150, allScales: false, check: (b) => [...castIs(7, 'adult')(b), ...travels(b)] },
+  { query: 'view=base&t=600', minColours: 150, allScales: false, check: (b) => [...castIs(7, 'adult')(b), ...travels(b), ...gardenIs(0, 2)(b)] },
   { query: 'view=base&preset=ages&t=60', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...everyStage(b), ...travels(b)] },
   { query: 'view=base&t=3600', minColours: 150, allScales: false, base: true, check: walkedOver(100) },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseInput },
@@ -499,6 +518,10 @@ const CASES: Case[] = [
   { query: 'view=base&preset=eggs&t=600&cam=872,376', minColours: 150, allScales: false, check: (b) => [...eggsIn(b), ...travels(b)] },
   { query: 'view=base&preset=hatch&t=120&cam=872,376', minColours: 150, allScales: false, check: (b) => [...hatchedOne(b), ...travels(b)] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseCard },
+  // the elder garden (plan S6): the garden preset's three residents on their plots, past the Garden Gate, by day and at
+  // night (napping, the lanterns lit)
+  { query: 'view=base&preset=garden&cam=1304,376&t=600', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...travels(b)] },
+  { query: 'view=base&preset=garden&cam=1304,376&t=600&hour=22', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...timeFields('night', false)(b)] },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);

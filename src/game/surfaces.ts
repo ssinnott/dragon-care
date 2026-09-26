@@ -18,15 +18,19 @@ import type { ClockRead, DayPhase } from './clock.ts';
 /** The house outline (ART_BIBLE 1.1). */
 export const INK = '#1a1018';
 
-/** Every floor anyone stands on, by name. Later slices add their own (the garden path, the mission road). */
+/** Every floor anyone stands on, by name. Later slices add their own (the mission road). */
 export const FLOORS = Object.freeze({
   /** Pale straw, the reference habitat floor (ART_BIBLE 5.4): L 0.674, S 0.18. */
   straw: '#e0d6b8',
+  /** The elder garden's path, pale gravel (plan S6: no green underfoot, D3): L 0.671, S 0.13. */
+  path: '#dcd6c0',
 });
 export type FloorName = keyof typeof FLOORS;
 
 /** The seams drawn over a straw floor: its top edge, and the towers' boards (a 1 px line, not a surface). */
 export const STRAW_SEAM = '#c9bd9c';
+/** The garden path's back edge (a 1 px line, not a surface). */
+export const PATH_EDGE = '#c2baa2';
 
 /** The back wall of a barn slot no room fills, and of the keepers' ladder bay (L 0.26). */
 export const EMPTY_WALL = '#9a8a76';
@@ -47,7 +51,7 @@ export const WALLS: Readonly<Partial<Record<RoomKind, string>>> = Object.freeze(
  * 20 % from lightning's body) until gate (w): now the lighter wood of the romp room's wheel. A prop's 1 px lines and its
  * cel shadow band are marks, not backdrops.
  */
-export const PROPS = Object.freeze({ hearth: '#9c948a', firebox: '#3a2626', tub: '#a47a52', pallet: '#a47a52', mattress: '#e6dcc4' });
+export const PROPS = Object.freeze({ hearth: '#9c948a', firebox: '#3a2626', tub: '#a47a52', pallet: '#a47a52', mattress: '#e6dcc4', gateLeaf: '#a47a52' });
 
 /**
  * The Hatchery's nests' straw heaps, the straw an egg lies nestled in (L 0.72): every element's egg -- its baby's scale
@@ -65,6 +69,11 @@ export interface Backdrops {
   liftWall: string;
   emptyWall: string;
   stone: string;
+  /** The elder garden, behind its residents (plan S6: green only behind and below the feet, never under them). */
+  hedge: string;
+  lawn: string;
+  trunk: string;
+  fence: string;
 }
 /**
  * The day's backdrops. Night is a mid-value blue hour (its bands L 0.19-0.28, never black: a dark dragon on the Aerie
@@ -82,14 +91,23 @@ export const BACKDROPS: Readonly<Backdrops> = Object.freeze({
   liftWall: LIFT_WALL,
   emptyWall: EMPTY_WALL,
   stone: STONE,
+  // (the garden: the hedge and the apple trees' crowns, the lawn behind the path, the trees' trunks, the bench, the
+  // lantern posts and the sign's posts -- a lighter wood than the barn's timber, which is too dark behind a dark
+  // body -- and the picket fence at the garden's end)
+  hedge: '#7f9e6c',
+  lawn: '#8fae76',
+  trunk: '#a47a52',
+  fence: '#e8e0cc',
 });
 
-/** The lights (docs/BASE_DESIGN.md 7): the towers' window slits by day and lit, the dorm's lamps, the hearth's fire, the stars and the moon. */
-export const LIGHTS = Object.freeze({ glass: '#cfe3ea', slit: '#ffd98a', lamp: '#ffa98c', fire: '#f39a2e', star: '#e8ecf8', moon: '#f0ecd8' });
+/** The lights (docs/BASE_DESIGN.md 7): the towers' window slits by day and lit, the dorm's lamps, the hearth's fire, the stars and the moon, and the garden's lanterns. */
+export const LIGHTS = Object.freeze({ glass: '#cfe3ea', slit: '#ffd98a', lamp: '#ffa98c', fire: '#f39a2e', star: '#e8ecf8', moon: '#f0ecd8', lantern: '#f2d36a' });
 /** The two stepped rings a dorm lamp throws on the wall at dusk and night: inner (r 10) and outer (r 16), flat. Gate (w). */
 export const LAMP_RINGS: readonly [string, string] = Object.freeze([mix(WALLS.dorm!, LIGHTS.lamp, 0.5), mix(WALLS.dorm!, LIGHTS.lamp, 0.25)] as [string, string]);
 /** The one flat ring the hearth throws on the kitchen wall at night. Gate (w). */
 export const HEARTH_RING = mix(WALLS.kitchen!, LIGHTS.fire, 0.25);
+/** The two stepped rings each garden lantern throws on the hedge at dusk and night (never on the path): inner and outer, flat. Gate (w). */
+export const LANTERN_RINGS: readonly [string, string] = Object.freeze([mix(BACKDROPS.hedge, LIGHTS.lantern, 0.5), mix(BACKDROPS.hedge, LIGHTS.lantern, 0.25)] as [string, string]);
 
 /** A colour stepped from `a` toward `b` by blend thirds (0: a, 3: b): the sky's three stepped mixes, never a gradient. */
 export function stepped(a: string, b: string, blend: number): string {

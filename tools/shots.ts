@@ -75,6 +75,13 @@ const pairs: string[] = [
   // the Hatchery with a hatchling at home: the eggs preset's water egg hatched (step 2160) into SPLASH, standing in front
   // of its own nest, now empty, with the rock and dusk eggs still in view in theirs
   'shots/base_hatchery_home.png=view=base&preset=eggs&t=2230&cam=872,376',
+  // the elder garden (plan S6): the garden preset's three residents on their plots past the Garden Gate, by day (sitting
+  // and napping by their nest mounds, the hedge, the apple trees, the lanterns, the pale path underfoot) and at night
+  // (napping, the lanterns' rings on the hedge); and the retire preset's first elder under the gate's arch, walking out
+  // (step 2564: npm run sim section 15)
+  'shots/base_garden.png=view=base&preset=garden&cam=1304,376&t=600',
+  'shots/base_garden_night.png=view=base&preset=garden&cam=1304,376&t=600&hour=22',
+  'shots/base_gate.png=view=base&preset=retire&cam=1060,376&t=2564',
 ];
 for (const el of ['fire', 'rock', 'slinkwing']) {
   for (const stage of ['elder', 'adult', 'young', 'baby']) {

@@ -14,8 +14,11 @@ import type { RoomPlace } from './layout.ts';
  * 4 (S5): the eggs in the Hatchery's nests and the next egg's id; a dragon's `settle` goal (a baby walking to the
  * module slot it will grow up in); the longest stage-up delay (stats.growDelayMax).
  * 5 (S5's review): a dragon's `hold` (steps it holds still where it is, growing up: its cheer, or waiting for room).
+ * 6 (S6): the elder garden: its plots; a dragon's place (the barn or the garden), its plot (`home`) and a resident's
+ * rhythm (`garden`: its mode, when a nap or a sit ends, its resting place), the `retire` goal; the longest retirement
+ * delay (stats.retireDelayMax).
  */
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }
@@ -45,6 +48,8 @@ export interface SaveV {
   lift: LiftState;
   /** The eggs in the nests (plain data: no references). */
   eggs: Egg[];
+  /** The elder garden: its plots (its residents are dragons, above). */
+  garden: { plots: number };
   stats: SimStats;
 }
 
@@ -61,19 +66,21 @@ export class SaveVersionError extends Error {
 /**
  * The world as JSON-safe data, in the simulation's own order (dragons, keepers and jobs as they sit in its arrays).
  * Every field of every dragon, keeper and job is kept -- the top level of each is copied whole, so a field a later
- * slice adds is saved with it -- and the plain objects they hold (needs, the act, the routes' legs, the lift's calls,
- * the eggs, the rooms' uses) are copied, so the save never changes as the world steps on.
+ * slice adds is saved with it -- and the plain objects they hold (needs, the act, the routes' legs, a garden resident's
+ * rhythm, the lift's calls, the eggs, the garden, the rooms' uses) are copied, so the save never changes as the world
+ * steps on.
  */
 export function serialize(sim: CareSim): SaveV {
   return {
     v: SAVE_VERSION, seed: sim.seed, dayLen: sim.dayLen, clock0: sim.clock0, tick: sim.tick, nextDragonId: sim.nextDragonId, nextJob: sim.nextJob, nextEggId: sim.nextEggId,
     rooms: sim.roomPlaces.map((p) => ({ ...p })),
     dragons: sim.dragons.map((d): DragonSave => ({ ...d, slot: d.slot ? { room: d.slot.room, i: d.slot.i } : null, needs: { ...d.needs }, act: d.act ? { ...d.act } : null,
-      legs: d.legs.map((l) => ({ ...l })) })),
+      legs: d.legs.map((l) => ({ ...l })), garden: d.garden ? { ...d.garden } : null })),
     keepers: sim.keepers.map((k): KeeperSave => ({ ...k, station: k.station.id, job: k.job ? k.job.id : null, legs: k.legs.map((l) => ({ ...l })) })),
     jobs: sim.jobs.map((j): JobSave => ({ ...j, dragon: j.dragon.id, keeper: j.keeper ? j.keeper.id : null })),
     lift: { ...sim.lift, calls: sim.lift.calls.map((c) => ({ ...c })) },
     eggs: sim.eggs.map((e) => ({ ...e })),
+    garden: { plots: sim.garden.plots },
     stats: { ...sim.stats, used: { ...sim.stats.used } },
   };
 }
@@ -87,11 +94,14 @@ export function worldKey(sim: CareSim): string {
 /**
  * The barn's own state -- its dragons, keepers, jobs, lift and eggs -- with every field that holds an absolute clock left
  * out (a dragon's stageSince, an egg's laid; the lift's blockedSince and its calls' ticks are world ticks, the same in
- * both), so two worlds started at different hours but stepped alike agree on it (S4's no-tint check).
+ * both), so two worlds started at different hours but stepped alike agree on it (S4's no-tint check). A garden
+ * resident's rhythm (`garden`) is left out too: its naps are the one thing that reads the day's phase (garden.ts), so a
+ * world with residents is the same barn by day and night only until a resident's rhythm moves one (the check's worlds
+ * have none).
  */
 export function barnKey(sim: CareSim): string {
   const s = serialize(sim);
-  return JSON.stringify({ dragons: s.dragons.map(({ stageSince: _s, ...d }) => d), keepers: s.keepers, jobs: s.jobs, lift: s.lift, eggs: s.eggs.map(({ laid: _l, ...e }) => e) });
+  return JSON.stringify({ dragons: s.dragons.map(({ stageSince: _s, garden: _g, ...d }) => d), keepers: s.keepers, jobs: s.jobs, lift: s.lift, eggs: s.eggs.map(({ laid: _l, ...e }) => e) });
 }
 
 /** A string's 32-bit FNV-1a hash (over its UTF-16 code units) as 8 hex digits: the digest the page's hook shows. */

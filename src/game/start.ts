@@ -1,5 +1,5 @@
-// The base a new game starts from, and the one view=base and tools/sim-check.ts run: one room per need, the hatchery
-// and the riders' rooms (docs/BASE_DESIGN.md 3), seven dragons -- one of each element, every one newly adult, 0 days
+// The base a new game starts from, and the one view=base and tools/sim-check.ts run: one room per need, the hatchery,
+// the riders' rooms and the Garden Gate (docs/BASE_DESIGN.md 3), seven dragons -- one of each element, every one newly adult, 0 days
 // into the stage (#9: "start with a young adult dragon of each kind"; BASE_DESIGN's Decisions: *young adult* is the
 // adult stage's first day), each in a slot of its own need's room -- and the four named keepers. Views that need other stages build their own casts (src/game/presets.ts).
 import type { RoomPlace, RoomKind } from './layout.ts';
@@ -17,10 +17,12 @@ export const START_ROOMS: readonly RoomPlace[] = [
   { kind: 'romp', part: 'barn', floor: 1, mod: 0, width: 2 },
   { kind: 'groom', part: 'barn', floor: 1, mod: 3, width: 3 },
   { kind: 'dorm', part: 'barn', floor: 2, mod: 3, width: 2 },
-  // the left tower: the riders' rooms (its floors 1 and 3, and all of the right tower, are bare)
+  // the left tower: the riders' rooms (its floors 1 and 3 are bare)
   { kind: 'tack', part: 'towerL', floor: 0 },
   { kind: 'bunks', part: 'towerL', floor: 2 },
   { kind: 'maproom', part: 'towerL', floor: 4 },
+  // the right tower's ground floor: the Garden Gate, the dragons' way out to the elder garden (its floors 1-4 are bare)
+  { kind: 'gate', part: 'towerR', floor: 0 },
 ];
 
 /**

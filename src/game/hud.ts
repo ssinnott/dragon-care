@@ -121,8 +121,11 @@ export function drawHint(ctx: CanvasRenderingContext2D, stripEnd: number): void 
 
 /** Where a dragon's card opens (screen px): under the top bar at the left, clear of the toasts (centred at x 320). */
 export const CARD: Readonly<Rect> = Object.freeze({ x: 8, y: 20, w: 160, h: 76 });
-/** What a dragon's card shows: its name, element and stage, its day of the stage (1..STAGE_DAYS), and each need (null: one it hasn't got). */
-export interface CardInfo { name: string; element: string; stage: string; day: number; needs: Readonly<Record<NeedKind, number | null>> }
+/**
+ * What a dragon's card shows: its name, element and stage, its day of the stage (1..STAGE_DAYS), each need (null: one
+ * it hasn't got, or a garden resident's held full), and whether it lives in the garden (plan S6: its stage line says so).
+ */
+export interface CardInfo { name: string; element: string; stage: string; day: number; needs: Readonly<Record<NeedKind, number | null>>; garden?: boolean }
 /** A day of the stage's bar: a filled day, a day to come. A need's bar: full enough (over QUEUE), then by its tier (soon, now). */
 const DAY_ON = '#e3b23e', DAY_OFF = '#2e2428', NEED_OK = '#7bbf6a', NEED_TIER = ['#f2d36a', '#e3b23e', '#d8402e'];
 
@@ -138,8 +141,9 @@ export function drawCard(ctx: CanvasRenderingContext2D, c: CardInfo): void {
   ctx.fillStyle = FACE; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
   drawTextOutlined(ctx, c.name, x + 6, y + 5, { size: 1, color: TEXT, outline: INK, thickness: 1, shadow: false });
   text(ctx, c.element.toUpperCase(), x + w - 6, y + 5, HINT, 'right');
-  const day = Math.max(1, Math.min(STAGE_DAYS, c.day));
-  text(ctx, `${c.stage.toUpperCase()} - DAY ${day} OF ${STAGE_DAYS}`, x + 6, y + 18);
+  // (a garden resident's month is done: its bar full, its stage line where it lives)
+  const day = c.garden ? STAGE_DAYS : Math.max(1, Math.min(STAGE_DAYS, c.day));
+  text(ctx, c.garden ? `${c.stage.toUpperCase()} - IN THE GARDEN` : `${c.stage.toUpperCase()} - DAY ${day} OF ${STAGE_DAYS}`, x + 6, y + 18);
   // (the stage's 30 days: 4 x 5 segments, 1 px of ink between)
   const bx = x + 5, by = y + 29;
   ctx.fillStyle = INK; ctx.fillRect(bx, by, STAGE_DAYS * 5 + 1, 7);
