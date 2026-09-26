@@ -23,9 +23,11 @@
 // at work covering the dragon's eye (K7), a stroking hand more than REACH_MISS px off its mark, or an act that never
 // ends.
 // The base (view=base, docs/BASE_DESIGN.md): frozen, it starts with a young adult of every element (#9), the ages
-// preset has every stage, and a minute in the care simulation must have got jobs done; live (never saving: save=0), a
-// drag must pan the camera, a tap on the first job chip must Rush that job, and the gallery's keys (E, the arrows,
-// Space, the digits) must neither rebuild the world nor leave it.
+// preset has every stage, and a minute in the care simulation must have got jobs done with the dragons walking (#7:
+// its hook reports each dragon's move, room and slot, the lift, and the px walked; and between the frames at t=600 and
+// t=3600 at least three dragons stand somewhere else); live (never saving: save=0), a drag must pan the camera, a tap
+// on the first job chip must Rush that job, and the gallery's keys (E, the arrows, Space, the digits) must neither
+// rebuild the world nor leave it.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -85,6 +87,24 @@ function castIs(n: number, stage: string | null) {
     return out;
   };
 }
+/** The hook reports the dragons on the move (#7): each one's move, room and slot, the lift's car, and the px walked. */
+function travels(b: BaseHook): string[] {
+  const out: string[] = [];
+  for (const d of b.dragons) {
+    if (typeof d.move !== 'string' || !d.move) out.push(`${d.name} has no move`);
+    if (!(d.room === null || typeof d.room === 'string') || !(d.slot === null || /^[a-z]+:\d+$/.test(d.slot))) out.push(`${d.name}'s room ${d.room} / slot ${d.slot} is not a kind or null / kind:index or null`);
+  }
+  if (!b.lift || typeof b.lift.y !== 'number' || !(b.lift.rider === null || typeof b.lift.rider === 'number')) out.push(`the hook's lift is ${JSON.stringify(b.lift)}`);
+  if (typeof b.walked !== 'number') out.push('the hook has no walked');
+  return out;
+}
+/** The dragons have walked more than this many px by the frozen frame. */
+function walkedOver(px: number) {
+  return (b: BaseHook): string[] => [...travels(b), ...(b.walked > px ? [] : [`the dragons walked ${b.walked} px in ${b.tick} steps, not over ${px}`])];
+}
+/** Two frozen frames of one world (by query): at least `n` dragons stand at a different x in the second (#7: they move around the rooms). */
+const PAIRS: { a: string; b: string; n: number }[] = [{ a: 'view=base&t=600', b: 'view=base&t=3600', n: 3 }];
+
 /** The base's dragons include every stage. */
 function everyStage(b: BaseHook): string[] {
   const st = new Set(b.dragons.map((d) => d.stage)), missing = AGE_STAGES.filter((s) => !st.has(s));
@@ -218,9 +238,9 @@ const CASES: Case[] = [
   { query: 'view=yardaudit&t=0', minColours: 2, allScales: false, timeout: 300000, care: 14 },
   // the base: its first seconds (a young adult of every element, #9), every stage (the ages preset), a minute of care
   // (jobs got done), and live input, never saving (a drag pans, a chip tap Rushes, the gallery's keys do nothing)
-  { query: 'view=base&t=600', minColours: 150, allScales: false, check: castIs(7, 'adult') },
-  { query: 'view=base&preset=ages&t=60', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...everyStage(b)] },
-  { query: 'view=base&t=3600', minColours: 150, allScales: false, base: true },
+  { query: 'view=base&t=600', minColours: 150, allScales: false, check: (b) => [...castIs(7, 'adult')(b), ...travels(b)] },
+  { query: 'view=base&preset=ages&t=60', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...everyStage(b), ...travels(b)] },
+  { query: 'view=base&t=3600', minColours: 150, allScales: false, base: true, check: walkedOver(100) },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseInput },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseKeys },
 ];
@@ -235,6 +255,8 @@ const port = (server.address() as { port: number }).port;
 const { chromium } = loadPlaywright();
 const browser = await launch(chromium);
 let bad = 0;
+/** The base's hook at each frozen base case's frame, by query (for PAIRS). */
+const hooks = new Map<string, BaseHook>();
 
 for (const c of CASES) {
   const page = await browser.newPage();
@@ -289,7 +311,7 @@ for (const c of CASES) {
     if (c.check) {
       const b: BaseHook | undefined = await page.evaluate(() => (window as any).__dragonCare?.base);
       if (!b) errors.push('the base reported nothing');
-      else errors.push(...c.check(b));
+      else { errors.push(...c.check(b)); hooks.set(c.query, b); }
     }
     if (c.act) errors.push(...await c.act(page));
     const colours: number[] = await page.evaluate(() => {
@@ -319,7 +341,20 @@ for (const c of CASES) {
   await page.close();
 }
 
+// the frozen pairs: the same world at two moments, its dragons moved between them
+for (const p of PAIRS) {
+  const a = hooks.get(p.a), b = hooks.get(p.b), errors: string[] = [];
+  if (!a || !b) errors.push(`no hook from ${a ? p.b : p.a}`);
+  else {
+    const moved = a.dragons.filter((d) => { const e = b.dragons.find((q) => q.id === d.id); return e && (e.x !== d.x || e.f !== d.f); });
+    if (moved.length < p.n) errors.push(`only ${moved.length} dragons moved from ${p.a} to ${p.b} (${moved.map((d) => d.name).join(', ') || 'none'}), not ${p.n} or more`);
+    else console.log(`  ok:   ${p.a} -> ${p.b}  (${moved.length} dragons moved: ${moved.map((d) => d.name).join(', ')})`);
+  }
+  if (errors.length) { bad++; console.log(`  FAIL: ${p.a} -> ${p.b} -> ${errors.join(' | ')}`); }
+}
+
 await browser.close();
 server.close();
-console.log(bad ? `SMOKE: ${bad} of ${CASES.length} views failed` : `SMOKE: all ${CASES.length} views drew dragons (and keepers), no page errors`);
+const total = CASES.length + PAIRS.length;
+console.log(bad ? `SMOKE: ${bad} of ${total} views and pairs failed` : `SMOKE: all ${CASES.length} views drew dragons (and keepers), no page errors; ${PAIRS.length} pair${PAIRS.length === 1 ? '' : 's'} moved`);
 process.exit(bad ? 1 : 0);

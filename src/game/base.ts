@@ -3,12 +3,16 @@
 // job strip, and two inputs: drag to look around, and tap a bubble, a job or a dragon to Rush it. A gallery scene
 // (view=base in src/gallery.ts), so the frozen-time contract holds: t= steps the world t times and draws that frame.
 // The world is built from a start (src/game/presets.ts: the new game, or a preset); its dragons are drawn by a cast
-// keyed by dragon id, which follows the simulation as dragons come, go and grow. The constructor never touches
-// storage; a live page that may save (opts.persist) will load in attach() (S4).
+// keyed by dragon id, which follows the simulation as dragons come, go and grow. The simulation walks the dragons to
+// their needs' rooms and rides them on the Dragon Lift (travel.ts); the view puts each pet where its dragon is, plays
+// its walk from the start of every walk bout at speed 1 (the sim moved it by that walk's own root motion, so the paws
+// stay planted), narrows it through a paper turn, and draws the lift's car where the car is. The constructor never
+// touches storage; a live page that may save (opts.persist) will load in attach() (S4).
 import { drawDragon, rootToScreen } from '../art/dragon/rig.ts';
 import { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
 import { ELEMENT_ANIM_FALLBACK } from '../art/dragon/anims.ts';
 import { drawText } from '../lib/engine/text.ts';
+import { resetChain } from '../lib/art/secondary.ts';
 import { makePet, petOpts, stepPet, stepWary, extentX, bowlFor, drawBowl } from './pet.ts';
 import type { Pet } from './pet.ts';
 import { CareSim } from './sim.ts';
@@ -17,6 +21,8 @@ import { startSpec, buildSim } from './presets.ts';
 import { worldKey, fnv1a } from './save.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import { WORLD_W, WORLD_H, feetY } from './layout.ts';
+import { walking, landingPlace } from './travel.ts';
+import { gaitOf } from './gait.ts';
 import { SOON, tierOf, chargeOf } from './needs.ts';
 import type { NeedKind } from './needs.ts';
 import { drawBuilding, drawPlates, drawLiftCar } from './building.ts';
@@ -29,8 +35,9 @@ const INK = '#1a1018';
 export const VIEW_W = 640, VIEW_H = 360;
 /**
  * Where the camera starts: the barn's three floors, the kitchen and the romp room (EMBER and ZAP), the Dragon Lift
- * parked at the ground floor, the ladder bay, and the first slots of the bathhouse, the grooming parlour and the lamp
- * dorm (RIPPLE, BRAMBLE and WICK). The new game's seven young adults stand in their need rooms' slots and span world
+ * (its car starts at the ground floor), the ladder bay, and the first slots of the bathhouse, the grooming parlour and
+ * the lamp dorm (RIPPLE, BRAMBLE and WICK), framed on the start: the dragons walk off to their needs from there. The
+ * new game's seven young adults start in their need rooms' slots and span world
  * x 188-1177 (measured over their idles), wider than one screen; the five in the west rooms and the first slots east
  * of the ladder bay span x 188-841, 14 px more than a screen, so the frame starts at 204: all five faces whole, EMBER's
  * and ZAP's tail tips (at most 16 px) cut at the left edge, and every plate in it whole (the kitchen's and the romp
@@ -56,12 +63,16 @@ export interface BaseViewOpts {
   persist?: boolean;
 }
 
-/** One dragon on screen: its pet, playing its wake before it goes back to idle, its eat bowl (found once), and the stage it was built at. */
+/**
+ * One dragon on screen: its pet, playing its wake before it goes back to idle, its eat bowl (found once), the stage it
+ * was built at, and the walk bout its walk anim was started for (-1: none yet; travel.ts Dragon.walkSeq).
+ */
 export interface PetView {
   pet: Pet;
   waking: boolean;
   bowl: { x: number; h: number; w: number } | null;
   stage: Stage;
+  walkSeq: number;
 }
 
 export class BaseView {
@@ -82,8 +93,6 @@ export class BaseView {
   private readonly top = new TopPass(160);
   private readonly budget = new AmbientBudget();
   private frame = 0;
-  /** The Dragon Lift's car, world y of its rider's feet: parked at the ground floor until dragons ride it (S3). */
-  private readonly carY = feetY(0);
   /** Last frame's bubbles (world px) and chips (screen px), for tapping. */
   private bubbles: { job: Job; r: Rect }[] = [];
   private chips: { job: Job; r: Rect }[] = [];
@@ -102,8 +111,15 @@ export class BaseView {
   /** Every dragon's pet, in id order. */
   get pets(): Pet[] { return [...this.cast.values()].map((v) => v.pet); }
 
-  /** A dragon's feet: its floor's straw band, a px apart from its neighbours' so the y-sort never ties. */
-  private feet(d: Dragon): number { return feetY(d.f, (d.id % 3) - 1); }
+  /**
+   * A dragon's feet: on the lift's car while it rides, else its floor's straw band, a px apart from its neighbours' so
+   * the y-sort never ties -- and in a landing's queue a px deeper per place, so each one behind is drawn over the rump
+   * of the one ahead, never the other way over its eye.
+   */
+  private feet(d: Dragon): number {
+    if (d.move === 'ride') return this.sim.lift.y;
+    return feetY(d.f, d.move === 'call' ? 2 + Math.min(3, landingPlace(this.sim, d).i) : (d.id % 3) - 1);
+  }
 
   /**
    * Match the cast to the simulation's dragons: a pet for a dragon it hasn't seen, none for one that's gone, and a
@@ -116,7 +132,7 @@ export class BaseView {
       const v = this.cast.get(d.id);
       if (v && v.stage === d.stage) continue;
       const pet = makePet(d.element, d.stage, d.seed, 'idle', d.x, this.feet(d), { facing: d.facing, mood: v ? v.pet.mood : d.mood });
-      this.cast.set(d.id, { pet, waking: false, bowl: null, stage: d.stage });
+      this.cast.set(d.id, { pet, waking: false, bowl: null, stage: d.stage, walkSeq: -1 });
     }
     for (const id of this.cast.keys()) if (!ids.has(id)) this.cast.delete(id);
   }
@@ -138,24 +154,47 @@ export class BaseView {
     this.frame++;
   }
 
-  /** What a dragon's anim should be: its job's while a keeper is at work with it, its tell while it waits, else idle. */
+  /**
+   * What a dragon's anim should be when it isn't walking: its job's while a keeper is at work with it, its tell while
+   * it waits (standing, at a landing, at the bay's edge or riding), else idle (a paper turn too: travel.ts).
+   */
   private animFor(d: Dragon): string {
     if (d.act) return d.act.need === 'sleep' && d.element === 'dusk' ? 'tuckin' : ACT_ANIM[d.act.need];
     const j = this.waitingJob(d);
     // the hungry tell (4.2), and slinkwing's lonely call (3.7)
-    if (j && j.need === 'food' && d.needs.food < SOON) return 'beg';
-    if (j && j.need === 'love' && d.element === 'slinkwing' && d.needs.love < SOON) return 'call';
+    if (j && j.need === 'food' && d.needs.food < SOON && d.move !== 'turn') return 'beg';
+    if (j && j.need === 'love' && d.element === 'slinkwing' && d.needs.love < SOON && d.move !== 'turn') return 'call';
     return 'idle';
   }
 
-  /** Point a pet at its dragon: its anim (a sleeper wakes before it idles), its bowl at a meal, its mood and charge. */
+  /**
+   * Point a pet at its dragon (plan S3): where it stands (on the car while riding) and faces; a walk bout's walk,
+   * restarted at speed 1 on the bout's first step (so the anim's root motion is the step's own: gait.ts); a paper
+   * turn's narrowing; else its anim (a sleeper wakes before it idles), its bowl at a meal, its mood and charge.
+   */
   private sync(d: Dragon, v: PetView): void {
-    const p = v.pet, want = this.animFor(d);
-    if (v.waking && p.player.done) { v.waking = false; p.player.play('idle', { blend: 8 }); p.anim = 'idle'; }
-    if (want !== p.anim && !(v.waking && want === 'idle')) {
-      if ((p.anim === 'sleep' || p.anim === 'tuckin') && want === 'idle') { p.player.play('wake', { blend: 8 }); p.anim = 'wake'; v.waking = true; }
-      else { p.player.play(want, { blend: 8, fallback: ELEMENT_ANIM_FALLBACK[want] }); p.anim = want; v.waking = false; }
-      p.hold = 0;
+    const p = v.pet;
+    p.x = d.x; p.y = this.feet(d);
+    // (the tail's chain starts again facing the other way, as the yard's turn does)
+    if (p.facing !== d.facing) { p.facing = d.facing; resetChain(p.rig.tailChain); }
+    p.turn = d.turn;
+    if (walking(d) && d.gaitT > 0) {
+      if (v.walkSeq !== d.walkSeq) {
+        p.player.play('walk', { restart: true, speed: 1, blend: 8 });
+        // (a view that meets a bout already under way -- a world loaded mid-walk -- catches the anim up to it: its
+        // tick this step then lands on the bout's own frame)
+        const n = (d.gaitT - 1) % gaitOf(d.element, d.stage).len;
+        for (let i = 0; i < n; i++) p.player.tick();
+        p.anim = 'walk'; v.walkSeq = d.walkSeq; v.waking = false; p.hold = 0;
+      }
+    } else {
+      const want = this.animFor(d);
+      if (v.waking && p.player.done) { v.waking = false; p.player.play('idle', { blend: 8 }); p.anim = 'idle'; }
+      if (want !== p.anim && !(v.waking && want === 'idle')) {
+        if ((p.anim === 'sleep' || p.anim === 'tuckin') && want === 'idle') { p.player.play('wake', { blend: 8 }); p.anim = 'wake'; v.waking = true; }
+        else { p.player.play(want, { blend: d.move === 'turn' ? 4 : 8, fallback: ELEMENT_ANIM_FALLBACK[want] }); p.anim = want; v.waking = false; }
+        p.hold = 0;
+      }
     }
     p.bowl = d.act && d.act.need === 'food' ? (v.bowl ??= bowlFor(p.rig, p.player.anims.eat ? p.player.anims.eat.frames : [])) : null;
     p.mood += (d.mood - p.mood) / 30;
@@ -184,7 +223,7 @@ export class BaseView {
     ctx.drawImage(this.plates, cx, cy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
     ctx.save();
     ctx.translate(-cx, -cy);
-    drawLiftCar(ctx, this.carY);
+    drawLiftCar(ctx, this.sim.lift.y);
     // the cast, y-sorted by the feet; keepers stand a step behind the dragons they work with, so a dragon's head is
     // never covered (ART_BIBLE 1.4: nothing covers the eye)
     const cast: { y: number; pet?: Pet; keeper?: number }[] = [];
@@ -220,7 +259,11 @@ export class BaseView {
       window.__dragonCare.base = { tick: this.sim.tick, camX: this.camX, camY: this.camY, jobs: this.sim.jobs.length, done: st.done, rushes: st.rushes, preempted: st.preempted,
         chips: this.chips.map((c) => ({ ...c.r, dragon: c.job.dragon.name, need: c.job.need, rushed: c.job.rushed })),
         digest: fnv1a(worldKey(this.sim)),
-        dragons: this.sim.dragons.map((d) => ({ id: d.id, name: d.name, element: d.element, stage: d.stage, f: d.f, x: d.x })) };
+        dragons: this.sim.dragons.map((d) => ({ id: d.id, name: d.name, element: d.element, stage: d.stage, f: d.f, x: d.x, move: d.move,
+          room: this.sim.rooms.find((r) => r.floor === d.f && d.x >= r.x0 && d.x <= r.x1)?.kind ?? null,
+          slot: d.slot ? `${this.sim.rooms[d.slot.room].kind}:${d.slot.i}` : null })),
+        lift: { y: this.sim.lift.y, rider: this.sim.lift.rider },
+        walked: st.dragonWalked };
     }
   }
 

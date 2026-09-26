@@ -1,14 +1,17 @@
 // The care simulation (docs/BASE_DESIGN.md 4): dragons whose needs drain, one queue of jobs, and the keepers who take
-// them -- fetch what a job needs from its room, walk and climb to the dragon, and do it while the need refills.
+// them. A dragon with an open need walks to that need's room -- riding the Dragon Lift between floors -- and takes a
+// slot there (travel.ts); its keeper fetches what the job needs from the room's post, meets it at the slot's stand
+// spot, and does the job while the need refills. Nothing else raises a need (#7: rooms don't heal, keepers do).
 // Deterministic and DOM-free: fixed 60 Hz steps, every tie broken by id, and the only randomness the starting needs
 // (seeded; any later draw is stateless, src/game/rand.ts), so tools/sim-check.ts runs it headless and view=base's
 // frozen frames (t=) come out the same every time. Dragons have stable ids (a new one takes nextDragonId), the world
 // has a clock (game time, clock0 + tick), and the whole of it saves to plain JSON and loads back exactly (save.ts).
 import { makeRng } from '../lib/engine/rng.ts';
-import { NEEDS, QUEUE, ROOM_REGEN, OWN_NEED, drainRate, hasNeed, moodOf, tierOf, fullNeeds } from './needs.ts';
+import { NEEDS, QUEUE, OWN_NEED, drainRate, hasNeed, moodOf, tierOf, fullNeeds } from './needs.ts';
 import type { NeedKind, Needs } from './needs.ts';
-import { ROOM_INFO, REACH, placeRooms, postX, waitX, route, feetY, clampToFloor, standSpot, fitsSlot } from './layout.ts';
+import { ROOM_INFO, REACH, LIFT_X0, LIFT_X1, placeRooms, postX, waitX, route, feetY, clampToFloor, standSpot, fitsSlot } from './layout.ts';
 import type { Room, RoomPlace, RoomKind, Leg, Spot, Slot } from './layout.ts';
+import { NEED_ROOM, LEAD_PX, WAIT_MAX, KEEPER_HALF, stepTravel, arrived, remainingCost, retarget, raiseCall, bayShut, inBay } from './travel.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
 import { SAVE_VERSION, SaveVersionError, worldKey } from './save.ts';
 import type { SaveV } from './save.ts';
@@ -27,8 +30,6 @@ export const WORK: Readonly<Record<NeedKind, number>> = Object.freeze({ food: 20
 export const SPECIALIST_TIME = 0.75;
 /** After its tuck-in a dragon sleeps this many steps (15 s) while its sleep refills; the keeper has gone. */
 export const SLEEP_STEPS = 900;
-/** An unclaimed job closes once its room has lifted the need this far back over QUEUE (4.6). */
-const CLOSE_OVER = 0.05;
 /** Where a keeper stands to work with a dragon: this far in front of its body's root, past the snout (2.4; layout.ts standSpot). */
 export { REACH };
 /** A specialist is worth this many px of walking when a keeper is chosen for a job (4.4). */
@@ -59,6 +60,15 @@ export type SimEvent = { kind: 'none' };
 /** What a job is doing to a dragon: the need refilling from `from` to 1 over `len` steps (sleep: the tuck-in, then the nap). */
 export interface Act { need: NeedKind; t: number; len: number; from: number }
 
+/**
+ * What a dragon's body is doing (travel.ts): standing; walking a floor; a paper turn in place; waiting at a lift landing
+ * for the car (`call`); walking into the car (`board`), carried in it (`ride`), walking out of the bay (`alight`); held
+ * at the lift bay's edge while the car moves (`bay`, the bay rule).
+ */
+export type DragonMove = 'still' | 'walk' | 'turn' | 'call' | 'board' | 'ride' | 'alight' | 'bay';
+/** Why a dragon is on the move: to a slot in its need's room, or out of a slot another dragon needed (a later slice adds more). */
+export type DragonGoal = 'need' | 'evict';
+
 export interface Dragon {
   id: number;
   name: string;
@@ -66,13 +76,27 @@ export interface Dragon {
   stage: Stage;
   seed: number;
   /**
-   * The slot it stands in (layout.ts Slot: one of its room's, the same object): its room, floor, x and facing. In this
-   * slice a dragon stays in its slot; walking between slots is the next (S3).
+   * The slot it has reserved (heading there) or holds (standing in it): layout.ts Slot, its room's own object. There is
+   * no home room: after a job a dragon keeps its slot until it leaves for another need, or is moved on (3.3).
    */
-  slot: Slot;
+  slot: Slot | null;
+  /** Why it is moving (null: lingering in its slot), and the job it is going to or being served for (by id). */
+  goal: DragonGoal | null;
+  goalJob: number | null;
+  /** Its floor (while riding, the floor it boarded at), x (the body's root) and facing. */
   f: number;
   x: number;
   facing: 1 | -1;
+  /** The route still to go, on its stage's net (a leg on another floor is one lift ride). */
+  legs: Leg[];
+  move: DragonMove;
+  /** Steps into the current walk bout (0: not walking); the bout's number (the view restarts its walk on a new one). */
+  gaitT: number;
+  walkSeq: number;
+  /** Steps into a paper turn (0..TURN_STEPS - 1), or -1. */
+  turn: number;
+  /** Steps it has waited at a lift landing or the bay's edge (the current wait). */
+  waited: number;
   needs: Needs;
   mood: number;
   act: Act | null;
@@ -82,7 +106,8 @@ export interface Dragon {
   stageSince: number;
 }
 
-export type Phase = 'idle' | 'fetch' | 'pickup' | 'go' | 'work' | 'home';
+/** A keeper's phase: free; fetching a supply, picking it up; going to the dragon's stand spot, waiting there for it; at work; going back. */
+export type Phase = 'idle' | 'fetch' | 'pickup' | 'go' | 'wait' | 'work' | 'home';
 export interface Keeper {
   id: number;
   name: string;
@@ -107,6 +132,8 @@ export interface Keeper {
   facing: 1 | -1;
   /** Px walked in all, for the view's stride. */
   walked: number;
+  /** Steps held at the lift bay's edge while the car moves (the bay rule, R1); 0 when not held. */
+  bayWait: number;
 }
 
 export interface Job {
@@ -119,9 +146,29 @@ export interface Job {
   rushed: boolean;
 }
 
+/** A dragon waiting at a landing for the car: its floor, where it rides to, when it called, and its priority (2 a mission, 1 a rushed job, 0 anything else). */
+export interface LiftCall { dragon: number; f: number; to: number; tick: number; prio: 0 | 1 | 2 }
+/**
+ * The Dragon Lift's one car (travel.ts; plan 3.4): its y (a rider's feet), the stop it is at or last left, the stop it
+ * is going to (null: parked), its rider (a dragon id, from the moment the car is sent for it until it walks off),
+ * whether it is moving, whether it is closing the bay to walkers (a departure blocked BAY_CLOSE steps), the tick its
+ * waiting departure was first blocked (-1: none), and the calls not yet served.
+ */
+export interface LiftState {
+  y: number;
+  f: number;
+  target: number | null;
+  rider: number | null;
+  moving: boolean;
+  closing: boolean;
+  blockedSince: number;
+  calls: LiftCall[];
+}
+
 export interface SimStats {
   opened: number;
   done: number;
+  /** Jobs closed without a keeper: none (#7: only a keeper meets a need). */
   closed: number;
   /** Steps from a job opening to its keeper starting work: the sum over started jobs, and the most. */
   waitSum: number;
@@ -132,9 +179,21 @@ export interface SimStats {
   preempted: number;
   /** Dragon-need-steps spent at 0. */
   emptySteps: number;
+  /** Px walked by dragons in all; lift rides completed; the longest a dragon waited at a landing for the car, steps. */
+  dragonWalked: number;
+  liftRides: number;
+  liftWaitMax: number;
+  /** Steps keepers stood at a stand spot waiting for the dragon (the sum over jobs started, and how many started). */
+  keeperWaitSum: number;
+  keeperWaits: number;
+  /** Keepers who gave up waiting (WAIT_MAX); dragons moved out of a slot for another's need; slots taken by a Rush. */
+  waitTimeouts: number;
+  evictions: number;
+  slotBumps: number;
   /**
    * Each room's (and structure's) uses by kind (#11: a named room earns its name by being used): a need room each
-   * time a keeper starts meeting its need there, and a supply room each time its supply is picked up.
+   * time a keeper starts meeting its need there, a supply room each time its supply is picked up, and the lift each
+   * ride completed.
    */
   used: Record<string, number>;
 }
@@ -154,7 +213,10 @@ export class CareSim {
   readonly dragons: Dragon[] = [];
   readonly keepers: Keeper[] = [];
   jobs: Job[] = [];
-  readonly stats: SimStats = { opened: 0, done: 0, closed: 0, waitSum: 0, started: 0, waitMax: 0, queueMax: 0, rushes: 0, preempted: 0, emptySteps: 0, used: {} };
+  readonly stats: SimStats = { opened: 0, done: 0, closed: 0, waitSum: 0, started: 0, waitMax: 0, queueMax: 0, rushes: 0, preempted: 0, emptySteps: 0,
+    dragonWalked: 0, liftRides: 0, liftWaitMax: 0, keeperWaitSum: 0, keeperWaits: 0, waitTimeouts: 0, evictions: 0, slotBumps: 0, used: {} };
+  /** The Dragon Lift: its car starts parked at the ground floor. */
+  lift: LiftState = { y: feetY(0), f: 0, target: null, rider: null, moving: false, closing: false, blockedSince: -1, calls: [] };
   /** What the last step did (cleared at the start of every step). */
   events: SimEvent[] = [];
   /** The id the next dragon gets, and the next job (public so a save can keep them). */
@@ -193,9 +255,9 @@ export class CareSim {
       // the starting needs: seeded, most of them fine, a few already asking
       const needs = fullNeeds();
       for (const k of NEEDS) needs[k] = hasNeed(p.element, k) ? rng.range(0.42, 1) : 1;
-      this.dragons.push({ id: this.nextDragonId++, name: p.name, element: p.element, stage: p.stage, seed: p.seed, slot, f: slot.f,
-        x: slot.x, facing: slot.facing, needs, mood: moodOf(p.element, needs), act: null, asleep: 0,
-        stageSince: this.clock0 - Math.round((p.days ?? 0) * this.dayLen) });
+      this.dragons.push({ id: this.nextDragonId++, name: p.name, element: p.element, stage: p.stage, seed: p.seed, slot, goal: null, goalJob: null,
+        f: slot.f, x: slot.x, facing: slot.facing, legs: [], move: 'still', gaitT: 0, walkSeq: 0, turn: -1, waited: 0,
+        needs, mood: moodOf(p.element, needs), act: null, asleep: 0, stageSince: this.clock0 - Math.round((p.days ?? 0) * this.dayLen) });
     }
     keepers.forEach((p, id) => {
       const station = roomOf(p.station, p.name);
@@ -204,7 +266,7 @@ export class CareSim {
       const mates = keepers.filter((q) => q.station === p.station), i = mates.indexOf(p);
       const stationX = clampToFloor(station.floor, Math.round(waitX(station) + (i - (mates.length - 1) / 2) * 22));
       this.keepers.push({ id, name: p.name, look: p.look, specialty: p.specialty, station, stationX, f: station.floor, x: stationX, y: feetY(station.floor),
-        climbing: false, legs: [], phase: 'idle', t: 0, job: null, carrying: null, rushing: false, facing: 1, walked: 0 });
+        climbing: false, legs: [], phase: 'idle', t: 0, job: null, carrying: null, rushing: false, facing: 1, walked: 0, bayWait: 0 });
     });
   }
 
@@ -229,7 +291,7 @@ export class CareSim {
       if (!slot) throw new Error(`save: no slot ${r.i} in room ${r.room}`);
       return slot;
     };
-    for (const d of s.dragons) sim.dragons.push({ ...d, slot: slotOf(d.slot), needs: { ...d.needs }, act: d.act ? { ...d.act } : null });
+    for (const d of s.dragons) sim.dragons.push({ ...d, slot: d.slot ? slotOf(d.slot) : null, needs: { ...d.needs }, act: d.act ? { ...d.act } : null, legs: d.legs.map((l) => ({ ...l })) });
     const jobs: Job[] = s.jobs.map((j) => ({ ...j, dragon: byId(sim.dragons, j.dragon, 'dragon'), keeper: null }));
     for (const k of s.keepers) {
       sim.keepers.push({ ...k, station: byId(sim.rooms, k.station, 'room'), job: k.job == null ? null : byId(jobs, k.job, 'job'), legs: k.legs.map((l) => ({ ...l })) });
@@ -237,6 +299,7 @@ export class CareSim {
     s.jobs.forEach((j, i) => { jobs[i].keeper = j.keeper == null ? null : byId(sim.keepers, j.keeper, 'keeper'); });
     sim.jobs = jobs;
     Object.assign(sim.stats, s.stats, { used: { ...s.stats.used } });
+    sim.lift = { ...s.lift, calls: s.lift.calls.map((c) => ({ ...c })) };
     return sim;
   }
 
@@ -257,17 +320,16 @@ export class CareSim {
 
   // ---------- a step ----------
 
+  /**
+   * One step (plan S3): the needs drain and the acts under way refill theirs; jobs open under QUEUE (and close only by
+   * being done: a need rises through a keeper's act alone); the dragons choose where to go, walk and turn, and the lift
+   * runs (travel.ts); then free keepers take jobs, and every keeper steps.
+   */
   step(): void {
     this.events = [];
     this.tick++;
-    // needs drain, the room a dragon stands in restores the need it meets (4.6; gone in S3, when keepers alone meet
-    // needs), and a job under way refills its need
     for (const d of this.dragons) {
-      const meets = ROOM_INFO[this.rooms[d.slot.room].kind].meets;
-      for (const k of NEEDS) {
-        if (!hasNeed(d.element, k)) continue;
-        d.needs[k] = clamp01(d.needs[k] - drainRate(d.element, d.stage, k) + (meets === k ? ROOM_REGEN : 0));
-      }
+      for (const k of NEEDS) if (hasNeed(d.element, k)) d.needs[k] = clamp01(d.needs[k] - drainRate(d.element, d.stage, k));
       const a = d.act;
       if (a) {
         a.t++;
@@ -278,19 +340,14 @@ export class CareSim {
       d.mood = moodOf(d.element, d.needs);
       for (const k of NEEDS) if (d.needs[k] <= 0) this.stats.emptySteps++;
     }
-    // jobs open under QUEUE; an unclaimed one closes if the dragon's room has lifted the need back
     for (const d of this.dragons) for (const k of NEEDS) {
       if (!hasNeed(d.element, k) || d.needs[k] >= QUEUE || (d.act && d.act.need === k)) continue;
       if (this.jobs.some((j) => j.dragon === d && j.need === k)) continue;
       this.jobs.push({ id: this.nextJob++, dragon: d, need: k, opened: this.tick, keeper: null, rushed: false });
       this.stats.opened++;
     }
-    this.jobs = this.jobs.filter((j) => {
-      if (j.keeper || j.rushed || j.dragon.needs[j.need] < QUEUE + CLOSE_OVER) return true;
-      this.stats.closed++;
-      return false;
-    });
     this.stats.queueMax = Math.max(this.stats.queueMax, this.jobs.length);
+    stepTravel(this);
     this.assign();
     for (const k of this.keepers) this.stepKeeper(k);
   }
@@ -313,13 +370,23 @@ export class CareSim {
     }
   }
 
-  /** A job a keeper can start: its dragon is awake, and no other keeper is on it. */
+  /**
+   * A job a keeper can go to (plan S3): its dragon is going for it, to a slot in the need's own room, and is there, or
+   * nearly (LEAD_PX of route left), or the job is rushed; the dragon is awake; and no other keeper is on it.
+   */
   private servable(j: Job): boolean {
     const d = j.dragon;
-    return d.asleep === 0 && !(d.act && d.act.need === 'sleep') && !this.jobs.some((o) => o !== j && o.dragon === d && o.keeper);
+    if (d.goalJob !== j.id || !d.slot || this.rooms[d.slot.room].kind !== NEED_ROOM[j.need]) return false;
+    if (d.asleep > 0 || (d.act && d.act.need === 'sleep')) return false;
+    if (this.jobs.some((o) => o !== j && o.dragon === d && o.keeper)) return false;
+    return j.rushed || arrived(this, d) || remainingCost(this, d) <= LEAD_PX;
   }
 
-  /** Rush (4.5): the job jumps the queue, and the nearest keeper runs to it -- a free one, else the one on the lowest job, which goes back in the queue. */
+  /**
+   * Rush (4.5): the job jumps the queue; its dragon, if it wasn't going for it, goes for it at once (taking a slot in
+   * the room from its lowest holder if the room is full, and calling the lift at priority); and the nearest keeper runs
+   * to it -- a free one, else the one on the lowest job, which goes back in the queue.
+   */
   rush(j: Job): void {
     if (!this.jobs.includes(j)) return;
     this.stats.rushes++;
@@ -329,6 +396,8 @@ export class CareSim {
     // someone is already with the dragon for another job: they hurry, and this one is next for it
     const other = this.jobs.find((o) => o !== j && o.dragon === d && o.keeper);
     if (other) { other.keeper!.rushing = true; return; }
+    if (d.goalJob !== j.id && !d.act) retarget(this, d, j);
+    raiseCall(this, d);
     if (!this.servable(j)) return;
     // (a keeper who can't reach the job is never chosen for it)
     let best: Keeper | null = null, bestCost = Infinity;
@@ -364,7 +433,22 @@ export class CareSim {
     this.stats.preempted++;
   }
 
+  /**
+   * A keeper gives a job back and walks home (a Rush took the dragon's slot, or the dragon never came: WAIT_MAX). The
+   * job goes back in the queue; the keeper can be given another on the way.
+   */
+  drop(k: Keeper): void {
+    const j = k.job;
+    if (j) j.keeper = null;
+    k.job = null; k.rushing = false; k.t = 0;
+    this.walkTo(k, { f: k.station.floor, x: k.stationX });
+    k.phase = 'home';
+  }
+
   private stepKeeper(k: Keeper): void {
+    // (a job its dragon has stopped going for -- it was moved out of the slot -- is given back)
+    const j = k.job;
+    if (j && k.phase !== 'work' && j.dragon.goalJob !== j.id) { this.drop(k); return; }
     switch (k.phase) {
       case 'idle': return;
       case 'pickup':
@@ -374,6 +458,11 @@ export class CareSim {
           k.carrying = need; this.walkTo(k, this.standAt(k.job!.dragon)); k.phase = 'go';
         }
         return;
+      case 'wait':
+        // at the stand spot before the dragon: the job starts the first step it stands in its slot, facing its way
+        if (arrived(this, k.job!.dragon)) this.startWork(k);
+        else if (++k.t > WAIT_MAX) { this.stats.waitTimeouts++; this.drop(k); }
+        return;
       case 'work':
         if (++k.t >= this.workLen(k, k.job!.need)) this.finish(k);
         return;
@@ -382,7 +471,11 @@ export class CareSim {
     }
   }
 
-  /** One step along the route; true once it is walked. A climb is at the link's x, floor to floor. */
+  /**
+   * One step along the route; true once it is walked. A climb is at the link's x, floor to floor. On a floor, the bay
+   * rule (R1): a keeper does not step into the lift bay while the car is moving (or closing) past this floor, but waits
+   * at its edge; one already in it walks on out.
+   */
   private move(k: Keeper): boolean {
     const leg = k.legs[0];
     if (!leg) return true;
@@ -395,7 +488,17 @@ export class CareSim {
     } else {
       const sp = WALK * pace, dx = leg.x - k.x;
       if (dx) k.facing = dx > 0 ? 1 : -1;
-      if (Math.abs(dx) <= sp) { k.walked += Math.abs(dx); k.x = leg.x; k.legs.shift(); }
+      let to = leg.x;
+      if (dx && bayShut(this, k.f) && !inBay(k.x, KEEPER_HALF)) {
+        const edge = dx > 0 ? LIFT_X0 - KEEPER_HALF : LIFT_X1 + KEEPER_HALF;
+        if ((edge - k.x) * dx >= 0 && (leg.x - edge) * dx > 0) {
+          if (k.x === edge) { k.bayWait++; return false; }
+          to = edge;
+        }
+      }
+      k.bayWait = 0;
+      const rest = Math.abs(to - k.x);
+      if (rest <= sp) { k.walked += rest; k.x = to; if (to === leg.x) k.legs.shift(); }
       else { k.x += Math.sign(dx) * sp; k.walked += sp; }
     }
     return k.legs.length === 0;
@@ -404,14 +507,24 @@ export class CareSim {
   private arrive(k: Keeper): void {
     if (k.phase === 'fetch') { k.phase = 'pickup'; k.t = 0; return; }
     if (k.phase === 'home') { k.phase = 'idle'; return; }
-    // 'go': at the dragon; the job starts, and the dragon's anim with it (the bowl set down, the ball out, the bucket)
+    // 'go': at the stand spot; the job starts now if the dragon is in its slot, else the keeper waits for it
+    const d = k.job!.dragon;
+    if (arrived(this, d)) { this.startWork(k); return; }
+    k.phase = 'wait'; k.t = 0;
+    if (d.slot) k.facing = d.slot.x >= k.x ? 1 : -1;
+  }
+
+  /** The job starts, and the dragon's anim with it (the bowl set down, the ball out, the bucket). */
+  private startWork(k: Keeper): void {
     const j = k.job!, d = j.dragon, len = this.workLen(k, j.need);
+    this.stats.keeperWaits++;
+    if (k.phase === 'wait') this.stats.keeperWaitSum += k.t;
     k.phase = 'work'; k.t = 0; k.carrying = null;
     k.facing = d.x >= k.x ? 1 : -1;
     const wait = this.tick - j.opened;
     this.stats.started++; this.stats.waitSum += wait; this.stats.waitMax = Math.max(this.stats.waitMax, wait);
-    // (#11: a need room is used when its own need is met in it)
-    const room = this.rooms[d.slot.room];
+    // (#11: a need room is used when its own need is met in it -- always, now: a dragon is met only in its need's room)
+    const room = this.rooms[d.slot!.room];
     if (ROOM_INFO[room.kind].meets === j.need) this.use(room.kind);
     d.act = { need: j.need, t: 0, len: j.need === 'sleep' ? len + SLEEP_STEPS : len, from: d.needs[j.need] };
   }
@@ -423,6 +536,8 @@ export class CareSim {
     else { d.needs[j.need] = 1; if (d.act && d.act.need === j.need) d.act = null; }
     this.jobs.splice(this.jobs.indexOf(j), 1);
     this.stats.done++;
+    // (the dragon lingers in its slot until it leaves for another need)
+    if (d.goalJob === j.id) { d.goal = null; d.goalJob = null; }
     k.job = null; k.rushing = false; k.t = 0;
     this.walkTo(k, { f: k.station.floor, x: k.stationX });
     k.phase = 'home';
@@ -430,16 +545,22 @@ export class CareSim {
 
   private workLen(k: Keeper, need: NeedKind): number { return Math.round(WORK[need] * (k.specialty === need ? SPECIALIST_TIME : 1)); }
 
-  /** Count one use of a room or structure (stats.used, #11). */
-  private use(kind: RoomKind | 'lift' | 'aerie'): void { this.stats.used[kind] = (this.stats.used[kind] ?? 0) + 1; }
+  /** Count one use of a room or structure (stats.used, #11): travel.ts counts the lift's rides here too. */
+  use(kind: RoomKind | 'lift' | 'aerie'): void { this.stats.used[kind] = (this.stats.used[kind] ?? 0) + 1; }
 
   // ---------- where things are ----------
 
   /** Where a keeper is, for routing: a keeper on a ladder counts as already at the floor they're climbing to. */
   spotOf(k: Keeper): Spot { return k.climbing && k.legs.length ? { f: k.legs[0].f, x: k.x } : { f: k.f, x: k.x }; }
 
-  /** Where a keeper stands to work with a dragon: its slot's stand spot (layout.ts standSpot), in front of its snout, inside the room. */
-  standAt(d: Dragon): Spot { return standSpot(d.slot, d.stage, this.rooms[d.slot.room]); }
+  /**
+   * Where a keeper stands to work with a dragon: its slot's stand spot (layout.ts standSpot), in front of its snout,
+   * inside the room -- always the slot's fixed spot, never the dragon's own x (so never through a wall).
+   */
+  standAt(d: Dragon): Spot {
+    if (!d.slot) throw new Error(`${d.name} has no slot to be met at`);
+    return standSpot(d.slot, d.stage, this.rooms[d.slot.room]);
+  }
 
   /** The room a need's supply comes from (the nearest, if there were more than one); null if it needs none. */
   private supplyRoom(need: NeedKind, from: Spot): Room | null {

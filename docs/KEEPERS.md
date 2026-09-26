@@ -33,7 +33,10 @@ that nothing did). **Also built:** **the base** (`view=base`, and the game's def
 draws its keepers as this cast too (`src/game/people.ts`), each in the anim closest to its job (walking, carrying,
 `watch`, `kneelIdle`, `pet`) while sim.ts's own care simulation walks it along the barn's routes and decides what job
 it is doing; the anim plays with its root motion pinned (`KeeperAgent.pinX`), since the base already moves the keeper
-itself. This is a plainer join than the yard's: it skips the plan (6.3), so a base keeper's stand and stroke are not
+itself, and a walk or carry plays at the keeper's pace over the look's own walk speed (`KeeperPlayer.setSpeed`: Bea's
+0.55 px a frame walk at 1.82x for the base's 1 px, 1.6x that on a Rush), so the feet no longer skate. A keeper who
+reaches the stand spot before the dragon stands in `watch` until it walks in, and one held at the Dragon Lift's bay
+stands in `idle`. This is a plainer join than the yard's: it skips the plan (6.3), so a base keeper's stand and stroke are not
 proven eye-clear or on the mark the way the yard's and the two audits' are. **Not built:** a player-facing game loop
 for the yard itself (it still runs on its own: nothing lets a player send one of these keepers to a dragon from it),
 props for the keepers' stations, keepers in the habitat view, and night: Iris tucks in whoever is sleepy.

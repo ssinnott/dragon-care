@@ -3,19 +3,21 @@
 // kept -- after construction every draw is rngAt(seed, ...) (rand.ts) -- so the seed is the only randomness saved.
 // The digest two runs compare (CareSim.digest) is this same JSON, minus the seed; the page's hook shows its hash.
 // This file never touches storage: src/game/storage.ts will (S4), and only from BaseView.attach().
-import type { CareSim, Dragon, Keeper, Job, SimStats } from './sim.ts';
+import type { CareSim, Dragon, Keeper, Job, SimStats, LiftState } from './sim.ts';
 import type { RoomPlace } from './layout.ts';
 
 /**
  * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded.
  * 2 (S2): a dragon's slot (by room id and index) in place of its home room; the rooms' uses (stats.used).
+ * 3 (S3): dragons on the move (a slot that may be none, a goal and its job by id, the route, the walk and the turn),
+ * a keeper waiting at the bay's edge, the lift (its car, its rider by id, its calls), the travel stats.
  */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }
-/** A dragon as saved: every field, its slot by room id and index. */
-export type DragonSave = Omit<Dragon, 'slot'> & { slot: SlotRef };
+/** A dragon as saved: every field, its slot by room id and index (null: none), its goal's job by id (it is one already). */
+export type DragonSave = Omit<Dragon, 'slot'> & { slot: SlotRef | null };
 /** A keeper as saved: every field, their station by room id and their job by job id. */
 export type KeeperSave = Omit<Keeper, 'station' | 'job'> & { station: number; job: number | null };
 /** A job as saved: its dragon and keeper by id. */
@@ -34,6 +36,8 @@ export interface SaveV {
   dragons: DragonSave[];
   keepers: KeeperSave[];
   jobs: JobSave[];
+  /** The lift as it was (its rider and callers are dragon ids already). */
+  lift: LiftState;
   stats: SimStats;
 }
 
@@ -50,16 +54,18 @@ export class SaveVersionError extends Error {
 /**
  * The world as JSON-safe data, in the simulation's own order (dragons, keepers and jobs as they sit in its arrays).
  * Every field of every dragon, keeper and job is kept -- the top level of each is copied whole, so a field a later
- * slice adds is saved with it -- and the plain objects they hold (needs, the act, the route's legs, the rooms' uses)
- * are copied, so the save never changes as the world steps on.
+ * slice adds is saved with it -- and the plain objects they hold (needs, the act, the routes' legs, the lift's calls,
+ * the rooms' uses) are copied, so the save never changes as the world steps on.
  */
 export function serialize(sim: CareSim): SaveV {
   return {
     v: SAVE_VERSION, seed: sim.seed, dayLen: sim.dayLen, clock0: sim.clock0, tick: sim.tick, nextDragonId: sim.nextDragonId, nextJob: sim.nextJob,
     rooms: sim.roomPlaces.map((p) => ({ ...p })),
-    dragons: sim.dragons.map((d): DragonSave => ({ ...d, slot: { room: d.slot.room, i: d.slot.i }, needs: { ...d.needs }, act: d.act ? { ...d.act } : null })),
+    dragons: sim.dragons.map((d): DragonSave => ({ ...d, slot: d.slot ? { room: d.slot.room, i: d.slot.i } : null, needs: { ...d.needs }, act: d.act ? { ...d.act } : null,
+      legs: d.legs.map((l) => ({ ...l })) })),
     keepers: sim.keepers.map((k): KeeperSave => ({ ...k, station: k.station.id, job: k.job ? k.job.id : null, legs: k.legs.map((l) => ({ ...l })) })),
     jobs: sim.jobs.map((j): JobSave => ({ ...j, dragon: j.dragon.id, keeper: j.keeper ? j.keeper.id : null })),
+    lift: { ...sim.lift, calls: sim.lift.calls.map((c) => ({ ...c })) },
     stats: { ...sim.stats, used: { ...sim.stats.used } },
   };
 }
@@ -71,12 +77,13 @@ export function worldKey(sim: CareSim): string {
 }
 
 /**
- * The barn's own state -- its dragons, keepers and jobs -- with every field that holds an absolute clock left out
- * (a dragon's stageSince), so two worlds started at different hours but stepped alike agree on it (S4's no-tint check).
+ * The barn's own state -- its dragons, keepers, jobs and lift -- with every field that holds an absolute clock left out
+ * (a dragon's stageSince; the lift's blockedSince and its calls' ticks are world ticks, the same in both), so two worlds
+ * started at different hours but stepped alike agree on it (S4's no-tint check).
  */
 export function barnKey(sim: CareSim): string {
   const s = serialize(sim);
-  return JSON.stringify({ dragons: s.dragons.map(({ stageSince: _s, ...d }) => d), keepers: s.keepers, jobs: s.jobs });
+  return JSON.stringify({ dragons: s.dragons.map(({ stageSince: _s, ...d }) => d), keepers: s.keepers, jobs: s.jobs, lift: s.lift });
 }
 
 /** A string's 32-bit FNV-1a hash (over its UTF-16 code units) as 8 hex digits: the digest the page's hook shows. */

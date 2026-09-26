@@ -1,0 +1,66 @@
+// A dragon's pace, read from its own walk (docs/BASE_DESIGN.md 2, "Moving around"; plan 3.4): the walk anim's frames
+// carry their root motion (`move`, px along facing per step), and a planted paw stands still on the floor only while
+// the body moves by exactly that much each step. So the care simulation (travel.ts) moves a walking dragon by its walk's
+// own per-frame `move`, at the anim's speed 1, and the view (base.ts) plays that walk from the start of the same bout at
+// speed 1: the two are the same numbers, step for step, and nothing skates. A walk is not a constant pace -- a baby's
+// stumble, spike's creep and slinkwing's pointer pause stand still for whole frames -- so the table is kept frame by
+// frame. The frames' durations and moves depend on the element and the stage only, never the seed (sim-check 9), and
+// build under plain Node (no DOM): about 20 ms per element and stage, once, the first time a dragon of it walks.
+import { dragonBuild } from '../art/dragon/build.ts';
+import { dragonAnims } from '../art/dragon/anims.ts';
+import type { DragonElement } from '../art/dragon/palettes.ts';
+import type { Stage } from '../art/dragon/stages.ts';
+
+/**
+ * A walk's root motion: its frames (duration in steps, `move` px per step), the whole cycle's length in steps, and the
+ * mean pace (px per step). `steps[t]` is the move at anim time t in [0, len): the frame containing t (frame i covers
+ * [cum_i, cum_i+1)); `loopStart` is the time the loop returns to (0: the whole anim loops).
+ */
+export interface Gait {
+  frames: readonly { dur: number; move: number }[];
+  len: number;
+  avg: number;
+  steps: readonly number[];
+  loopStart: number;
+}
+
+const GAITS = new Map<string, Gait>();
+
+/** A walk anim's frames as a gait table. */
+export function gaitFrom(frames: readonly { dur?: number; move?: number }[], loopFrom = 0): Gait {
+  const fr = frames.map((f) => ({ dur: f.dur || 1, move: f.move || 0 }));
+  const steps: number[] = [];
+  let loopStart = 0, sum = 0;
+  fr.forEach((f, i) => {
+    if (i === loopFrom) loopStart = steps.length;
+    for (let k = 0; k < f.dur; k++) steps.push(f.move);
+    sum += f.dur * f.move;
+  });
+  return { frames: fr, len: steps.length, avg: steps.length ? sum / steps.length : 0, steps, loopStart };
+}
+
+/**
+ * The gait of an element's walk at a stage: built once, from the walk the pets play (anims.ts dragonAnims(stage, spec,
+ * dims).walk, a seed-1 build's dims), and kept.
+ */
+export function gaitOf(el: DragonElement, stage: Stage): Gait {
+  const key = `${el}:${stage}`, had = GAITS.get(key);
+  if (had) return had;
+  const b = dragonBuild({ element: el, stage, seed: 1 });
+  const walk = dragonAnims(stage, b.spec, b.dims).walk;
+  if (!walk || !walk.frames.length) throw new Error(`gait: ${el} ${stage} has no walk`);
+  const g = gaitFrom(walk.frames, walk.loopFrom ?? 0);
+  GAITS.set(key, g);
+  return g;
+}
+
+/**
+ * The walk's move at anim time t (t steps after it was played from its start at speed 1): the frame containing t,
+ * the loop wrapping at its length back to its loop start. `DragonAnimPlayer.tick` at speed 1 leaves its `move` at
+ * exactly this after its t-th tick.
+ */
+export function moveAt(g: Gait, t: number): number {
+  if (t < g.len) return g.steps[t < 0 ? 0 : t];
+  const loop = g.len - g.loopStart;
+  return g.steps[g.loopStart + ((t - g.loopStart) % loop)];
+}

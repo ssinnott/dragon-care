@@ -41,12 +41,17 @@ interface Window {
      * view=base (src/game/base.ts), as of the last frame drawn: the care simulation's step, the camera, the open jobs,
      * the jobs done and the Rushes so far, and the job strip's chips (canvas px) for tapping; the world's digest (the
      * 8-hex FNV-1a hash of src/game/save.ts worldKey: the save's JSON less the seed) and every dragon (its stable id,
-     * element, stage, floor and x). Gone once the base is detached (the page left it).
+     * element, stage, floor and x; what its body is doing, sim.ts DragonMove; the kind of room at its floor and x, or
+     * null in the lift bay and the ladder bay; its slot as `kind:index`, or null); the Dragon Lift's car (y, its rider's
+     * feet, and the rider's dragon id or null); and the px the dragons have walked in all. Gone once the base is
+     * detached (the page left it).
      */
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
       chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[];
       digest: string;
-      dragons: { id: number; name: string; element: string; stage: string; f: number; x: number }[] };
+      dragons: { id: number; name: string; element: string; stage: string; f: number; x: number; move: string; room: string | null; slot: string | null }[];
+      lift: { y: number; rider: number | null };
+      walked: number };
   };
 }
 

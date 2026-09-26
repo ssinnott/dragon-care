@@ -80,8 +80,8 @@ picture.*
   roof to the Aerie. One car carries one dragon on a 152 px straw deck (an elder, at most 137 px, fits), between two
   40 px side rails, on two cables from a headframe that stands over the Aerie a room's height above the deck. It stops
   at the ground floor, the upper floor, the hayloft and the Aerie (floors 0, 1, 2 and 5; floors 3 and 4 are passed
-  through), and a straw landing runs across the shaft on each barn floor. Keepers never ride it. In this slice the
-  car stays parked at the ground floor; dragons ride it from the next (S3).
+  through), and a straw landing runs across the shaft on each barn floor. Keepers never ride it. Dragons ride it to
+  their needs' rooms (below, "Moving around").
 - **The ladder bay** is where the hay hoist was, between modules 2 and 3 (64 px): the keepers' centre ladder through
   the barn's three floors, a hatch in each slab, with straw floors running straight across it. The hoist went because
   dragons are to walk across the middle of the barn: its dark shaft (`#5a4436`, L 0.07) failed the floor gate (1),
@@ -111,8 +111,23 @@ picture.*
 the centre ladder bay's through the barn; the towers and the barn meet on the ground and upper floors only. Dragons
 have ways of their own, a net per stage: the barn's floors kept half a body's length from the walls (30, 56, 72 and 76
 px, baby to elder: the measured extents), the hayloft between modules 1 and 5 only (clear of the low roof slopes), the
-Aerie deck, and the lift between them; never a tower. In this slice a dragon stays in its slot (the idle anim and its
-variants keep it lively); walking to its needs, and riding the lift, come next (S3).
+Aerie deck, and the lift between them; never a tower.
+
+**A dragon with an open need walks to that need's room** (#7), riding the Dragon Lift between floors, and a keeper
+meets it there (section 3's slots, 4.4). It walks by its walk anim's own root motion, frame by frame (`src/game/gait.ts`:
+the body moves exactly as far each step as the anim's planted paws slide, so nothing skates; spike's creep and
+slinkwing's pointer pause stand still for whole frames), and a reversal is a paper turn in place (6 steps, the facing
+flipped halfway: the yard's). At the lift it waits on the landing just outside the bay, facing it; callers line up nose
+to tail (the one behind drawn over the rump of the one ahead, never over an eye) and step up as the car takes the one
+ahead. The car comes for it, it walks in to the car's middle, turns to face the side it will walk off, rides, and walks
+off. The car takes a rushed dragon's call first, then any call waiting a minute or more, then a caller on the floor the
+car is at, then the oldest call (`src/game/travel.ts`).
+
+**The bay rule.** The lift bay (x 488 to 648) is also the way across each barn floor, so one rule keeps a moving car
+clear of everyone: nobody (a keeper, or a dragon other than the car's rider) steps into the bay while the car moves past
+their floor, but waits at its edge (a keeper at x 478 or 658, a dragon a half-body out); the car sets off only when
+nobody stands in the bay on any floor from where it is to where it goes; a departure blocked for 4 s closes the bay to
+newcomers until the car goes; and anyone already in the bay walks on out, never stopping there.
 
 ---
 
@@ -120,7 +135,8 @@ variants keep it lively); walking to its needs, and riding the lift, come next (
 
 **Every named room has a purpose** (#11: "Rooms should only be named and have special furniture if the room has a
 real purpose"): a dragon need, met there by a keeper, or a human or other action. **Each need is met in exactly one
-kind of room.** A place with no purpose is not a room: it is left bare (an empty wall, no props, no name). The code
+kind of room, with a keeper** (#7: "Each room should be where a need is fulfilled - which need to be done by a
+trainer"): a dragon with an open need walks to that room, and a keeper meets it there; nothing else raises a need. A place with no purpose is not a room: it is left bare (an empty wall, no props, no name). The code
 holds each purpose (`src/game/layout.ts` `ROOM_INFO`, `STRUCTURES`), and `tools/sim-check.ts` proves every named room
 is used: every mechanic that uses one counts it (`sim.stats.used`), and over the whole check each must show a use, or
 be listed as planned for a later slice (and a planned one that shows a use fails, so the list is kept honest).
@@ -128,7 +144,7 @@ be listed as planned for a later slice (and a planned one that shows a use fails
 | Where | Room | Purpose | Built (the slice that uses it) |
 |---|---|---|---|
 | Ground floor, modules 0-1 | Hearth Kitchen | meets **food**: a keeper feeds the dragon here, with the bowl taken at the hearth | S2: food met there, bowls picked up |
-| Module 2, floor to roof | Dragon Lift | carries dragons between the barn's floors and up to the Aerie | S3: dragons ride it |
+| Module 2, floor to roof | Dragon Lift | carries dragons between the barn's floors and up to the Aerie | S3: dragons ride it (a ride completed) |
 | Ground floor, modules 3-4 | Bathhouse | meets **bath**: a keeper washes the dragon here, with the bucket filled at the tub | S2: baths met there, buckets filled |
 | Ground floor, module 5 | Hatchery | eggs lie in its three nests and hatch into babies | S5: an egg laid or hatched |
 | Upper floor, modules 0-1 | Romp Room | meets **play**: a keeper plays with the dragon here, with a ball from the box by the wheel | S2: play met there, balls taken |
@@ -150,8 +166,13 @@ Library, the Workshop, the Infirmary and the Lookout (no mechanic); and two of t
 (a one-module room faces its post; in a two-module room the two dragons face each other, so their keepers work between
 them; a three-module room faces +1, +1, -1), and two baby sub-slots 40 px in from its sides. A module holds either one
 grown dragon or up to two babies; the Hatchery has baby sub-slots only. A keeper meets a dragon at its slot's **stand
-spot**: in front of its snout (58 px for an adult), kept inside the room. The new game starts with one dragon per
-need room's first slot, the three love dragons filling the Grooming Parlour. Between jobs a keeper waits in their own
+spot**: in front of its snout (58 px for an adult), kept inside the room. A dragon going for a need **reserves** the
+room's lowest free slot of its size and walks there; after its job it **lingers** in that slot (there is no home room)
+until it leaves for another need. If the room is full, it moves on a lingerer (one with nowhere to be, no act and no
+keeper coming: the lowest id), who walks to the nearest free slot elsewhere; a Rush may also move on a holder whose
+keeper has not started work (the lowest in the queue). A dragon standing in a room that meets another of its jobs in
+the same tier as its most pressing one takes that job first, and saves the walk. The new game starts with one dragon
+per need room's first slot, the three love dragons filling the Grooming Parlour. Between jobs a keeper waits in their own
 room at a spot clear of every slot's body, whatever the stage in it (the middle of the Hearth Kitchen, the Romp Room
 and the Lamp Dorm; the Grooming Parlour's between its second and third slots), so a keeper at rest is never hidden
 behind a dragon; the supplies are still taken at the hearth, the ball box and the tub. The room names hang on the
@@ -188,8 +209,12 @@ lightning's static (its crackle, then the zap: 3.5); a hungry dragon begs.
 **4.4 Keepers.** The humans on care duty; they are assigned automatically.
 - **Taking a job.** A free keeper takes the highest job in the queue. Among jobs that are close in priority, a keeper
   prefers their **specialty** (the cook feeds, the groomer grooms, the handler plays and bathes) and the nearer dragon.
-- **Doing it.** The keeper fetches the **supply** from its room (a bowl from the kitchen, a ball from the Romp Room, a
-  bucket from the Bathhouse), walks to the dragon and does the job while the dragon plays the anim for it:
+- **When.** A keeper goes to a job once its dragon is going for it, to a slot in the need's own room, and is there or
+  nearly there (300 px of route left, so they meet about when it arrives), or the job is rushed.
+- **Doing it.** The keeper fetches the **supply** from the room's post (a bowl at the hearth, a ball from the box by
+  the Romp Room's wheel, a bucket filled at the Bathhouse's tub), walks to the slot's stand spot and, if the dragon
+  is not there yet, **waits** for it (watching it come). The job starts the moment the dragon stands in its slot,
+  facing its way; the keeper does it while the dragon plays the anim for it:
   - food: `eat`, with the bowl the keeper set down;
   - love: `pet`;
   - play and bath: `happy`;
@@ -203,10 +228,11 @@ lightning's static (its crackle, then the zap: 3.5); a hungry dragon begs.
 
 It costs nothing but the job it bumps.
 
-**4.6 Rooms help (until S3).** For now the room a dragon stands in restores the need it meets at 1.5 times the base
-drain, so a dragon in its own need's room asks for less; its own need, draining twice as fast, still falls, only
-slowly. This regeneration goes in the next slice (S3): from then on only a keeper meets a need (#7), in that need's
-room, and the dragon walks there.
+**4.6 Rooms don't heal; keepers do.** A need rises only through a keeper's act, in that need's room (#7): the dragon
+walks there, and the keeper meets it. A room no longer restores the need it meets (the regeneration of the first slices
+is gone), and a job no longer closes by itself: every job opened is either done by a keeper or still open. A keeper
+waiting at a stand spot gives the job back after 2 minutes if the dragon never comes (it never happens in the checked
+run).
 
 **4.7 Capacity.** A queue that keeps growing means too few keepers or the wrong rooms: hire, or build. Riders away on
 a mission are not keeping, which is the price of sending a team (5.6).
@@ -221,10 +247,26 @@ a mission are not keeping, which is the price of sending a team (5.6).
 
 | | |
 |---|---|
-| Base drain | full to 0.5 in 6 minutes of play; a dragon's own need in 3 |
+| Base drain | full to 0.5 in 7 minutes of play; a dragon's own need in 3.5 (`HALF_LIFE_S` 420; it was 6 and 3 until S3, see below) |
 | Keeper pace | 1 px a frame walking, 0.8 climbing, 1.6 times either when rushed |
+| Dragon pace | its walk anim's own: each frame's `move` at the anim's speed 1, 0.28 to 0.54 px a frame for adults (spike 0.28 and slinkwing 0.32 with their pauses, rock 0.30, dusk 0.40, fire and water 0.45, lightning 0.54); no hurrying, even under Rush |
 | Fetching a supply | 40 frames |
 | A job at the dragon | food 200 frames, love 160, play 200, bath 200; sleep: 90 of tuck-in, then 15 s asleep while it refills |
+| A keeper sets off (`LEAD_PX`) | when the dragon has 300 px of route left, or is there, or the job is rushed |
+| A keeper waits at the stand spot (`WAIT_MAX`) | at most 7200 frames (2 min), then gives the job back |
+| The lift (`LIFT_SPEED`) | 1.5 px a frame (the plan's third lever; it started at 1) |
+| The bay closes (`BAY_CLOSE`) | after a departure is blocked 240 frames (4 s) |
+| A call is overdue (`OVERDUE`) | after 3600 frames (1 min): it is served before the car's own floor's |
+
+The two changes from the first numbers were measured (`npm run sim`, 30 minutes on the starting base, section 8.1).
+With the dragons walking and one car between the floors, the car is the barn's bottleneck: about 0.9 rides per job,
+each keeping the car about 13 s (half of it the rider's 152 px walk in, then the ride, then waiting for the bay to
+clear), so the car is busy 95 % of the time. Served strictly oldest call first, the car made empty trips: jobs waited
+131 s on average, and needs ran empty on five of six seeds. Serving a caller on the car's own floor first (with a
+one-minute overdue rule, so nobody waits on for ever) brought that to 81 to 97 s with no need empty; then the plan's
+third and fourth levers, a faster car (1.5) and slower drains (`HALF_LIFE_S` 420), to 55 to 74 s (seeds 1 to 6). Its
+first two levers were tried and did not help: `LEAD_PX` 450 only kept keepers standing longer, and `QUEUE` 0.55 opened
+more jobs and let needs empty.
 
 ---
 
@@ -302,42 +344,48 @@ a mission are not keeping, which is the price of sending a team (5.6).
 
 1. **Needs and jobs.** Built. Run `npm run dev` and open `index.html` (this is the game's default page; `?view=base`
    still names it, for the gallery's other debug views): drag to look around, and tap a bubble, a job chip or a
-   dragon to Rush it. The four keepers are the named cast of `docs/KEEPERS.md`, each in the anim closest to its job
+   dragon to Rush it. Each dragon walks to its need's room, riding the Dragon Lift between floors, and a keeper meets
+   it there (#7). The four keepers are the named cast of `docs/KEEPERS.md`, each in the anim closest to its job
    while this slice's own simulation walks it and picks what it's doing (KEEPERS.md's status has the join). The page
    takes `seed=`, `cam=x,y` (where the camera starts, world px), `preset=ages` (a code-built start with every stage:
    the base's first twelve-dragon cast) and `save=0` (a live page that never loads or saves; a preset page never
    does either); `t=` freezes it as in every gallery view. The gallery's own keys (the arrows, Space, E, the digits)
    do nothing here, and its arrows step over the base, so a debug view reached with them can still be left.
 
-   ![The built slice, 30 s in, in the start frame: west to east the Hearth Kitchen and the Romp Room (EMBER; ZAP asleep, Tomas walking back to his parlour), the Dragon Lift with its car parked at the ground floor, the keepers' ladder bay (Pip taking a ball down to RIPPLE), and the first slots of the Bathhouse, the Grooming Parlour and the Lamp Dorm (RIPPLE, BRAMBLE and WICK; Iris passing behind BRAMBLE on her way to the tub); the job strip](base/base_live.png)
+   ![The built slice, 49 s in, in the start frame: RIPPLE rides the Dragon Lift up to the Romp Room, where Pip waits at its slot's stand spot with a ball; ZAP waits at the ground floor's east landing for the car up to the Lamp Dorm, and WICK at the hayloft's for the car down to the Romp Room; COBBLE walks into the Bathhouse to its slot (Tomas fills the bucket at the tub, out of frame); ECHO walks past BRAMBLE in the Grooming Parlour on its way down to the Bathhouse; Bea waits in the Hearth Kitchen; the job strip](base/base_live.png)
 
    | File | What it is |
    |---|---|
-   | `src/game/pet.ts` | the pet code, moved out of `src/gallery.ts` unchanged (the gallery renders pixel for pixel as before) |
+   | `src/game/pet.ts` | the pet code, moved out of `src/gallery.ts` unchanged (the gallery renders pixel for pixel as before), and the paper turn the base's dragons turn with |
    | `src/game/needs.ts` | the five needs, the drains, the tiers, mood and lightning's charge |
    | `src/game/layout.ts` | the grid; the rooms, each with its purpose (#11), and their dragon slots and stand spots; the Dragon Lift and the Aerie; the keepers' net (the ladders) and a dragon net per stage (the lift); routes between any two spots on a net; the name plates' places |
    | `src/game/surfaces.ts` | every floor anyone stands on (`FLOORS`: straw), each gated by `tools/palette-check.ts`, and the bare and lift-shaft walls |
    | `src/game/start.ts` | the starting base: the rooms of section 3, seven newly adult dragons (one per element, 0 days into adulthood), each in a slot of its own need's room, and the four named keepers |
    | `src/game/presets.ts` | code-built starts for views that need what a new game hasn't got (`ages`: every stage) |
-   | `src/game/sim.ts` | the care simulation: the queue, the keepers' trips and jobs, and Rush; no drawing, seeded, deterministic; dragons with stable ids, a clock, and its options (seed, day length, start time) |
+   | `src/game/sim.ts` | the care simulation: the queue, the keepers' trips and jobs (fetch, go, wait at the stand spot, work), and Rush; no drawing, seeded, deterministic; dragons with stable ids, a clock, and its options (seed, day length, start time) |
+   | `src/game/travel.ts` | the dragons on the move: each chooses its need's room and takes a slot there (moving a lingerer on, or bumping a holder for a Rush), walks and turns, queues at a landing, and rides the Dragon Lift; the lift's car and its calls; the bay rule |
+   | `src/game/gait.ts` | each element's walk at each stage as a table of per-frame root motion, the pace the simulation walks a dragon at |
    | `src/game/save.ts` | the save format: the whole world as JSON, every reference an id, loaded back exactly (`CareSim.fromSave`); the digest two runs compare |
    | `src/game/rand.ts` | stateless draws (`rngAt(seed, tag, ...keys)`): no RNG state is ever kept or saved |
-   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building (its rooms, the lift's shaft, car and headframe, the ladder bay, the Aerie's deck and gantry), the keepers on the named cast's rig (`docs/KEEPERS.md`), the bubbles and chips |
-   | `src/game/base.ts` | the live view: the simulation driving the dragons' anims, the camera, the HUD and the input |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play with its invariants, determinism, Rush, the start cast, saves (a loaded world steps on exactly as its original), `rngAt`, and the rooms (a purpose each, one room per need, every named room used over the check unless planned) |
+   | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building (its rooms, the lift's shaft, car and headframe, the ladder bay, the Aerie's deck and gantry), the keepers on the named cast's rig (`docs/KEEPERS.md`), their walks played at their pace, the bubbles and chips |
+   | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks, turns and rides) and their anims, the lift's car, the camera, the HUD and the input |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play with its invariants (the bay rule among them), determinism, Rush (and a slot bump), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), and the gait (the walks' tables, a scripted walk as far as the anim carries it) |
 
    Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play, 149
-   jobs opened and 146 were done. A keeper started on a job 14.5 s after it opened on average (41.0 s at most), and
-   no need ever emptied; the need rooms were used 31 (Bathhouse), 36 (Romp Room), 32 (Hearth Kitchen), 8 (Grooming
-   Parlour) and 2 (Lamp Dorm) times (a need met in its own room, or its supply taken there). (In the mockups' rooms,
-   before the building was rebuilt: 149 opened, 148 done, 14.2 s and 40.5 s; the first cast, twelve dragons, gave 274
-   opened, 271 done, 15.9 s and 53.4 s.) Not in this slice:
-   - dragons stay in their slots (the idle and its variants keep them lively), and the room a dragon stands in still
-     restores the need it meets (4.6): walking to a need's room, riding the lift and the end of that regeneration are
-     the next slice. The seven span more than one screen (world x 188 to 1177), so the start camera frames five of
-     them with every face whole (EMBER's and ZAP's tail tips at the left edge), and a drag shows COBBLE and ECHO;
-   - the lift's car stays parked at the ground floor, and nothing uses the Hatchery, the riders' rooms or the Aerie
-     yet (section 3's table says which slice does);
+   jobs opened and 143 were done, every one by a keeper (none closed on its own). A keeper started on a job 73.5 s after
+   it opened on average (330.3 s at most), most of it the dragon's own walk and its wait for the lift; no need ever
+   emptied. Keepers who reached the stand spot first waited 7.1 s on average for the dragon, and none gave up. The
+   dragons walked 95 304 px and rode the lift 129 times (a wait at a landing of 76.4 s at most, and a rider held in the
+   car at most 19.5 s while the bay cleared); dragons were held at the bay's edge at most 11.8 s and keepers 12.9 s;
+   44 lingerers were moved on. Every dragon had its needs met in four rooms or more (EMBER, which has no bath need, in
+   four; the rest in five), and the rooms were used 54 (Hearth Kitchen), 50 (Bathhouse), 60 (Romp Room), 33 (Grooming
+   Parlour), 28 (Lamp Dorm) and 129 (the lift) times. (With the dragons in their slots and the rooms restoring their
+   needs, S2's building gave 149 opened, 146 done, 14.5 s and 41.0 s; its checks wanted 30 s and 120 s, and this
+   slice's are 90 s and 400 s: 4.9 says why.) Not in this slice:
+   - the seven span more than one screen, so the start camera shows some of them and a drag shows the rest; they
+     no longer stay put;
+   - nothing uses the Hatchery, the riders' rooms or the Aerie yet (section 3's table says which slice does), so no
+     dragon rides the lift to the Aerie yet;
    - the base is the fixed starting one (or a preset), and nothing is stored yet: the save format exists and is
      checked, but nothing writes it to the browser;
    - no building of rooms (the rooms are section 3's fixed set), and no missions.
@@ -348,7 +396,8 @@ a mission are not keeping, which is the price of sending a team (5.6).
 
 ## 9. Open questions
 
-- Should a dragon ever take itself to a room (a tired dragon to the Lamp Dorm), or only ever be moved by the player?
+- ~~Should a dragon ever take itself to a room (a tired dragon to the Lamp Dorm), or only ever be moved by the
+  player?~~ Resolved (S3, #7): every dragon takes itself to its needs' rooms, and a keeper meets it there (2, 3, 4.4).
 - Day and night: dusk is the early sleeper and slinkwing the night owl (3.7, 3.8). A night shift of keepers?
 - Is any care kept as a player action, the grow-up (240 f, "look at me") above all?
 - The wall gate's exact rule, once the room palette exists.
