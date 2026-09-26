@@ -25,7 +25,7 @@ except what the keepers need from them (four small read-only helpers in `src/car
 **Status. Built:** the four keepers (`src/art/keeper/`), the care acts and the agents they drive
 (`src/care/acts.ts`, `keeper.ts`, `dragon.ts`), the planned walks (`src/care/path.ts`), the yard
 (`src/care/yard.ts`), and the gallery views `keepers`, `care`, `careaudit`, `yard` and `yardaudit`. `npm run check`
-runs the keeper palette gates (164 of 164 pass since the elder garden's path, S6: counted apart from the dragons' 2374) and eight new smoke cases, the
+runs the keeper palette gates (231 of 231 pass since the mission road and the grumpy miller, S9a: counted apart from the dragons' 2492) and eight new smoke cases, the
 care audits among them (every act on all 28 looks: 112 runs; the same mirrored on two elements: 32; and every act
 the yard plays in two and a half minutes, walks included). `npm run shots` renders the keeper sheets. The
 yard also brings the game side of one care hook: **dusk's `tuckin` is played on a tuck-in** (the bible's status noted
@@ -99,7 +99,7 @@ dragons' maths:
   (`KEEPER_SKIN_SHADOW`) sits >= 25 % under its skin. The engine's `toneOf` shadow is cooler, which on skin is a
   mauve-grey that read as stubble or a smudge across the lower face; a warmer, redder step reads as a face's underside.
 - **(Kc, Ke) the far side**: the far arm and leg keep >= 25 % from the near side, and >= 25 % and 6 Oklab L from the ink.
-- **(Ki) the floor**: shoes and trousers keep >= 25 % from every floor they walk (the straw, and the elder garden's path: Iris's rose slippers are the one light shoe, 40 % on both).
+- **(Ki) the floor**: shoes and trousers keep >= 25 % from every floor they walk (the straw, the elder garden's path and the mission road: Iris's rose slippers are the one light shoe, 40 % on all three).
 - **(Kf) told apart**: the four tops pass the dragons' RULE_B pairwise, as seen and under simulated deuteranopia and
   protanopia (a player tells the keepers apart across the yard by the top first).
 - **(Kg) at work**: the night keeper's trousers and cardigan pass the ladder against dusk's scale at every stage:
@@ -115,7 +115,8 @@ pair with its numbers, after the dragons' report):
 per keeper: 8 to 13 adjacency pairs, every slot's ramp and the skin shadow, 4 far-side colours, shoes and trousers on the floor
 the four tops: 6 pairs, each as seen, under deuteranopia and under protanopia
 the night keeper on dusk: trousers and cardigan, 4 stages each
-KEEPERS: PASS  164 of 164 gates passed
+the grumpy miller (src/game/npcs.ts, on the keepers' rig): 17 adjacency pairs, ramps and skin shadow, the far side, shoes, trousers and sack on every floor, his shirt against the four tops
+KEEPERS: PASS  231 of 231 gates passed
 ```
 
 ## 4. The rig

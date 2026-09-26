@@ -82,6 +82,17 @@ const pairs: string[] = [
   'shots/base_garden.png=view=base&preset=garden&cam=1304,376&t=600',
   'shots/base_garden_night.png=view=base&preset=garden&cam=1304,376&t=600&hour=22',
   'shots/base_gate.png=view=base&preset=retire&cam=1060,376&t=2564',
+  // the mission art kit (plan S9a; docs/ART_BIBLE.md "Mission art"): the six climates at the four phases (the chooser's
+  // 300 x 112 pictures), two of them filling a road scene, the eleven set pieces ahead and met (a dragon in the fog,
+  // which stands behind it), the three baddies' faces, poses and exits beside an adult dragon, the grumpy miller
+  // grumpy and talked round beside the keepers (and their silhouettes), and the icons
+  'shots/missionart_climates.png=view=missionart&sheet=climates&t=0',
+  'shots/missionart_road_caves.png=view=missionart&sheet=climates&climate=caves&phase=day&t=120',
+  'shots/missionart_road_ice_night.png=view=missionart&sheet=climates&climate=ice&phase=night&t=120',
+  'shots/missionart_setpieces.png=view=missionart&sheet=setpieces&t=60',
+  'shots/missionart_baddies.png=view=missionart&sheet=baddies&t=30',
+  'shots/missionart_people.png=view=missionart&sheet=people&t=50',
+  'shots/missionart_icons.png=view=missionart&sheet=icons&t=0',
 ];
 for (const el of ['fire', 'rock', 'slinkwing']) {
   for (const stage of ['elder', 'adult', 'young', 'baby']) {

@@ -32,6 +32,8 @@ interface Window {
     pour?: { id: string; frame: number; top: number; lip: number; column: boolean }[];
     /** view=neutral (src/gallery.ts): per look, the share of its pixels that are neutral (HSV S < 0.25); `over` > 40 % (3.1). */
     neutral?: { id: string; share: number; over: boolean }[];
+    /** view=missionart (src/game/missionart.ts): the sheet shown and every item it drew (plan S9a's mission art kit). */
+    missionart?: { sheet: string; drawn: string[] };
     /**
      * view=careaudit (src/gallery.ts): per care act and look, the most pixels of the dragon's eye box the keeper covers
      * (K7: never any), where, how far a stroking hand lands from its mark, and whether the act finished.

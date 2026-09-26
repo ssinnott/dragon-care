@@ -27,6 +27,8 @@
 //   view=tails                 the tail-ceiling audit (a fluke never rises over 3 px above the back: 3.0), narrowed the same
 //   view=pour                  the pour-column audit (no breath effect joins the mouth to the floor: 3.8), narrowed the same
 //   view=neutral               the neutral-area recorder (each look's share of HSV S < 0.25 pixels, <= 40 %: 3.1)
+//   view=missionart            the mission art kit (src/game/missionart.ts; plan S9a): sheet=climates (&climate=<c>&phase=<p>:
+//                              one climate as a scrolling road scene) | setpieces | baddies | people | icons
 //   view=base                  the base (src/game/base.ts; docs/BASE_DESIGN.md): the barn and towers at 640 x 360 with the
 //                              care simulation running -- need bubbles, keepers, the job strip; live, drag to look around
 //                              and tap a bubble, a job or a dragon to Rush it; seed= seeds the world, cam=x,y starts the
@@ -72,12 +74,13 @@ import type { ActKind, CareAct } from './care/acts.ts';
 import { Yard } from './care/yard.ts';
 import { REACH_MISS, ACT_MAX, YARD_ACT_MAX } from './care/limits.ts';
 import { FLOORS } from './game/surfaces.ts';
+import { missionArtScene } from './game/missionart.ts';
 
 /** The reference habitat floor (5.4, gate i): the base's straw (src/game/surfaces.ts, every floor gated by tools/palette-check.ts). */
 export const STRAW = FLOORS.straw;
 const LABEL = '#3a2a30';
 
-export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings', 'keepers', 'care', 'careaudit', 'yard', 'yardaudit', 'base'] as const;
+export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings', 'keepers', 'care', 'careaudit', 'yard', 'yardaudit', 'missionart', 'base'] as const;
 export type View = typeof VIEWS[number];
 /** The views the arrows and Space cycle through: every one but the game's (view=base keeps its keys, so it could never be left). */
 const RING: readonly View[] = VIEWS.filter((v) => v !== 'base');
@@ -1345,6 +1348,7 @@ function makeScene(P: GalleryParams): Scene {
     case 'careaudit': return careAuditScene(P);
     case 'yard': return yardScene(P);
     case 'yardaudit': return yardAuditScene(P);
+    case 'missionart': return missionArtScene(location.search);
     // (a frozen view never loads or saves (G4), and nor does a preset or a start hour: loading would hide it, autosaving
     // would put it in place of the player's barn)
     case 'base': return new BaseView({ seed: P.seed, cam: P.cam, preset: P.preset, persist: P.t == null && P.save && !P.preset && P.hour == null, hour: P.hour, layers: P.layers });

@@ -28,9 +28,9 @@
 
 **Where this came from.** Three art directors proposed designs independently, from three lenses: readability (R), charm (C) and growth (G). This bible takes the strongest idea for each decision rather than averaging, and says where each one came from. Readability constraints are **hard rules**. No decision below trades one away. v2 was proposed the same way: an elder-stage proposal (**EL**), two independent seventh-element proposals (**NA**, "Vesper", and **NB**, "Wisp"), and a spike-and-water proposal (**SW**), each prototyped in a scratch copy of the rig; the lead art director took one seventh element, grafted the best of the other onto it, and re-ran every colour through the extended palette check (Decisions (v2)).
 
-**Status.** v1 is built: the quadruped rig, the shared features and all six v1 elements, each finished by its own element artist, reviewed and integrated (the **Element pass** in the Review log), live in `src/art/dragon/` (file list in 1.1). Built: the core animation set of 4.2 per stage (idle with its variants, walk, happy, eat, sleep and wake, breath, pet, beg), authored as tracks from the 4.1 stage timing rules and tuned per element by the generic knobs of 4.3; every element's signature breath, baby fizzle, idle fidget (section 3) and 4.3 column (walk, happy flourish, hungry tell, sleep pose); the element anims fire's `bath`, rock's `upset` tuck and slinkwing's lonely `call`; rock's roll-over happy and the E8 fan flop; a turn in place (a paper turn: 4.1) and a head that looks back over its shoulder (a head pitched past vertical: 4.1). **Not built yet:** the anims grow-up (the base plays a stand-in, 4.2: the new stage's body swapped in, flat in `glow.hi` inside its own ink for 12 f, then `happy`), hopGlide, fly and rock's boulder hop, play, refuse and zap, and the other elements' baths; water floating belly-up (the habitat has no water) and spike's shed quills (a collectible). The game's side of the care loop does not exist yet: nothing consumes `event: 'shriek'`, `'call'` or `'hush'` (nor plays dusk's `tuckin` on a tuck-in: `ELEMENT_ANIM_FALLBACK` names every other element's sleep for it), the pebble pile of rock's hungry tell is drawn by rock rather than placed as a habitat prop, and `bond` (DrawDragonOpts) is fed only by the gallery (its `bond` query). **The game's pet renderer** (the base, `src/game/base.ts` and `pet.ts`) now feeds `charge` from lightning's play need and runs the wary latch and the crowd rule (5.4) every step, which matters now that its dragons walk past each other: it walks each dragon by its walk anim's own root motion (the simulation moves the body by each frame's `move` at speed 1 and the view plays that walk from the start of every bout, `src/game/gait.ts`, so a planted paw holds still on the floor), turns it with the paper turn (4.1) and carries it on the Dragon Lift's car. Each element file's header lists what it draws.
+**Status.** v1 is built: the quadruped rig, the shared features and all six v1 elements, each finished by its own element artist, reviewed and integrated (the **Element pass** in the Review log), live in `src/art/dragon/` (file list in 1.1). Built: the core animation set of 4.2 per stage (idle with its variants, walk, happy, eat, sleep and wake, breath, pet, beg), authored as tracks from the 4.1 stage timing rules and tuned per element by the generic knobs of 4.3; every element's signature breath, baby fizzle, idle fidget (section 3) and 4.3 column (walk, happy flourish, hungry tell, sleep pose); the element anims fire's `bath`, rock's `upset` tuck and slinkwing's lonely `call`; rock's roll-over happy and the E8 fan flop; a turn in place (a paper turn: 4.1) and a head that looks back over its shoulder (a head pitched past vertical: 4.1). **Not built yet:** the anims grow-up (the base plays a stand-in, 4.2: the new stage's body swapped in, flat in `glow.hi` inside its own ink for 12 f, then `happy`), hopGlide, fly and rock's boulder hop, play, refuse and zap, and the other elements' baths; water floating belly-up (the habitat has no water) and spike's shed quills (a collectible). The game's side of the care loop does not exist yet: nothing consumes `event: 'shriek'`, `'call'` or `'hush'` (nor plays dusk's `tuckin` on a tuck-in: `ELEMENT_ANIM_FALLBACK` names every other element's sleep for it), the pebble pile of rock's hungry tell is drawn by rock rather than placed as a habitat prop, and `bond` (DrawDragonOpts) is fed only by the gallery (its `bond` query). **The game's pet renderer** (the base, `src/game/base.ts` and `pet.ts`) now feeds `charge` from lightning's play need and runs the wary latch and the crowd rule (5.4) every step, which matters now that its dragons walk past each other: it walks each dragon by its walk anim's own root motion (the simulation moves the body by each frame's `move` at speed 1 and the view plays that walk from the start of every bout, `src/game/gait.ts`, so a planted paw holds still on the floor), turns it with the paper turn (4.1) and carries it on the Dragon Lift's car. Each element file's header lists what it draws. **The mission art kit is built** (plan S9a, 5.10): the six climates at every phase, the eleven set pieces, the three big baddies (faces, poses, cozy exits, gate x), the grumpy miller on the keepers' rig and the mission icons, laid out by the gallery's `view=missionart`; nothing in the game draws them until the mission slices wire them in.
 
-**v2 status: designed, reviewed and built: the colour half, the elder core and the element pass v2.** The palette is code: `src/art/dragon/palettes.ts` holds the seven base palettes and the greying transform (`agePalette`, `agedPalette`, the silvered highlight in `dragonTones`, the elder face greys `muzzleOf` / `beardOf`, with every strength as data), and `tools/palette-check.ts` runs every gate on all seven elements at all four stages (report in 5.8: **2374 of 2374 gates pass**, the water and rock beards' exempt pairs reported, not counted; gate (i) runs on every floor the base's dragons and keepers stand on, `src/game/surfaces.ts` `FLOORS` (the straw, and the elder garden's pale path), each also held under HSV S 0.20; the egg gate, counted apart, **8 of 8** (every element's egg, its baby's colour, ≥ 25 % from the Hatchery's nest straw, and the egg seen against that straw alone: 5.9); gate (w), counted apart, **1105 of 1105**, holds everything the base's dragons are seen against -- the sky at every hour of the day and night, every wall, the elder garden's hedge, lawn, wood and fence, and the lamps' and lanterns' light ≥ 25 % *lighter* than every dark body (L ≥ 0.159, so night stays mid-value, never black), the big props behind a slot ≥ 25 % from them either way, and all 6 Oklab L from the ink -- and no dragon is ever tinted for night). Water is sea green and the sandstone a touch warmer in the rig today. **The elder core is built** in the shared rig (the Review log's **Elder core** entries): the elder in `Stage` and every per-stage table (`STAGE_DIMS.elder`, `STAGE_TIMING`, `TAIL_CHAIN`, the fidget's `FIDGET_TIMING`), every stage drawn through `agedPalette` with the tone cache seeded from `dragonTones` for every slot (no element renderer reads a base palette at runtime), the elder's posture (the settled chest, the paunch, the level head, the wider stance), face (the grey muzzle and brow tuft, the inked beard fitted to each head, the worn fangs, the slower blink), wing wear (the tears, and the notched hole at full spread, cut through the far wing and the back row), the elder column of the shared anims with its variants (the back stretch, reminisce, airing the wings), and the gallery's elder row (every view, and `view=wings`). **The element pass v2 is built and integrated** (the Review log's **Element pass v2**): every elder cue and elder-only extra of section 3 (the hearth and its coal bed, the sap-buds, the 36 × 12 dome and the fourth crystal, the third bolt tooth and the far bolt's tear, the 18 × 9 fluke with its rays and pearls, the 19 px fans and their frost, the resident moth), every elder breath's finale ring (4.2), spike's spikier comb (3.3), slinkwing's arm-panel tear and its own elder preen (2.9, 1.3), rock's sunning and lightning's storm-watch in the airing's place (4.2), and **dusk, built whole** (3.8: the lamp and its lexicon, the nose frost and the smoke tip, Nightfall and the fizzle, the moths and motes, the lantern carry, the search by lamplight, the lamp-bat and the tuck-in). An elder now gains its face, its greys, its airing and its element's extra: the last grow-up's reward (D15) is drawn, waiting for the grow-up anim to show it off. **Not built yet:** the grow-up and its "look at me" beat, the gliding flight (the holes' other showing), the fly and the hop-glide, and the game side of the care loop (the Review log's known gaps). `npm run shots` renders the standard sheets of 5.5 and `npm run smoke` checks every gallery view, the floor, leg-root, tail-ceiling, pour-column and neutral-area audits included (all seven elements; the gallery's lineup, cast, mood and silhouette views lay out seven columns, the habitat holds all seven). Every hex below comes from that module and passed that check. The bible has been through one design review round (a readability critique and a care-game critique), four review rounds of the built rig, the element pass, two cast reviews (the whole cast judged together), the v2 design round, the v2 review (a readability critique and a care-game critique of the v2 design), two review rounds of the built elder core, the element pass v2 (a critique and a fix round per element, then the integration) and two cast reviews of the v2 cast (appeal and distinctness, each round fixed and re-checked on renders: Nightfall is now breathed out in puffs that settle as one sheet, the habitat keeps spread wings apart by a crowd rule, and a pour-column audit joins the smoke run); what changed, and what was turned down, is in the **Review log** at the end, with what building the core animations found.
+**v2 status: designed, reviewed and built: the colour half, the elder core and the element pass v2.** The palette is code: `src/art/dragon/palettes.ts` holds the seven base palettes and the greying transform (`agePalette`, `agedPalette`, the silvered highlight in `dragonTones`, the elder face greys `muzzleOf` / `beardOf`, with every strength as data), and `tools/palette-check.ts` runs every gate on all seven elements at all four stages (report in 5.8: **2492 of 2492 gates pass**, the water and rock beards' exempt pairs reported, not counted; gate (i) runs on every floor the base's dragons and keepers stand on, `src/game/surfaces.ts` `FLOORS` (the straw, the elder garden's pale path and the mission road), each also held under HSV S 0.20; the egg gate, counted apart, **8 of 8** (every element's egg, its baby's colour, ≥ 25 % from the Hatchery's nest straw, and the egg seen against that straw alone: 5.9); gate (w), counted apart, **3458 of 3458**, holds everything the base's dragons are seen against -- the sky at every hour of the day and night, every wall, the elder garden's hedge, lawn, wood and fence, every layer of the six mission climates at every phase, and the lamps' and lanterns' light ≥ 25 % *lighter* than every dark body (L ≥ 0.159, so night stays mid-value, never black), the big props behind a slot ≥ 25 % from them either way, and all 6 Oklab L from the ink -- and no dragon is ever tinted for night). Water is sea green and the sandstone a touch warmer in the rig today. **The elder core is built** in the shared rig (the Review log's **Elder core** entries): the elder in `Stage` and every per-stage table (`STAGE_DIMS.elder`, `STAGE_TIMING`, `TAIL_CHAIN`, the fidget's `FIDGET_TIMING`), every stage drawn through `agedPalette` with the tone cache seeded from `dragonTones` for every slot (no element renderer reads a base palette at runtime), the elder's posture (the settled chest, the paunch, the level head, the wider stance), face (the grey muzzle and brow tuft, the inked beard fitted to each head, the worn fangs, the slower blink), wing wear (the tears, and the notched hole at full spread, cut through the far wing and the back row), the elder column of the shared anims with its variants (the back stretch, reminisce, airing the wings), and the gallery's elder row (every view, and `view=wings`). **The element pass v2 is built and integrated** (the Review log's **Element pass v2**): every elder cue and elder-only extra of section 3 (the hearth and its coal bed, the sap-buds, the 36 × 12 dome and the fourth crystal, the third bolt tooth and the far bolt's tear, the 18 × 9 fluke with its rays and pearls, the 19 px fans and their frost, the resident moth), every elder breath's finale ring (4.2), spike's spikier comb (3.3), slinkwing's arm-panel tear and its own elder preen (2.9, 1.3), rock's sunning and lightning's storm-watch in the airing's place (4.2), and **dusk, built whole** (3.8: the lamp and its lexicon, the nose frost and the smoke tip, Nightfall and the fizzle, the moths and motes, the lantern carry, the search by lamplight, the lamp-bat and the tuck-in). An elder now gains its face, its greys, its airing and its element's extra: the last grow-up's reward (D15) is drawn, waiting for the grow-up anim to show it off. **Not built yet:** the grow-up and its "look at me" beat, the gliding flight (the holes' other showing), the fly and the hop-glide, and the game side of the care loop (the Review log's known gaps). `npm run shots` renders the standard sheets of 5.5 and `npm run smoke` checks every gallery view, the floor, leg-root, tail-ceiling, pour-column and neutral-area audits included (all seven elements; the gallery's lineup, cast, mood and silhouette views lay out seven columns, the habitat holds all seven). Every hex below comes from that module and passed that check. The bible has been through one design review round (a readability critique and a care-game critique), four review rounds of the built rig, the element pass, two cast reviews (the whole cast judged together), the v2 design round, the v2 review (a readability critique and a care-game critique of the v2 design), two review rounds of the built elder core, the element pass v2 (a critique and a fix round per element, then the integration) and two cast reviews of the v2 cast (appeal and distinctness, each round fixed and re-checked on renders: Nightfall is now breathed out in puffs that settle as one sheet, the habitat keeps spread wings apart by a crowd rule, and a pour-column audit joins the smoke run); what changed, and what was turned down, is in the **Review log** at the end, with what building the core animations found.
 
 
 **The keepers.** People who look after the dragons now share their screen: four keepers (a cook, a groomer, a night
@@ -1146,7 +1146,7 @@ Scale saturation b / y / a / e: fire 0.86 / 0.86 / 0.86 / 0.74, spike 0.64 / 0.6
 
 **Why fire / spike gives way in greyscale, as elders only (D29, E10).** Normal-vision luminance F, S (fire, spike) and protanopia-simulated luminance f, s: at hatching F / S = 1.36 and s / f = 1.35, both just over the 1.333 of B2. Greying keeps F and S but pulls f up toward F (the red's lost luminance comes back as grey) and s down toward S. Holding s / f ≥ 1.333 needs fire to darken (λ < 0) or spike to lighten (λ > 0), which shrinks F / S; holding F / S needs the opposite. With spike greying visibly (k ≈ 0.4) no pair of strengths keeps both: the protanopia gate is what players need, so it holds (26 / 26 / 26 / 28 %, gate f) and the greyscale step thins at the elder stage only, where both bodies grey (26 / 26 / 26 / 14 %). In normal vision they still pass B1 at every stage (S ≥ 0.34, 111° apart: red against green).
 
-**Checks in `tools/palette-check.ts`:** every gate at all four stages; (b) and (f) at all 16 stage combinations of every pair (an elder shares the habitat with babies), (b) with the dark-pair floor on value-only passes; (a) the elder face pairs (muzzle / scale, scale.sh, dark, ink; beard / belly, belly.sh, scale.sh, ink; slinkwing's muzzle / mask and frost / membrane; rock's muzzle / nose horn) and the elder-only extras (fire's coal bed, spike's sap-buds); (i) the beard, dusk's smoke tip, slate band and nightlight on every floor (the base's `FLOORS`, each under HSV S 0.20); (j) identity through age; (k) visible greying. **Result: 2374 of 2374 gates pass** (5.8; the water and rock beards' exempt pairs are reported, not counted: 5.6 E14, E15). The thinnest passes, all by design and all re-run whenever a hex or strength moves: deuteranopia fire / water 14 % by B3 (baby / baby: water's simulated grey against fire's saturated olive), protanopia rock / water B3 with ΔS 0.31 at elder / elder (margin 1.04), fire / spike in greyscale as elders (E10), rock / floor 28 % and rock's belly / floor 26 % (unchanged since v1), lightning's glow / membrane 26 %, fire's beard / floor 29 %, lightning / dusk by value (6.5 Oklab L and 0.129 ΔE at the report's thinnest, baby / young; its least ΔE 0.095, elder Zap / baby Wick, 30 % in value); and two value-only colour-blind passes under the dark-pair floor, reported, not gated (E13): deuteranopia slinkwing / dusk and protanopia fire / spike.
+**Checks in `tools/palette-check.ts`:** every gate at all four stages; (b) and (f) at all 16 stage combinations of every pair (an elder shares the habitat with babies), (b) with the dark-pair floor on value-only passes; (a) the elder face pairs (muzzle / scale, scale.sh, dark, ink; beard / belly, belly.sh, scale.sh, ink; slinkwing's muzzle / mask and frost / membrane; rock's muzzle / nose horn) and the elder-only extras (fire's coal bed, spike's sap-buds); (i) the beard, dusk's smoke tip, slate band and nightlight on every floor (the base's `FLOORS`, each under HSV S 0.20); (j) identity through age; (k) visible greying. **Result: 2492 of 2492 gates pass** (5.8; the water and rock beards' exempt pairs are reported, not counted: 5.6 E14, E15). The thinnest passes, all by design and all re-run whenever a hex or strength moves: deuteranopia fire / water 14 % by B3 (baby / baby: water's simulated grey against fire's saturated olive), protanopia rock / water B3 with ΔS 0.31 at elder / elder (margin 1.04), fire / spike in greyscale as elders (E10), rock / floor 28 % and rock's belly / floor 26 % (unchanged since v1), lightning's glow / membrane 26 %, fire's beard / floor 29 %, lightning / dusk by value (6.5 Oklab L and 0.129 ΔE at the report's thinnest, baby / young; its least ΔE 0.095, elder Zap / baby Wick, 30 % in value); and two value-only colour-blind passes under the dark-pair floor, reported, not gated (E13): deuteranopia slinkwing / dusk and protanopia fire / spike.
 
 ---
 
@@ -1410,7 +1410,7 @@ Babies come in at about 18 to 22 and the young at about 26 to 32. An elder adds 
   - *water:* a bluer membrane (`#16566e`: dusk's new body) and a greener one (spike's leaf).
 
 ### 5.8 Palette check report
-Output of `node tools/palette-check.ts` for the base palettes of 3.1 at all four stages (the greying of 3.9), and (since the base's day and night) gate (w) on everything the base's dragons are seen against (`src/game/surfaces.ts`: the sky at every phase and every stepped mix between two, the walls, the big props behind a slot, the lamps' light; since the elder garden, its hedge, lawn, trunks and bench, fence, nest mounds and the lanterns' rings), counted on its own line, and (since the Hatchery's eggs) the egg gate (5.9), on its own line too; the keepers' gates are in `docs/KEEPERS.md`. Re-paste it whenever a hex or a greying strength changes.
+Output of `node tools/palette-check.ts` for the base palettes of 3.1 at all four stages (the greying of 3.9), and (since the base's day and night) gate (w) on everything the base's dragons are seen against (`src/game/surfaces.ts`: the sky at every phase and every stepped mix between two, the walls, the big props behind a slot, the lamps' light; since the elder garden, its hedge, lawn, trunks and bench, fence, nest mounds and the lanterns' rings), counted on its own line, and (since the Hatchery's eggs) the egg gate (5.9), on its own line too; since the mission art kit (S9a, 5.10), the mission road in (i), the six climates in (w) (one line per climate and phase) and gate (x) on the big baddies, on its own line; the keepers' gates (the grumpy miller's among them) are in `docs/KEEPERS.md`. Re-paste it whenever a hex or a greying strength changes.
 
 ```
 DRAGON PALETTE CHECK  (tools/palette-check.ts)
@@ -1790,6 +1790,16 @@ stages: baby / young / adult / elder (b/y/a/e), each the base palette greyed by 
   ok   slinkwing  scale 92/92/92/92%  belly 28/28/28/28%  sound arc 47/47/47/47%  sound arc edge 92/92/92/92%  beard -/-/-/58%
   ok   dusk       scale 88/87/88/87%  belly 55/55/55/55%  mist lobe (opaque) 47/47/47/47%  mist ring 88/87/88/87%  smoke tail tip 29/29/29/29%  slate band 66/66/66/65%  nightlight dark face 67/67/67/67%  beard -/-/-/29%
 
+(i) HABITAT FLOOR road #dcd6c4  (L 0.67, S 0.11: hue never counts, >= 25% luminance; % b/y/a/e)
+  ok   saturation 0.109 < 0.20
+  ok   fire       scale 66/66/66/69%  belly 49/49/49/49%  breath puff outer ring 66/66/66/69%  beard -/-/-/29%
+  ok   spike      scale 75/75/75/73%  belly 43/43/43/43%  sap streak / sparkle edge 75/75/75/73%  beard -/-/-/61%
+  ok   rock       scale 28/28/28/28%  belly 26/26/26/26%  dust puff (opaque) 28/28/28/28%  adult roar puff ring 59/59/59/59%  pebble 81/81/81/81%  beard exempt (the muzzle white, inked on its outer contour: 5.6 E15)
+  ok   lightning  scale 82/82/82/82%  belly 31/31/31/31%  spark ring 82/82/82/82%  beard -/-/-/53%
+  ok   water      scale 49/49/49/49%  belly 28/28/28/28%  bubble / drip ring 87/87/87/87%  beard exempt (inked on its outer contour: 5.6 E14)
+  ok   slinkwing  scale 92/92/92/92%  belly 28/28/28/28%  sound arc 47/47/47/47%  sound arc edge 92/92/92/92%  beard -/-/-/58%
+  ok   dusk       scale 88/87/88/88%  belly 55/55/56/56%  mist lobe (opaque) 47/47/47/47%  mist ring 88/87/88/88%  smoke tail tip 30/30/30/30%  slate band 66/66/66/65%  nightlight dark face 67/67/67/67%  beard -/-/-/30%
+
 (j) IDENTITY THROUGH AGE  (every stage's scale keeps HSV S >= 0.3; scale k b/y/a/e from palettes.ts ageK)
   ok   fire       scale S 0.86/0.86/0.86/0.74  (>= 0.30)  k 0.00/0.00/0.00/0.14  #f04422 #f04422 #f04422 #dd4d39
   ok   spike      scale S 0.64/0.64/0.64/0.34  (>= 0.30)  k 0.00/0.00/0.00/0.41  #2f8232 #2f8232 #2f8232 #558056
@@ -1902,6 +1912,32 @@ stages: baby / young / adult / elder (b/y/a/e), each the base palette greyed by 
   ok   prop pallet                  #a47a52  L 0.224  least  47% apart   (lightning elder)  okL 42.2 from ink
   ok   prop mattress                #e6dcc4  L 0.720  least  83% apart   (lightning elder)  okL 70.6 from ink
   ok   prop gateLeaf                #a47a52  L 0.224  least  47% apart   (lightning elder)  okL 42.2 from ink
+ the mission climates (src/game/surfaces.ts CLIMATE_BACKDROPS; backdrops.ts drawClimate): sky top / middle / low, ridge, near, detail, marks
+  ok   climate meadow night  7 colours, least  38% lighter (sky top #6a78a8 on lightning elder), okL 39.1 from ink at least
+  ok   climate meadow dawn   7 colours, least  58% lighter (marks #8490b8 on lightning elder), okL 46.8 from ink at least
+  ok   climate meadow day    7 colours, least  60% lighter (marks #7898bc on lightning elder), okL 47.9 from ink at least
+  ok   climate meadow dusk   7 colours, least  45% lighter (marks #8a7a9c on lightning elder), okL 41.6 from ink at least
+  ok   climate caves night   10 colours, least  35% lighter (sky top #6a74a4 on lightning elder), okL 38.0 from ink at least
+  ok   climate caves dawn    10 colours, least  81% lighter (near #e8ccaa on lightning elder), okL 67.0 from ink at least
+  ok   climate caves day     10 colours, least  81% lighter (near #e6cc9e on lightning elder), okL 66.6 from ink at least
+  ok   climate caves dusk    10 colours, least  81% lighter (ridge #e6c8b4 on lightning elder), okL 66.3 from ink at least
+  ok   climate forest night  7 colours, least  33% lighter (sky top #66749e on lightning elder), okL 37.4 from ink at least
+  ok   climate forest dawn   7 colours, least  47% lighter (detail #a47a52 on lightning elder), okL 42.2 from ink at least
+  ok   climate forest day    7 colours, least  47% lighter (detail #a47a52 on lightning elder), okL 42.2 from ink at least
+  ok   climate forest dusk   7 colours, least  45% lighter (marks #8a7a9c on lightning elder), okL 41.6 from ink at least
+  ok   climate peaks night   7 colours, least  34% lighter (sky top #6874a6 on lightning elder), okL 38.0 from ink at least
+  ok   climate peaks dawn    7 colours, least  82% lighter (sky top #d6d2ea on lightning elder), okL 68.4 from ink at least
+  ok   climate peaks day     7 colours, least  83% lighter (sky top #d2dcea on lightning elder), okL 70.1 from ink at least
+  ok   climate peaks dusk    7 colours, least  81% lighter (sky top #dccae0 on lightning elder), okL 67.0 from ink at least
+  ok   climate ice night     7 colours, least  36% lighter (sky top #6676aa on lightning elder), okL 38.4 from ink at least
+  ok   climate ice dawn      7 colours, least  83% lighter (sky top #d4d6ee on lightning elder), okL 69.2 from ink at least
+  ok   climate ice day       7 colours, least  84% lighter (sky top #cfe2f0 on lightning elder), okL 71.3 from ink at least
+  ok   climate ice dusk      7 colours, least  81% lighter (sky top #dccce6 on lightning elder), okL 67.6 from ink at least
+  ok   climate ash night     7 colours, least  31% lighter (sky top #6c70a0 on lightning elder), okL 37.1 from ink at least
+  ok   climate ash dawn      7 colours, least  69% lighter (ridge #c0a0a4 on lightning elder), okL 54.5 from ink at least
+  ok   climate ash day       7 colours, least  68% lighter (ridge #c89a8a on lightning elder), okL 53.3 from ink at least
+  ok   climate ash dusk      7 colours, least  58% lighter (near #a48c88 on lightning elder), okL 47.1 from ink at least
+  ok   prop cave mouth              #3a2e36  L 0.031  least  41% apart   (slinkwing baby)  okL 12.8 from ink
 
 (egg) EGGS  (each element's egg is its baby's scale colour, inked round: >= 25% luminance from the nest #e6dcc4 it lies in, L 0.720)
   ok   fire       egg #f04422  L 0.228   68% from the nest (darker)
@@ -1913,8 +1949,48 @@ stages: baby / young / adult / elder (b/y/a/e), each the base palette greyed by 
   ok   dusk       egg #1f5580  L 0.083   88% from the nest (darker)
   ok   egg-lie    every egg lies against the nest's straw alone: the 162 pixels round its ink ring over its 3 wobbles, all in the heap (20 x 21 px), over the band, off the strands
 
-RESULT: PASS  2374 of 2374 gates passed
-BACKDROPS: PASS  1105 of 1105 gates passed
+(x) BADDIES  (each fill on a baddie's silhouette edge >= 25% luminance from the road #dcd6c4 and from every band of its home climate at every phase; every fill >= 6 Oklab L from the ink; touching colours by the ladder)
+ THE MOLE KING (112 x 88; home caves)
+  ok   edge velvet   #5e4238  L 0.066  least  64% (night sky top #6a74a4), 25 bands
+  ok   edge paw      #e8969c  L 0.414  least  33% (dusk ridge #e6c8b4), 25 bands
+  ok   edge crown    #d8a838  L 0.429  least  30% (dusk ridge #e6c8b4), 25 bands
+  ok   velvet/belly     lum  60%  hue  6deg  lum      #5e4238 #8a6a58  (the belly on the body)
+  ok   velvet/paw       lum  84%  hue 20deg  lum      #5e4238 #e8969c  (the paws and snout on the body)
+  ok   belly/paw        lum  60%  hue 26deg  lum      #8a6a58 #e8969c  (the paws over the belly)
+  ok   velvet/crown     lum  85%  hue 26deg  lum      #5e4238 #d8a838  (the crown on the head)
+  ok   crown/jewel      lum  72%  hue 54deg  lum+hue  #d8a838 #b0304a  (the jewel on the crown)
+  ok   velvet/rim       lum  85%  hue 26deg  lum      #5e4238 #d8a838  (the spectacles on the face)
+  ok   velvet/white     lum  93%  hue   n/a  lum      #5e4238 #f8f4ec  (the eye on the face)
+ THE STORM ROC (140 x 100; home peaks)
+  ok   edge body     #4a5a7a  L 0.102  least  44% (night sky top #6874a6), 25 bands
+  ok   edge wing     #34405c  L 0.052  least  72% (night sky top #6874a6), 25 bands
+  ok   edge fluff    #9aa6c4  L 0.381  least  38% (night ridge #7a84aa), 25 bands
+  ok   edge beak     #e8a848  L 0.456  least  27% (dusk sky top #dccae0), 25 bands
+  ok   edge leg      #e8a848  L 0.456  least  27% (dusk sky top #dccae0), 25 bands
+  ok   body/wing        lum  49%  hue  2deg  lum      #4a5a7a #34405c  (the folded wing on the body)
+  ok   body/fluff       lum  73%  hue  3deg  lum      #4a5a7a #9aa6c4  (the breast fluff on the body)
+  ok   body/beak        lum  78%  hue 176deg  lum+hue  #4a5a7a #e8a848  (the beak on the head)
+  ok   wing/fluff       lum  86%  hue  1deg  lum      #34405c #9aa6c4  (the wing over the fluff)
+  ok   body/white       lum  89%  hue   n/a  lum      #4a5a7a #f8f4ec  (the eye on the face)
+  ok   fluff/leg        lum  16%  hue 173deg  HUE ONLY #9aa6c4 #e8a848  (the legs under the fluff)
+ THE FROST GIANT (96 x 140; home ice)
+  ok   edge wool     #98a8c4  L 0.387  least  37% (night sky low #7686b6), 25 bands
+  ok   edge face     #d8a4a0  L 0.437  least  32% (dusk sky top #dccce6), 25 bands
+  ok   edge scarf    #a8323a  L 0.109  least  42% (night sky top #6676aa), 25 bands
+  ok   edge stripe   #d89a48  L 0.382  least  36% (night sky low #7686b6), 25 bands
+  ok   edge nose     #b83040  L 0.127  least  32% (night sky top #6676aa), 25 bands
+  ok   edge boot     #503a34  L 0.050  least  73% (night sky top #6676aa), 25 bands
+  ok   wool/face        lum  11%  hue 146deg  HUE ONLY #98a8c4 #d8a4a0  (the face in the wool)
+  ok   wool/scarf       lum  72%  hue 138deg  lum+hue  #98a8c4 #a8323a  (the scarf on the wool)
+  ok   scarf/stripe     lum  71%  hue 38deg  lum      #a8323a #d89a48  (the knitted stripes)
+  ok   face/nose        lum  71%  hue 11deg  lum      #d8a4a0 #b83040  (the nose on the face)
+  ok   wool/boot        lum  87%  hue 155deg  lum+hue  #98a8c4 #503a34  (the boots under the wool)
+  ok   face/white       lum  52%  hue   n/a  lum      #d8a4a0 #f8f4ec  (the eye on the face)
+  ok   wool/scarf       lum  72%  hue 138deg  lum+hue  #98a8c4 #a8323a  (the mittens on the arms)
+
+RESULT: PASS  2492 of 2492 gates passed
+BACKDROPS: PASS  3458 of 3458 gates passed
+BADDIES: PASS  387 of 387 gates passed
 EGGS: PASS  8 of 8 gates passed
 ```
 
@@ -1944,6 +2020,72 @@ the straw is all it is ever seen against: never the Hatchery's wall, the band or
   dusk's) both read in it; and **egg-lie** checks that the straw is what it is seen against: every pixel just outside
   the egg's ink ring, at each wobble, lies in the heap's plain straw (a px in from its antialiased inked edge, over the
   band, off the strands). Its report: the `(egg)` block in 5.8.
+
+### 5.10 Mission art
+The missions' drawings (plan S9a; built ahead of the mission slices, S8 and S9 wire them in): drawing only, no game
+state, every quantity a pure function of its inputs and a step count, so a frozen view draws the same frame every time.
+All in the house style: a 1 px `#1a1018` ink, flat cel bands lit from the top left (the engine's cel helpers through
+`src/game/cel.ts`, the dragons' and keepers' exact shading), no gradients, no alpha, no mark under 2 px. The gallery's
+`view=missionart` lays each part out on the mission road (`sheet=climates|setpieces|baddies|people|icons`; shots
+`missionart_*`). The shared names (climates, challenges, skills, baddies, faces, poses, exits) are `src/game/missiondata.ts`.
+
+- **The climates** (`src/game/backdrops.ts` `drawClimate(ctx, climate, phase, rect, scroll)`): MILD MEADOWS (rolling downs,
+  hedgerows, rain), DRY HILLS AND CAVES (mesas, sandy hills, one cave mouth with its lantern and one stepped pool of its
+  light), DEEP FOREST (a row of firs, round-crowned trees, rain), STORMY PEAKS (snow-capped peaks, crags, storm clouds with
+  3 px bolts), FROZEN LAKE (white hills, the lake and its floes, snow), WARM ASH HILLS (round cones, their flank bands, heat
+  bands in the low sky). Each is stepped flat layers -- three sky bands, a far ridge at 0.2 parallax, near forms at 0.5,
+  weather marks (rain 2 x 4 streaks, snow 2 x 2, 3 px bolts, 2 px heat bands) -- at day, dusk, night and dawn, with no
+  dragon in it. It draws the chooser's 300 x 112 picture and fills a 640 x 300 road scene as `scroll` advances (the
+  landforms scale with the rect's height; the marks keep their px). Night is the blue hour, never black. Every colour is
+  `surfaces.ts` `CLIMATE_BACKDROPS` (`BACKDROPS.climate`) and passes gate (w); the three climates a big baddie lives in
+  (caves, peaks, ice) keep their bands pale by day, dusk and dawn (L >= 0.6) and at L 0.17-0.26 at night, so a baddie's
+  fills can sit dark (L <= 0.13) or in the middle (L 0.35-0.45) against its home at every hour (gate x).
+- **The set pieces** (`src/game/setpieces.ts` `drawSetPiece(ctx, id, x, feetY, state, t)`): one per challenge, standing on
+  the road behind the team, `ahead`/`unmet` showing the problem and `met` visibly solving it: a cave mouth (a lantern and
+  one stepped lamp pool when met), a boulder across the road beside an empty cart (loaded when met), a snowdrift (a low
+  heap, a puddle and steam), a storm cloud with 3 px bolts (a small white cloud and the sun), a ford over the road (the
+  stepping stones showing), a bramble arch with a tangle across the road (pulled aside, the arch in flower), a signpost
+  fork with a board hanging and a "?" (straightened, the lost bundle found, a check), the mill (sails turning, the door
+  open, a flour sack out), a small bird on a tussock that can't fly (its wing in a neat bandage, hopping, a heart: never
+  a wound), a fog bank in stepped flat bands drawn behind the team (thinned to a low band and a waymark), two tall rocks
+  with a narrow way between (a knotted rope and a flag).
+- **The big baddies** (`src/game/baddies.ts`: `BADDIE_ART`, `drawBaddie(ctx, id, x, feetY, facing, face, pose, t)`,
+  `drawBaddiePortrait(ctx, id, x, y)` 24 x 24): THE MOLE KING (about 112 x 88: a round velvet-brown body, a tiny gold crown
+  with a jewel, big pink digging paws with fat toes, gold spectacles ringing his eye, a pale muzzle; exit calmed), THE
+  STORM ROC (about 140 x 100: a fluffy slate-blue bird, folded wings with stepped feather ends, a tufted crest, a hooked
+  beak, a pale breast; exit outwitted), THE FROST GIANT (about 96 x 140: a tall woolly blue-grey mass with wool lumps and
+  curls, a peach face, a big deep-red nose, a knitted scarf with stripes, mittens and boots; exit driven off). Faces only
+  from `BaddieFace`: neutral, grumpy (a heavy FLAT brow pulled low, the eye lidded under it, a pout -- never a V brow),
+  surprised (brows up, the eye wide, an "o"), sleepy (the eye shut in a soft curve). Poses: walk, stand, sit, turn (it
+  looks back the other way, a "!"), leave (a shuffle with 2 px dust at its heels and a flat grumble cloud). The exits
+  (`BADDIE_EXIT_LOOK`, `exitLook(exit, u)`): calmed sits and dozes with three 3 x 3 "z"s stepping up; outwitted turns,
+  surprised, then wanders off the wrong way; driven off shuffles off grumbling. No knockback, no hurt pose, nothing flung;
+  the type has no hurt, health or defeat field (`_NoHurt`) and exactly the three exits (`_Exits`). Nothing covers an
+  eye (the spectacles ring it).
+- **Gate (x)** (`tools/palette-check.ts`, counted apart: `BADDIES: PASS 387 of 387`): each fill on a baddie's silhouette
+  edge (`BADDIE_EDGE`) keeps >= 25 % luminance from the road (`FLOORS.road` `#dcd6c4`, L 0.673, S 0.11, itself gated by
+  (i) and (Ki)) and from every band of its home climate at every phase (25 bands each); every fill keeps 6 Oklab L from
+  the ink; the colours that touch inside it pass the ladder. Its report is the `(x)` block in 5.8. The thinnest: the
+  Storm Roc's beak and legs against Highfold's dusk sky (27 %), the Mole King's crown against Old Mine Road's dusk ridge
+  (30 %).
+- **The grumpy miller** (`src/game/npcs.ts` `drawMiller(ctx, x, feetY, facing, state, t)`): a non-player person on the
+  keepers' rig (not in `KEEPER_IDS`): stocky, older and never frail, a flat miller's cap with flour on it, bushy grey
+  brows and a grey moustache, a flour-dusted apron over an ochre shirt with its sleeves rolled, his flour sack at his
+  feet (the flat cap, the barrel of a body and the sack tell him from the four keepers at a third of the size).
+  `grumpy`: heavy flat brows pulled right down onto narrowed eyes, the moustache drooping over a pout, arms folded high
+  across his chest, chin tucked, turned away from the team, a small flat "hmph" puff from his nose now and then.
+  `talkedRound`: brows lifted, eyes creased happy, a blush, a smile at the moustache's ends, facing the team, lifting his
+  cap by its crown. His palette takes the keeper gates in the KEEPERS section (`KEEPERS: PASS 231 of 231`, his shirt told
+  apart from the four keepers' tops as seen and under both dichromacies; his shoes, trousers and sack on every floor).
+  No mockup was on the notes branch when he was built; he was built from the plan's description.
+- **The icons** (`src/game/missionicons.ts`): 9 x 9 icons in the `icons.ts` sprite format (every pixel ringed in ink):
+  the eleven challenges (a crescent moon, a boulder, a snowflake, a storm cloud, water, a bramble, a "?", a windmill,
+  a sticking plaster, fog bands, two rocks), the four skills (a speech bubble with a heart, a first-aid cross, a compass,
+  a feather), a saddle (11 x 7), and the egg a rider carries home (S5's egg, whole: `carriedEgg`, `drawCarriedEgg`).
+
+**Status (S9a):** built as above; nothing in the game draws them yet (S8 wires the climate picture, the icons and the
+portraits into the Map Room chooser; S9 the road scene, the set pieces, the baddie beat and the miller). Follow-ups:
+the rain and snow are placed, not falling (a frozen scene's weather moves only with `scroll`); the miller has no walk.
 
 ---
 

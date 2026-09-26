@@ -49,8 +49,8 @@ const CRACKS: readonly (readonly [number, number][])[] = [
 ];
 
 const sprites = new Map<string, Sprite>();
-/** An element's egg with `cracks` (0, 1 or 2) cracks, built once. */
-function eggSprite(el: DragonElement, cracks: number): Sprite {
+/** An element's egg with `cracks` (0, 1 or 2) cracks, built once (missionicons.ts carries the whole one: the rider's egg). */
+export function eggSprite(el: DragonElement, cracks: number): Sprite {
   const key = `${el}/${cracks}`, had = sprites.get(key);
   if (had) return had;
   const pal = agedPalette(el, 'baby'), t = makeTones(pal.scale);

@@ -66,6 +66,14 @@
 //                   body; a big prop may lie either way (the hearth's firebox is a dark mouth behind kitchen slot 0).
 //                   (The garden's green is the hedge and the lawn behind the path, the grass strip below it: never a
 //                   floor. Its path is FLOORS.path, gated by (i) and (Ki) with the straw.)
+//                   The mission regions' climates (plan S9a; surfaces.ts CLIMATE_BACKDROPS, drawn by backdrops.ts) are
+//                   backdrops too: every layer of each climate at each phase (sky bands, far ridge, near forms, weather
+//                   marks, the caves' lamp pool) is held lighter than every dark body; the cave mouth is a prop.
+// BADDIES (counted apart, its own RESULT line: BADDIES):
+//   (x) baddies   : each fill on a big baddie's silhouette edge (src/game/baddies.ts BADDIE_EDGE) keeps >= 25 %
+//                   luminance from the mission road (FLOORS.road) and from every band of its home climate at every
+//                   phase; every fill >= OKL_MIN Oklab L from the ink; the colours that touch inside it pass the ladder.
+// The grumpy miller (src/game/npcs.ts) takes the keeper gates inside the KEEPERS section.
 // EGGS (counted apart, its own RESULT line: EGGS):
 //   (egg) eggs    : every element's egg (src/game/eggs.ts: its shell is the element's BABY scale colour, inked round)
 //                   keeps >= 25 % luminance from the Hatchery's nest straw it lies in (src/game/surfaces.ts NEST), so a
@@ -90,7 +98,11 @@ import type { KeeperPalette } from '../src/art/keeper/palettes.ts';
 import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
 import type { KeeperId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
-import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, stepped } from '../src/game/surfaces.ts';
+import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, CAVE, stepped } from '../src/game/surfaces.ts';
+import { lampPool } from '../src/game/backdrops.ts';
+import { BADDIE_ART, BADDIE_HOME, BADDIE_EDGE, BADDIE_PAIRS, BADDIE_WHITE } from '../src/game/baddies.ts';
+import { MILLER_PALETTE, MILLER_SKIN_SHADOW } from '../src/game/npcs.ts';
+import { CLIMATES, BADDIE_IDS } from '../src/game/missiondata.ts';
 import { NEST_RX, NEST_RY, NEST_STRANDS, WALL_H, floorTop, nestBase, eggBottom } from '../src/game/layout.ts';
 import { SHELL, WOBBLE } from '../src/game/eggs.ts';
 import { PHASE_ORDER } from '../src/game/clock.ts';
@@ -798,6 +810,51 @@ for (const slot of ['secondary', 'primary'] as const) {
   out.push(`${allOk ? '  ok  ' : '  FAIL'} (Kg) iris ${(slot === 'secondary' ? 'trousers' : 'cardigan').padEnd(9)} ${c} on dusk: ${cells.join('  ')}`);
 }
 
+// the grumpy miller (src/game/npcs.ts, plan S9a): drawn on the keepers' rig, so he takes the keeper gates -- the ladder
+// on the colours that touch on him, the ramps and his skin shadow, the far side, his shoes and trousers on every floor,
+// and his shirt told apart from the four keepers' tops (as seen and under both dichromacies)
+{
+  const P = MILLER_PALETTE as Record<string, string>;
+  out.push(' the grumpy miller (src/game/npcs.ts MILLER_PALETTE)');
+  const mcol = (k: string) => (k === 'white' ? KEEPER_SHARED.white : P[k]);
+  const M_PAIRS: readonly [string, string, string][] = [
+    ['skin', 'hair', 'the brows and moustache on the face'], ['skin', 'primary', 'the neck on the collar, a rolled forearm over the shirt'], ['hair', 'primary', 'the hair at the nape on the collar'],
+    ['primary', 'secondary', 'the shirt on the trousers'], ['secondary', 'dark', 'the trousers on the shoes'], ['skin', 'white', 'the eye whites on the face'], ['glow', 'skin', 'the blush on the cheek'],
+    ['apron', 'primary', 'the apron bib on the shirt'], ['apron', 'secondary', 'the apron on the trousers'], ['apron', 'skin', 'the folded forearms over the apron'],
+    ['hat', 'hair', 'the cap on the hair'], ['hat', 'skin', 'the cap over the brow, the hand on the cap'], ['trim', 'hat', 'the flour on the cap'], ['trim', 'tool', 'the flour on the sack'],
+    ['tool', 'secondary', 'the sack by the trousers'], ['tool', 'dark', 'the sack by the shoes'], ['accent', 'tool', 'the sack\'s tie'],
+  ];
+  for (const [a, b, where] of M_PAIRS) {
+    const m = ladder(mcol(a), mcol(b));
+    kcount(`(Ka) miller ${a}/${b}`, m.pass);
+    out.push(`${m.pass ? '  ok  ' : '  FAIL'} (Ka) ${(a + '/' + b).padEnd(18)} lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by.padEnd(8)} ${mcol(a)} ${mcol(b)}  (${where})`);
+  }
+  for (const [slot, hex] of Object.entries(P)) {
+    const t = makeTones(hex), ok = t.sh !== t.base && t.hi !== t.base && t.sh !== t.hi;
+    if (!kcount(`(Kd) miller ${slot} ramp`, ok)) out.push(`  FAIL (Kd) ${slot} ramp collapses: ${t.sh} ${t.base} ${t.hi}`);
+  }
+  const dSh = relDiff(MILLER_SKIN_SHADOW, P.skin);
+  kcount('(Kd) miller skin shadow', dSh >= LUM_MIN);
+  out.push(`${dSh >= LUM_MIN ? '  ok  ' : '  FAIL'} (Kd) skin shadow      ${pct(dSh)} under the skin  ${MILLER_SKIN_SHADOW} on ${P.skin}`);
+  const far = farPalette(MILLER_PALETTE, KEEPER_FAR.shade, KEEPER_FAR.desat) as Record<string, string>;
+  for (const slot of ['skin', 'primary', 'secondary', 'dark'] as const) {
+    const f = far[slot], dn = relDiff(f, P[slot]), di = relDiff(f, S.outline), dk = okDiff(f, S.outline);
+    const okC = kcount(`(Kc) miller far ${slot}`, dn >= LUM_MIN), okE = kcount(`(Ke) miller far ${slot} / ink`, di >= LUM_MIN && dk >= OKL_MIN);
+    out.push(`${okC && okE ? '  ok  ' : '  FAIL'} (Kc/Ke) far ${slot.padEnd(10)} ${f}  vs near ${pct(dn)}  vs ink ${pct(di)} ${okf(dk)}`);
+  }
+  for (const [floorName, floorHex] of FLOOR_LIST) for (const slot of ['dark', 'secondary', 'tool'] as const) {
+    const d = relDiff(P[slot], floorHex), ok = kcount(`(Ki) miller ${slot} / ${floorName} floor`, d >= LUM_MIN);
+    out.push(`${ok ? '  ok  ' : '  FAIL'} (Ki) ${(slot === 'dark' ? 'shoes' : slot === 'tool' ? 'sack' : 'trousers') + ' / floor'}${' '.repeat(slot === 'secondary' ? 2 : 5)} ${pct(d)}  ${P[slot]} on ${floorName} ${floorHex}`);
+  }
+  const cells: string[] = [];
+  let allOk = true;
+  for (const id of KEEPER_IDS) for (const [k, f] of [['as seen', (h: string) => h], ['deutan', (h: string) => simulate(h, 'deutan')], ['protan', (h: string) => simulate(h, 'protan')]] as const) {
+    const m = ruleB(f(P.primary), f(KEEPER_PALETTES[id].primary));
+    if (!kcount(`(Kf) miller/${id} tops ${k}`, m.pass)) { allOk = false; cells.push(`${id} ${k} FAIL`); }
+  }
+  out.push(`${allOk ? '  ok  ' : '  FAIL'} (Kf) the miller's shirt ${P.primary} against the four keepers' tops, as seen, deutan and protan${cells.length ? ': ' + cells.join(', ') : ''}`);
+}
+
 // ---------- (w) backdrops (src/game/surfaces.ts) ----------
 /** A body is dark, for gate (w), under this luminance (lightning 0.119, dusk 0.083, slinkwing 0.053 at every stage). */
 const W_DARK = 0.15;
@@ -847,6 +904,33 @@ function lighterBy(a: string, b: string): number {
     const ink = okDiff(hex, INK), inkOk = wcount(`(w) ${what} / ink`, ink >= OKL_MIN);
     out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${what.padEnd(28)} ${hex}  L ${lumOf(hex).toFixed(3)}  least ${pct(least)} ${apart ? 'apart  ' : 'lighter'} (${by})  ${okf(ink)} from ink`);
   }
+  // (the mission regions' climates, plan S9a: every layer of each climate's picture at each phase -- the three sky
+  // bands, the far ridge, the near forms and their second colour, the weather marks, and the caves' lamp pool -- each
+  // lighter than every dark body; the cave mouth is a dark mouth, a prop, either way. One line per climate and phase.)
+  out.push(' the mission climates (src/game/surfaces.ts CLIMATE_BACKDROPS; backdrops.ts drawClimate): sky top / middle / low, ridge, near, detail, marks');
+  for (const c of CLIMATES) for (const ph of PHASE_ORDER) {
+    const P = BACKDROPS.climate[c][ph];
+    const cols: [string, string][] = [['sky top', P.sky[0]], ['sky middle', P.sky[1]], ['sky low', P.sky[2]], ['ridge', P.ridge], ['near', P.near], ['detail', P.detail], ['marks', P.mark]];
+    if (c === 'caves') { const [i, o] = lampPool(P.near); cols.push(['lamp pool inner', i], ['lamp pool outer', o], ['lamp', CAVE.lamp]); }
+    let least = Infinity, by = '', inkLeast = Infinity, allOk = true;
+    for (const [what, hex] of cols) {
+      for (const b of dark) {
+        const d = lighterBy(hex, b.hex);
+        if (!wcount(`(w) climate ${c} ${ph} ${what} / ${b.who}`, d >= LUM_MIN)) allOk = false;
+        if (d < least) { least = d; by = `${what} ${hex} on ${b.who}`; }
+      }
+      const ink = okDiff(hex, INK);
+      if (!wcount(`(w) climate ${c} ${ph} ${what} / ink`, ink >= OKL_MIN)) allOk = false;
+      inkLeast = Math.min(inkLeast, ink);
+    }
+    out.push(`${allOk ? '  ok  ' : '  FAIL'} climate ${(c + ' ' + ph).padEnd(13)} ${cols.length} colours, least ${pct(least)} lighter (${by}), ${okf(inkLeast)} from ink at least`);
+  }
+  {
+    let least = Infinity, by = '';
+    for (const b of dark) { const d = relDiff(CAVE.mouth, b.hex); wcount(`(w) cave mouth / ${b.who}`, d >= LUM_MIN); if (d < least) { least = d; by = b.who; } }
+    const ink = okDiff(CAVE.mouth, INK), inkOk = wcount('(w) cave mouth / ink', ink >= OKL_MIN);
+    out.push(`${least >= LUM_MIN && inkOk ? '  ok  ' : '  FAIL'} ${'prop cave mouth'.padEnd(28)} ${CAVE.mouth}  L ${lumOf(CAVE.mouth).toFixed(3)}  least ${pct(least)} apart   (${by})  ${okf(ink)} from ink`);
+  }
 }
 
 // ---------- (egg) the Hatchery's eggs (src/game/eggs.ts) ----------
@@ -885,11 +969,44 @@ for (const e of DRAGON_ELEMENTS) {
   out.push(`${bad ? '  FAIL' : '  ok  '} egg-lie    every egg lies against the nest's straw alone: the ${seen} pixels round its ink ring over its ${new Set(WOBBLE).size} wobbles, all in the heap (${NEST_RX} x ${NEST_RY} px), over the band, off the strands${bad ? ` -- ${bad}` : ''}`);
 }
 
+// ---------- (x) the big baddies (src/game/baddies.ts, plan S9/S9a) ----------
+// Every fill on a baddie's silhouette edge (BADDIE_EDGE) keeps >= 25 % luminance from the mission road (FLOORS.road)
+// and from every band of its home climate (the three sky bands, the far ridge, the near forms and their second colour)
+// at every phase, so it reads on the road and against its region at any hour; every fill keeps >= 6 Oklab L from the
+// ink; and the colours that touch inside it (BADDIE_PAIRS) pass the house ladder.
+let xGates = 0, xFailures = 0;
+const xFailed: string[] = [];
+function xcount(label: string, ok: boolean): boolean { xGates++; if (!ok) { xFailures++; xFailed.push(label); } return ok; }
+head(`(x) BADDIES  (each fill on a baddie's silhouette edge >= ${LUM_MIN * 100}% luminance from the road ${FLOORS.road} and from every band of its home climate at every phase; every fill >= ${OKL_MIN} Oklab L from the ink; touching colours by the ladder)`);
+for (const id of BADDIE_IDS) {
+  const B = BADDIE_ART[id], home = BADDIE_HOME[id];
+  out.push(` ${B.name} (${B.w} x ${B.h}; home ${home})`);
+  const bands: [string, string][] = [['road', FLOORS.road]];
+  for (const ph of PHASE_ORDER) { const P = BACKDROPS.climate[home][ph]; bands.push([`${ph} sky top`, P.sky[0]], [`${ph} sky middle`, P.sky[1]], [`${ph} sky low`, P.sky[2]], [`${ph} ridge`, P.ridge], [`${ph} near`, P.near], [`${ph} detail`, P.detail]); }
+  for (const key of BADDIE_EDGE[id]) {
+    const hex = B.palette[key];
+    let least = Infinity, by = '';
+    for (const [what, b] of bands) { const d = relDiff(hex, b); xcount(`(x) ${id} ${key} / ${what}`, d >= LUM_MIN); if (d < least) { least = d; by = `${what} ${b}`; } }
+    out.push(`${least >= LUM_MIN ? '  ok  ' : '  FAIL'} edge ${key.padEnd(8)} ${hex}  L ${lumOf(hex).toFixed(3)}  least ${pct(least)} (${by}), ${bands.length} bands`);
+  }
+  for (const [key, hex] of Object.entries(B.palette)) {
+    const ink = okDiff(hex, INK), ok = xcount(`(x) ${id} ${key} / ink`, ink >= OKL_MIN);
+    if (!ok) out.push(`  FAIL ${key} ${hex} only ${okf(ink)} from ink`);
+  }
+  for (const [a, b, where] of BADDIE_PAIRS[id]) {
+    const ca = a === 'white' ? BADDIE_WHITE : B.palette[a], cb = b === 'white' ? BADDIE_WHITE : B.palette[b];
+    const m = ladder(ca, cb);
+    xcount(`(x) ${id} ${a}/${b}`, m.pass);
+    out.push(`${m.pass ? '  ok  ' : '  FAIL'} ${(a + '/' + b).padEnd(16)} lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by.padEnd(8)} ${ca} ${cb}  (${where})`);
+  }
+}
+
 // ---------- verdict ----------
 out.push('');
 out.push(failures ? `RESULT: FAIL  ${failures} of ${gates} gates failed: ${failed.join('; ')}` : `RESULT: PASS  ${gates} of ${gates} gates passed`);
 out.push(kFailures ? `KEEPERS: FAIL  ${kFailures} of ${kGates} gates failed: ${kFailed.join('; ')}` : `KEEPERS: PASS  ${kGates} of ${kGates} gates passed`);
 out.push(wFailures ? `BACKDROPS: FAIL  ${wFailures} of ${wGates} gates failed: ${wFailed.join('; ')}` : `BACKDROPS: PASS  ${wGates} of ${wGates} gates passed`);
+out.push(xFailures ? `BADDIES: FAIL  ${xFailures} of ${xGates} gates failed: ${xFailed.join('; ')}` : `BADDIES: PASS  ${xGates} of ${xGates} gates passed`);
 out.push(eFailures ? `EGGS: FAIL  ${eFailures} of ${eGates} gates failed: ${eFailed.join('; ')}` : `EGGS: PASS  ${eGates} of ${eGates} gates passed`);
 console.log(out.join('\n'));
-if (failures || kFailures || wFailures || eFailures) process.exitCode = 1;
+if (failures || kFailures || wFailures || eFailures || xFailures) process.exitCode = 1;

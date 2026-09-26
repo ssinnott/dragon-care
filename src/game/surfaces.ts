@@ -14,6 +14,7 @@
 import { mix } from '../lib/art/palettes.ts';
 import type { RoomKind } from './layout.ts';
 import type { ClockRead, DayPhase } from './clock.ts';
+import type { Climate } from './missiondata.ts';
 
 /** The house outline (ART_BIBLE 1.1). */
 export const INK = '#1a1018';
@@ -24,6 +25,8 @@ export const FLOORS = Object.freeze({
   straw: '#e0d6b8',
   /** The elder garden's path, pale gravel (plan S6: no green underfoot, D3): L 0.671, S 0.13. */
   path: '#dcd6c0',
+  /** The mission road (plan S9a/S9: the team walks it in the road scene; every baddie fill is gated from it, gate x): L 0.673, S 0.11. */
+  road: '#dcd6c4',
 });
 export type FloorName = keyof typeof FLOORS;
 
@@ -61,6 +64,62 @@ export const PROPS = Object.freeze({ hearth: '#9c948a', firebox: '#3a2626', tub:
  */
 export const NEST = '#e6dcc4';
 
+/**
+ * One climate's picture at one phase of the day (backdrops.ts drawClimate): its three sky bands (top to bottom), the
+ * far ridge (0.2 parallax), the near forms (0.5) and their second colour (a tree's crown, a rock's face, an ice floe's
+ * top, a cone's flank), and its weather marks (rain streaks, snow, bolts, heat bands; the caves' lamp pool). Every one
+ * is a backdrop: gate (w), each >= 25 % LIGHTER than every dark body. The three climates a big baddie lives in (caves,
+ * peaks, ice) keep their bands out of that baddie's way too (gate x): pale by day, dusk and dawn (L >= 0.6) and a blue
+ * hour at night (L 0.17-0.26), so a baddie's fills sit dark (L <= 0.127) or in the middle (L 0.35-0.45).
+ */
+export interface ClimatePhase { sky: readonly [string, string, string]; ridge: string; near: string; detail: string; mark: string }
+
+const cp = (sky: readonly [string, string, string], ridge: string, near: string, detail: string, mark: string): ClimatePhase => Object.freeze({ sky: Object.freeze(sky) as readonly [string, string, string], ridge, near, detail, mark });
+/**
+ * The six climates (plan S8's regions: MILD MEADOWS, DRY HILLS AND CAVES, DEEP FOREST, STORMY PEAKS, FROZEN LAKE, WARM
+ * ASH HILLS), each at day, dusk, night and dawn. Night is mid-value everywhere (never black: the darkness rule).
+ */
+export const CLIMATE_BACKDROPS: Readonly<Record<Climate, Readonly<Record<DayPhase, ClimatePhase>>>> = Object.freeze({
+  meadow: Object.freeze({
+    day: cp(['#bcd8e4', '#cfe3ea', '#e0eef0'], '#9ec2b4', '#a8cc84', '#86b06c', '#7898bc'),
+    dusk: cp(['#b89ab0', '#e0b8a0', '#e8c8a8'], '#a8a0b0', '#b0b480', '#949a6c', '#8a7a9c'),
+    night: cp(['#6a78a8', '#6f7fa8', '#7f8fb8'], '#6c80a4', '#7a92a0', '#6e8898', '#b8c8ec'),
+    dawn: cp(['#b8b0d0', '#d8d0e0', '#ecd6c8'], '#aab8bc', '#b4c494', '#9aac80', '#8490b8'),
+  }),
+  caves: Object.freeze({
+    day: cp(['#dde4e6', '#e8e6dc', '#f0e6d2'], '#e8d4b0', '#e6cc9e', '#ecd8b8', '#ffd98a'),
+    dusk: cp(['#e4c8d4', '#eed0c4', '#f2dcc4'], '#e6c8b4', '#e8ccaa', '#ecd0bc', '#ffd98a'),
+    night: cp(['#6a74a4', '#727ca8', '#7c84b0'], '#7c7aa0', '#86809e', '#8e88a6', '#ffd98a'),
+    dawn: cp(['#d8d4e8', '#e6dce6', '#f2e2d6'], '#e2d0bc', '#e8ccaa', '#e8d4c2', '#ffd98a'),
+  }),
+  forest: Object.freeze({
+    day: cp(['#c4dcd8', '#d4e6de', '#e2eee4'], '#7fa890', '#6f9e6a', '#a47a52', '#6c90b4'),
+    dusk: cp(['#b49aae', '#d8b4a4', '#e2c4aa'], '#8a8c94', '#7c8a6c', '#a47a52', '#8a7a9c'),
+    night: cp(['#66749e', '#6c7aa2', '#7888b0'], '#62789a', '#6a8494', '#7a84a0', '#b8c8ec'),
+    dawn: cp(['#b4aed0', '#d2cede', '#e6d4c8'], '#8aa4a0', '#80a07c', '#a47a52', '#8490b8'),
+  }),
+  peaks: Object.freeze({
+    day: cp(['#d2dcea', '#dee6ee', '#e8eef2'], '#eef2f6', '#d8dce6', '#e4e8ee', '#ffe45a'),
+    dusk: cp(['#dccae0', '#e8d4dc', '#f0dcd8'], '#f0e6ec', '#dcd0dc', '#e8dce4', '#ffe45a'),
+    night: cp(['#6874a6', '#6e7aaa', '#7682b2'], '#7a84aa', '#707aa4', '#7680a8', '#ffe45a'),
+    dawn: cp(['#d6d2ea', '#e2dcec', '#eee2e4'], '#eeecf4', '#dad6e4', '#e6e2ec', '#ffe45a'),
+  }),
+  ice: Object.freeze({
+    day: cp(['#cfe2f0', '#dcebf4', '#e8f2f6'], '#f0f4f8', '#d6e8f2', '#eef6fa', '#ffffff'),
+    dusk: cp(['#dccce6', '#e8d6e6', '#f0e0e4'], '#f2eaf2', '#dcd6e8', '#eee6f0', '#ffffff'),
+    night: cp(['#6676aa', '#6c7cae', '#7686b6'], '#7684b2', '#6e7eae', '#7482b0', '#e8ecf8'),
+    dawn: cp(['#d4d6ee', '#e0e0f0', '#ece6ec'], '#f0f0f6', '#d8e2f0', '#eceef6', '#ffffff'),
+  }),
+  ash: Object.freeze({
+    day: cp(['#e4d4c4', '#ecdcc8', '#f2e4cc'], '#c89a8a', '#b8a090', '#d0b8a0', '#dca888'),
+    dusk: cp(['#c89aa6', '#e2aa94', '#ecc09c'], '#b4868a', '#a48c88', '#c0a494', '#f6d4b8'),
+    night: cp(['#6c70a0', '#7474a2', '#8080aa'], '#7a6e98', '#827896', '#8e84a0', '#b8b0d4'),
+    dawn: cp(['#c8b8d0', '#dcc8d4', '#ecd4c8'], '#c0a0a4', '#b8a4a0', '#ccb4ac', '#d4a4a4'),
+  }),
+});
+/** The caves' own props (gate w, `apart` like the hearth's firebox): the cave mouth's dark (a deep mouth, never black) and its lamp. */
+export const CAVE = Object.freeze({ mouth: '#3a2e36', lamp: '#ffd98a' });
+
 /** Every sky, hill and cloud colour at each phase of the day (the bands top to bottom: world y 0-200, 200-420, 420 to the ground), and the building's own backdrops. */
 export interface Backdrops {
   sky: Readonly<Record<DayPhase, readonly [string, string, string]>>;
@@ -74,6 +133,8 @@ export interface Backdrops {
   lawn: string;
   trunk: string;
   fence: string;
+  /** Each mission region's climate, by phase (backdrops.ts drawClimate: the chooser's picture and the road scene). */
+  climate: Readonly<Record<Climate, Readonly<Record<DayPhase, ClimatePhase>>>>;
 }
 /**
  * The day's backdrops. Night is a mid-value blue hour (its bands L 0.19-0.28, never black: a dark dragon on the Aerie
@@ -98,6 +159,7 @@ export const BACKDROPS: Readonly<Backdrops> = Object.freeze({
   lawn: '#8fae76',
   trunk: '#a47a52',
   fence: '#e8e0cc',
+  climate: CLIMATE_BACKDROPS,
 });
 
 /** The lights (docs/BASE_DESIGN.md 7): the towers' window slits by day and lit, the dorm's lamps, the hearth's fire, the stars and the moon, and the garden's lanterns. */

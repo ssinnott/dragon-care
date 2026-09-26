@@ -38,6 +38,9 @@
 // hatched into a baby by t=120; live, a tap on the head of a dragon with nothing waiting opens its card, and a tap on
 // the card closes it. The elder garden (plan S6): the new game's garden has its two empty plots; the garden preset's
 // three residents live on three plots, by day and by night (each dragon says where it lives: the barn or the garden).
+// The mission art kit (plan S9a, view=missionart): every sheet -- the climates (and one as a scrolling road scene), the
+// set pieces, the baddies, the people (the miller beside the keepers) and the icons -- draws every item on it, with
+// no page error, in enough colours.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -50,6 +53,8 @@ import { CareSim } from '../src/game/sim.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts';
 import { serialize } from '../src/game/save.ts';
 import { SAVE_KEY, BACKUP_KEY } from '../src/game/storage.ts';
+import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS } from '../src/game/missiondata.ts';
+import { PHASE_ORDER } from '../src/game/clock.ts';
 
 const require = createRequire(import.meta.url);
 function loadPlaywright(): any {
@@ -86,6 +91,8 @@ interface Case {
   act?: (page: any) => Promise<string[]>;
   /** Before the page loads (a save planted in its storage). */
   init?: (page: any) => Promise<void>;
+  /** view=missionart (plan S9a): the sheet the page's hook must name, and every item it must have drawn. */
+  art?: { sheet: string; want: readonly string[] };
   /** Hash the frame (an in-page FNV-1a over the canvas's pixels) for TINT: the whole frame, and the world between the HUD's bars (rows 16-338). */
   hash?: boolean;
 }
@@ -522,6 +529,13 @@ const CASES: Case[] = [
   // night (napping, the lanterns lit)
   { query: 'view=base&preset=garden&cam=1304,376&t=600', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...travels(b)] },
   { query: 'view=base&preset=garden&cam=1304,376&t=600&hour=22', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...timeFields('night', false)(b)] },
+  // the mission art kit (plan S9a): every sheet draws everything on it (the page's hook lists it), in its colours
+  { query: 'view=missionart&sheet=climates&t=0', minColours: 1000, allScales: false, art: { sheet: 'climates', want: CLIMATES.flatMap((c) => PHASE_ORDER.map((p) => `${c}:${p}`)) } },
+  { query: 'view=missionart&sheet=climates&climate=peaks&phase=night&t=90', minColours: 500, allScales: false, art: { sheet: 'climates', want: ['peaks:night:scene'] } },
+  { query: 'view=missionart&sheet=setpieces&t=60', minColours: 1000, allScales: false, art: { sheet: 'setpieces', want: CHALLENGE_IDS } },
+  { query: 'view=missionart&sheet=baddies&t=30', minColours: 1000, allScales: false, art: { sheet: 'baddies', want: [...BADDIE_IDS, ...BADDIE_IDS.map((b) => `${b}:portrait`)] } },
+  { query: 'view=missionart&sheet=people&t=50', minColours: 1000, allScales: false, keepers: true, art: { sheet: 'people', want: ['miller:grumpy', 'miller:talkedRound', ...KEEPER_IDS] } },
+  { query: 'view=missionart&sheet=icons&t=0', minColours: 300, allScales: false, art: { sheet: 'icons', want: [...CHALLENGE_IDS.map((c) => `challenge:${c}`), ...SKILLS.map((k) => `skill:${k}`), 'saddle', ...DRAGON_ELEMENTS.map((e) => `egg:${e}`), ...BADDIE_IDS.map((b) => `portrait:${b}`)] } },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -602,6 +616,15 @@ for (const c of CASES) {
       const b: BaseHook | undefined = await page.evaluate(() => (window as any).__dragonCare?.base);
       frames.set(c.query, h);
       if (b && !hooks.has(c.query)) hooks.set(c.query, b);
+    }
+    if (c.art) {
+      const h: { sheet: string; drawn: string[] } | undefined = await page.evaluate(() => (window as any).__dragonCare?.missionart);
+      if (!h) errors.push('the mission art sheet reported nothing');
+      else {
+        if (h.sheet !== c.art.sheet) errors.push(`the sheet is ${h.sheet}, not ${c.art.sheet}`);
+        const missing = c.art.want.filter((w) => !h.drawn.includes(w));
+        if (missing.length) errors.push(`not drawn: ${missing.join(', ')}`);
+      }
     }
     if (c.act) errors.push(...await c.act(page));
     const colours: number[] = await page.evaluate(() => {
