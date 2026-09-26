@@ -57,10 +57,10 @@
 //    the room it is going to, is served in a baby's sub-slot there, never in the module slot.
 // 14. Eggs (#5.4's Hatchery side): three eggs fill the three nests and a fourth is not taken; an egg hatches exactly two
 //    days after it was laid into a baby with a new id, its element's first free name and the egg's seed, the Hatchery's
-//    sub-slots first (the one nearest its nest); the baby asks for food at once and is fed within three minutes; with
-//    every baby sub-slot taken an egg waits in its nest, nothing lost, and hatches as soon as one frees; a baby moved on
-//    never comes to rest in the Hatchery; names never repeat and stay within 8 characters; two runs give the same names
-//    and seeds.
+//    sub-slots first (one in front of no other egg, then the one nearest its nest); the baby asks for food at once and
+//    is fed within three minutes; with every baby sub-slot taken an egg waits in its nest, nothing lost, and hatches as
+//    soon as one frees; a baby moved on never comes to rest in the Hatchery; names never repeat and stay within 8
+//    characters; two runs give the same names and seeds.
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
 import { CareSim, REACH, DAY_STEPS, START_HOUR } from '../src/game/sim.ts';
@@ -1140,14 +1140,21 @@ let firstRide = '';
   if (!baby || baby.slot !== freed || full.eggs.length || full.dragons.length !== n0) fail(`eggs: a sub-slot freed, the waiting egg ${baby ? `hatched into the ${baby.slot ? full.rooms[baby.slot.room].kind : '-'}:${baby.slot?.i}, not the freed one` : 'did not hatch'} (${full.eggs.length} eggs, ${full.dragons.length} dragons)`);
   noteUse(full);
   // a hatchling takes the Hatchery's sub-slot nearest its own nest (standing in front of its nest, now empty, not in
-  // front of another's egg): the egg in nest 2, due first, hatches into the hatchery:1 (x 1152), not the hatchery:0
-  const near = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1, dayLen: SHORT });
-  near.addEgg('fire'); near.addEgg('dusk'); near.addEgg('spike', near.clock - H);
-  near.step();
-  const hn = near.dragons.find((d) => near.events.some((e) => e.kind === 'hatch' && e.dragon === d.id));
-  const hnAt = hn?.slot ? `${near.rooms[hn.slot.room].kind}:${hn.slot.i}` : '-';
-  if (!hn || hnAt !== 'hatchery:1' || near.eggs.length !== 2) fail(`eggs: the egg in nest 2 hatched into ${hn ? `${hn.name} in the ${hnAt}` : 'nothing'}, not a baby in the hatchery:1 in front of its own nest`);
-  noteUse(near);
+  // front of another's egg): the egg in nest 2, due first, hatches into the hatchery:1 (x 1152), not the hatchery:0;
+  // and the middle nest's, whose two sub-slots are as near (x 1072 and 1152), into the one in front of no egg: with a
+  // newer egg in nest 0, the hatchery:1
+  const nearRun = (eggs: readonly [DragonElement, boolean][]) => {
+    const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1, dayLen: SHORT });
+    for (const [el, due] of eggs) w.addEgg(el, due ? w.clock - H : w.clock);
+    w.step();
+    const d = w.dragons.find((q) => w.events.some((e) => e.kind === 'hatch' && e.dragon === q.id));
+    noteUse(w);
+    return { d, at: d?.slot ? `${w.rooms[d.slot.room].kind}:${d.slot.i}` : '-', left: w.eggs.length };
+  };
+  const { d: hn, at: hnAt, left: hnLeft } = nearRun([['fire', false], ['dusk', false], ['spike', true]]);
+  if (!hn || hnAt !== 'hatchery:1' || hnLeft !== 2) fail(`eggs: the egg in nest 2 hatched into ${hn ? `${hn.name} in the ${hnAt}` : 'nothing'}, not a baby in the hatchery:1 in front of its own nest`);
+  const mid = nearRun([['fire', false], ['dusk', true]]);
+  if (!mid.d || mid.at !== 'hatchery:1' || mid.left !== 1) fail(`eggs: the egg in nest 1, a newer one in nest 0, hatched into ${mid.d ? `${mid.d.name} in the ${mid.at}` : 'nothing'}, not a baby in the hatchery:1, in front of no egg`);
   // a baby moved on (a lingerer evicted, or a Rush's bump) never comes to rest in the Hatchery's sub-slots -- they are
   // the hatchlings' first places, so the nests stay in view: BURR, lingering in the bathhouse's second module, is moved
   // on for ZAP's bath, the Hatchery's sub-slot the nearest free, and goes elsewhere
@@ -1168,7 +1175,7 @@ let firstRide = '';
   const got: string[] = [];
   for (let i = 0; i < 80; i++) got.push(hatchName(fake(got), 'lightning'));
   if (new Set(got).size !== got.length || got.some((n) => n.length > NAME_MAX)) fail(`names: 80 lightning hatchlings gave ${new Set(got).size} names, the longest ${Math.max(...got.map((n) => n.length))} characters`);
-  console.log(`  14 eggs: three eggs in nests 0-2, a fourth not taken; each hatched exactly ${H} steps (2 days of ${SHORT}) after it was laid: ${r.hatched.map((h) => `${h.d.name} (id ${h.d.id}, seed ${h.d.seed}) into the ${h.at}, fed ${((fedIn.get(h.d) ?? NaN) / FPS).toFixed(1)} s later`).join('; ')}; two runs alike; every sub-slot taken, the egg waited ${H} steps, nothing lost, and hatched into the ${freed ? `${full.rooms[freed.room].kind}:${freed.i}` : '-'} the step it freed; 80 lightning names, the last ${got[got.length - 1]}; a hatchling in front of its own nest (${hn?.name} from nest 2 into the ${hnAt}); a baby moved on never to the Hatchery (BURR, in ZAP's way, to the ${evAt})`);
+  console.log(`  14 eggs: three eggs in nests 0-2, a fourth not taken; each hatched exactly ${H} steps (2 days of ${SHORT}) after it was laid: ${r.hatched.map((h) => `${h.d.name} (id ${h.d.id}, seed ${h.d.seed}) into the ${h.at}, fed ${((fedIn.get(h.d) ?? NaN) / FPS).toFixed(1)} s later`).join('; ')}; two runs alike; every sub-slot taken, the egg waited ${H} steps, nothing lost, and hatched into the ${freed ? `${full.rooms[freed.room].kind}:${freed.i}` : '-'} the step it freed; 80 lightning names, the last ${got[got.length - 1]}; a hatchling in front of its own nest (${hn?.name} from nest 2 into the ${hnAt}) or of none (${mid.d?.name} from nest 1, an egg in nest 0, into the ${mid.at}); a baby moved on never to the Hatchery (BURR, in ZAP's way, to the ${evAt})`);
 }
 
 // ---------- 8 (the whole suite). every named room used (#11) ----------

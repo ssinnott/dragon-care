@@ -14,14 +14,15 @@
 // stage's `happy` (gait.ts happyLen), so the view's `happy` plays through. A baby in a baby sub-slot first takes a module slot, which its next stage fits (a
 // module holds one grown dragon or two babies: 3.3), and walks there (goal `settle`); it grows once settled there, and
 // waits in its sub-slot while none is free. An elder's next is retirement (S6). An egg (sim.ts addEgg) hatches
-// HATCH_DAYS game days after it was laid, as soon as a baby sub-slot is free (the Hatchery's two first, the one nearest
-// its nest; else the nearest): a baby of its element, a new id, the next free name of its element's (names.ts), the
-// egg's seed, hungry (it asks for the kitchen at once), standing up in its nest and walking to its sub-slot. With no
-// sub-slot free it waits in its nest, and nothing is lost. DOM-free, deterministic, by id.
+// HATCH_DAYS game days after it was laid, as soon as a baby sub-slot is free (the Hatchery's two first -- one in front
+// of no other egg, then the one nearest its nest; else the nearest): a baby of its element, a new id, the next free
+// name of its element's (names.ts), the egg's seed, hungry (it asks for the kitchen at once), standing up in its nest
+// and walking to its sub-slot. With no sub-slot free it waits in its nest, and nothing is lost. DOM-free,
+// deterministic, by id.
 import { STAGES } from '../art/dragon/stages.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import { STAGE_DAYS, HATCH_DAYS } from './clock.ts';
-import { fitsSlot, nestX } from './layout.ts';
+import { fitsSlot, nestX, slotBody, WORLD_W } from './layout.ts';
 import { fullNeeds, moodOf } from './needs.ts';
 import { nearestFree, sendTo, slotFree, bodySpan, KEEPER_HALF } from './travel.ts';
 import { happyLen } from './gait.ts';
@@ -83,10 +84,10 @@ function growUp(sim: CareSim, d: Dragon): void {
 }
 
 /**
- * An egg due to hatch hatches if a baby sub-slot is free for its baby -- the Hatchery's, the one nearest its nest first
- * (so a hatchling stands in front of its own nest, now empty, not another's egg; ties to the lower), else the nearest
- * by its route from the nest: the baby stands up in the nest, facing west, and walks to it; the egg is gone. False: it
- * waits.
+ * An egg due to hatch hatches if a baby sub-slot is free for its baby -- the Hatchery's first: one in front of no other
+ * egg, then the one nearest its nest (so a hatchling stands in front of its own nest, now empty, or of an empty one --
+ * never of another's egg while the other sub-slot is free; ties to the lower) -- else the nearest by its route from
+ * the nest: the baby stands up in the nest, facing west, and walks to it; the egg is gone. False: it waits.
  */
 function hatch(sim: CareSim, e: Egg): boolean {
   const room = sim.rooms.find((r) => r.kind === 'hatchery');
@@ -96,8 +97,19 @@ function hatch(sim: CareSim, e: Egg): boolean {
   const baby: Dragon = { id: sim.nextDragonId, name: hatchName(sim, e.element), element: e.element, stage: 'baby', seed: e.seed, slot: null, goal: null, goalJob: null,
     f: room.floor, x: nestX(room, e.nest), facing: -1, legs: [], move: 'still', gaitT: 0, walkSeq: 0, turn: -1, waited: 0,
     needs, mood: moodOf(e.element, needs), act: null, asleep: 0, stageSince: sim.clock, hold: 0 };
-  let slot: Slot | null = null;
-  for (const s of room.slots) if (slotFree(sim, baby, s) && (!slot || Math.abs(s.x - baby.x) < Math.abs(slot.x - baby.x))) slot = s;
+  // (each of the Hatchery's sub-slots stands in front of a nest: a baby there hides that nest's egg, so one in front of
+  // no other egg comes first -- the nest-1 egg's hatchling does not stand before a newer egg in nest 0 -- then the one
+  // nearest its own nest)
+  const hides = (s: Slot): boolean => {
+    const [a, b] = slotBody(s, 'baby');
+    return sim.eggs.some((o) => o !== e && nestX(room, o.nest) >= a && nestX(room, o.nest) <= b);
+  };
+  let slot: Slot | null = null, best = Infinity;
+  for (const s of room.slots) {
+    if (!slotFree(sim, baby, s)) continue;
+    const cost = (hides(s) ? WORLD_W : 0) + Math.abs(s.x - baby.x);
+    if (cost < best) { best = cost; slot = s; }
+  }
   slot ??= nearestFree(sim, baby);
   if (!slot) return false;
   sim.nextDragonId++;
