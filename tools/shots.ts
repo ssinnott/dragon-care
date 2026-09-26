@@ -87,11 +87,14 @@ const pairs: string[] = [
   'shots/base_gate.png=view=base&preset=retire&cam=1060,376&t=1950',
   // barn capacity (plan S6b): the capacity benchmark's twelve -- the barn at its cap, BARN 12/12 -- a minute and a half
   // in, west and east (a need's rooms repeat on every floor: the herd is met on its own floors, the lift nearly idle);
-  // and the full preset, 21 dragons forced over the cap (BARN 21/12, amber): its egg fell due on the first step (the
-  // toast THE BARN IS FULL) and waits in its nest, three dots over it (partly behind the baby resting in front of it)
+  // the full preset, 21 dragons forced over the cap (BARN 21/12, amber): its egg fell due on the first step (the toast
+  // THE BARN IS FULL) and waits in its nest, three dots over it (partly behind the baby resting in front of it); and the
+  // capped preset, the twelve at the cap (BARN 12/12, amber), its babies out of the Hatchery: the egg waiting in the
+  // first nest in plain view, its three dots over it, and the toast
   'shots/base_twelve.png=view=base&preset=twelve&t=5400',
   'shots/base_twelve_east.png=view=base&preset=twelve&t=5400&cam=560,376',
   'shots/base_full.png=view=base&preset=full&t=60&cam=168,280',
+  'shots/base_capped.png=view=base&preset=capped&t=60&cam=168,280',
 ];
 for (const el of ['fire', 'rock', 'slinkwing']) {
   for (const stage of ['elder', 'adult', 'young', 'baby']) {

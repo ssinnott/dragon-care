@@ -8,8 +8,9 @@
 //   node tools/capacity.ts --casts=twelve --seeds=1-3 --min=10
 //   node tools/capacity.ts --casts=start7,7a2y6b --seeds=1,4 --json=out.json --workers=2
 //
-// Flags: --casts=a,b (names below, or any `<n>a<n>y<n>b<n>e` cast: adults, counting the start's seven, then young,
-// babies and elders), --seeds=1-8 (a range, a list, or both: 1-4,9), --min=30 (minutes of play; a fraction is fine),
+// Flags: --casts=a,b (names below, or any `<n>a<n>y<n>b<n>e` cast: adults, counting the start's seven -- fewer than
+// seven take the first of them, a late game's barn with its hatchlings in place of the retired: 0a12b, 2a10b -- then
+// young, babies and elders), --seeds=1-8 (a range, a list, or both: 1-4,9), --min=30 (minutes of play; a fraction is fine),
 // --json=path (every run's numbers as JSON), --workers=3 (runs at once, in worker threads, 1-3).
 //
 // Casts: start7, the new game's seven adults; eight, one more adult (sim-check section 10's EIGHTH: a fire adult in the
@@ -32,8 +33,9 @@
 // go to); the longest a dragon waited at a landing for the car and at the bay's edge; the keepers' busy share (steps
 // with a job); an eye under a standing body (sim-check section 2's measure, the sim's own model -- travel.ts depthOf,
 // eyeSpan, dragonSpan: seconds summed over every pair, and the longest); stalls (S3's rules: a keeper standing still 10 s
-// on the way somewhere, not held at the bay's edge; a dragon standing still 10 s mid-walk, boarding or walking off; the
-// car standing still with work to do for a minute; a keeper giving up on a dragon, WAIT_MAX); breaks of section 2's
+// on the way somewhere, not held at the bay's edge; a dragon mid-walk -- walking, turning, boarding or walking off --
+// getting no more than 4 px on in 10 s, stood still or turned about on one spot; the car standing still with work to do
+// for a minute; a keeper giving up on a dragon, WAIT_MAX); breaks of section 2's
 // invariants (checked every 30 steps as it does, the shaft every step); the jobs still open at the end and the oldest
 // (the average wait counts only jobs started: a starving barn's never-started jobs show here); and ms per sim step (the
 // step alone, measured in the worker; three workers share a 4-core machine).
@@ -61,9 +63,9 @@ import type { Stage } from '../src/art/dragon/stages.ts';
 
 // ---------- casts ----------
 
-/** The named casts, as `<n>a<n>y<n>b` (adults counting the start's seven, young, babies). */
+/** The named casts, as `<n>a<n>y<n>b` (adults counting the start's seven, young, babies; placeCast has any other). */
 export const CASTS: Readonly<Record<string, string>> = Object.freeze({ start7: '7a', eight: '8a', ten: '7a3b', twelve: '7a3y2b', thirteen: '7a3y3b', fifteen: '7a4y4b' });
-/** A cast: how many of each stage (adults count the start's seven). */
+/** A cast: how many of each stage (adults count the start's seven; fewer than seven are the first of them). */
 export interface CastSpec { adult: number; young: number; baby: number; elder: number }
 /** The elements the dragons past the start's seven take, in turn (the first three section 10's EIGHTH, NINTH and TENTH's). */
 export const EXTRA_ELEMENTS: readonly DragonElement[] = ['fire', 'water', 'rock', 'lightning', 'spike', 'dusk', 'slinkwing'];
@@ -76,8 +78,7 @@ export function parseCast(name: string): CastSpec {
   const key: Record<string, keyof CastSpec> = { a: 'adult', y: 'young', b: 'baby', e: 'elder' };
   if (!/^(\d+[aybe])+$/.test(pat)) throw new Error(`capacity: no cast "${name}" (the casts: ${Object.keys(CASTS).join(', ')}, or a pattern like 7a3y2b)`);
   for (const m of pat.matchAll(/(\d+)([aybe])/g)) spec[key[m[2]]] += Number(m[1]);
-  const start = START_DRAGONS.length;
-  if (spec.adult < start) throw new Error(`capacity: cast "${name}" has ${spec.adult} adults; every cast starts from the new game's ${start}`);
+  if (!castSize(spec)) throw new Error(`capacity: cast "${name}" has no dragons`);
   return spec;
 }
 
@@ -85,12 +86,13 @@ export function parseCast(name: string): CastSpec {
 export const castSize = (s: CastSpec): number => s.adult + s.young + s.baby + s.elder;
 
 /**
- * A cast's dragons on the start base: the new game's seven, then the rest (grown ones first -- adults, young, elders --
+ * A cast's dragons on the start base: the new game's seven (or its first few), then the rest (grown ones first -- adults, young, elders --
  * then babies), each in the first free slot of its kind (see the header), checked by CareSim's own constructor. `missing`
  * says what did not fit (the dragons placed before it are in `places`).
  */
 export function placeCast(spec: CastSpec): { places: DragonPlace[]; missing: string | null } {
-  const places: DragonPlace[] = [...START_DRAGONS];
+  // (fewer adults than the start's seven: the first of them -- a late game's barn, its hatchlings in place of the retired)
+  const places: DragonPlace[] = START_DRAGONS.slice(0, Math.min(spec.adult, START_DRAGONS.length));
   const rooms = placeRooms(START_ROOMS), hatchery = rooms.find((r) => r.kind === 'hatchery') ?? null;
   const rank = (r: Room) => { const i = GROWN_ROOMS.indexOf(r.kind); return i < 0 ? GROWN_ROOMS.length + r.id : i; };
   // (a DragonPlace names its room by kind and its number among the rooms of that kind: `n`, the first by default)
@@ -107,7 +109,7 @@ export function placeCast(spec: CastSpec): { places: DragonPlace[]; missing: str
   };
   const babies = all.filter(({ s }) => s.baby).sort((p, q) => near(p.r, p.s) - near(q.r, q.s) || p.r.id - q.r.id || p.s.i - q.s.i);
   const extra: Stage[] = [
-    ...Array<Stage>(spec.adult - START_DRAGONS.length).fill('adult'), ...Array<Stage>(spec.young).fill('young'),
+    ...Array<Stage>(Math.max(0, spec.adult - START_DRAGONS.length)).fill('adult'), ...Array<Stage>(spec.young).fill('young'),
     ...Array<Stage>(spec.elder).fill('elder'), ...Array<Stage>(spec.baby).fill('baby'),
   ];
   for (const [n, stage] of extra.entries()) {
@@ -161,6 +163,7 @@ export function runOne(t: Task, done?: (sim: CareSim) => void): Run {
   const stall = (m: string) => { stalls++; if (stallNotes.length < 4) stallNotes.push(`step ${sim.tick}: ${m}`); };
   const broke = (m: string) => { breaks++; if (breakNotes.length < 4) breakNotes.push(`step ${sim.tick}: ${m}`); };
   const still = new Map<Keeper, { key: string; since: number; told: boolean }>(), stood = new Map<Dragon, { key: string; since: number; told: boolean }>();
+  const going = new Map<Dragon, { f: number; x: number; since: number; told: boolean }>(), GO_PX = 4;
   let carKey = '', carSince = 0, carTold = false, carBusy = 0, keeperBusy = 0;
   let callMax = 0, bayMax = 0, keeperBayMax = 0, heldMax = 0, ms = 0;
   const covers = new Map<string, number>(), cover = { total: 0, longest: 0, worst: '' };
@@ -253,8 +256,15 @@ export function runOne(t: Task, done?: (sim: CareSim) => void): Run {
       if (d.goal === 'evict' && d.slot && sim.rooms[d.slot.room].kind === 'hatchery') broke(`${d.name} was moved on to the Hatchery`);
       const y = d.move === 'ride' ? L.y : feetY(d.f), key = `${d.move}@${d.f},${d.x},${y}`, was = stood.get(d);
       if (!was || was.key !== key) stood.set(d, { key, since: sim.tick, told: false });
-      else if (!was.told && ['walk', 'board', 'alight'].includes(d.move) && sim.tick - was.since > STALL) { was.told = true; stall(`${d.name} stood still mid-${d.move} for ${STALL / FPS} s`); }
       else if (d.move === 'ride') heldMax = Math.max(heldMax, sim.tick - was.since);
+      // (a dragon mid-walk -- walking, turning, boarding or walking off, a route left -- that gets no more than GO_PX on
+      // in STALL: stood still mid-walk, or turning about on one spot, walked back and forth by a line that re-sorts it
+      // each step; the two alike a stall. Not one waiting its turn: at a landing, at the bay's edge, or standing to set
+      // off while one walking over it passes first -- its job's wait counts that)
+      const on = d.legs.length > 0 && ['walk', 'turn', 'board', 'alight'].includes(d.move), g = going.get(d);
+      if (!on) going.delete(d);
+      else if (!g || g.f !== d.f || Math.abs(d.x - g.x) > GO_PX) going.set(d, { f: d.f, x: d.x, since: sim.tick, told: false });
+      else if (!g.told && sim.tick - g.since > STALL) { g.told = true; stall(`${d.name} (${d.stage}) got no more than ${GO_PX} px on from f${d.f} x ${g.x.toFixed(1)} in ${STALL / FPS} s (${d.move})`); }
     }
   }
   for (const [k, n] of covers) coverEnd(k, n);
@@ -373,7 +383,7 @@ export function report(sums: CastSummary[], runs: Run[], head: { rev: string; mi
     '*Jobs done*, *Rides* and the busy shares: the mean over the seeds (*Car busy*: a rider, or a stop to go to; *Keepers busy*: keeper-steps with a job).',
     '*Landing* and *Bay edge*: the longest a dragon waited at a landing for the car, and held at the bay\'s edge (the most on any seed).',
     '*Eye covered*: sim-check section 2\'s measure, seconds of an eye under a standing body summed over every pair, the mean a run (the longest one moment on any seed).',
-    '*Stalls*: S3\'s rules broken, summed over the seeds (a keeper or a dragon mid-walk standing still 10 s, the car still with work a minute, a keeper giving up); *inv*: section 2\'s invariants broken.',
+    '*Stalls*: S3\'s rules broken, summed over the seeds (a keeper standing still 10 s on the way somewhere, a dragon mid-walk getting no more than 4 px on in 10 s -- stood still or turned about on one spot --, the car still with work a minute, a keeper giving up); *inv*: section 2\'s invariants broken.',
     `*ms/step*: CareSim.step() alone, the mean (${head.workers > 1 ? `${head.workers} worker threads at once` : 'one worker thread'}). Wall time ${f1(head.wallS)} s.`,
   ].join(' '));
   return L.join('\n');

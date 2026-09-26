@@ -47,9 +47,12 @@
 //    the paper turn is the yard's.
 // 10. Barn capacity (plan S6b, C1 and C3): the benchmark cast `twelve` (tools/capacity.ts) for 30 minutes, checked every
 //    step as section 2 -- no need empty, short waits, the car mostly free, no stall, no two in the shaft; eight adults,
-//    ten, and the ages preset's twelve keep their service; and the `full` preset, forced 9 over the cap, keeps moving
-//    with its egg waiting. (It runs in two worker threads beside the other sections, and is printed at the end: the
-//    suite keeps to 30 s.)
+//    ten, and the ages preset's twelve keep their service; the `full` preset, forced 9 over the cap, keeps moving with
+//    its egg waiting; and (the S6b review) a barn of babies -- any mix under the cap -- is served: four babies each
+//    resting in the room another wants are met (a job's wait for its own floor's room ends at SOON), twelve babies
+//    packed from the ground floor up served for 30 minutes, and two walking up to a landing at one spot placed in the
+//    order they stand, never turned back and forth. (It runs in three worker threads beside the other sections, and is
+//    printed at the end: the suite keeps to 30 s.)
 // 11. The clock (docs/BASE_DESIGN.md 7) on a real day and a 600-step test day: the day, the hour and the phase at each
 //    phase's start, the sky's three stepped thirds over a phase's first hour, day 2 at midnight, a whole day read step
 //    by step (the phases in order, the turn never going back; the lights and the HUD's sun or moon in step with the
@@ -107,7 +110,7 @@ import type { DragonPlace } from '../src/game/start.ts';
 import type { Keeper, Dragon } from '../src/game/sim.ts';
 import {
   NEED_ROOM, TURN_STEPS, TURN_HALF, WAIT_MAX, LEAD_PX, arrived, inTheBay, liftRange, needRoom, dragonSpan, dragonInBay, depthOf, eyeSpan, walking,
-  landingEdge, ridesLeft, remainingCost, nearestFree, bodySpan, LIVELY, DRAGON_EYE,
+  landingEdge, ridesLeft, remainingCost, nearestFree, bodySpan, landingLine, LIVELY, DRAGON_EYE,
 } from '../src/game/travel.ts';
 import { gaitOf, gaitFrom, moveAt, wrapT, happyLen } from '../src/game/gait.ts';
 import { TURN_HALF as YARD_TURN_HALF } from '../src/care/dragon.ts';
@@ -145,14 +148,18 @@ import { STAGES } from '../src/art/dragon/stages.ts';
  * longest section beside the rest on another core); the worker runs section 10 alone, and sends back its line, its
  * failures and its rooms' uses, which the main thread prints and counts before the suite's end.
  */
-const MAIN = isMainThread, PART: 'capacity' | 'full' | null = MAIN ? null : (workerData as { part: 'capacity' | 'full' }).part;
-/** Section 10's two parts, each in a worker of its own: the benchmark and the crowds, and the over-full `full` preset (C3: about 14 s alone). */
-const worker = (part: 'capacity' | 'full') => new Promise<{ fails: string[]; used: Record<string, number>; usedRoom: number[]; line: string }>((ok, no) => {
+type Part = 'capacity' | 'full' | 'babies';
+const MAIN = isMainThread, PART: Part | null = MAIN ? null : (workerData as { part: Part }).part;
+/**
+ * Section 10's three parts, each in a worker of its own: the benchmark and the crowds; the over-full `full` preset (C3:
+ * about 14 s alone); and a barn of babies with the landing's line kept in order (the S6b review).
+ */
+const worker = (part: Part) => new Promise<{ fails: string[]; used: Record<string, number>; usedRoom: number[]; line: string }>((ok, no) => {
   const w = new Worker(new URL(import.meta.url), { workerData: { part } });
   w.once('message', ok); w.once('error', no);
   w.once('exit', (code) => no(new Error(`sim-check: section 10's ${part} worker left (code ${code}) without a result`)));
 });
-const capacity = MAIN ? [worker('capacity'), worker('full')] : null;
+const capacity = MAIN ? [worker('capacity'), worker('full'), worker('babies')] : null;
 const fails: string[] = [];
 const fail = (m: string) => { if (fails.length < 40) fails.push(m); };
 const newSim = (seed = 1) => new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed });
@@ -174,12 +181,12 @@ const noteUse = (w: CareSim, since: Uses | null = null) => {
  * The service 30 minutes of play must give (section 2, seeds 1-3, and section 4's Rush after Rush, seed 1), measured
  * and frozen with about 20 % headroom (docs/BASE_DESIGN.md 4.7, 4.9, 8.1). The gates a dragon feels most keep the
  * plan's values on every seed: no need ever empties, done >= 120, a keeper's wait at the stand spot <= 20 s, bay waits
- * <= 60 s, a walking dragon never stands still 10 s. The waits: with one car between the floors and one dragon at a
- * time in its shaft (plan 7's mustFix), S3's barn -- one room per need -- kept the car busy about 95 % of the run, and a
- * job's wait was mostly its dragon's wait for it (83.5 s on average over seeds 1-3, gated at 100 s; 360 s at most).
- * Plan S6b's barn repeats the need rooms on the floors, so a dragon's needs are met on its own floor and the car is
- * nearly idle (1 to 4 rides in 30 minutes): seeds 1-3 wait 29.1 / 21.6 / 26.0 s on average (mean 25.6), 112.3 s at
- * most -- gated at 31 s (the mean over the three) and 135 s. A landing wait, a rider held in the car and Rush after
+ * <= 60 s, a walking dragon never stands still, nor turns about on one spot, 10 s. The waits: with one car between the
+ * floors and one dragon at a time in its shaft (plan 7's mustFix), S3's barn -- one room per need -- kept the car busy
+ * about 95 % of the run, and a job's wait was mostly its dragon's wait for it (83.5 s on average over seeds 1-3, gated
+ * at 100 s; 360 s at most). Plan S6b's barn repeats the need rooms on the floors, so a dragon's needs are met on its own
+ * floor and the car is nearly idle (1 to 4 rides in 30 minutes): seeds 1-3 wait 28.4 / 21.6 / 26.0 s on average (mean
+ * 25.3; 29.1 on seed 1 before the S6b review), 112.3 s at most -- gated at 31 s (the mean over the three) and 135 s. A landing wait, a rider held in the car and Rush after
  * Rush keep S3's gates (they measure far under them now: 13.0 s, 8.0 s). One seed's numbers move by a fifth either way
  * with any change to who goes when, so the average is gated over the three. An eye under the body of a dragon standing
  * over it (the sim's model: DRAGON_BODY and DRAGON_EYE, the worst of every element) is left only at a crowded landing
@@ -193,15 +200,17 @@ const GATE = { done: 120, waitAvgS: 31, waitMaxS: 135, keeperWaitAvgS: 20, liftW
 /**
  * Section 10 (plan S6b, C1): the benchmark cast `twelve` (tools/capacity.ts: the start's seven adults, three young and
  * two babies), seed 1, 30 minutes, checked every step with section 2's invariants and eye model (capacity.ts runOne).
- * Measured: no need empty; wait avg 42.5 s, max 209.4 s; 265 done; 48 rides (the car 33 % busy); a landing wait 39.5 s,
- * the bay's edge 39.5 s; an eye covered 52.0 s in all, 14.1 s at most; no stall, no shaft overlap. Frozen with about 20 %
- * headroom; `rides` is a ceiling (the property that the car stays mostly free: the need rooms repeat on the floors).
- * (The design's gates -- 42 / 171 s, 217 done, 46 rides, 42 / 37 s, 44 / 17 s -- were frozen on the capacity study's
- * build, whose `babyHome` rule rested a baby moved on in the Hatchery; S5 forbids that -- a resting baby would hide an
- * egg -- and plan S6b drops it, which moves seed 1: 34.8 -> 42.5 s. Over seeds 1-8, `npm run capacity`: 42.1 s against
- * 39.3 s, twelve still SERVED on 8 of 8 seeds, so these are frozen on the build as it is.)
+ * Measured (after the S6b review): no need empty; wait avg 40.2 s, max 154.3 s; 266 done; 44 rides (the car 28 % busy);
+ * a landing wait 42.1 s, the bay's edge 39.5 s; an eye covered 46.5 s in all, 14.1 s at most; no stall (one held
+ * mid-walk, or turned about on one spot), no shaft overlap. Frozen with about 20 % headroom (none looser than the S6b
+ * build's: the landing's 47 s kept); `rides` is a ceiling (the property that the car stays mostly free: the need rooms
+ * repeat on the floors). (The design's gates -- 42 / 171 s, 217 done, 46 rides, 42 / 37 s, 44 / 17 s -- were frozen on
+ * the capacity study's build, whose `babyHome` rule rested a baby moved on in the Hatchery; S5 forbids that -- a resting
+ * baby would hide an egg -- and plan S6b drops it. This build meets the design's waits, jobs, rides and longest eye
+ * cover; its landing (42.1 s), bay edge (39.5 s) and eye cover in all (46.5 s) are over the design's by 0.1, 2.5 and
+ * 2.5 s.)
  */
-const TWELVE = { waitAvgS: 51, waitMaxS: 251, done: 212, rides: 58, landingS: 47, bayS: 47, coverTotalS: 62, coverS: 17 } as const;
+const TWELVE = { waitAvgS: 48, waitMaxS: 185, done: 213, rides: 53, landingS: 47, bayS: 47, coverTotalS: 56, coverS: 17 } as const;
 /**
  * Section 10's other runs (plan S6b): S3's ride-throughput guards are gone (the car no longer carries the barn); each
  * keeps service gates, measured on seed 1 and frozen with about 20 % headroom -- 8 adults for 30 minutes (170 done,
@@ -215,6 +224,12 @@ const CROWD_GATES = [{ done: 136, waitAvgS: 35, waitMaxS: 135 }, { done: 62, wai
  * no keeper gives up, the car never stands with work for a minute (it stood 17 s at most), and the egg still waits.
  */
 const FULL_DONE = 31;
+/**
+ * Section 10 (the S6b review): twelve babies packed from the Hatchery and the ground floor up, seed 1, 30 minutes --
+ * measured 289 jobs done, waits 56.6 s on average and 320.9 s at most (no need at 0, no stall); frozen with about 20 %
+ * headroom.
+ */
+const BABIES_GATE = { done: 231, waitAvgS: 68, waitMaxS: 385 } as const;
 /**
  * The rooms and structures whose mechanic a later slice builds (plan 3.9): they must show no use yet, and each entry
  * goes when its mechanic lands (S8 the tack room, the bunks, the map room, the Aerie). The lift's landed in S3 (dragons
@@ -354,6 +369,7 @@ if (MAIN) {
   const play = (seed: number) => {
     const sim = newSim(seed), MIN = 30, steps = MIN * 60 * FPS, at = seed === 1 ? '' : `seed ${seed}, `;
     const still = new Map<Keeper, { key: string; since: number }>(), stood = new Map<Dragon, { key: string; since: number }>();
+    const going = new Map<Dragon, { f: number; x: number; since: number; told: boolean }>();
     const f0 = new Map(sim.dragons.map((d) => [d, d.f])), f0Of = (d: Dragon) => f0.get(d)!;
     const metIn = new Map<Dragon, Set<string>>(), x0 = new Map(sim.dragons.map((d) => [d, d.x])), moved = new Set<Dragon>();
     let callMax = 0, bayMax = 0, keeperBayMax = 0, heldMax = 0, shaft = 0;
@@ -434,12 +450,17 @@ if (MAIN) {
           if (m.grown > 1 || m.babies > 2 || (m.grown && m.babies)) fail(`${at}step ${sim.tick}: module ${d.slot.mod} of the ${sim.rooms[d.slot.room].kind} holds ${m.grown} grown and ${m.babies} babies`);
         }
         if (d.act && (!d.slot || Math.abs(d.x - d.slot.x) >= 0.5 || sim.rooms[d.slot.room].kind !== NEED_ROOM[d.act.need])) fail(`${at}step ${sim.tick}: ${d.name} is met for ${d.act.need} away from its slot of the ${NEED_ROOM[d.act.need]}`);
-        // a walking dragon gets somewhere (spike's creep and slinkwing's pause stand still a moment); a rider is held in
-        // the car only while someone clears the bay; a wait at a landing or the bay's edge lasts a while at most
+        // a walking dragon gets somewhere (spike's creep and slinkwing's pause stand still a moment): mid-walk --
+        // walking, turning, boarding or walking off, a route left -- it gets more than 4 px on in GATE.walkStallS, not
+        // stood still nor turned about on one spot (capacity.ts runOne's stall rule); a rider is held in the car only
+        // while someone clears the bay; a wait at a landing or the bay's edge lasts a while at most
         const y = d.move === 'ride' ? L.y : feetY(d.f), key = `${d.move}@${d.f},${d.x},${y}`, was = stood.get(d);
         if (!was || was.key !== key) stood.set(d, { key, since: sim.tick });
-        else if (['walk', 'board', 'alight'].includes(d.move) && sim.tick - was.since > GATE.walkStallS * FPS) fail(`${at}step ${sim.tick}: ${d.name} has stood still mid-${d.move} for ${GATE.walkStallS} s`);
         else if (d.move === 'ride') heldMax = Math.max(heldMax, sim.tick - was.since);
+        const on = d.legs.length > 0 && ['walk', 'turn', 'board', 'alight'].includes(d.move), g = going.get(d);
+        if (!on) going.delete(d);
+        else if (!g || g.f !== d.f || Math.abs(d.x - g.x) > 4) going.set(d, { f: d.f, x: d.x, since: sim.tick, told: false });
+        else if (!g.told && sim.tick - g.since > GATE.walkStallS * FPS) { g.told = true; fail(`${at}step ${sim.tick}: ${d.name} has got no more than 4 px on from x ${g.x.toFixed(1)} mid-walk (${d.move}) for ${GATE.walkStallS} s`); }
         if (d.move === 'call') callMax = Math.max(callMax, d.waited);
         if (d.move === 'bay') bayMax = Math.max(bayMax, d.waited);
         if (d.x !== x0.get(d) || d.f !== f0Of(d)) moved.add(d);
@@ -1128,6 +1149,75 @@ if (PART === 'full') {
     noteUse(sim);
   }
   parentPort!.postMessage({ fails, used: USED, usedRoom: USED_ROOM, line: `  10 over the cap: ${out.join('; ')}` });
+}
+
+if (PART === 'babies') {
+  // (the S6b review) a barn of babies -- the late game's: the start's seven retired to the garden, hatchlings in their
+  // places, any mix of BARN_CAP counts -- served, and two on their way to a landing kept in the order they stand; in a
+  // worker of its own
+  const out: string[] = [];
+  // two walking up to the ground floor's west landing at one spot (a baby resting in the Grooming Parlour's sub-slot
+  // beside it, so the line's best place clear of every eye lies behind them, and the nearest one drawn behind the baby
+  // ahead of them): the one nearer the bay is placed nearer it, so neither walks back through the other -- placed the
+  // other way round, the two passed each other, swapped and turned back every few steps, for minutes (4 grown and 8
+  // babies, seed 3), or for ever (2 and 10, seed 2)
+  {
+    const by = (n: string) => START_DRAGONS.find((p) => p.name === n)!;
+    const cast: DragonPlace[] = [by('EMBER'), { ...by('BRAMBLE'), slot: { room: 'romp', i: 0 } }, { name: 'BURR', element: 'spike', stage: 'baby', seed: 45, slot: { room: 'groom', i: 1 } }];
+    const sim = new CareSim(START_ROOMS, cast, START_KEEPERS, { seed: 1 }), [e, b] = ['EMBER', 'BRAMBLE'].map((n) => sim.dragons.find((d) => d.name === n)!);
+    for (const [d, x] of [[e, 344.3], [b, 343.95]] as const) { d.x = x; d.facing = 1; d.move = 'walk'; d.gaitT = 0; d.legs = [{ f: 0, x: LIFT_CX }, { f: 2, x: LIFT_CX }, { f: 2, x: 792 }]; }
+    const line = landingLine(sim, 0, -1), places = line.map((w) => `${w.d.name} ${w.x.toFixed(1)}${w.back ? ' (drawn behind)' : ''}`).join(', ');
+    if (line.length !== 2 || line[0].d !== e) fail(`landing line: EMBER at x 344.3 and BRAMBLE at 343.95 walking up to the west landing are placed ${places}: the nearer the bay not the nearer it`);
+    const turns = new Map<Dragon, number>([[e, 0], [b, 0]]);
+    for (let s = 0; s < 600; s++) {
+      const was = [e.move, b.move];
+      sim.step();
+      [e, b].forEach((d, i) => { if (d.move === 'turn' && was[i] !== 'turn') turns.set(d, turns.get(d)! + 1); });
+    }
+    if (turns.get(e)! > 6 || turns.get(b)! > 6) fail(`landing line: EMBER turned ${turns.get(e)} times and BRAMBLE ${turns.get(b)} in 10 s walking up to one landing (want <= 6: not turned back and forth)`);
+    out.push(`two walking up to a landing at one spot placed ${places}; in 10 s EMBER turned ${turns.get(e)} times, BRAMBLE ${turns.get(b)}`);
+    noteUse(sim);
+  }
+  // four babies on the upper floor each resting in the room another wants (the start's seven but ZAP, whose Romp Room
+  // they take): two in its Hearth Kitchen wanting play, two in its Romp Room wanting food. A baby with a job is never
+  // moved on, and a job waits for its own floor's room -- until its need falls to SOON (travel.ts STAY_TIER): then a
+  // room a floor away. Without that the four stood still for good from the first second, 45 264 need-steps at 0 in 20
+  // minutes. 10 minutes: no need at 0, each of the four met for the need it wanted
+  {
+    const B = (name: string, element: DragonElement, room: RoomKind, i: number): DragonPlace => ({ name, element, stage: 'baby', seed: name.length * 7 + i, slot: { room, i, n: 1 }, days: 0 });
+    const cast = [...START_DRAGONS.filter((p) => p.name !== 'ZAP'), B('KA', 'fire', 'kitchen', 1), B('KB', 'water', 'kitchen', 2), B('RA', 'rock', 'romp', 1), B('RB', 'spike', 'romp', 2)];
+    const sim = new CareSim(START_ROOMS, cast, START_KEEPERS, { seed: 1 }), want: Record<string, NeedKind> = { KA: 'play', KB: 'play', RA: 'food', RB: 'food' };
+    for (const d of sim.dragons) for (const k of NEEDS) if (hasNeed(d.element, k)) d.needs[k] = 1;
+    for (const d of sim.dragons) if (d.name in want) d.needs[want[d.name]] = 0.3;
+    const met = new Map<string, number>();
+    for (let s = 0; s < 10 * 60 * FPS; s++) {
+      sim.step();
+      for (const d of sim.dragons) if (d.act && d.act.t === 0 && want[d.name] === d.act.need && !met.has(d.name)) met.set(d.name, sim.tick);
+    }
+    const st = sim.stats, missed = Object.keys(want).filter((n) => !met.has(n));
+    if (st.emptySteps || missed.length) fail(`babies: four on the upper floor each resting in the room another wants -- ${st.emptySteps} need-steps at 0 in 10 minutes, ${missed.length ? `${missed.join(', ')} never met for ${missed.map((n) => want[n]).join(', ')}` : 'each met'} (want none at 0, each met)`);
+    out.push(`four babies each resting in the room another wants: met at steps ${Object.keys(want).map((n) => `${n} ${met.get(n) ?? '-'}`).join(', ')}; ${st.emptySteps} need-steps at 0 in 10 min, ${st.done} jobs done`);
+    noteUse(sim);
+  }
+  // the late game's barn: twelve babies (every grown dragon retired), packed as hatchlings leave the Hatchery -- its two
+  // sub-slots, then the free ones room by room from the ground floor up, so every room of the ground floor holds two
+  // babies. 30 minutes on seed 1, checked every step as the twelve (capacity.ts runOne): no need at 0, no stall -- one
+  // held mid-walk, or turned about on one spot -- no invariant broken; the waits and the jobs done frozen with about
+  // 20 % headroom (measured: BABIES_GATE). Before the S6b review the ground floor's babies, each wanting a room another
+  // rested in, stood still: 3.1 M need-steps at 0, 83 jobs done
+  {
+    const rooms = placeRooms(START_ROOMS), nth = (r: (typeof rooms)[number]) => rooms.filter((q) => q.kind === r.kind).indexOf(r), places: DragonPlace[] = [];
+    for (const r of [...rooms.filter((q) => q.kind === 'hatchery'), ...rooms.filter((q) => q.kind !== 'hatchery')]) for (const sl of r.slots) {
+      if (!sl.baby || places.length >= BARN_CAP) continue;
+      const element = DRAGON_ELEMENTS[places.length % DRAGON_ELEMENTS.length];
+      places.push({ name: hatchName(new CareSim(START_ROOMS, places, []), element), element, stage: 'baby', seed: 700 + places.length, slot: { room: r.kind, i: sl.i, ...(nth(r) ? { n: nth(r) } : {}) }, days: 0 });
+    }
+    const run = runOne({ cast: 'babies', pattern: '12b', places, seed: 1, min: 30 }, (w) => noteUse(w)), G = BABIES_GATE;
+    if (run.emptySteps || run.stalls || run.breaks) fail(`babies (twelve, packed from the ground floor): ${run.emptySteps} need-steps at 0 (${run.mostEmpty}), ${run.stalls} stalls, ${run.breaks} invariant breaks (${[...run.stallNotes, ...run.breakNotes].join('; ')})`);
+    if (run.done < G.done || run.waitAvgS > G.waitAvgS || run.waitMaxS > G.waitMaxS) fail(`babies (twelve): ${run.done} jobs done in 30 minutes, waits ${run.waitAvgS.toFixed(1)} s on average, ${run.waitMaxS.toFixed(1)} s at most (want >= ${G.done}, <= ${G.waitAvgS} s, <= ${G.waitMaxS} s)`);
+    out.push(`twelve babies packed from the ground floor, 30 min: ${run.emptySteps} steps with a need at 0; wait avg ${run.waitAvgS.toFixed(1)} s, max ${run.waitMaxS.toFixed(1)} s; ${run.done} jobs done; ${run.rides} rides; ${run.stalls} stalls, ${run.breaks} invariant breaks; ${run.evictions} moved on`);
+  }
+  parentPort!.postMessage({ fails, used: USED, usedRoom: USED_ROOM, line: `  10 babies: ${out.join('; ')}` });
 }
 
 // ---------- 11. the clock ----------

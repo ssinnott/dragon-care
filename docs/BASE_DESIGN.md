@@ -133,7 +133,10 @@ slinkwing's pointer pause stand still for whole frames), and a reversal is a pap
 flipped halfway: the yard's). Among its jobs in the same tier it takes one met on its own floor before one a ride away.
 A need's rooms repeat on the floors (3), so it goes to one on its own floor whenever its floor has one -- the ground and
 upper floors have all five, the hayloft food, love and sleep -- and rides the lift only for the hayloft's missing play
-and bath, a Rush (which may take it to any floor's room), a full floor that has none of its size, or the garden.
+and bath, a Rush (which may take it to any floor's room), a full floor that has none of its size, a need fallen to its
+yellow bubble with no room of its floor to be had (it then takes a slot free a floor away: `STAY_TIER`, 4.9 -- a baby
+with a job is never moved on, so babies each resting in the room another needs would otherwise wait for ever), or the
+garden.
 
 **The lively step** (plan S6b). Stepping on to the lift's car and off it until clear of the bay, and wherever its body
 is in the lift bay or steps into it (a dragon crossing the bay on its own floor: need rooms lie on both sides of it), a
@@ -152,11 +155,15 @@ the line, whose rump its head is over (nose to tail: the mean of their half-bodi
 adults). Each one waiting is drawn over the ones ahead of it and over the dragons in the slots; where no such place is
 left (the room beside the landing full), it may stand drawn *behind* the dragons about it instead, where none of their
 bodies covers its eye. A dragon on its way to the line may have to walk back to its place (an evictee leaving the slot
-beside the landing that its evicter is coming to); one already waiting only ever steps up, and keeps its place (and
-its turn for the car) if it changes where it is going but still rides from there. A slot beside a landing is not taken
+beside the landing that its evicter is coming to), but never back through another on its way there: two walking up at
+one spot are placed in the order they stand (each placed in turn from the bay, the nearest may get the best place clear
+of every eye behind the other's, and the two would pass each other, swap and turn back every few steps); one already
+waiting only ever steps up, and keeps its place (and its turn for the car) if it changes where it is going but still
+rides from there. A slot beside a landing is not taken
 while a dragon waits over it, and a dragon lingering in one (3) while others wait at that landing, or are on their way
 to it, moves over to a free slot of its own room clear of the landing. Walking up to the bay (within 250 px of its
-edge), a dragon keeps a step behind one walking up ahead of it the same way, so two never arrive on one spot; and a
+edge, to cross it or to call the car there), a dragon keeps a step behind one walking up ahead of it the same way, so
+two never arrive on one spot -- one whose walk ends at a slot short of the bay is not held so, nor holds another; and a
 crosser held at the bay's edge stops short of the places of anyone waiting ahead of it there, its snout clear of their
 eyes.
 
@@ -168,7 +175,7 @@ start's seven ride it 1 to 4 times in 30 minutes -- so what is left is mostly tw
 floor, one standing over the other while they wait to cross. The model the check counts with is the worst case (the
 longest body and the widest eye of every element, and any body over the eye's x, tail tip included): 3.7 s over three
 30-minute runs of the start (seeds 1 to 3, 1.5 s at most; it was 4.2 s and 2.5 s with S3's one room per need), and
-with twelve dragons, the barn's cap (4.7), 31.7 s in 30 minutes on average over seeds 1 to 8, 14.1 s at most (it was
+with twelve dragons, the barn's cap (4.7), 31.6 s in 30 minutes on average over seeds 1 to 8, 15.3 s at most (it was
 273.6 s and 117.5 s in the one-room-per-need barn) (4.7, 8.1). Drawn, most of it is a tail or a flank over the other's
 head, and it ends when the bay opens.
 
@@ -280,7 +287,8 @@ dragon or up to two babies. The Hatchery has two baby sub-slots only, 60 and 120
 facing into the barn, tails to the slope (no grown dragon fits there). A keeper meets a dragon at its slot's **stand
 spot**: in front of its snout (58 px for an adult), kept inside the room. A dragon going for a need **reserves** a
 free slot of its size in a room that meets it -- among that need's rooms on its own floor if the floor has one (every
-floor's, only for a Rush), the cheapest by its walk there (a ride counted 600 px more, a room with no slot free for it
+floor's for a Rush, and a slot free a floor away once the need has fallen to its yellow bubble with none of its floor's
+to be had: `STAY_TIER`), the cheapest by its walk there (a ride counted 600 px more, a room with no slot free for it
 200 px more: `travel.ts` `roomsFor`) -- and walks there; after its job it **lingers** in that slot (there is no home
 room) until it leaves for another need. If the room is full, it moves on a lingerer (one with nowhere to be, no act and
 no keeper coming, never a baby with a job open: the lowest id), who goes to a free slot on its own floor in a room
@@ -427,51 +435,69 @@ more, jobs wait 90 s or less on average from opening to their keeper starting, a
 
 | Cast | Dragons | Seeds with a need empty | Wait avg s | Wait max s | Jobs done | Rides | Car busy | Landing max s | Bay edge max s | Keepers busy | Eye covered s (longest) | Stalls, invariant breaks |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| the start (7a) | 7 | 0/8 | 23.6 | 112.3 | 152.8 | 1.6 | 1 % | 16.6 | 17.5 | 26 % | 1.1 (2.8) | 0, 0 |
-| eight (8a) | 8 | 0/8 | 24.5 | 113.3 | 171.0 | 1.8 | 1 % | 16.6 | 17.5 | 30 % | 2.3 (3.9) | 0, 0 |
-| ten (7a3b) | 10 | 0/8 | 36.8 | 240.3 | 221.0 | 11.3 | 8 % | 36.4 | 33.0 | 46 % | 6.4 (4.0) | 0, 0 |
-| 11a | 11 | 0/8 | 27.8 | 125.7 | 235.4 | 24.8 | 15 % | 39.6 | 33.8 | 42 % | 11.9 (24.8) | 0, 0 |
-| 12a | 12 | 0/8 | 32.7 | 264.7 | 254.0 | 42.8 | 27 % | 61.4 | 37.9 | 46 % | 13.7 (18.8) | 0, 0 |
-| 7a5b | 12 | 0/8 | 47.3 | 258.7 | 264.6 | 38.8 | 32 % | 62.1 | 47.6 | 60 % | 27.2 (10.0) | 0, 0 |
-| **twelve (7a3y2b)** | **12** | **0/8** | **42.1** | 285.4 | 262.6 | 41.8 | 29 % | 79.5 | 44.9 | 53 % | 31.7 (14.1) | 0, 0 |
-| thirteen (7a3y3b) | 13 | 1/8 (26 need-steps) | 46.3 | 297.0 | 283.9 | 62.0 | 44 % | 58.5 | 45.3 | 59 % | 30.5 (13.2) | 0, 0 |
-| 13a | 13 | 0/8 | 34.1 | 189.3 | 274.0 | 62.5 | 40 % | 85.6 | 41.2 | 50 % | 18.6 (15.0) | 0, 0 |
-| 7a4y2b | 13 | 1/8 (624) | 43.4 | 285.4 | 283.0 | 64.6 | 43 % | 71.3 | 48.3 | 57 % | 28.8 (16.3) | 0, 0 |
-| 8a3y2b | 13 | 1/8 (555) | 43.2 | 237.2 | 281.4 | 63.0 | 43 % | 69.5 | 45.0 | 57 % | 37.0 (27.4) | 0, 0 |
-| 7a2y4b | 13 | 0/8 | 48.0 | 276.9 | 285.4 | 59.4 | 44 % | 56.3 | 61.3 | 63 % | 25.8 (20.2) | 2 (seed 3: two stood 10 s), 0 |
-| fifteen (7a4y4b) | 15 | 8/8 (14.1 M) | 62.1 | 1151.5 | 207.5 | 18.5 | 12 % | 39.3 | 35.0 | 36 % | 10.1 (8.3) | 0, 0 |
+| the start (7a) | 7 | 0/8 | 23.4 | 112.3 | 152.9 | 1.5 | 1 % | 16.6 | 17.5 | 26 % | 1.1 (2.8) | 0, 0 |
+| eight (8a) | 8 | 0/8 | 24.2 | 113.3 | 171.4 | 2.0 | 1 % | 16.6 | 17.5 | 30 % | 2.5 (3.9) | 0, 0 |
+| ten (7a3b) | 10 | 0/8 | 37.3 | 240.3 | 220.6 | 11.3 | 8 % | 36.4 | 29.4 | 46 % | 8.7 (14.7) | 0, 0 |
+| 11a | 11 | 0/8 | 27.2 | 155.6 | 235.9 | 24.6 | 15 % | 39.6 | 30.4 | 41 % | 4.2 (5.1) | 0, 0 |
+| 12a | 12 | 0/8 | 32.1 | 215.6 | 254.6 | 41.5 | 26 % | 35.9 | 34.1 | 46 % | 14.3 (18.8) | 0, 0 |
+| 7a5b | 12 | 0/8 | 47.6 | 253.7 | 264.9 | 38.3 | 32 % | 93.9 | 45.9 | 59 % | 23.7 (11.7) | 1 (seed 6: a convoy stand behind a baby), 0 |
+| **twelve (7a3y2b)** | **12** | **0/8** | **41.7** | 285.4 | 262.0 | 45.1 | 33 % | 78.2 | 44.9 | 53 % | 31.6 (15.3) | 0, 0 |
+| 4a8b | 12 | 0/8 | 51.4 | 291.6 | 268.8 | 28.0 | 26 % | 97.0 | 48.4 | 67 % | 20.7 (12.1) | 1 (seed 8: a baby behind a baby), 0 |
+| 2a10b | 12 | 0/8 | 47.5 | 251.6 | 282.8 | 16.5 | 16 % | 68.6 | 59.0 | 72 % | 16.0 (10.3) | 0, 0 |
+| 0a12b | 12 | 1/8 (690 need-steps) | 49.3 | 234.3 | 293.0 | 8.6 | 10 % | 66.1 | 46.4 | 77 % | 17.7 (21.2) | 0, 0 |
+| thirteen (7a3y3b) | 13 | 0/8 | 44.8 | 272.4 | 284.5 | 58.4 | 42 % | 101.6 | 44.4 | 59 % | 23.6 (9.8) | 0, 0 |
+| 13a | 13 | 0/8 | 33.7 | 198.1 | 273.6 | 62.1 | 39 % | 73.0 | 41.6 | 50 % | 18.2 (23.3) | 0, 0 |
+| 7a4y2b | 13 | 0/8 | 44.7 | 323.9 | 281.4 | 66.3 | 46 % | 61.7 | 42.2 | 57 % | 28.2 (16.3) | 0, 0 |
+| 8a3y2b | 13 | 0/8 | 42.6 | 350.5 | 281.0 | 60.5 | 41 % | 61.6 | 40.6 | 57 % | 27.5 (10.8) | 0, 0 |
+| 7a2y4b | 13 | 0/8 | 48.2 | 278.2 | 284.9 | 60.0 | 47 % | 95.8 | 44.0 | 63 % | 24.7 (24.0) | 0, 0 |
+| fifteen (7a4y4b) | 15 | 8/8 (15.5 M) | 63.7 | 1398.4 | 195.1 | 20.5 | 11 % | 33.8 | 35.0 | 33 % | 7.0 (8.3) | 0, 0 |
 
-(`a` adults, the start's seven among them; `y` young; `b` babies. *Wait* is a job's open-to-start wait, the mean of the
-seeds' averages and the longest on any seed; *Eye covered* the check's worst-case model, seconds of an eye under a
-standing body in 30 minutes, the mean, and the longest one moment; the rest as `npm run capacity` prints it. Over seeds
-1 to 16 the twelve wait 40.9 s and are served on every seed, with no stall.)
+(`a` adults, the start's seven among them -- fewer than seven are the first of them: a late game's barn, its
+hatchlings in place of the retired; `y` young; `b` babies. *Wait* is a job's open-to-start wait, the mean of the seeds'
+averages and the longest on any seed; *Eye covered* the check's worst-case model, seconds of an eye under a standing
+body in 30 minutes, the mean, and the longest one moment; *Stalls* a keeper standing still 10 s on the way somewhere,
+a dragon mid-walk getting no more than 4 px on in 10 s -- stood still, or turned about on one spot -- the car standing
+with work a minute, a keeper giving up; the rest as `npm run capacity` prints it. Over seeds 1 to 32 the twelve wait
+39.9 s and are served on every seed, with no stall; 7a5b over seeds 1 to 32 has a need touch empty on 2 (a lightning
+adult's play 25 s on seed 12 while crawling babies crossed the bay the other way; a baby's under a second on seed 32)
+and 3 convoy stands behind a crawling baby.)
 
-- **The start** waits 23.6 s where it waited 75.6 s, and rides the car 1.6 times in 30 minutes where it rode 107; the
-  car is nearly idle until the herd passes ten, and a quarter busy at twelve.
+- **The start** waits 23.4 s where it waited 75.6 s, and rides the car 1.5 times in 30 minutes where it rode 107; the
+  car is nearly idle until the herd passes ten, and a third busy at twelve.
 - **The cap: `BARN_CAP` 12** (`src/game/life.ts`, with `barnCount` and `barnFull`). Every 11- and 12-dragon mix measured
-  is served, twelve on every seed of 16. Thirteen is served for most mixes but not all to the letter (a young or a baby
-  touching empty on one seed of eight; 7a2y4b's two 10 s stands in a convoy behind a baby), and fourteen fails (the
-  study: 7a5y2b and 13a1b on every seed): the barn's 13 grown modules are the cliff -- a baby needs a whole module free
-  of grown dragons -- so fifteen, which now fits the barn, starves. 12 is the largest herd every mix measured is served
+  is served -- the start's seven with young and babies, twelve adults, and the late game's barns of babies (0a12b, its
+  babies packed near the Hatchery, and a barn of twelve babies packed from the ground floor up, served in `npm run sim`
+  section 10) -- twelve on every seed of 32. Thirteen is served for the mixes measured, and fourteen fails (the study:
+  7a5y2b and 13a1b on every seed): the barn's 13 grown modules are the cliff -- a baby needs a whole module free of
+  grown dragons -- so fifteen, which now fits the barn, starves. 12 is the largest herd every mix measured is served
   at, one dragon short of that cliff. The barn counts every dragon not living in the garden: those away on a mission
   (their places are kept -- measured in the study, a team's riders away, 10 dragons at home with two keepers are
   served and 12 sit at the edge, and a returning team would push the barn to the cliff) and an elder still walking out
   to the garden. **An egg never hatches while the barn holds 12** (7): it waits in its nest, and hatches the first step
   an elder's arrival in the garden frees a place; a mission (S8) offers no egg while the barn is full. The top bar shows
   the count against the cap (4.8).
+- **A barn of babies** (the S6b review). A baby with a job open is never moved on, and a job waits for its own floor's
+  room: as built, babies each resting in the room another wanted stood still for good -- twelve babies packed from the
+  ground floor up starved (11.7 M need-steps at 0 over 4 seeds, 83 to 104 jobs done), and four babies on the upper floor
+  resting crosswise froze it from the first second. A job's wait for its own floor now ends when its need falls to its
+  yellow bubble (`STAY_TIER`, 4.9) with none of its floor's rooms to be had: it takes a slot free a floor away. The
+  ground-floor twelve then have no need empty on 7 of 8 seeds (285 jobs done), and the four are met within 90 s.
 - **Over the cap** only a preset puts more: `preset=full`, 21 dragons (the start's seven and a baby in every free
   sub-slot), is starved but keeps moving -- 39 jobs done in 10 minutes, the car never standing with work for more than
   a moment, no keeper giving up (`npm run sim` section 10) -- and its due egg waits.
 - **What the check holds** (`npm run sim` section 10, seed 1, frozen with about 20 % headroom): the twelve with no need
-  empty, waits of at most 51 s on average and 251 s at the longest (42.5 and 209.4 measured), 212 jobs done or more
-  (265), at most 58 rides (48: the car stays mostly free), a landing and the bay's edge at most 47 s (39.5 and 39.5),
-  an eye covered at most 62 s in all and 17 s at once (52.0 and 14.1), no stall and no two in the shaft; the crowds S3
-  measured the one car against keep service gates instead of ride counts (eight adults: 170 done, 29.1 s; ten: 78 done,
-  24.7 s; the `ages` preset's twelve of every stage: 55 done, 49.3 s; none with a need empty). (The design's gates for
-  the twelve, 42 s and 171 s, 217 done, 46 rides, 42 and 37 s, 44 and 17 s, were frozen on the capacity study's build,
-  which rested a baby moved on in the Hatchery; S5 keeps babies moved on out of it, so no resting baby hides an egg,
-  and without that seed 1 measures 42.5 s where it measured 34.8 s -- over seeds 1 to 8, 42.1 s against 39.3 s, still
-  served on every seed -- so the gates are frozen on the build as it is.)
+  empty, waits of at most 48 s on average and 185 s at the longest (40.2 and 154.3 measured), 213 jobs done or more
+  (266), at most 53 rides (44: the car stays mostly free), a landing and the bay's edge at most 47 s (42.1 and 39.5),
+  an eye covered at most 56 s in all and 17 s at once (46.5 and 14.1), no stall and no two in the shaft; the crowds S3
+  measured the one car against keep service gates instead of ride counts (eight adults: 171 done, 27.7 s; ten: 78 done,
+  24.7 s; the `ages` preset's twelve of every stage: 55 done, 49.3 s; none with a need empty); and a barn of babies:
+  twelve packed from the ground floor up, no need empty, no stall, at least 231 jobs done (289), waits of at most 68 s
+  and 385 s (56.6 and 320.9); the four resting crosswise each met, no need empty; and two walking up to one landing at
+  one spot placed in the order they stand, neither turned back and forth. (The design's gates for the twelve -- 42 s
+  and 171 s, 217 done, 46 rides, a landing 42 s and the bay's edge 37 s, an eye 44 s and 17 s -- were frozen on the
+  capacity study's build, which rested a baby moved on in the Hatchery; S5 keeps babies moved on out of it, so no
+  resting baby hides an egg. This build meets the design's waits, jobs, rides and longest eye cover; its landing, bay
+  edge and eye cover in all are 0.1, 2.5 and 2.5 s over the design's, so those gates are frozen on the build.)
 
 **4.8 On screen.**
 - **The top bar** (y 0 to 15, `src/game/hud.ts`), left to right:
@@ -525,6 +551,7 @@ standing body in 30 minutes, the mean, and the longest one moment; the rest as `
 | Walking up to the bay (`APPROACH`) | within 250 px of the bay's edge, a dragon keeps `FOLLOW_GAP` behind one walking up ahead of it the same way |
 | A dragon moved on picks a slot (`RIDE_PX`) | a ride counted 600 px more than its route: one on its own floor first; the same when a dragon picks among a need's rooms (`roomsFor`) |
 | A need's room with no slot free (`EVICT_PX`) | counted 200 px more when a dragon picks among the need's rooms (a lingerer must be moved on first) |
+| A job's wait for its own floor's room ends (`STAY_TIER`) | at tier 1 (the yellow bubble, SOON), with none of its floor's rooms to be had: it takes a slot free a floor away (the S6b review: babies each resting in the room another needs no longer wait for ever, 4.7) |
 | The barn's cap (`BARN_CAP`, `src/game/life.ts`) | 12 dragons (every one not living in the garden): no egg hatches while the barn holds that many (4.7, 7) |
 | A dragon held at the bay's edge (`CROSS_MAX`) | 2400 frames (40 s) in all, and it goes before the next rider on its floor boards |
 
@@ -567,10 +594,18 @@ empty on any seed (8 of 8 had one before, at 345.1 s). The judge's ablations: th
 home to the nearest room of their station's kind, noise (fixed stations were kept); a keeper fetching a supply by the
 whole trip, not merely the nearest post (kept: without it 41.1 s and a stall); a baby moved on resting in the
 Hatchery, noise (dropped: S5 keeps babies moved on out of the Hatchery, so no resting baby hides an egg -- measured
-here it costs twelve about 3 s of average wait, 42.1 s against 39.3 s, still served on every seed); a baby with a job
+here it costs twelve about 3 s of average wait, 42.1 s against 39.3 s, still served on every seed; 41.7 s after the
+S6b review); a baby with a job
 open never moved on, noise (kept); a dragon moved on going to its lowest need's room on any floor before merely the
 nearest slot (kept: without it 7 adults and 5 babies are NOT served, 2 of 8). `npm run sim` gates the start's three
-seeds' waits at a mean of 31 s (25.6 measured) and 135 s at most (112.3), and section 10's twelve on seed 1 (4.7).
+seeds' waits at a mean of 31 s (25.3 measured) and 135 s at most (112.3), and section 10's twelve on seed 1 (4.7).
+The S6b review added three rules, each measured over the table in 4.7: a job's wait for its own floor's room ends at
+its yellow bubble (`STAY_TIER`: babies each resting in the room another needs had waited for ever); the rules for
+walking up to the bay hold only a dragon walking up to it -- to cross it or to call the car there -- not one whose walk
+ends at a slot short of it (an adult had stood 12 s over a baby crawling up to the bay: without the change thirteen and
+8a3y2b are not served, 7a5b stands five times over seeds 9 to 32 against two); and a landing's line places two walking
+up at one spot in the order they stand (they had passed each other and turned back every few steps, for minutes, or
+for good in a barn of babies).
 
 ---
 
@@ -772,7 +807,9 @@ seeds' waits at a mean of 31 s (25.6 measured) and 135 s at most (112.3), and se
    **Barn capacity is built too** (plan S6b; 3, 4.7): a need's rooms repeat on the floors, dragons step lively on and
    off the car and across the lift bay, and the barn is capped at 12 dragons (`BARN n/12` in the top bar; an egg waits
    in its nest while it is full). `preset=twelve` shows the barn at its cap (the capacity benchmark's twelve: the
-   start's seven, three young and two babies), and `npm run capacity` measures any herd (4.7).
+   start's seven, three young and two babies), `preset=capped` the same twelve with its babies out of the Hatchery and
+   an egg falling due on the first step -- it waits in plain view in the first nest, its three dots over it, with the
+   toast THE BARN IS FULL and `BARN 12/12` in amber -- and `npm run capacity` measures any herd (4.7).
    **The elder garden is built too** (3, The Garden; #10): the Garden Gate in the right tower's ground floor, the garden
    past it (a plot a resident, two from day 1: pan right from the start to see it), elders retiring to it 30 days into
    their stage, and its residents napping, sitting and strolling, needing only food and love, met where they rest by a
@@ -807,28 +844,30 @@ seeds' waits at a mean of 31 s (25.6 measured) and 135 s at most (112.3), and se
    | `src/game/garden.ts` | the elder garden: retiring (30 days into the elder stage), the plots it grows, the residents' nap, sit and stroll (napping only at night: the one simulation module that reads the day's phase), their resting places kept apart (clear of each other's eyes, no two bodies overlapping more than 20 px), their jobs met where they rest |
    | `src/game/gardenArt.ts` | the garden, drawn: a plot's tile (the hedge, the lawn, an apple tree on every other, a nest mound, a lantern, flowers on stalks; the path, the kerb, the ground), drawn only where it is on screen; the fence at the world's end; the lanterns' rings at night, clipped to the hedge's own shape; the GARDEN sign |
    | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks, turns and rides; a resident's nap and wake) and their anims, the lift's car, the eggs, the grow-up's flash, the garden, the sky and the lights, the speed, the camera (out to the garden's end), the HUD (the dragon card too) and the input; a live page loads and saves the barn |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and the barn's capacity (eight adults, ten, and the `ages` preset's twelve, each keeping its service); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled with room to grow every time, each grow-up held still for its `happy`, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days; a baby Rushed on its way to grow up met in a sub-slot) and eggs (the nests, hatching exactly 2 days on into a new baby, in front of its own nest or an empty one, fed within 3 minutes, a full barn's egg waiting, no baby moved on to the Hatchery, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up; the elder garden (routes out through the Garden Gate to every plot; retiring 30 days after growing into an elder (however late that was) and soon after, a retiree at a landing no longer than a barn dragon, in a crowded barn too, the gate passed, a plot each and the garden grown to hold them, a resident in the garden with no slot; the residents' 30 minutes: food and love only at a quarter of an elder's drain, asleep half their steps or more and every night step, strolling, met where they rest by a keeper come out to them, none at rest under another's body or lying across another, the barn's service beside them; saves taken with residents napping, sitting, strolling, waiting and being met, and with elders on their way out); barn capacity (plan S6b: the building as its design table says, room by room; the keepers at their fixed stations; the lively step moving a body as the anim player at 2x does, every walk; the benchmark's twelve served for 30 minutes, checked every step, the crowds and the `full` preset keeping moving; the cap -- an egg waiting in a full barn, hatching when an elder leaves for the garden; saves at a call for the car, with a walk's speed and each room's uses; every room used, each copy of a need's room). Section 10 (the capacity runs) runs in two worker threads beside the rest, so the whole check keeps to about 19 s |
-   | `tools/capacity.ts` | `npm run capacity` (not in `npm run check`): the capacity benchmark -- named casts (`start7`, `eight`, `ten`, `twelve`, `thirteen`, `fifteen`) or any `7a3y2b` mix placed on the start barn, 30 minutes on seeds 1 to 8, every run checked as section 2 is -- printed as a table with a SERVED / NOT SERVED verdict each (4.7) |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room kind per need -- a need's rooms repeat -- and every room used over the check, room by room, unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled with room to grow every time, each grow-up held still for its `happy`, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days; a baby Rushed on its way to grow up met in a sub-slot) and eggs (the nests, hatching exactly 2 days on into a new baby, in front of its own nest or an empty one, fed within 3 minutes, a full barn's egg waiting, no baby moved on to the Hatchery, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up; the elder garden (routes out through the Garden Gate to every plot; retiring 30 days after growing into an elder (however late that was) and soon after, a retiree at a landing no longer than a barn dragon, in a crowded barn too, the gate passed, a plot each and the garden grown to hold them, a resident in the garden with no slot; the residents' 30 minutes: food and love only at a quarter of an elder's drain, asleep half their steps or more and every night step, strolling, met where they rest by a keeper come out to them, none at rest under another's body or lying across another, the barn's service beside them; saves taken with residents napping, sitting, strolling, waiting and being met, and with elders on their way out); barn capacity (plan S6b: the building as its design table says, room by room; the keepers at their fixed stations; the lively step moving a body as the anim player at 2x does, every walk; the benchmark's twelve served for 30 minutes, checked every step, eight adults, ten and the `ages` preset's twelve keeping their service, a barn of twelve babies served, and the `full` preset keeping moving; the cap -- an egg waiting in a full barn, hatching when an elder leaves for the garden; saves at a call for the car, with a walk's speed and each room's uses; every room used, each copy of a need's room). Section 10 (the capacity runs) runs in three worker threads beside the rest, so the whole check keeps to about 19 s |
+   | `tools/capacity.ts` | `npm run capacity` (not in `npm run check`): the capacity benchmark -- named casts (`start7`, `eight`, `ten`, `twelve`, `thirteen`, `fifteen`) or any `7a3y2b` mix placed on the start barn (fewer than seven adults too: `0a12b`, a late game's barn of babies), 30 minutes on seeds 1 to 8, every run checked as section 2 is (a dragon mid-walk getting no more than 4 px on in 10 s, stood still or turned about on one spot, a stall) -- printed as a table with a SERVED / NOT SERVED verdict each (4.7) |
 
    Measured by `npm run sim` on the starting base (its seven dragons and four keepers, the need rooms repeated on the
-   floors: plan S6b): over 30 minutes of play (seed 1), 154 jobs opened and 151 were done, every one by a keeper (none
-   closed on its own). A keeper started on a job 29.1 s after it opened on average (112.3 s at most); no need ever
-   emptied. Keepers who reached the stand spot first waited 3.1 s on average for the dragon, and none gave up. The
-   dragons walked 102 125 px and rode the lift 4 times (a wait at a landing of 6.0 s at most, a rider held in the car
-   at most 8.0 s while the bay cleared): with a need's rooms on their own floor they seldom need it; dragons were held
-   at the bay's edge at most 17.2 s (keepers never); 90 lingerers were moved on. The shaft never showed two dragons
-   one over the other; an eye was under the body of a dragon standing over it 1.7 s in all (6 moments, the longest
-   0.4 s: section 2's "What is left"). Every dragon had its needs met in four kinds of room or more (EMBER, which has no
+   floors: plan S6b, as its review left it): over 30 minutes of play (seed 1), 154 jobs opened and 152 were done, every
+   one by a keeper (none closed on its own). A keeper started on a job 28.4 s after it opened on average (112.3 s at
+   most); no need ever emptied. Keepers who reached the stand spot first waited 3.1 s on average for the dragon, and
+   none gave up. The dragons walked 100 869 px and rode the lift 3 times (a wait at a landing of 6.0 s at most, a rider
+   held in the car at most 8.0 s while the bay cleared): with a need's rooms on their own floor they seldom need it;
+   dragons were held at the bay's edge at most 17.2 s (keepers never); 89 lingerers were moved on. The shaft never
+   showed two dragons one over the other; an eye was under the body of a dragon standing over it 1.6 s in all (5
+   moments, the longest 0.4 s: section 2's "What is left"). Every dragon had its needs met in four kinds of room or more (EMBER, which has no
    bath need, in four; the rest in five), and the rooms were used 54 (the Hearth Kitchens), 54 (the Bathhouses), 64
-   (the Romp Rooms), 36 (the Grooming Parlours), 29 (the Lamp Dorms) and 4 (the lift) times. Seeds 1 to 3 together
-   (the check's service gates): average waits of 29.1, 21.6 and 26.0 s (mean 25.6), 112.3 s at most, no need empty, a
-   landing 13.0 s and the bay's edge 17.2 s at most, an eye covered 3.7 s in all (1.5 s at most), 4, 1 and 3 rides. A
+   (the Romp Rooms), 37 (the Grooming Parlours), 29 (the Lamp Dorms) and 3 (the lift) times. Seeds 1 to 3 together
+   (the check's service gates): average waits of 28.4, 21.6 and 26.0 s (mean 25.3), 112.3 s at most, no need empty, a
+   landing 13.0 s and the bay's edge 17.2 s at most, an eye covered 3.7 s in all (1.5 s at most), 3, 1 and 3 rides. A
    Rush every 30 s for 30 minutes (seed 1): no need empty, every rushed job done within 42.7 s, keepers standing for
    rushed dragons 6.1 % of their time. The herd the game grows (section 10, seed 1): the capacity benchmark's twelve
-   -- the barn at its cap (4.7) -- no need empty, waits of 42.5 s on average (209.4 s at most), 265 jobs done, 48 rides
-   (the car 33 % busy), no stall and no two in the shaft; eight adults 29.1 s, ten 24.7 s, the `ages` preset's twelve
+   -- the barn at its cap (4.7) -- no need empty, waits of 40.2 s on average (154.3 s at most), 266 jobs done, 44 rides
+   (the car 28 % busy), no stall and no two in the shaft; eight adults 27.7 s, ten 24.7 s, the `ages` preset's twelve
    of every stage 49.3 s, none with a need empty; the `full` preset, forced 9 over the cap, still does 39 jobs in 10
-   minutes, its due egg waiting. The cap (section 17): with twelve in the barn an egg falling due waits in its nest --
+   minutes, its due egg waiting; a barn of babies -- twelve packed from the ground floor up -- no need empty, 56.6 s
+   (320.9 s at most), 289 jobs done, no stall; four babies each resting in the room another wants all met, none empty;
+   and two walking up to one landing at one spot placed in the order they stand. The cap (section 17): with twelve in the barn an egg falling due waits in its nest --
    one "THE BARN IS FULL" -- and hatches the step after an elder retiring from the barn arrives in the garden. Over
    the whole check every room is used, each copy of a need's room too (section 8). (S3's barn, one room per need, gave
    136 opened, 128 done, 87.6 s and 301.2 s, 112 rides with the car 95 % busy; S2's, the dragons pinned in their

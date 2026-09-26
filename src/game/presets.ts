@@ -1,9 +1,9 @@
 // Starts built in code (view=base&preset=<name>): a world other than the new game's, for views and checks that need
-// what a new game has not got yet -- every stage at once, the barn at its cap (the capacity benchmark's twelve), a dragon
-// about to grow up, eggs in the nests (one about to hatch), every baby sub-slot taken (forced over the cap), elders in
-// the garden and elders about to retire to it, and later (each slice adds its own) a team away. A preset is always code, never a
-// save and never hundreds of thousands of steps, so a frozen view of it (t=) is as quick and as deterministic as the
-// new game's.
+// what a new game has not got yet -- every stage at once, the barn at its cap (the capacity benchmark's twelve, and it
+// with an egg waiting), a dragon about to grow up, eggs in the nests (one about to hatch), every baby sub-slot taken
+// (forced over the cap), elders in the garden and elders about to retire to it, and later (each slice adds its own) a
+// team away. A preset is always code, never a save and never hundreds of thousands of steps, so a frozen view of it (t=)
+// is as quick and as deterministic as the new game's.
 import { CareSim } from './sim.ts';
 import type { SimOptions } from './sim.ts';
 import { STAGE_DAYS, HATCH_DAYS, RETIRE_DAYS } from './clock.ts';
@@ -58,6 +58,12 @@ export const TWELVE_EXTRA: readonly DragonPlace[] = [
   { name: 'BOLT', element: 'lightning', stage: 'baby', seed: 504, slot: { room: 'hatchery', i: 0 }, days: 0 },
   { name: 'BURR', element: 'spike', stage: 'baby', seed: 505, slot: { room: 'hatchery', i: 1 }, days: 0 },
 ];
+/**
+ * The `capped` preset's two babies: the twelve's, out of the Hatchery -- in the hayloft's Lamp Dorm -- so no baby rests
+ * in front of the nests and the egg waiting at the cap shows (the twelve's and the full preset's babies in the
+ * Hatchery hide every nest).
+ */
+export const CAPPED_BABIES: readonly DragonPlace[] = TWELVE_EXTRA.filter((p) => p.stage === 'baby').map((p, k) => ({ ...p, slot: { room: 'dorm', i: 1 + k, n: 2 } }));
 
 /** The new game: the start's rooms, its seven young adults and the four keepers. */
 function newGame(): StartSpec { return { rooms: START_ROOMS, dragons: START_DRAGONS, keepers: START_KEEPERS }; }
@@ -95,6 +101,12 @@ export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze(
   ages: () => ({ rooms: START_ROOMS, dragons: AGES_DRAGONS, keepers: START_KEEPERS }),
   /** The capacity benchmark's twelve (tools/capacity.ts `twelve`): the new game's seven, three young and two babies. */
   twelve: () => ({ ...newGame(), dragons: [...START_DRAGONS, ...TWELVE_EXTRA] }),
+  /**
+   * The barn at its cap with an egg waiting (plan S6b, C2): the twelve, its babies in the hayloft's Lamp Dorm
+   * (CAPPED_BABIES), and a fire egg in the first nest falling due on the first step -- with the barn full it waits
+   * ("THE BARN IS FULL" that step), the three dots over it, BARN 12/12 in amber.
+   */
+  capped: () => ({ ...newGame(), dragons: [...START_DRAGONS, ...TWELVE_EXTRA.filter((p) => p.stage !== 'baby'), ...CAPPED_BABIES], after: (sim) => { sim.addEgg('fire', sim.clock + 1 - hatchLen(sim)); } }),
   /**
    * The new game with EMBER due to grow up (adult to elder) GROWUP_IN steps in, every need of its full, so it is settled
    * then (no job, no keeper coming): the grow-up (the flash, `happy`, the toast) at step 30.

@@ -39,7 +39,8 @@
 // the card closes it. The elder garden (plan S6): the new game's garden has its two empty plots; the garden preset's
 // three residents live on three plots, by day and by night (each dragon says where it lives: the barn or the garden).
 // Barn capacity (plan S6b): the hook counts the barn's dragons against its cap (7 of 12 in the new game, the twelve
-// preset at the cap, the full preset forced over it with its due egg waiting in its nest).
+// preset at the cap, the full preset forced over it with its due egg waiting in its nest, and the capped preset at the
+// cap with its due egg waiting in plain view, nobody in front of its nest).
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -372,9 +373,17 @@ function barnIs(count: number) {
     return b.barn && b.barn.count === count && b.barn.cap === 12 && inBarn === count ? [] : [`the barn is ${JSON.stringify(b.barn)} with ${inBarn} dragons out of the garden, not ${count} of 12`];
   };
 }
-/** view=base&preset=full: the due egg still in its nest (the barn over its cap: it waits, and its nest shows it). */
+/** view=base&preset=full and capped: the due egg still in its nest (the barn at or over its cap: it waits, and its nest shows it). */
 function eggWaits(b: BaseHook): string[] {
   return b.eggs?.length === 1 && b.eggs[0].progress === 1 ? [] : [`the eggs are ${JSON.stringify(b.eggs)}, not one due and waiting`];
+}
+/**
+ * view=base&preset=capped: nobody stands in front of the waiting egg's nest (the first, world x 228 in the hayloft), so
+ * the egg and its dots show (a baby's body reaches 30 px either way of its root: layout.ts DRAGON_PAD).
+ */
+function nestClear(b: BaseHook): string[] {
+  const by = b.dragons.filter((d) => d.f === 2 && Math.abs(d.x - 228) < 40);
+  return by.length ? [`${by.map((d) => `${d.name} (x ${Math.round(d.x)})`).join(', ')} stands in front of the waiting egg's nest`] : [];
 }
 
 /** The base's dragons include every stage. */
@@ -543,6 +552,9 @@ const CASES: Case[] = [
   // them; and the full preset, forced 9 over it (BARN 21/12), its due egg waiting in its nest in the hayloft's corner
   { query: 'view=base&preset=twelve&t=600', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...travels(b), ...barnIs(12)(b)] },
   { query: 'view=base&preset=full&t=60&cam=168,280', minColours: 150, allScales: false, check: (b) => [...castIs(21, null)(b), ...barnIs(21)(b), ...eggWaits(b)] },
+  // and the capped preset, the barn at its cap (BARN 12/12), its egg due on the first step waiting in the Hatchery's
+  // first nest with nobody in front of it (the nest's dots in view)
+  { query: 'view=base&preset=capped&t=60&cam=168,280', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...barnIs(12)(b), ...eggWaits(b), ...nestClear(b)] },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
