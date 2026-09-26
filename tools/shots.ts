@@ -82,6 +82,9 @@ const pairs: string[] = [
   'shots/base_garden.png=view=base&preset=garden&cam=1304,376&t=600',
   'shots/base_garden_night.png=view=base&preset=garden&cam=1304,376&t=600&hour=22',
   'shots/base_gate.png=view=base&preset=retire&cam=1060,376&t=2564',
+  // taking a keeper (plan S7): BEA held by hand from the first step -- the mark over her head in her colour, her badge
+  // lit, the line over the pad and the pad at the bottom right, the camera following her
+  'shots/base_control.png=view=base&t=120&take=bea',
 ];
 for (const el of ['fire', 'rock', 'slinkwing']) {
   for (const stage of ['elder', 'adult', 'young', 'baby']) {

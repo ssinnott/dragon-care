@@ -5,6 +5,7 @@
 // This file never touches storage: src/game/storage.ts will (S4), and only from BaseView.attach().
 import type { CareSim, Dragon, Keeper, Job, SimStats, LiftState, Egg } from './sim.ts';
 import type { RoomPlace } from './layout.ts';
+import { releasedState } from './control.ts';
 
 /**
  * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded.
@@ -17,8 +18,10 @@ import type { RoomPlace } from './layout.ts';
  * 6 (S6): the elder garden: its plots; a dragon's place (the barn or the garden), its plot (`home`) and a resident's
  * rhythm (`garden`: its mode, when a nap or a sit ends, its resting place), the `retire` goal; the longest retirement
  * delay (stats.retireDelayMax).
+ * 7 (S7): a keeper's hand-held state (`manual`, the direction `held`, the "?" `cue`, `pendingTake` -- always saved
+ * released: control.ts releasedState) and the takes, hand-overs and jobs done by hand (stats.taken, handovers, doneBy).
  */
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }
@@ -65,29 +68,36 @@ export class SaveVersionError extends Error {
 
 /**
  * The world as JSON-safe data, in the simulation's own order (dragons, keepers and jobs as they sit in its arrays).
+ * A keeper held by the player's hand is saved released (plan 3.6: control.ts releasedState -- going home, or finishing
+ * the job at hand first), exactly the world a release that step would make, so a save never holds a keeper by hand;
+ * `exact` keeps them as they are (worldKey: the digest two runs compare sees the hand too).
  * Every field of every dragon, keeper and job is kept -- the top level of each is copied whole, so a field a later
  * slice adds is saved with it -- and the plain objects they hold (needs, the act, the routes' legs, a garden resident's
  * rhythm, the lift's calls, the eggs, the garden, the rooms' uses) are copied, so the save never changes as the world
  * steps on.
  */
-export function serialize(sim: CareSim): SaveV {
+export function serialize(sim: CareSim, exact = false): SaveV {
+  const held = (k: Keeper): Keeper => (!exact && (k.manual || k.pendingTake) ? { ...k, ...releasedState(sim, k) } : k);
   return {
     v: SAVE_VERSION, seed: sim.seed, dayLen: sim.dayLen, clock0: sim.clock0, tick: sim.tick, nextDragonId: sim.nextDragonId, nextJob: sim.nextJob, nextEggId: sim.nextEggId,
     rooms: sim.roomPlaces.map((p) => ({ ...p })),
     dragons: sim.dragons.map((d): DragonSave => ({ ...d, slot: d.slot ? { room: d.slot.room, i: d.slot.i } : null, needs: { ...d.needs }, act: d.act ? { ...d.act } : null,
       legs: d.legs.map((l) => ({ ...l })), garden: d.garden ? { ...d.garden } : null })),
-    keepers: sim.keepers.map((k): KeeperSave => ({ ...k, station: k.station.id, job: k.job ? k.job.id : null, legs: k.legs.map((l) => ({ ...l })) })),
+    keepers: sim.keepers.map(held).map((k): KeeperSave => ({ ...k, held: { ...k.held }, station: k.station.id, job: k.job ? k.job.id : null, legs: k.legs.map((l) => ({ ...l })) })),
     jobs: sim.jobs.map((j): JobSave => ({ ...j, dragon: j.dragon.id, keeper: j.keeper ? j.keeper.id : null })),
     lift: { ...sim.lift, calls: sim.lift.calls.map((c) => ({ ...c })) },
     eggs: sim.eggs.map((e) => ({ ...e })),
     garden: { plots: sim.garden.plots },
-    stats: { ...sim.stats, used: { ...sim.stats.used } },
+    stats: { ...sim.stats, used: { ...sim.stats.used }, doneBy: { ...sim.stats.doneBy } },
   };
 }
 
-/** The world as one string, the seed left out (so "seeds 7 and 8 start different worlds" is a real check): two runs agree on it step for step. */
+/**
+ * The world as one string, the seed left out (so "seeds 7 and 8 start different worlds" is a real check): two runs agree
+ * on it step for step. A keeper held by hand is in it as they are (not released, as a save has them).
+ */
 export function worldKey(sim: CareSim): string {
-  const { seed: _seed, ...rest } = serialize(sim);
+  const { seed: _seed, ...rest } = serialize(sim, true);
   return JSON.stringify(rest);
 }
 
@@ -100,7 +110,7 @@ export function worldKey(sim: CareSim): string {
  * have none).
  */
 export function barnKey(sim: CareSim): string {
-  const s = serialize(sim);
+  const s = serialize(sim, true);
   return JSON.stringify({ dragons: s.dragons.map(({ stageSince: _s, garden: _g, ...d }) => d), keepers: s.keepers, jobs: s.jobs, lift: s.lift, eggs: s.eggs.map(({ laid: _l, ...e }) => e) });
 }
 

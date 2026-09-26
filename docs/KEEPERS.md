@@ -37,7 +37,12 @@ itself, and a walk or carry plays at the keeper's pace over the look's own walk 
 0.55 px a frame walk at 1.82x for the base's 1 px, 1.6x that on a Rush), so the feet no longer skate. A keeper who
 reaches the stand spot before the dragon stands in `watch` until it walks in, and one held at the Dragon Lift's bay
 stands in `idle`. This is a plainer join than the yard's: it skips the plan (6.3), so a base keeper's stand and stroke are not
-proven eye-clear or on the mark the way the yard's and the two audits' are. **Not built:** a player-facing game loop
+proven eye-clear or on the mark the way the yard's and the two audits' are. **The base now has a player loop** (#6;
+`docs/BASE_DESIGN.md` 4.10): the player may take any one keeper by hand -- walked with WASD, the arrows or a touch pad
+(`walk` or `carry` at the keeper's pace while moving, `idle` standing, `hold` picking a supply up), climbing the
+ladders, and doing a chore with E from the same stand spot a keeper sent there uses -- marked by a 7 x 5 arrow in the
+keeper's own top colour over the head (where the rush mark goes: a keeper held is never rushed). The cast has no climb
+anim, so a climb, by hand or not, shows `idle` (a stand-in). **Not built:** a player-facing game loop
 for the yard itself (it still runs on its own: nothing lets a player send one of these keepers to a dragon from it),
 props for the keepers' stations, keepers in the habitat view, and night: Iris tucks in whoever is sleepy.
 A plan (6.3) is made the first time a keeper does a job for a look, in the tick the job starts (tens of ms; a game
@@ -59,7 +64,7 @@ would make them while it loads).
 | K8 | **The mark adapts** to the look, in order: the back of the crown, the same arc slid back, the top of the neck, lower down it, the back. A baby is patted on its **back or rump**; a tuck-in strokes the **back** of a dragon lying down. | The eye box is most of the side of a baby's head, and of a head laid on the floor: no arc of a baby's head kept a hand off its eye on any look. |
 | K9 | **Staging**: a feed is **front on** (the bowl goes in front of the dragon; the dragon walks up to it, eats, turns and trots off before the keeper takes the bowl away); a pet, a groom and a tuck-in are **from the side**, the way a person pets a pony: at the dragon's shoulder, a step nearer the camera (9 px in front of its floor line, just outside its footprint), facing the way it faces, kneeling on both knees for a small or a lying dragon. | Front on, a keeper kneeling at a bowl under a dragon's nose covered its face; from the side the keeper's body is over the dragon's body, away from its face. |
 | K10 | **No shared uniform.** A neckerchief in one colour on all four was measured against their skins (Bea's warm mid-brown, Tomas's light, Iris's deep, Pip's light) and no colour cleared all four by the ladder. | The palette check decides, not taste. |
-| K11 | **The yard**: needs rise and show (7.1); a director sends the keeper whose job it is to the neediest dragon (7.2); keepers wait at stations along the back of the yard, and every walk is **planned** round the dragons' bodies and off their eyes (6.2), along the floor and across it on the diagonal. | A living scene, with nothing in it the player has to run. A keeper walking straight across it passed over other dragons' faces. |
+| K11 | **The yard**: needs rise and show (7.1); a director sends the keeper whose job it is to the neediest dragon (7.2); keepers wait at stations along the back of the yard, and every walk is **planned** round the dragons' bodies and off their eyes (6.2), along the floor and across it on the diagonal. | A living scene, with nothing in it the player *must* run (in the base the player may take any one keeper by hand: `docs/BASE_DESIGN.md` 4.10). A keeper walking straight across it passed over other dragons' faces. |
 | K12 | **Deterministic**: everything is seeded and stepped at 60 Hz, so the gallery's frozen `t` is always the same frame (the tools/shot.ts contract). A plan is computed once per keeper, act and look and cached. | The pipeline's screenshots and audits depend on it. |
 
 ---

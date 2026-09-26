@@ -418,6 +418,60 @@ async function baseInput(page: any): Promise<string[]> {
   if (d.rushes !== b.rushes + 1) out.push(`tapping ${c.dragon}'s ${c.need} chip Rushed ${d.rushes - b.rushes} jobs, not 1`);
   return out;
 }
+/**
+ * view=base, live (save=0): taking a keeper (plan S7, #6). A tap on BEA's badge takes her (the hook's `controlled`);
+ * holding d walks her right; Esc lets go; a tap on her body (low in her box: a bubble over a dragon's head may stand
+ * over its top) takes her again; holding the pad's right arrow walks her right; a tap on LET GO lets go. The pad and the
+ * line over it are there while she is held (the hook's `action`), and gone after.
+ */
+async function baseControl(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  const bea = (b: BaseHook) => b.keepers.find((k) => k.name === 'BEA')!;
+  const held = (name: string | null) => page.waitForFunction((n: string | null) => (window as any).__dragonCare?.base?.controlled === n, name, { timeout: 5000 }).then(() => true, () => false);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (x: number, y: number) => page.mouse.click(box.x + x * k, box.y + y * k);
+  const b0 = await st(), badge = b0.badges.BEA;
+  if (!badge || badge.y + badge.h > 15) return [`BEA's badge is ${JSON.stringify(badge)}, not in the top bar`];
+  // 1. her badge
+  await click(badge.x + badge.w / 2, badge.y + badge.h / 2);
+  if (!(await held('BEA'))) out.push(`a tap on BEA's badge: controlled is ${(await st()).controlled}`);
+  const b1 = await st();
+  if (!b1.action || !b1.action.startsWith('BEA')) out.push(`BEA held, the line over the pad is ${JSON.stringify(b1.action)}`);
+  // 2. d held 600 ms
+  await page.waitForTimeout(200);
+  const x1 = bea(await st()).x;
+  await page.keyboard.down('d'); await page.waitForTimeout(600); await page.keyboard.up('d');
+  await page.waitForTimeout(100);
+  const x2 = bea(await st()).x;
+  if (!(x2 > x1 + 5)) out.push(`holding d walked BEA from x ${x1.toFixed(1)} to ${x2.toFixed(1)}`);
+  // 3. Esc
+  await page.keyboard.press('Escape');
+  if (!(await held(null))) out.push(`Esc left ${(await st()).controlled} held`);
+  if ((await st()).action !== null) out.push('let go, the line over the pad is still there');
+  // 4. her body
+  await page.waitForTimeout(150);
+  const kb = bea(await st()).box;
+  await click(kb.x + kb.w / 2, kb.y + kb.h * 0.75);
+  if (!(await held('BEA'))) out.push(`a tap on BEA's body (${JSON.stringify(kb)}): controlled is ${(await st()).controlled}`);
+  // 5. the pad's right arrow held 500 ms
+  await page.waitForTimeout(200);
+  const b5 = await st(), right = b5.pad.right, x5 = bea(b5).x;
+  await page.mouse.move(box.x + (right.x + right.w / 2) * k, box.y + (right.y + right.h / 2) * k);
+  await page.mouse.down(); await page.waitForTimeout(500); await page.mouse.up();
+  await page.waitForTimeout(100);
+  const b6 = await st(), x6 = bea(b6).x;
+  if (!(x6 > x5 + 5)) out.push(`the pad's right arrow held walked BEA from x ${x5.toFixed(1)} to ${x6.toFixed(1)}`);
+  if (b6.controlled !== 'BEA') out.push(`holding the pad let go of BEA (controlled ${b6.controlled})`);
+  // 6. LET GO
+  const lg = b6.pad.letgo;
+  await click(lg.x + lg.w / 2, lg.y + lg.h / 2);
+  if (!(await held(null))) out.push(`a tap on LET GO left ${(await st()).controlled} held`);
+  if (!out.length) console.log(`        control: BEA taken by her badge, walked by d (x ${x1.toFixed(0)} -> ${x2.toFixed(0)}), let go by Esc, taken by a tap on her, walked by the pad (x ${x5.toFixed(0)} -> ${x6.toFixed(0)}), let go by LET GO`);
+  return out;
+}
+
 const CASES: Case[] = [
   { query: 'view=lineup&t=0', minColours: 150, allScales: true },
   { query: 'view=lineup&t=45&mood=-1', minColours: 150, allScales: true },
@@ -518,6 +572,10 @@ const CASES: Case[] = [
   { query: 'view=base&preset=eggs&t=600&cam=872,376', minColours: 150, allScales: false, check: (b) => [...eggsIn(b), ...travels(b)] },
   { query: 'view=base&preset=hatch&t=120&cam=872,376', minColours: 150, allScales: false, check: (b) => [...hatchedOne(b), ...travels(b)] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseCard },
+  // taking a keeper (plan S7): frozen, BEA held from the first step (the pad, her mark, the line); live, taken and let
+  // go by her badge, the keys, a tap on her and the pad
+  { query: 'view=base&t=120&take=bea', minColours: 150, allScales: false, check: (b) => [...castIs(7, 'adult')(b), ...(b.controlled === 'BEA' && b.action?.startsWith('BEA') && b.keepers.find((k) => k.name === 'BEA')?.phase === 'manual' ? [] : [`take=bea: controlled ${b.controlled}, the line ${JSON.stringify(b.action)}`])] },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseControl },
   // the elder garden (plan S6): the garden preset's three residents on their plots, past the Garden Gate, by day and at
   // night (napping, the lanterns lit)
   { query: 'view=base&preset=garden&cam=1304,376&t=600', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...travels(b)] },

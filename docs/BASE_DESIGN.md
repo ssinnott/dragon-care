@@ -27,12 +27,12 @@ shows it.*
 | # | Decision | Why (and what lost) |
 |---|---|---|
 | B1 | **The base is a side-view cutaway:** a barn for the dragons with a tower at each end for the people, scrolled at 1x like Fallout Shelter's vault. | The rig is side view, facing right, authored at scale 1 (1.1). A cutaway shows every room at once in that view. |
-| B2 | **Care is managerial.** Dragons have needs that drain over time; keepers (the humans) walk over and meet them. The player's one per-dragon action is **Rush**. | Tapping every dragon every few minutes is a chore, not a game (the user's words: "that doesn't sound very fun"). The hands-on care of the art bible (spike's chin, dusk's tuck-in) becomes what keepers *do*, animated. |
+| B2 | **Care is managerial by default; you may take any one keeper by hand** (4.10). Dragons have needs that drain over time; keepers (the humans) walk over and meet them. The player's one per-dragon action is **Rush**; a keeper taken by hand is walked by the player and does the chores the player picks (#6). | Tapping every dragon every few minutes is a chore, not a game (the user's words: "that doesn't sound very fun"). The hands-on care of the art bible (spike's chin, dusk's tuck-in) becomes what keepers *do*, animated. |
 | B3 | **Needs show as thought bubbles** over the dragons and as a **prioritised job queue** along the bottom of the screen. | The bubble says *which* dragon wants *what* at a glance; the queue says *what's next*. |
 | B4 | **Missions are set and forget,** a mission table in the style of World of Warcraft: pick a team, the dragons' elements and the riders' skills counter the mission's challenges, a success chance, a reward. | Simple at this stage, by the user's choice; no choices mid-mission. |
 | B5 | **Missions are watchable:** an animated side-scrolling scene of the team completing it. **The scene is the timer.** | The user wants to see the team at work; the side-view walk the rig already has makes it cheap. |
 | B6 | **Everything runs only while the game is open.** One clock drives care, missions and hatching; closing the game pauses the world. | No coming back to a barn of red bubbles; no offline catch-up to build. Missions therefore last minutes of play, not hours. |
-| B7 | **Humans are assigned automatically:** keepers to jobs, riders to the dragons you send. | Fewer clicks; the player's choices are *which dragons* and *what to build*. |
+| B7 | **Humans are assigned automatically:** keepers to jobs, riders to the dragons you send -- unless you take one (4.10): the keeper you hold is left out of every automatic pick until you let go. | Fewer clicks; the player's choices are *which dragons* and *what to build*. |
 | B8 | **Cozy:** no combat. Missions have hazards, not enemies; nobody is hurt; old age is never decline (D21): retiring to the garden is the elder's reward (D21), a place and never a farewell (3, The Garden). | The game's face set has no angry face (D18) and the elder is a reward. |
 
 *Young adult* in the user's request (#9: "start with a young adult dragon of each kind") means a dragon at the very
@@ -401,7 +401,8 @@ be moved on, and in 80 000 steps its egg never finds a sub-slot while needs sit 
     the clock, `DAY 3 14:00` (the minutes in tens; from day 100 `D100 14:00`, so the clock never runs into JOBS);
   - `JOBS n`, the open jobs (at x 90, or a space after a longer clock);
   - a badge per keeper (46 x 13, at x 138, 186, 234 and 282): a chip in the keeper's own top colour, the name, and a
-    dot while at a job (display only; taking a keeper makes them tappable, S7);
+    dot while at a job -- or, held by hand (4.10), the badge lit and a small mark pointing down. A tap on a badge takes
+    that keeper (the camera eases to them), or lets go of the one held;
   - three buttons: **NEW** (x 528: tap it twice within 2 s for a new barn), **II** (x 558: pause) and **>1X** (x 578:
     the speed, cycling 1x, 2x, 4x and 8x). A button is lit (`#6b4a34`) while it is in force: NEW asked, paused,
     faster than 1x. A tap on the bar goes to its buttons, never to the world under it.
@@ -414,14 +415,22 @@ be moved on, and in 80 000 steps its egg never finds a sub-slot while needs sit 
   stage's 30 days as a bar, and its needs, each an icon over a bar. A tap on a bubble or a chip Rushes only. A tap on
   the card, or anywhere else in the world, closes it (the top bar's buttons leave it open, so the game can be paused
   to read it).
-- **The hint** (drag to look around, tap a bubble to Rush) on an ink strip at the bottom right, beside the job strip;
-  it gives way when the strip reaches it.
+- **The hint** (`TAP A BUBBLE: RUSH   TAP A KEEPER: TAKE`) on an ink strip at the bottom right, beside the job strip;
+  it gives way when the strip reaches it, and while a keeper is held (the pad is there then: 4.10).
 - **Toasts**, centred under the top bar for 3 s: "SURE? TAP AGAIN", "A NEW BARN", "NEW BARN: THE OLD SAVE DIDN'T FIT",
   a grow-up ("EMBER IS AN ELDER NOW!") and the dawn's tip at 05:00 ("3 DRAGONS GROW UP IN 2 DAYS": the dragons whose
   stage-up falls due within two game days). Life's news (the grow-ups, the tip) waits its turn behind the toast
   showing, never cutting it short, and grow-ups into one stage still waiting to be shown share one toast ("EMBER AND
   ZAP ARE ELDERS NOW!", "EMBER, BRAMBLE AND 2 MORE ARE ELDERS NOW!": the new game's seven all fall due at once).
-- **Panning:** drag the barn. **Keys:** 1 to 4 pick 1x, 2x, 4x and 8x; p pauses and plays.
+- **Panning:** drag the barn (while a keeper is held, the camera follows them again 3 s after a drag). **Keys:** 1 to
+  4 pick 1x, 2x, 4x and 8x; p pauses and plays; with a keeper held (4.10), WASD or the arrows walk them (W and S climb at
+  a ladder), E or Space does the chore in reach, Esc lets go, and Tab takes the next keeper.
+- **Taps, in order:** a top-bar button or badge; the pad (a keeper held); the card (closes it); a job chip; a bubble; a
+  keeper (takes them); a dragon (its card, and Rush if a job waits); empty space (lets go of the keeper held, closes
+  the card).
+- **The canvas** is as big as the window allows: whole pixels from 1x up, and under 1x in a smaller window (a phone
+  held upright). In an upright window, while a keeper is held, a line under the top bar says TURN SIDEWAYS FOR BIG
+  BUTTONS.
 
 **4.9 First numbers** (tuning, not law):
 
@@ -468,6 +477,42 @@ average wait at most 100 s (83.5 measured), the longest 360 s (301.2), a landing
 the car 25 s (20.5). The plan's first 60 s, 180 s and 60 s are not reached on any of 48 seeds at this car (4.7); the
 gates that are the plan's own stay: no need empty, done >= 120, a keeper's wait at the
 stand spot <= 20 s, the bay's edge <= 60 s.
+
+**4.10 Taking a keeper** (#6: "You should be able to choose a person - then you will control them and be able to do
+this chores ... Uses standard WASD controls - and a button to feed/collect stuff"; `src/game/control.ts`). Care stays
+managerial (B2): the other keepers go on taking jobs by themselves. But any one keeper can be taken by hand:
+- **Take:** tap the keeper (their body), their badge in the top bar, or press Tab (the next keeper by id). Taking
+  another lets go of the one held first. A keeper taken while at work (mid-meal, mid-tuck-in) finishes that job first,
+  then is yours where they stand; otherwise any job they had goes back to the queue, a climb under way is finished,
+  and whatever they carry stays in their hand. A mark in their own colour hangs over their head, their badge is lit,
+  and the camera follows them (it keeps them inside the middle of the screen; a drag stops it for 3 s).
+- **Walk:** A and D (or the arrows) walk them along the floor at a keeper's pace; W and S at a ladder (within 8 px)
+  climb it one floor. The lift bay's rule holds for them as for anyone (2): they wait at its edge while the car moves
+  past their floor, and one let stand in the bay walks on the way they face until they are clear of it (at the Aerie
+  deck's end, which lies in the bay, they turn back), so the car is never held by them. Keepers never ride the lift.
+- **E** (or Space, or the pad's E), in this order: **pick up** a supply at its post (within 24 px: the bowl at the
+  hearth, the ball at the box by the wheel, the bucket at the tub; 40 frames; carrying another swaps it); **serve** a
+  dragon: only one that has **arrived at its slot in its need's room** (#7, D6: a dragon still walking there cannot be
+  met, and the line says "WICK IS ON THE WAY"), or a garden resident waiting where it rests; from its stand spot (within
+  24 px; the keeper steps onto the same eye-safe spot a keeper sent there uses), with the supply in hand for food,
+  play and a bath; the most pressing such job first. A keeper already sent for it hands it over and goes home. The job
+  is done as any keeper does it, and counts to the keeper's name; **put back** the supply carried at its own post;
+  else a "?" over their head says there is nothing to do there.
+- **The line over the pad** says who is held, what they carry and what E does: `BEA - BOWL - E: FEED WICK`, `E: TAKE
+  BOWL`, `E: GROOM COBBLE`, `E: TUCK IN ECHO`, `E: BATHE RIPPLE`, `E: PLAY WITH ZAP`, `E: PUT BOWL BACK`, `WICK IS ON
+  THE WAY`, `ZAP WANTS THE BALL`.
+- **Let go:** Esc, a tap on empty space, a tap on their badge, or the pad's LET GO. They walk home (or, at work,
+  finish the job first) and are a keeper like the others again.
+- **Left out of the automatic picks:** the keeper held is never given a job, never sent for a Rush and never taken off
+  one for it, and is never rushed.
+- **The touch pad** (only while a keeper is held), bottom right: the four arrows (26 x 26), E (48 x 36) and LET GO
+  (48 x 16). A pad arrow held down walks until it is let up; E and LET GO act on a tap. Each finger is its own: one can
+  hold an arrow while another taps E, and the camera is dragged by a finger that isn't on the pad.
+- **Saves:** a save never holds a keeper by hand: the one held is saved as if let go that moment (walking home, or
+  finishing the job at hand), so a reload has every keeper on their own.
+- The pad and the line sit over the world at the bottom right, like the job strip: a dragon on the ground floor at
+  the right of the screen can stand under them for a while (the camera, following a keeper on the ground floor, is at
+  the world's bottom there).
 
 ---
 
@@ -658,6 +703,9 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    two presets show it: `preset=garden` (three residents on their plots -- BRAMBLE, COBBLE and ECHO -- and four adults in
    the barn) and `preset=retire` (the seven starters, elders a tenth of a day from retiring: they walk out one by one,
    and the garden widens to seven plots).
+   **Taking a keeper is built too** (4.10; #6): tap a keeper or their badge, walk them with WASD or the arrows (or the
+   touch pad), and E fetches, feeds, bathes, plays, grooms and tucks in; the page also takes `take=bea` (that keeper
+   held from the first step: `view=base&t=120&take=bea` is the frozen picture of it).
 
    ![The built slice, 49 s in, in the start frame: RIPPLE walks off the Dragon Lift's car at the upper floor to the Romp Room, and Pip, sent for it now it is past its ride, goes for a ball at the box by the wheel; ZAP waits at the ground floor's east landing for the car up to the Lamp Dorm, back to back with COBBLE walking into the Bathhouse's first slot (Tomas brings the bucket, out of frame); WICK waits at the hayloft's east landing for the car down to the Romp Room; ECHO walks past BRAMBLE in the Grooming Parlour on its way down to the Bathhouse; Bea waits in the Hearth Kitchen; the job strip](base/base_live.png)
 
@@ -669,7 +717,7 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    | `src/game/surfaces.ts` | every floor anyone stands on (`FLOORS`: straw, the garden's path), and everything a dragon is seen against (the walls, the sky's colours at every phase, the big props behind a slot, the lamps' and lanterns' light, the garden's hedge, lawn, wood and fence), each gated by `tools/palette-check.ts` (i, Ki, w) |
    | `src/game/clock.ts` | the day's length and phases, the speeds, reading the clock (the day, the time, the phase and the sky's stepped turn) |
    | `src/game/sky.ts` | the sky behind the building, in screen space: the bands, the far hills and clouds, the moon and the stars |
-   | `src/game/hud.ts` | the top bar (the clock, the jobs, the keepers' badges, NEW, pause, the speed), the toasts and the hint |
+   | `src/game/hud.ts` | the top bar (the clock, the jobs, the keepers' badges -- tappable: 4.10 -- NEW, pause, the speed), the toasts, the hint, and while a keeper is held the touch pad, the line over it and the portrait line |
    | `src/game/storage.ts` | the only code that touches the browser's storage: load the barn (or set aside one that doesn't fit), save it, forget it |
    | `src/game/start.ts` | the starting base: the rooms of section 3, seven newly adult dragons (one per element, 0 days into adulthood), each in a slot of its own need's room, and the four named keepers |
    | `src/game/presets.ts` | code-built starts for views that need what a new game hasn't got (`ages`: every stage; `growup`, `eggs`, `hatch`, `full`; `garden`: three residents; `retire`: seven elders about to retire) |
@@ -684,8 +732,9 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    | `src/game/eggs.ts` | the eggs, drawn: the shell, its cracks and wobble, the hatch's shell bits |
    | `src/game/garden.ts` | the elder garden: retiring (30 days into the elder stage), the plots it grows, the residents' nap, sit and stroll (napping only at night: the one simulation module that reads the day's phase), their resting places kept apart (clear of each other's eyes, no two bodies overlapping more than 20 px), their jobs met where they rest |
    | `src/game/gardenArt.ts` | the garden, drawn: a plot's tile (the hedge, the lawn, an apple tree on every other, a nest mound, a lantern, flowers on stalks; the path, the kerb, the ground), drawn only where it is on screen; the fence at the world's end; the lanterns' rings at night, clipped to the hedge's own shape; the GARDEN sign |
+   | `src/game/control.ts` | taking a keeper by hand (4.10): the player's commands (take, steer, act, let go), applied at the start of a step; walking and climbing by hand under the bay rule; what E does (pick up, serve, put back) and the line that says so; a keeper held saved as let go |
    | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks, turns and rides; a resident's nap and wake) and their anims, the lift's car, the eggs, the grow-up's flash, the garden, the sky and the lights, the speed, the camera (out to the garden's end), the HUD (the dragon card too) and the input; a live page loads and saves the barn |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled with room to grow every time, each grow-up held still for its `happy`, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days; a baby Rushed on its way to grow up met in a sub-slot) and eggs (the nests, hatching exactly 2 days on into a new baby, in front of its own nest or an empty one, fed within 3 minutes, a full barn's egg waiting, no baby moved on to the Hatchery, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up; the elder garden (routes out through the Garden Gate to every plot; retiring 30 days after growing into an elder (however late that was) and soon after, a retiree at a landing no longer than a barn dragon, in a crowded barn too, the gate passed, a plot each and the garden grown to hold them, a resident in the garden with no slot; the residents' 30 minutes: food and love only at a quarter of an elder's drain, asleep half their steps or more and every night step, strolling, met where they rest by a keeper come out to them, none at rest under another's body or lying across another, the barn's service beside them; saves taken with residents napping, sitting, strolling, waiting and being met, and with elders on their way out). Section 10 (the capacity runs, about 9 s) runs in a worker thread beside the rest, so the whole check keeps to about 22 s |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled with room to grow every time, each grow-up held still for its `happy`, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days; a baby Rushed on its way to grow up met in a sub-slot) and eggs (the nests, hatching exactly 2 days on into a new baby, in front of its own nest or an empty one, fed within 3 minutes, a full barn's egg waiting, no baby moved on to the Hatchery, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up; the elder garden (routes out through the Garden Gate to every plot; retiring 30 days after growing into an elder (however late that was) and soon after, a retiree at a landing no longer than a barn dragon, in a crowded barn too, the gate passed, a plot each and the garden grown to hold them, a resident in the garden with no slot; the residents' 30 minutes: food and love only at a quarter of an elder's drain, asleep half their steps or more and every night step, strolling, met where they rest by a keeper come out to them, none at rest under another's body or lying across another, the barn's service beside them; saves taken with residents napping, sitting, strolling, waiting and being met, and with elders on their way out); taking a keeper (section 17: BEA taken, fetching the bowl and feeding EMBER by hand, up and down the centre ladder, 10 000 steps held with Rushes about and never given a job, let go home; every chore by hand, a resident too; saves with a keeper held loaded as let go, stepping on exactly; a keeper let stand in the lift bay walking out). Section 10 (the capacity runs, about 9 s) runs in a worker thread beside the rest, so the whole check keeps to about 25 s |
 
    Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play (seed
    1), 136 jobs opened and 128 were done, every one by a keeper (none closed on its own). A keeper started on a job
@@ -736,6 +785,8 @@ stand spot <= 20 s, the bay's edge <= 60 s.
      (the presets show it);
    - the base is the fixed starting one (or a preset); it is kept in the browser (7), but there is one barn, with no
      save slots;
+   - a keeper held by hand climbs a ladder in their `idle` pose (the cast has no climb anim: a stand-in, as for every
+     keeper's climb), and the touch pad and its line can stand over a ground-floor dragon at the screen's right (4.10);
    - no building of rooms (the rooms are section 3's fixed set), and no missions.
 2. **Rooms you build:** place, merge and upgrade rooms; move dragons between them; ~~save and load~~ (built: 7).
 3. **Missions:** the table, then the scene.

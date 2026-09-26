@@ -83,10 +83,23 @@
 //    met where it rests by a keeper come out of the barn at its snout (the garden used); no resident at rest with its eye
 //    under another's body, nor two at rest lying one over the other (bodies overlapping REST_OVERLAP px at most); the
 //    barn beside them keeps its service; the keeper visits per resident are printed.
+// 17. Taking a keeper (#6: "choose a person - then you will control them and be able to do this chores", "WASD
+//    controls - and a button to feed/collect stuff"; plan S7): BEA taken by a command is held by hand after one step,
+//    walks to the hearth, takes the bowl (E, 40 steps), feeds EMBER in its kitchen slot from its stand spot (doneBy),
+//    crosses the lift bay under the bay rule, climbs the centre ladder up (W) and down (S) within 200 steps; held
+//    10 000 steps with jobs pending and 20 Rushes she is never given a job she didn't take; let go, she is a keeper
+//    like the others (in a calm barn, home and idle at her station); the same commands give the same world; every
+//    chore by hand (feed, bathe, play with, groom, tuck in; a resident met in the garden), supplies taken and put back;
+//    a world saved with a keeper held (walking, climbing, picking up, at work, taken at work) loads with no one held and
+//    steps on exactly as the world given a release that step; R4: let stand in the lift bay she walks on out of it (at
+//    the Aerie deck's end, which lies in the bay, turning back). The section 2 invariants hold every step (the idle one
+//    for every keeper not held by hand).
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
-import { CareSim, REACH, DAY_STEPS, START_HOUR } from '../src/game/sim.ts';
+import { CareSim, REACH, DAY_STEPS, START_HOUR, PICKUP } from '../src/game/sim.ts';
+import { actionFor } from '../src/game/control.ts';
+import type { Command } from '../src/game/control.ts';
 import { nextStage, stageDue, inTheWayOfGrowing, HATCH_FOOD } from '../src/game/life.ts';
 import { NAMES, NAME_MAX, hatchName } from '../src/game/names.ts';
 import { GROWUP_IN, HATCH_IN, EGGS_PRESET } from '../src/game/presets.ts';
@@ -94,7 +107,7 @@ import type { DragonPlace } from '../src/game/start.ts';
 import type { Keeper, Dragon } from '../src/game/sim.ts';
 import {
   NEED_ROOM, TURN_STEPS, TURN_HALF, WAIT_MAX, LEAD_PX, arrived, inTheBay, liftRange, needRoom, dragonSpan, dragonInBay, depthOf, eyeSpan, walking,
-  landingEdge, ridesLeft, remainingCost, nearestFree,
+  landingEdge, ridesLeft, remainingCost, nearestFree, inBay, KEEPER_HALF,
 } from '../src/game/travel.ts';
 import { gaitOf, gaitFrom, moveAt, wrapT, happyLen } from '../src/game/gait.ts';
 import { TURN_HALF as YARD_TURN_HALF } from '../src/care/dragon.ts';
@@ -624,7 +637,8 @@ if (MAIN) {
   missing(a.stats, blob.stats, 'stats');
   // and every field of the world itself: a field a later slice adds to CareSim (a lift, a garden, a board) fails here
   // until it is saved, or listed below with the reason it needn't be (the digest is the save, so it can't see one left out)
-  const UNSAVED: Readonly<Record<string, string>> = { rooms: 'placed again from roomPlaces', roomPlaces: 'saved as rooms', events: 'one step\'s output, cleared by the next', nets: 'built again from the garden\'s plots (layout.ts makeNets)' };
+  const UNSAVED: Readonly<Record<string, string>> = { rooms: 'placed again from roomPlaces', roomPlaces: 'saved as rooms', events: 'one step\'s output, cleared by the next', nets: 'built again from the garden\'s plots (layout.ts makeNets)',
+    commands: 'the player\'s input for the next step, not the world (control.ts; a save is the world as released)' };
   for (const k of Object.keys(a)) if (!(k in blob) && !(k in UNSAVED)) fail(`save: the world's ${k} is not in its save (save it, or say in sim-check why not)`);
   const b = CareSim.fromSave(through(serialize(a)));
   if (b.digest() !== a.digest()) fail('save: a loaded world differs from its save at once');
@@ -1477,6 +1491,244 @@ if (MAIN) {
   noteUse(w);
   const perHour = (n: number) => (n * 60 / MIN).toFixed(0);
   console.log(`  16 residents (the garden preset, ${MIN} min of the real day): ${R.map((d) => { const p = per.get(d)!; return `${d.name} napped ${(p.nap / steps * 100).toFixed(0)} % (every one of ${p.night} night steps), strolled ${p.strolls} times, ${p.visits.length} keeper visits (${p.visits.join(', ') || 'none'}; ${perHour(p.visits.length)} an hour)`; }).join('; ')}; jobs for food and love only, draining at a quarter of an elder's (per step x 1e6: ${drains.join(', ')}; within ${(worstDrain * 100).toFixed(3)} %); two at rest overlapping at most ${restMax.toFixed(1)} px (gate ${REST_OVERLAP}); the barn beside them: ${st.done} jobs done, wait avg ${avg.toFixed(1)} s, max ${max.toFixed(1)} s, ${st.emptySteps} steps with a need at 0, the Garden Gate passed ${st.used.gate ?? 0} times`);
+}
+
+// ---------- 17. taking a keeper (#6) ----------
+if (MAIN) {
+  // plan S7 (D5): a keeper taken by the player's hand -- walked, climbing the ladders, picking up, serving and putting
+  // back by commands (control.ts) -- on seed 1 at the real day, with the section 2 invariants checked every step
+  const through = <T>(v: T): T => JSON.parse(JSON.stringify(v));
+  const inv = (w: CareSim, at: string) => {
+    for (const d of w.dragons) for (const k of NEEDS) if (!(d.needs[k] >= 0 && d.needs[k] <= 1)) fail(`${at}, step ${w.tick}: ${d.name}'s ${k} is ${d.needs[k]}`);
+    for (const j of w.jobs) if (j.keeper && j.keeper.job !== j) fail(`${at}, step ${w.tick}: job ${j.id}'s keeper ${j.keeper.name} is on another job`);
+    for (const d of w.dragons) if (w.jobs.filter((j) => j.dragon === d && j.keeper).length > 1) fail(`${at}, step ${w.tick}: two keepers on ${d.name}`);
+    if (w.keepers.filter((k) => k.manual || k.pendingTake).length > 1) fail(`${at}, step ${w.tick}: two keepers held by hand`);
+    for (const k of w.keepers) {
+      if (k.job && !w.jobs.includes(k.job)) fail(`${at}, step ${w.tick}: ${k.name} is on a job that is gone`);
+      // (the idle invariant holds for every keeper not held by hand; one held by hand holds a job only at work)
+      if (!k.manual && (k.phase === 'idle') !== (!k.job && !k.legs.length)) fail(`${at}, step ${w.tick}: ${k.name} is ${k.phase} with ${k.job ? 'a job' : 'no job'}`);
+      if (k.manual && (!!k.job !== (k.phase === 'work') || !['manual', 'pickup', 'work'].includes(k.phase))) fail(`${at}, step ${w.tick}: ${k.name}, held by hand, is ${k.phase} with ${k.job ? 'a job' : 'no job'}`);
+      if (k.phase === 'manual' && !k.manual) fail(`${at}, step ${w.tick}: ${k.name} is 'manual' but not held`);
+      if (k.manual && k.rushing) fail(`${at}, step ${w.tick}: ${k.name}, held by hand, was rushed`);
+      if (!k.climbing && spanOf(k.f, k.x, w.nets.keeper) < 0) fail(`${at}, step ${w.tick}: ${k.name} stands off floor ${k.f} at x ${k.x.toFixed(1)}`);
+      if (k.phase === 'work' && k.job) { const sp = w.standAt(k.job.dragon); if (k.f !== sp.f || Math.abs(k.x - sp.x) > 1) fail(`${at}, step ${w.tick}: ${k.name} works with ${k.job.dragon.name} at f${k.f} x ${k.x.toFixed(1)}, not its stand spot`); }
+    }
+    if (w.lift.moving) { const r = liftRange(w)!, who = inTheBay(w, r[0], r[1]); if (who) fail(`${at}, step ${w.tick}: ${who} is in the lift bay while the car moves floors ${r[0]}-${r[1]}`); }
+    for (const d of w.dragons) {
+      if (d.move !== 'ride' && spanOf(d.f, d.x, w.nets.dragon[d.stage]) < 0) fail(`${at}, step ${w.tick}: ${d.name} stands off its floor`);
+      if (d.act && d.place === 'barn' && (!d.slot || Math.abs(d.x - d.slot.x) >= 0.5 || w.rooms[d.slot.room].kind !== NEED_ROOM[d.act.need])) fail(`${at}, step ${w.tick}: ${d.name} is met for ${d.act.need} away from its slot of the ${NEED_ROOM[d.act.need]}`);
+    }
+  };
+  const step = (w: CareSim, at: string, n = 1) => { for (let i = 0; i < n; i++) { w.step(); inv(w, at); } };
+  const send = (w: CareSim, c: Command) => w.command(c);
+  /** Walk the keeper held along the floor to x (steering, then letting go of the key); false if not there in `max` steps. */
+  const walkTo = (w: CareSim, k: Keeper, x: number, at: string, max = 3000): boolean => {
+    let n = 0;
+    while (Math.abs(k.x - x) > 0.5 && n++ < max) { const dx = k.x < x ? 1 : -1; if (k.held.dx !== dx || k.held.dy) send(w, { kind: 'steer', dx, dy: 0 }); step(w, at); }
+    send(w, { kind: 'steer', dx: 0, dy: 0 }); step(w, at);
+    return Math.abs(k.x - x) <= 1.5;
+  };
+  /** Climb one floor at the ladder here (dy -1 up, 1 down): the steps it took, or -1. */
+  const climb = (w: CareSim, k: Keeper, dy: -1 | 1, at: string, max = 400): number => {
+    const f = k.f;
+    send(w, { kind: 'steer', dx: 0, dy });
+    let n = 0;
+    while ((k.f === f || k.climbing) && n++ < max) step(w, at);
+    send(w, { kind: 'steer', dx: 0, dy: 0 }); step(w, at);
+    return k.f === f - dy && !k.climbing ? n : -1;
+  };
+  /** Take the keeper held to a spot the way a keeper walks (the keepers' net: floors and ladders). */
+  const goTo = (w: CareSim, k: Keeper, to: Spot, at: string): boolean => {
+    const r = route({ f: k.f, x: k.x }, to, w.nets.keeper);
+    if (!r) return false;
+    for (const l of r.legs) {
+      if (l.f === k.f) { if (!walkTo(w, k, l.x, at)) return false; }
+      else { if (!walkTo(w, k, l.x, at)) return false; while (k.f !== l.f) if (climb(w, k, l.f > k.f ? -1 : 1, at) < 0) return false; }
+    }
+    return k.f === to.f && Math.abs(k.x - to.x) <= 1.5;
+  };
+  const press = (w: CareSim, at: string) => { send(w, { kind: 'act' }); step(w, at); };
+  /**
+   * The whole loop by hand, the plan's script: take BEA, feed EMBER (fetching the bowl), climb to f1 and back down,
+   * then up again; 10 000 steps with jobs pending and 20 Rushes; let go. Returns the world and what it saw.
+   */
+  const script = () => {
+    const w = newSim(1), bea = w.keepers.find((k) => k.name === 'BEA')!, ember = w.dragons.find((d) => d.name === 'EMBER')!, at = 'control';
+    const out = { w, fed: -1, up: -1, down: -1, jobBy: 0, rushed: 0, home: -1, handovers: 0 };
+    // 1. take BEA: after one step she is held by hand, free
+    for (const k of NEEDS) ember.needs[k] = 1;
+    ember.needs.food = 0.3;
+    send(w, { kind: 'take', keeper: bea.id }); step(w, at);
+    if (!bea.manual || bea.phase !== 'manual' || w.controlled !== bea.id) fail(`control: BEA taken is ${bea.phase}, manual ${bea.manual}, controlled ${w.controlled}`);
+    // 2.-4. EMBER's food at 0.3 (it stands in kitchen slot 0); the bowl from the hearth (x 232), then to its stand spot
+    if (!walkTo(w, bea, postX(w.rooms.find((r) => r.kind === 'kitchen')!), at)) fail('control: BEA never reached the hearth');
+    const pick = actionFor(w, bea);
+    if (pick.kind !== 'pickup' || pick.label !== 'E: TAKE BOWL') fail(`control: at the hearth E would ${JSON.stringify(pick)}, not take the bowl`);
+    press(w, at); step(w, at, PICKUP);
+    if (bea.carrying !== 'food' || bea.phase !== 'manual') fail(`control: after E and ${PICKUP} steps BEA carries ${bea.carrying} (${bea.phase})`);
+    const job = w.jobs.find((j) => j.dragon === ember && j.need === 'food');
+    if (!job || !arrived(w, ember)) fail(`control: EMBER's food job is ${job ? `open, EMBER ${ember.move} at x ${ember.x}` : 'not open'}`);
+    if (!walkTo(w, bea, w.standAt(ember).x, at)) fail('control: BEA never reached EMBER\'s stand spot');
+    const serve = actionFor(w, bea);
+    if (serve.kind !== 'serve' || serve.label !== 'E: FEED EMBER') fail(`control: at EMBER's stand spot E would ${JSON.stringify(serve)}, not feed it`);
+    press(w, at);
+    let n = 0;
+    while (bea.phase === 'work' && n++ < 400) step(w, at);
+    out.fed = n;
+    if (w.stats.doneBy.BEA !== 1 || ember.needs.food !== 1 || bea.phase !== 'manual' || w.jobs.includes(job!)) fail(`control: after the feed doneBy ${JSON.stringify(w.stats.doneBy)}, EMBER's food ${ember.needs.food}, BEA ${bea.phase}`);
+    // 5. across the lift bay (the bay rule, R1) to the centre ladder (x 680), up to the upper floor, down, up again
+    if (!walkTo(w, bea, 680, at)) fail('control: BEA never reached the centre ladder');
+    out.up = climb(w, bea, -1, at);
+    if (out.up < 0 || out.up > 200) fail(`control: W at the centre ladder took BEA to floor ${bea.f} (${out.up} steps; want floor 1 within 200)`);
+    out.down = climb(w, bea, 1, at);
+    if (out.down < 0 || out.down > 200) fail(`control: S at the centre ladder took BEA to floor ${bea.f} (${out.down} steps; want floor 0 within 200)`);
+    climb(w, bea, -1, at);
+    // 6. 10 000 steps with jobs pending, 20 Rushes on waiting jobs chosen by rngAt: BEA's job only ever set by E
+    for (let s = 0; s < 10000; s++) {
+      if (s % 500 === 250) {
+        const open = w.queue().filter((j) => !j.keeper);
+        if (open.length) { w.rush(open[Math.floor(rngAt(1, TAG.BOARD, 17, s).next() * open.length)]); out.rushed++; }
+      }
+      step(w, at);
+      if (bea.job) out.jobBy++;
+    }
+    if (out.jobBy || !bea.manual) fail(`control: BEA, held by hand and never pressing E, had a job ${out.jobBy} steps (Rushes ${out.rushed})`);
+    if (out.rushed < 20) fail(`control: only ${out.rushed} Rushes (no open job to Rush)`);
+    // 7. let go: a keeper like the others again at once -- walking home, or (jobs waiting) given one the same step
+    send(w, { kind: 'release' }); step(w, at);
+    if (bea.manual || w.controlled != null || !(bea.phase === 'home' || bea.job)) fail(`control: let go, BEA is ${bea.phase} (manual ${bea.manual}, a job ${!!bea.job})`);
+    // (and in a calm barn, home to her station and idle there)
+    {
+      const c = newSim(1), k = c.keepers.find((q) => q.name === 'BEA')!;
+      for (const d of c.dragons) for (const q of NEEDS) d.needs[q] = 1;
+      send(c, { kind: 'take', keeper: k.id }); step(c, at);
+      walkTo(c, k, 700, at);
+      send(c, { kind: 'release' }); step(c, at);
+      const was = k.phase;
+      n = 0;
+      while (k.phase !== 'idle' && n++ < 3000) step(c, at);
+      out.home = n;
+      if (was !== 'home' || k.phase !== 'idle' || k.f !== k.station.floor || Math.abs(k.x - k.stationX) > 0.5) fail(`control: let go in a calm barn, BEA went ${was} and is ${k.phase} at f${k.f} x ${k.x.toFixed(1)}, not idle at her station (x ${k.stationX})`);
+      noteUse(c);
+    }
+    out.handovers = w.stats.handovers;
+    return out;
+  };
+  const a = script(), b = script();
+  // 9. the same commands at the same steps, the same world
+  if (a.w.digest() !== b.w.digest()) fail('control: the same command script run twice made two worlds');
+  noteUse(a.w);
+  // every chore by hand (D5: fetch, feed, bathe, play, groom and tuck in; a garden resident too): the barn calm (every
+  // need full), BEA fetches the supply if the need takes one and waits at the dragon's stand spot, its need falls to
+  // 0.3, and E meets it -- before any keeper sent for it arrives (handing it over if one was)
+  const chores: string[] = [];
+  {
+    const w = newSim(1), bea = w.keepers.find((k) => k.name === 'BEA')!, at = 'control chores';
+    const calm = () => { for (const d of w.dragons) for (const k of NEEDS) d.needs[k] = 1; };
+    calm();
+    send(w, { kind: 'take', keeper: bea.id }); step(w, at);
+    for (const [name, need] of [['EMBER', 'food'], ['RIPPLE', 'bath'], ['ZAP', 'play'], ['BRAMBLE', 'love'], ['WICK', 'sleep']] as [string, NeedKind][]) {
+      calm();
+      const d = w.dragons.find((q) => q.name === name)!, sup = w.rooms.find((r) => ROOM_INFO[r.kind].supplies === need);
+      if (sup) {
+        if (!goTo(w, bea, { f: sup.floor, x: postX(sup) }, at)) { fail(`control: BEA never reached the ${sup.kind}'s post`); continue; }
+        press(w, at); step(w, at, PICKUP);
+        if (bea.carrying !== need) fail(`control: BEA at the ${sup.kind}'s post carries ${bea.carrying}, not ${need}'s supply`);
+      } else if (bea.carrying) {
+        // (a supply she has no use for goes back to its post first)
+        const back = w.rooms.find((r) => ROOM_INFO[r.kind].supplies === bea.carrying)!;
+        goTo(w, bea, { f: back.floor, x: postX(back) }, at);
+        const p = actionFor(w, bea);
+        if (p.kind !== 'putback') fail(`control: at the ${back.kind}'s post with its supply E would ${JSON.stringify(p)}, not put it back`);
+        press(w, at);
+        if (bea.carrying) fail(`control: E at the ${back.kind}'s post left BEA carrying ${bea.carrying}`);
+      }
+      if (!goTo(w, bea, w.standAt(d), at)) { fail(`control: BEA never reached ${name}'s stand spot`); continue; }
+      calm(); d.needs[need] = 0.3;
+      let n = 0, p = actionFor(w, bea);
+      while (p.kind !== 'serve' && n++ < 600) { step(w, at); p = actionFor(w, bea); }
+      const done = w.stats.doneBy.BEA ?? 0;
+      press(w, at);
+      n = 0;
+      while (bea.phase === 'work' && n++ < 400) step(w, at);
+      if ((w.stats.doneBy.BEA ?? 0) !== done + 1 || (need !== 'sleep' && d.needs[need] !== 1)) fail(`control: E at ${name}'s stand spot (${p.label}) did not meet its ${need} (${d.needs[need].toFixed(2)})`);
+      else chores.push(p.label.replace('E: ', '').toLowerCase());
+    }
+    noteUse(w);
+    // a garden resident: met by hand where it rests (the garden preset, TOMAS out to BRAMBLE)
+    const g = buildSim(startSpec('garden'), 1), tom = g.keepers.find((k) => k.name === 'TOMAS')!, r = g.dragons.find((d) => d.place === 'garden')!;
+    send(g, { kind: 'take', keeper: tom.id }); step(g, at);
+    for (const d of g.dragons) for (const k of NEEDS) d.needs[k] = 1;
+    r.needs.love = 0.3;
+    let n = 0;
+    while (!(r.goalJob != null && arrived(g, r)) && n++ < 6000) step(g, at);
+    if (!goTo(g, tom, g.standAt(r), at)) fail(`control: TOMAS never reached ${r.name} in the garden`);
+    const p = actionFor(g, tom);
+    const used = g.stats.used.garden ?? 0;
+    press(g, at);
+    n = 0;
+    while (tom.phase === 'work' && n++ < 400) step(g, at);
+    if (p.kind !== 'serve' || r.needs.love !== 1 || g.stats.doneBy.TOMAS !== 1 || (g.stats.used.garden ?? 0) !== used + 1) fail(`control: TOMAS at ${r.name}'s stand spot in the garden: E would ${JSON.stringify(p)}; its love ${r.needs.love.toFixed(2)}`);
+    else chores.push(`${p.label.replace('E: ', '').toLowerCase()} in the garden`);
+    noteUse(g);
+  }
+  // saves: a keeper held by hand is saved released -- the world a release that step makes (walking home, or at the job
+  // at hand, finishing it first) -- and loads never held; each such save, loaded through JSON, steps 5000 on beside the
+  // same world given a release that step, to the same world
+  const saves: string[] = [];
+  {
+    const at = 'control saves', kp = (w: CareSim, name: string) => w.keepers.find((k) => k.name === name)!;
+    const takeBea = (w: CareSim) => { const k = kp(w, 'BEA'); send(w, { kind: 'take', keeper: k.id }); step(w, at); return k; };
+    const moments: [string, () => CareSim][] = [
+      ['walking', () => { const w = newSim(1); takeBea(w); send(w, { kind: 'steer', dx: 1, dy: 0 }); step(w, at, 30); return w; }],
+      ['climbing', () => { const w = newSim(1), k = takeBea(w); walkTo(w, k, 680, at); send(w, { kind: 'steer', dx: 0, dy: -1 }); step(w, at, 40); return w; }],
+      ['picking up', () => { const w = newSim(1), k = takeBea(w); walkTo(w, k, 232, at); press(w, at); step(w, at, 10); return w; }],
+      ['at work', () => {
+        const w = newSim(1), e = w.dragons[0];
+        for (const k of NEEDS) e.needs[k] = 1;
+        e.needs.food = 0.3;
+        const k = takeBea(w);
+        walkTo(w, k, 232, at); press(w, at); step(w, at, PICKUP); walkTo(w, k, w.standAt(e).x, at); press(w, at); step(w, at, 50);
+        return w;
+      }],
+      ['taken at work', () => {
+        const w = newSim(1);
+        while (!w.keepers.some((k) => k.phase === 'work') && w.tick < 20000) step(w, at);
+        send(w, { kind: 'take', keeper: w.keepers.find((k) => k.phase === 'work')!.id }); step(w, at);
+        return w;
+      }],
+    ];
+    for (const [what, mk] of moments) {
+      const w = mk(), held = w.keepers.find((k) => k.manual || k.pendingTake);
+      if (!held) { fail(`control: no keeper held (${what})`); continue; }
+      const blob = serialize(w), loaded = CareSim.fromSave(through(blob)), lk = loaded.keepers[held.id], was = { phase: held.phase, climbing: held.climbing, loaded: lk.phase };
+      if (lk.manual || lk.pendingTake || loaded.controlled != null || lk.phase === 'manual') fail(`control: a world saved with ${held.name} held (${what}) loaded with ${held.name} ${lk.phase}, manual ${lk.manual}`);
+      if (!isDeepStrictEqual(blob, through(blob))) fail(`control: the save (${what}) changes through JSON`);
+      const twin = mk(), since = { ...loaded.stats.used };
+      twin.command({ kind: 'release' });
+      for (let s = 0; s < 5000; s++) { twin.step(); loaded.step(); inv(loaded, at); }
+      if (loaded.digest() !== twin.digest()) fail(`control: a world saved with ${held.name} held (${what}) and loaded drifted from one given a release that step`);
+      noteUse(loaded, since); noteUse(twin);
+      saves.push(`${what} (${held.name} ${was.phase}${was.climbing ? ', climbing' : ''}: loaded ${was.loaded})`);
+    }
+  }
+  // 10. R4: let stand in the lift bay, a keeper held by hand walks on the way they face until clear of it -- and at the
+  // Aerie deck's end, which lies in the bay, turns and walks out the other way
+  const r4: string[] = [];
+  {
+    const at = 'control R4';
+    for (const [what, f, x, facing] of [['the ground floor', 0, 560, 1], ['the Aerie deck\'s end', AERIE_F, DECK_X1 - 10, 1]] as [string, number, number, 1 | -1][]) {
+      const w = newSim(1), k = w.keepers.find((q) => q.name === 'BEA')!;
+      send(w, { kind: 'take', keeper: k.id }); step(w, at);
+      // (put there: a test's shortcut to the spot)
+      k.f = f; k.x = x; k.y = feetY(f); k.facing = facing;
+      let n = 0, stood = 0;
+      while (inBay(k.x, KEEPER_HALF) && n++ < 400) { const x0 = k.x; step(w, at); if (k.x === x0) stood++; }
+      if (inBay(k.x, KEEPER_HALF) || stood) fail(`control: BEA let stand in the lift bay on ${what} (x ${x}) is at x ${k.x} after ${n} steps, ${stood} of them standing`);
+      else r4.push(`${what} out in ${n} steps`);
+    }
+  }
+  console.log(`  17 control: BEA taken, fetched the bowl and fed EMBER by hand (${a.fed} steps at work, doneBy ${JSON.stringify(a.w.stats.doneBy)}, ${a.handovers} handed over), climbed the centre ladder up in ${a.up} steps and down in ${a.down}; 10000 steps held with ${a.rushed} Rushes and no job she didn't take; let go, home in ${a.home} steps; the same script twice, the same world; every chore by hand: ${chores.join(', ')}; saved held, loaded released and stepping on as a release makes it: ${saves.join(', ')}; R4: ${r4.join(', ')}`);
 }
 
 // ---------- 10 (its worker's result) ----------
