@@ -160,8 +160,9 @@ of what is left is the waiting one's tail passing under the head of the dragon i
 waiting (a car that keeps up) or a landing moved clear of the slots (the building's layout, section 3) would end it.
 
 **The car.** It takes the waiting dragons one at a time, in this order: a rushed dragon's call first; then one caught
-standing over another's eye, or under another's body (a landing crowded past its room), so that ends; then the one
-going for the most pressing need; then any call waiting a minute or more; then, while its last rider walks off, a
+standing over another's eye, or under another's body (a landing crowded past its room), so that ends; then an elder
+on its way to the garden (3, The Garden) that has waited a minute or more; then the one going for the most pressing
+need (a retiree's, its lower garden need's); then any call waiting a minute or more; then, while its last rider walks off, a
 caller who can walk in behind it; then a caller on the floor the car is at; then the front of a landing's line; then
 the oldest call. It comes for its rider, who walks in to the car's middle once no other dragon is in the bay, turns
 to face the side it will walk off, rides, and walks off; the car is its rider's until it has walked clear of the bay
@@ -251,20 +252,31 @@ are in leaf with apples on them, and the elders are the same elders, drawn as be
   the ground floor's nets run out to it, and a picket fence stands 40 px in from it, moving out as the garden grows.
   Its floor is a pale gravel path (2); its green is the hedge and the lawn behind the path and the grass strip below
   it, never underfoot. Each plot has a straw nest mound, a lantern (lit at dusk and night: two stepped rings on the
-  hedge, never on the path) and flowers in the lawn; every other plot an apple tree; plot 0 a bench and the GARDEN sign.
-- **Retiring.** 30 game days into its elder stage (counted from the stage's start, 7), an elder retires as soon as it
+  hedge, following its scalloped top, never on the path) and flowers on stalks in the lawn (a round 4 x 4 blossom on
+  a 2 px stalk: no mark under 2 px); every other plot an apple tree; plot 0 a bench and the GARDEN sign.
+- **Retiring.** 30 game days into its elder stage (counted from the step it grew into an elder, however late that
+  stage-up was: 7), an elder retires as soon as it
   may be sent somewhere new -- not being met, not in the lift's hands or its bay -- wherever it is (it keeps its size,
   so unlike a stage-up it need not stand settled): its jobs are dropped (a keeper coming for one goes home), its slot
   is let go, and it walks, riding the lift down if it must, through the Garden Gate to the middle of the lowest free
-  plot. There it is a resident, and a toast says so: "ASH MOVED TO THE GARDEN".
-- **What residents do.** They **nap** (30 to 60 minutes of game time), **sit** (10 to 20: the elder's idle and its
-  variants), and from a sit **stroll** (six times in ten) to a resting place among their own plot and the two beside
-  it, walked by their own walk like any dragon, or nap again. At night they only nap: a sit ends at nightfall, a nap
-  that ends at night starts another, and no stroll starts that would not end before 20:00 -- the one thing in the
-  simulation that reads the day's phase (7). Every resident's resting place, and every plot's middle waiting for a
-  newcomer, are kept clear of each other's eyes (ART_BIBLE 1.4), so a stroll goes only to a clear place; passing
-  another on the way is a moment's overlap, as in the barn. Measured over 30 minutes (`npm run sim` section 16): asleep
-  70 to 77 % of their steps, every night step, and each strolled 8 to 10 times.
+  plot. There it is a resident, and a toast says so: "ASH MOVED TO THE GARDEN". A retiree asks for nothing on its
+  way, so no need of its can raise its call for the lift as a barn dragon's does: once its call has waited a minute
+  it goes before the barn's (4.9 `OVERDUE`), so it waits at a landing no longer than a barn dragon may (at most 124 s;
+  measured 73.7 s in the busy barn and 72.7 s in a crowded one of ten, where it waited 161.9 s before that rule) and
+  its walk out takes 218 s at most (the longest in a run: 139 to 218 s; `npm run sim` section 15).
+- **What residents do.** They **nap** (1800 to 3600 steps: 30 to 60 s of play at 1x, 4 to 8 game hours of the real
+  day), **sit** (600 to 1200 steps: 10 to 20 s, about 1.3 to 2.7 game hours: the elder's idle and its variants), and
+  from a sit **stroll** (six times in ten) to a resting place among their own plot and the two beside it, walked by
+  their own walk like any dragon, or nap again. At night they only nap: a sit ends at nightfall, a nap that ends at
+  night starts another, and no stroll starts that would not end before 20:00 -- the one thing in the simulation that
+  reads the day's phase (7). Every resident's resting place, and every plot's middle waiting for a newcomer, are kept
+  apart: clear of each other's eyes (ART_BIBLE 1.4), and roomy, no two bodies overlapping more than 20 px
+  (`REST_OVERLAP`: a tail's tip behind another's, never one lying across another -- eye-clear alone let two lie back to
+  back, up to 95 px of their bodies one over the other, in 43 % of a full garden's steps); a stroll goes only to such a
+  place, else it naps; passing another on the way is a moment's overlap, as in the barn. Measured over 30 minutes
+  (`npm run sim` section 16): asleep 73 to 74 % of their steps, every night step, each strolled 9 to 12 times, and two
+  at rest overlapped 10.7 px at most; in a full seven-plot garden (the `retire` preset, seeds 1 and 2, 35 minutes of
+  the real day) they still stroll 3 to 25 times each, 31 to 100 px at the median, and overlap 12.7 px at most.
 - **Few needs** (4.1): food and love only, at a quarter of an elder's drain; sleep, play and bath are held full. A
   resident asks for a keeper about four times an hour of play, where a barn dragon asks about 36.
 - **Keepers come to them: the one exception to "each need is met in its own room".** The garden is the residents'
@@ -424,7 +436,7 @@ be moved on, and in 80 000 steps its egg never finds a sub-slot while needs sit 
 | A keeper waits at the stand spot (`WAIT_MAX`) | at most 7200 frames (2 min), then gives the job back |
 | The lift (`LIFT_SPEED`) | 2 px a frame, a floor in 0.93 s (the plan's third lever, 1 to 1.5, taken to its cap of 2) |
 | The bay closes (`BAY_CLOSE`) | after a departure is blocked 240 frames (4 s) |
-| A call is overdue (`OVERDUE`) | after 3600 frames (1 min): it is served before the follow-in, the car's own floor and the front of a line |
+| A call is overdue (`OVERDUE`) | after 3600 frames (1 min): it is served before the follow-in, the car's own floor and the front of a line; an elder's on its way to the garden, before every tier too (it asks for nothing on the way, so nothing else raises its call) |
 | Waiting at a landing (`LANDING_CLEAR`, `DRAGON_EYE`) | the snout 2 px short of the bay; nose to tail behind the one ahead (the mean of their half-bodies and 16 px: 88 px for adults); no body over an eye (an eye 21 to 38 px ahead of an adult's root) |
 | Walking in behind the last rider (`FOLLOW_GAP`) | 8 px, body to body |
 | Walking up to the bay (`APPROACH`) | within 250 px of the bay's edge, a dragon keeps `FOLLOW_GAP` behind one walking up ahead of it the same way |
@@ -559,7 +571,9 @@ stand spot <= 20 s, the bay's edge <= 60 s.
   measured); without that hold it would set off on its next errand the step after being served and seldom be settled
   with room. So a keeper never stands at the old stage's reach, or anywhere in the new body, while it is swapped in. It stays
   **exact**: the next stage counts from the day this one fell due, never from the day it was applied (`src/game/life.ts`;
-  `npm run sim` section 13: each stage exactly 18 000 steps on a 600-step day). A baby in a baby sub-slot first takes a
+  `npm run sim` section 13: each stage exactly 18 000 steps on a 600-step day) -- all but the elder stage, which has no
+  stage after it to keep in step with: it counts from the step the dragon grew, so its 30 days to the garden are all
+  its own, however late the stage-up. A baby in a baby sub-slot first takes a
   free module slot, which its next stage fits (3), and walks there; with none free it waits. Everything that goes by
   stage follows from that step on: the drains (a baby's 1.25 times, an elder's 0.8), the reach, the walk, the body's
   room. How long a stage-up waits is how long the dragon takes to finish what it was doing: alone, at most a minute
@@ -567,9 +581,10 @@ stand spot <= 20 s, the bay's edge <= 60 s.
   one car, the job: 68 s to 144 s at most over seeds 1 to 8, checked against 3 minutes, a thirtieth of a stage: 4.7).
   A baby on its way to its module slot that a need calls (or a Rush) to the room it is going to is met there in a
   baby's sub-slot, like any baby, and goes on growing up after. An elder's next is the garden (3, The Garden): 30 days
-  into the elder stage, counted from its start like a stage-up, it retires -- as soon as it may be sent somewhere new,
-  not settled (it keeps its size, so no net or line minds) -- at most 683 steps late in the busy barn (seed 1; 408 to
-  1092 over seeds 1 to 8), none late with the `retire` preset (`npm run sim` section 15).
+  after the step it grew into an elder it retires -- as soon as it may be sent somewhere new, not settled (it keeps its
+  size, so no net or line minds). In the busy barn (seven adults falling due to grow elder mid-errand, seeds 1 to 8)
+  they grow up to 5788 steps late and are elders 30.00 to 33.33 days, each retiring at most 130 to 1998 steps past its
+  due (seed 1: 2339 late, 30.00 to 31.80 days, 1081); none is late with the `retire` preset (`npm run sim` section 15).
   **The cheer:** just grown up, a dragon holds where it stands for exactly its new stage's `happy` (61 to 139 steps,
   read from the anim tables: `src/game/gait.ts` `happyLen`; the hold is the dragon's own `hold` and is saved): it takes
   no errand, no keeper comes for it and no one moves it on, so nothing cuts the cheer short (`npm run sim` section 13
@@ -667,10 +682,10 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    | `src/game/life.ts` | growing up (a stage-up 30 days into a stage, applied once the dragon is settled, exact; a baby first moving to a module slot) and hatching (an egg 2 days after it was laid, into a free baby sub-slot) |
    | `src/game/names.ts` | the hatchlings' names, six per element, the first free one taken |
    | `src/game/eggs.ts` | the eggs, drawn: the shell, its cracks and wobble, the hatch's shell bits |
-   | `src/game/garden.ts` | the elder garden: retiring (30 days into the elder stage), the plots it grows, the residents' nap, sit and stroll (napping only at night: the one simulation module that reads the day's phase), their resting places kept clear of each other's eyes, their jobs met where they rest |
-   | `src/game/gardenArt.ts` | the garden, drawn: a plot's tile (the hedge, the lawn, an apple tree on every other, a nest mound, a lantern, flowers; the path, the kerb, the ground), drawn only where it is on screen; the fence at the world's end; the lanterns' rings at night; the GARDEN sign |
+   | `src/game/garden.ts` | the elder garden: retiring (30 days into the elder stage), the plots it grows, the residents' nap, sit and stroll (napping only at night: the one simulation module that reads the day's phase), their resting places kept apart (clear of each other's eyes, no two bodies overlapping more than 20 px), their jobs met where they rest |
+   | `src/game/gardenArt.ts` | the garden, drawn: a plot's tile (the hedge, the lawn, an apple tree on every other, a nest mound, a lantern, flowers on stalks; the path, the kerb, the ground), drawn only where it is on screen; the fence at the world's end; the lanterns' rings at night, clipped to the hedge's own shape; the GARDEN sign |
    | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks, turns and rides; a resident's nap and wake) and their anims, the lift's car, the eggs, the grow-up's flash, the garden, the sky and the lights, the speed, the camera (out to the garden's end), the HUD (the dragon card too) and the input; a live page loads and saves the barn |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled with room to grow every time, each grow-up held still for its `happy`, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days; a baby Rushed on its way to grow up met in a sub-slot) and eggs (the nests, hatching exactly 2 days on into a new baby, in front of its own nest or an empty one, fed within 3 minutes, a full barn's egg waiting, no baby moved on to the Hatchery, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up; the elder garden (routes out through the Garden Gate to every plot; retiring 30 days into the elder stage and soon after, the gate passed, a plot each and the garden grown to hold them, a resident in the garden with no slot; the residents' 30 minutes: food and love only at a quarter of an elder's drain, asleep half their steps or more and every night step, strolling, met where they rest by a keeper come out to them, none at rest under another's body, the barn's service beside them; saves taken with residents napping, sitting, strolling, waiting and being met, and with elders on their way out). Section 10 (the capacity runs, about 9 s) runs in a worker thread beside the rest, so the whole check keeps to about 21 s |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: every route on the keepers' and the dragons' nets, 30 minutes of play on three seeds with its invariants (the bay rule, one dragon at a time in the lift's shaft, no eye under a standing body but for a moment), determinism, Rush (a keeper sent once the dragon is near, one taken off a lower job, a slot bump, and a Rush every 30 s), the start cast, saves (a loaded world steps on exactly as its original, mid-ride too), `rngAt`, the rooms (a purpose each, one room per need, every named room used over the check unless planned), the gait (the walks against their anim tables and players, a walk with an intro, a scripted walk as far as the anim carries it), and one car's capacity (eight adults, ten, and the `ages` preset's twelve: the ceiling, measured and frozen); the clock (every phase's start, the sky's stepped thirds, a whole day read step by step), and night not the barn's (a barn started at 07:00 and one at 19:00 the same barn for 20 000 steps; no simulation module reads the phase); growing up (a baby grown young, adult and elder, each stage exactly 30 days, settled with room to grow every time, each grow-up held still for its `happy`, the drains following; the busy barn's stage-ups within an errand; the real day's 30 days; a baby Rushed on its way to grow up met in a sub-slot) and eggs (the nests, hatching exactly 2 days on into a new baby, in front of its own nest or an empty one, fed within 3 minutes, a full barn's egg waiting, no baby moved on to the Hatchery, the names), and saves taken with eggs incubating, a baby walking to grow up, a hatch and a grow-up; the elder garden (routes out through the Garden Gate to every plot; retiring 30 days after growing into an elder (however late that was) and soon after, a retiree at a landing no longer than a barn dragon, in a crowded barn too, the gate passed, a plot each and the garden grown to hold them, a resident in the garden with no slot; the residents' 30 minutes: food and love only at a quarter of an elder's drain, asleep half their steps or more and every night step, strolling, met where they rest by a keeper come out to them, none at rest under another's body or lying across another, the barn's service beside them; saves taken with residents napping, sitting, strolling, waiting and being met, and with elders on their way out). Section 10 (the capacity runs, about 9 s) runs in a worker thread beside the rest, so the whole check keeps to about 22 s |
 
    Measured by `npm run sim` on the starting base (its seven dragons and four keepers): over 30 minutes of play (seed
    1), 136 jobs opened and 128 were done, every one by a keeper (none closed on its own). A keeper started on a job
@@ -695,9 +710,12 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    a mean of 100 s and 360 s over three seeds: 4.9 says why.) The elder garden (`npm run sim` sections 15 and 16): with
    the `retire` preset on a 600-step day, the seven retire the step they fall due and arrive over 3895 to 13 143 steps
    (the lift carries the five upstairs down one at a time), the gate passed 7 times, the garden grown to 7 plots and
-   the world 2568 wide; in the busy barn, falling due mid-errand, each retires at most 683 steps late. The `garden`
-   preset, 30 minutes of the real day: its three residents asleep 70 to 77 % of their steps (every night step), each
-   strolling 8 to 10 times and visited by a keeper twice (4 an hour: Tomas for love five times, Bea for food once),
+   the world 2568 wide; in the busy barn (seven adults grown elder mid-errand, up to 2339 steps late), each retires
+   30.00 to 31.80 days after it grew and at most 1081 steps past its due, waits at a landing 73.7 s at most (72.7 s
+   for one retiring from a crowded barn of ten, where it waited 161.9 s before its call had its own overdue rule) and
+   walks out within 189 s. The `garden` preset, 30 minutes of the real day: its three residents asleep 73 to 74 % of
+   their steps (every night step), each strolling 9 to 12 times, two at rest overlapping 10.7 px at most, and visited
+   by a keeper twice (4 an hour: Tomas for love five times, Bea for food once),
    their food and love draining at exactly a quarter of an elder's rate; the barn's four adults beside them waited 33.1
    s on average (88.8 s at most), no need empty. Not in this slice:
    - the seven span more than one screen, so the start camera shows some of them and a drag shows the rest; they

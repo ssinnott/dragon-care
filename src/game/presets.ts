@@ -107,7 +107,10 @@ export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze(
       settleInGarden(sim, d, plot, true);
     });
   } }),
-  /** All seven starters elders RETIRE_AT days into the stage: each retires once settled, a tenth of a day in, and walks out to the garden. */
+  /**
+   * All seven starters elders RETIRE_AT days into the stage: each retires a tenth of a day in, as soon as it may be sent
+   * somewhere new (travel.ts redirectable), and walks out to the garden.
+   */
   retire: () => ({ ...newGame(), dragons: START_DRAGONS.map((p): DragonPlace => ({ ...p, stage: 'elder', days: RETIRE_AT })) }),
 });
 

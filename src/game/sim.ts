@@ -9,7 +9,8 @@
 // Life (life.ts) runs in every step once the needs have drained and the acts under way have run, before any job opens
 // or anyone moves: a dragon grows into its next stage 30 game days into its stage, once it is settled with room to grow
 // (then it cheers where it stands a moment), and an egg in the Hatchery's nests (addEgg) hatches into a baby 2 game days
-// after it was laid; 30 game days into the elder stage an elder, settled, retires to the garden. The garden (garden.ts,
+// after it was laid; 30 game days into the elder stage an elder retires to the garden, as soon as it may be sent
+// somewhere new (travel.ts redirectable: not being met, not in the lift's hands or its bay). The garden (garden.ts,
 // after the keepers in every step) is the retired elders' home: its residents keep a nap, sit and stroll rhythm, and
 // need only food and love, slowly -- a keeper comes out to them (plan S6).
 import { makeRng } from '../lib/engine/rng.ts';

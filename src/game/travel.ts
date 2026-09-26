@@ -11,7 +11,7 @@
 // (ART_BIBLE 1.4). An elder retired to the garden walks by these same rules (garden.ts routes it there), and a garden
 // resident strolls by its gait too, but chooses nothing here: the garden runs it. DOM-free and deterministic: every
 // loop in id order, every tie by id.
-import { tierOf } from './needs.ts';
+import { tierOf, GARDEN_NEEDS } from './needs.ts';
 import type { NeedKind } from './needs.ts';
 import { ROOM_INFO, ROOM_KINDS, LIFT_X0, LIFT_X1, LIFT_CX, DRAGON_PAD, DRAGON_BODY, CLIMB_COST, TOWER_R, GARDEN_MIN_PLOTS, GATE_MID, route, feetY, fitsSlot, spanOf, bayFloors, makeNets, worldWOf } from './layout.ts';
 import type { Room, RoomKind, Slot, Spot } from './layout.ts';
@@ -802,23 +802,32 @@ export function eyeClashes(sim: CareSim): Set<Dragon> {
 
 /**
  * The caller the car serves next: the highest priority first (a Rush); then one whose waiting has it over another's
- * eye or under another's body (eyeClashes: a crowded landing), so that ends; then the one going for the most pressing
- * need (its tier, as the job queue ranks: 4.3); then any call waiting OVERDUE or more (the oldest first), so nobody
+ * eye or under another's body (eyeClashes: a crowded landing), so that ends; then an elder on its way to the garden
+ * whose call has waited OVERDUE or more; then the one going for the most pressing need (its tier, as the job queue
+ * ranks: 4.3; a retiree's, its lower garden need's); then any call waiting OVERDUE or more (the oldest first), so nobody
  * waits on for ever; then, while its last rider walks off (`off`), a caller who can walk in behind it; then a caller on
  * the floor the car is at (no empty trip); then the front of a landing's line (it walks through nobody to the car);
- * then the oldest call; then the lowest id.
+ * then the oldest call; then the lowest id. (A retiree asks for nothing on its way -- garden.ts retire -- so no job of
+ * its can grow more pressing and raise its call's tier as a barn caller's does: without its own OVERDUE rule a busy car
+ * could pass it over for as long as the barn's needs kept coming.)
  */
 function nextCall(sim: CareSim, off: Dragon | null = null): LiftCall | null {
   const L = sim.lift, over = (c: LiftCall) => (sim.tick - c.tick >= OVERDUE ? 1 : 0), here = (c: LiftCall) => (c.f === L.f ? 1 : 0);
   let clashes: Set<Dragon> | null = null;
   const clash = (c: LiftCall) => ((clashes ??= eyeClashes(sim)).has(dragonById(sim, c.dragon)) ? 1 : 0);
   const after = (c: LiftCall) => (behind(sim, c, off) ? 1 : 0);
-  const tier = (c: LiftCall) => { const d = dragonById(sim, c.dragon), j = d.goalJob == null ? null : sim.jobs.find((q) => q.id === d.goalJob); return j ? tierOf(d.needs[j.need]) : 0; };
+  const tier = (c: LiftCall) => {
+    const d = dragonById(sim, c.dragon);
+    if (d.goal === 'retire') return tierOf(Math.min(...GARDEN_NEEDS.map((k) => d.needs[k])));
+    const j = d.goalJob == null ? null : sim.jobs.find((q) => q.id === d.goalJob);
+    return j ? tierOf(d.needs[j.need]) : 0;
+  };
+  const leaving = (c: LiftCall) => (over(c) && dragonById(sim, c.dragon).goal === 'retire' ? 1 : 0);
   // (the front of its landing's line: nobody to walk through to the car)
   const first = (c: LiftCall) => { const d = dragonById(sim, c.dragon), line = landingLine(sim, d.f, sideOf(d)).filter((w) => w.d.move === 'call' || w.d.move === 'bay'); return line[0]?.d === d ? 1 : 0; };
   let best: LiftCall | null = null;
   for (const c of L.calls) {
-    if (!best || (c.prio - best.prio || clash(c) - clash(best) || tier(c) - tier(best) || over(c) - over(best) || (over(c) ? 0 : after(c) - after(best) || here(c) - here(best) || first(c) - first(best)) || best.tick - c.tick || best.dragon - c.dragon) > 0) best = c;
+    if (!best || (c.prio - best.prio || clash(c) - clash(best) || leaving(c) - leaving(best) || tier(c) - tier(best) || over(c) - over(best) || (over(c) ? 0 : after(c) - after(best) || here(c) - here(best) || first(c) - first(best)) || best.tick - c.tick || best.dragon - c.dragon) > 0) best = c;
   }
   return best;
 }

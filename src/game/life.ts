@@ -9,15 +9,17 @@
 // just served it, turning for home -- HOLDS where it is (`hold`, a step at a time: it takes no goal, no keeper comes for
 // it and no one moves it on) until the keeper has walked out of it; else it would set off on its next errand the step
 // after being served, and seldom be settled with room. Then `stageSince` moves on by exactly the stage's length (a late
-// stage-up never shortens the next stage), the stage advances, and every per-stage thing (the drains, the reach, the
+// stage-up never pushes the next one later: the stages keep in step) -- but for the elder stage, which has no stage after
+// it, `stageSince` is the step it grew, so its 30 days to the garden are counted from when it really became an elder --
+// the stage advances, and every per-stage thing (the drains, the reach, the
 // gait, the pad, the stand spot) follows from that step on; and the dragon CHEERS where it stands, holding for its new
 // stage's `happy` (gait.ts happyLen), so the view's `happy` plays through. A baby in a baby sub-slot first takes a module slot, which its next stage fits (a
 // module holds one grown dragon or two babies: 3.3), and walks there (goal `settle`); it grows once settled there, and
 // waits in its sub-slot while none is free. An elder's next is retirement (plan S6): RETIRE_DAYS (30) game days into
 // the elder stage, as soon as it may be sent somewhere new (not being met, not holding still, not in the lift's hands
 // or its bay: travel.ts redirectable -- a Rush's rule; it keeps its size, so unlike a stage-up it need not stand still),
-// it retires to the garden (garden.ts retire: the elder's reward, never a decline) -- counted from the stage's start,
-// so a late stage-up never shortens it. An egg (sim.ts addEgg) hatches
+// it retires to the garden (garden.ts retire: the elder's reward, never a decline) -- counted from the step it grew into
+// an elder, so a late stage-up never shortens its time as one. An egg (sim.ts addEgg) hatches
 // HATCH_DAYS game days after it was laid, as soon as a baby sub-slot is free (the Hatchery's two first -- one in front
 // of no other egg, then the one nearest its nest; else the nearest): a baby of its element, a new id, the next free
 // name of its element's (names.ts), the egg's seed, hungry (it asks for the kitchen at once), standing up in its nest
@@ -84,7 +86,9 @@ function growUp(sim: CareSim, d: Dragon): void {
   }
   if (inTheWayOfGrowing(sim, d, next)) { d.hold = Math.max(d.hold, 1); return; }
   sim.stats.growDelayMax = Math.max(sim.stats.growDelayMax, sim.clock - due);
-  d.stageSince = due;
+  // (the next stage counts from the day this one fell due, so the stages keep in step -- but the elder stage, with no
+  // stage after it to keep in step with, begins the step the dragon grows: its 30 days to the garden are all its own)
+  d.stageSince = next === 'elder' ? sim.clock : due;
   d.stage = next;
   d.hold = happyLen(d.element, next);
   if (d.goal === 'settle') d.goal = null;

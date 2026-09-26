@@ -9,8 +9,9 @@
 // plot if it has none spare (plots = max(2, residents + retiring): CareSim.setPlots). There it is a resident.
 //
 // A resident (stepGarden, run after the keepers in every step) has only food and love, draining at a quarter of an
-// elder's rate (needs.ts GARDEN_RATE), and lives by a small rhythm: it NAPS (30 to 60 minutes of game time), SITS (10 to
-// 20), and from a sit either STROLLS -- walked by its own walk's root motion (gait.ts), to a resting place among the
+// elder's rate (needs.ts GARDEN_RATE), and lives by a small rhythm: it NAPS (1800 to 3600 steps: 30 to 60 s of play at
+// 1x, 4 to 8 game hours of the real day), SITS (600 to 1200 steps: 10 to 20 s, about 1.3 to 2.7 game hours), and from a
+// sit either STROLLS -- walked by its own walk's root motion (gait.ts), to a resting place among the
 // plots beside its own -- or naps again. At night (the one thing in the simulation that reads the day's phase, plan G8:
 // clock.ts readClock) it only naps: a sit ends at nightfall, a nap that ends at night starts another, and a stroll is
 // never begun that would not end before 20:00. When a job opens it WAITS where it rests (one strolling walks on to its
@@ -18,11 +19,12 @@
 // garden is the residents' room, and the keepers come to them -- stands in front of its snout, and meets the need there;
 // then it sits (or naps, at night).
 //
-// Where a resident rests is kept clear of the others' eyes (ART_BIBLE 1.4): every resident's resting place (where it
+// Where a resident rests is kept apart from the others (ART_BIBLE 1.4): every resident's resting place (where it
 // stands, or where its stroll ends) and every plot waiting for a newcomer (a retiree's own, and an empty one's middle)
-// are pairwise clear -- no body over another's eye, whichever is drawn in front -- so a newcomer always finds its plot's
-// middle free, and a stroll is only ever to a clear place (else it naps). Passing another on the way is a moment's
-// overlap, as in the barn.
+// are pairwise apart -- no body over another's eye, whichever is drawn in front, and no two bodies overlapping more than
+// REST_OVERLAP px (a tail's tip behind another's; never one lying across another) -- so a newcomer always finds its
+// plot's middle free, and a stroll is only ever to such a place (else it naps). Passing another on the way is a
+// moment's overlap, as in the barn.
 import { readClock, hourSteps, PHASE_HOURS, RETIRE_DAYS } from './clock.ts';
 import { GARDEN_MIN_PLOTS, GARDEN_PLOT, REACH, plotX, plotMid, gardenSpan, DRAGON_PAD } from './layout.ts';
 import type { Spot } from './layout.ts';
@@ -35,7 +37,10 @@ import type { CareSim, Dragon, GardenMode, Job } from './sim.ts';
 
 export { plotX, plotMid };
 
-/** A nap's and a sit's length, steps (30-60 and 10-20 minutes of game time), and a sit's odds of ending in a stroll (else a nap). */
+/**
+ * A nap's and a sit's length, steps (30-60 s and 10-20 s of play at 1x: 4-8 and about 1.3-2.7 game hours of the real
+ * day's 450-step hour), and a sit's odds of ending in a stroll (else a nap).
+ */
 export const NAP: readonly [number, number] = [1800, 3600], SIT: readonly [number, number] = [600, 1200];
 export const STROLL_P = 0.6;
 /** Draws a stroll gets to find a clear resting place, the least it walks (px), and how long before 20:00 it must end (steps). */
@@ -44,7 +49,7 @@ const STROLL_TRIES = 8, STROLL_MIN = 24, NIGHT_MARGIN = 60;
 /** Whether it is night by the clock (20:00-05:00): a resident's time to nap (the simulation's one reader of the phase, plan G8). */
 export function isNight(sim: CareSim): boolean { return readClock(sim.clock, sim.dayLen).phase === 'night'; }
 
-/** The clock an elder's retirement falls due at: its elder stage's start plus RETIRE_DAYS game days. */
+/** The clock an elder's retirement falls due at: its elder stage's start (the step it grew into an elder: life.ts) plus RETIRE_DAYS game days. */
 export function retireDue(sim: CareSim, d: Dragon): number { return d.stageSince + RETIRE_DAYS * sim.dayLen; }
 
 /** The garden's residents, by id. */
@@ -70,6 +75,19 @@ export function restsClear(a: Rest, b: Rest): boolean {
   const meet = (p: readonly [number, number], q: readonly [number, number]) => p[0] <= q[1] && p[1] >= q[0];
   return !meet(bodySpan('elder', a.facing, a.x), eyeSpan('elder', b.facing, b.x)) && !meet(bodySpan('elder', b.facing, b.x), eyeSpan('elder', a.facing, a.x));
 }
+/**
+ * The most two resting elders' bodies may overlap, px: a tail's tip behind another's, never one lying across another.
+ * (Eye-clear alone still lets two lie back to back with their tails and haunches one over the other, up to 97 px of an
+ * elder's 127: the garden gives each its own plot, and a full one looked like a heap.)
+ */
+export const REST_OVERLAP = 20;
+/** How far two elders resting at a and b overlap, px (0 or less: apart). */
+export function restOverlap(a: Rest, b: Rest): number {
+  const p = bodySpan('elder', a.facing, a.x), q = bodySpan('elder', b.facing, b.x);
+  return Math.min(p[1], q[1]) - Math.max(p[0], q[0]);
+}
+/** Whether two elders resting at a and b are clear of each other's eyes and roomy (bodies overlapping REST_OVERLAP px at most). */
+export function restsApart(a: Rest, b: Rest): boolean { return restsClear(a, b) && restOverlap(a, b) <= REST_OVERLAP; }
 /**
  * Every resting place the garden keeps: each resident's (where it stands, or where its stroll will end, facing the way
  * it walks), each retiree's (its plot's middle, facing east, the way it walks in), and each plot no one has (its
@@ -107,8 +125,8 @@ function nightfall(sim: CareSim): number {
 
 /**
  * Where a resident strolls to: a resting place drawn among its own plot and the two beside it, inside the garden,
- * at least STROLL_MIN px away, clear of every other resting place the garden keeps, and reached before nightfall (a
- * margin kept); up to STROLL_TRIES draws, else null (it naps instead).
+ * at least STROLL_MIN px away, apart from every other resting place the garden keeps (restsApart: clear of their eyes,
+ * and roomy), and reached before nightfall (a margin kept); up to STROLL_TRIES draws, else null (it naps instead).
  */
 function strollTo(sim: CareSim, d: Dragon, r: RngInstance): number | null {
   const [s0, s1] = residentSpan(sim), [p0, p1] = plotX(d.home ?? 0);
@@ -118,7 +136,7 @@ function strollTo(sim: CareSim, d: Dragon, r: RngInstance): number | null {
     const tx = Math.round(lo + r.next() * (hi - lo));
     if (Math.abs(tx - d.x) < STROLL_MIN) continue;
     const me: Rest = { x: tx, facing: tx > d.x ? 1 : -1, who: d, plot: null };
-    if (!others.every((o) => restsClear(me, o))) continue;
+    if (!others.every((o) => restsApart(me, o))) continue;
     if (sim.clock + strollSteps(d, tx) + NIGHT_MARGIN > dark) continue;
     return tx;
   }

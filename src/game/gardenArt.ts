@@ -5,7 +5,7 @@
 // the tile covers the building canvas's own ground east of the tower. The house style: a 1 px #1a1018 outline, flat
 // cel bands lit from the top left, no gradients, no mark under 2 px.
 // Behind the feet (y < 688): a lawn band, rounded hedge blobs, an apple tree on every other plot, a bench on plot 0,
-// one straw nest mound per plot (the resident naps before it), a lantern on its post, 3 x 3 flowers in the lawn. Under
+// one straw nest mound per plot (the resident naps before it), a lantern on its post, flowers on stalks in the lawn. Under
 // the feet (the band, y 688-702): the path, FLOORS.path (gates i and Ki: pale, S 0.13, no green underfoot), then a
 // stone kerb, and below the ground the earth and its 5 px grass strip: the only green below the feet. A picket fence
 // stands 40 px in from the world's end, and moves out as the garden grows. At dusk and night each lantern throws two
@@ -20,28 +20,38 @@ import { measureText } from '../lib/engine/text.ts';
 
 /** The band a garden dragon's feet stand in (the ground floor's: y 688-702), the kerb under it, and the tile's top (a tree's crown). */
 const BAND_Y = floorTop(0) + 88, KERB_Y = BAND_Y + BAND, TILE_Y = 520;
-/** The hedge's blobs' middles (y), their radius, and the lawn's top. */
+/** The hedge's blobs' middles (y), their radius, their spacing, and the lawn's top. */
 const HEDGE_Y = 612, HEDGE_R = 13, HEDGE_DX = 22, LAWN_Y = 640;
 /** A tile's lantern (x in the tile, the lamp's top-left y), and its tree's trunk x. */
 const LANTERN_X = 164, LAMP_Y = 611, TREE_X = 112;
 /** Every blob's y offset across one tile (8 blobs of 22 px: the tiles meet seamlessly). */
 const BLOB_DY = [0, -3, 1, -2, 0, -4, 2, -1] as const;
-/** The flowers in one tile's lawn: x, y, colour (3 x 3 marks). */
+/** The flowers in one tile's lawn: x, y (the blossom's middle), colour (drawn by `flower`). */
 const FLOWERS: readonly (readonly [number, number, string])[] = [[14, 670, '#f3e6c8'], [41, 658, '#e89ab0'], [67, 676, '#f2d36a'], [96, 664, '#b8a8e0'], [125, 674, '#f3e6c8'], [149, 657, '#e89ab0'], [31, 681, '#f2d36a'], [138, 683, '#b8a8e0']];
 /** A tree's apples on its crown (dx, dy from the crown's middle). */
 const APPLES: readonly (readonly [number, number])[] = [[-14, -6], [-4, 4], [9, -10], [15, 3], [2, -18], [-18, 6]];
 
 function rect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string): void { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
 function disc(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, c: string): void { g.fillStyle = c; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill(); }
+/**
+ * A lawn flower: a round 4 x 4 blossom (its corners cut) on a 2 x 2 stalk in the lawn's shade -- every mark 2 px or
+ * more, so it reads as a plant, never as a twinkle (a 1 px plus did).
+ */
+function flower(g: CanvasRenderingContext2D, x: number, y: number, c: string): void {
+  rect(g, x - 1, y - 2, 2, 4, c); rect(g, x - 2, y - 1, 4, 2, c);
+  rect(g, x - 1, y + 2, 2, 2, makeTones(BACKDROPS.lawn).sh);
+}
 /** An inked box with a lit top row (top-left light). */
 function box(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string): void {
   rect(g, x, y, w, h, INK); rect(g, x + 1, y + 1, w - 2, h - 2, c); rect(g, x + 1, y + 1, w - 2, 1, makeTones(c).hi);
 }
 
+/** The middle of the hedge's k-th blob from a tile's left edge (k may run past the tile: the pattern repeats each tile). */
+function blob(k: number): [number, number] { return [HEDGE_DX / 2 + k * HEDGE_DX, HEDGE_Y + BLOB_DY[((k % 8) + 8) % 8]]; }
 /** The hedge's blobs across a tile (and one past each end, so the ink round their union meets the next tile's). */
 function hedge(g: CanvasRenderingContext2D): void {
   const blobs: [number, number][] = [];
-  for (let k = -1; k <= GARDEN_PLOT / HEDGE_DX; k++) blobs.push([HEDGE_DX / 2 + k * HEDGE_DX, HEDGE_Y + BLOB_DY[((k % 8) + 8) % 8]]);
+  for (let k = -1; k <= GARDEN_PLOT / HEDGE_DX; k++) blobs.push(blob(k));
   const tn = makeTones(BACKDROPS.hedge);
   for (const [x, y] of blobs) disc(g, x, y, HEDGE_R + 1, INK);
   for (const [x, y] of blobs) disc(g, x, y, HEDGE_R, BACKDROPS.hedge);
@@ -118,7 +128,7 @@ function tile(kind: Tile): HTMLCanvasElement {
   hedge(g);
   rect(g, 0, LAWN_Y, GARDEN_PLOT, BAND_Y - LAWN_Y, BACKDROPS.lawn);
   rect(g, 0, LAWN_Y, GARDEN_PLOT, 1, makeTones(BACKDROPS.lawn).sh);
-  for (const [x, y, col] of FLOWERS) { if (kind === 'end' && x > GARDEN_END) continue; rect(g, x - 1, y, 3, 1, col); rect(g, x, y - 1, 1, 3, col); }
+  for (const [x, y, col] of FLOWERS) { if (kind === 'end' && x > GARDEN_END - 2) continue; flower(g, x, y, col); }
   if (kind !== 'end') {
     if (kind === 'first') bench(g, 16);
     mound(g, GARDEN_PLOT / 2);
@@ -160,16 +170,21 @@ export function drawGarden(g: CanvasRenderingContext2D, plots: number, worldW: n
 /**
  * The lanterns' light, in world space after the lights of the building and before the plates (never over a dragon:
  * plan G8): as the dusk's sky turns, and until the dawn's has (sky.ts lightsOf, like the dorm's lamps), each lantern on
- * screen throws its stepped rings (the inner one, then both) on the hedge, clipped to it (never on the sky over it, the
- * lawn or the path), and its lamp is drawn over them.
+ * screen throws its stepped rings (the inner one, then both) on the hedge, clipped to the hedge's own shape -- its
+ * blobs' fill and the band under them, so the light follows the scalloped top, inside its ink -- never on the sky over
+ * it, the lawn or the path; and its lamp is drawn over them.
  */
 export function drawGardenLights(g: CanvasRenderingContext2D, plots: number, lit: Lights, view: readonly [number, number]): void {
   if (lit.rings <= 0) return;
   for (let i = 0; i < plots; i++) {
-    const x = GARDEN_X0 + i * GARDEN_PLOT + LANTERN_X;
+    const t0 = GARDEN_X0 + i * GARDEN_PLOT, x = t0 + LANTERN_X;
     if (x + 20 < view[0] || x - 20 > view[1]) continue;
     g.save();
-    g.beginPath(); g.rect(x - 20, HEDGE_Y - 3, 40, LAWN_Y - 3 - (HEDGE_Y - 3)); g.clip();
+    g.beginPath(); g.rect(x - 20, HEDGE_Y - HEDGE_R - 8, 40, LAWN_Y - 3 - (HEDGE_Y - HEDGE_R - 8)); g.clip();
+    g.beginPath();
+    for (let k = 0; k <= GARDEN_PLOT / HEDGE_DX + 2; k++) { const [bx, by] = blob(k); g.moveTo(t0 + bx + HEDGE_R, by); g.arc(t0 + bx, by, HEDGE_R, 0, Math.PI * 2); }
+    g.rect(t0, HEDGE_Y, GARDEN_PLOT + HEDGE_DX * 2, LAWN_Y - 3 - HEDGE_Y);
+    g.clip();
     const cy = LAMP_Y + 4;
     if (lit.rings > 1) disc(g, x, cy, 16, LANTERN_RINGS[1]);
     disc(g, x, cy, 10, LANTERN_RINGS[0]);

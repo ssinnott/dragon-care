@@ -54,7 +54,8 @@
 //    state, the residents' rhythm, is left out of barnKey).
 // 13. Growing up (#8: "a 'month' of game time to have a dragon grow from one age class to another"; plan S5): on a
 //    600-step day, a baby grows young, adult and elder, one grow event each, its stage's start moved on exactly 30 days
-//    each time, after walking from the Hatchery to a module slot, and its drains follow the new stage; a stage-up only
+//    each time (the elder stage's, which has no next, the step it grew: its time to the garden is all its own), after
+//    walking from the Hatchery to a module slot, and its drains follow the new stage; a stage-up only
 //    ever applies to a dragon settled in a slot it fits (no act, no keeper on it) with no keeper where its new body
 //    will be, and it then holds still for exactly its `happy` (no walk, no turn, no act, no keeper coming); the delay
 //    from falling due is short alone and bounded by an errand in the busy barn; at the real day's length, 30 days less
@@ -67,16 +68,21 @@
 //    soon as one frees; a baby moved on never comes to rest in the Hatchery; names never repeat and stay within 8
 //    characters; two runs give the same names and seeds.
 // 15. Retirement (#10: "dragons who are too old (30 days pass elder) will move to this area"; plan S6): on a 600-step
-//    day, the retire preset's seven elders and the busy barn's (falling due mid-errand) each retire once, never before
-//    30 days into the elder stage and soon after, walk out through the Garden Gate (counted: #11) to a plot of their own,
-//    and the garden grows to hold them (plots = max(2, residents + retiring), the world 1304 + 176 a plot + 32 wide);
-//    all along, a retiree asks for nothing and holds no slot, a resident stays in the garden with no barn slot, everyone
-//    keeps to their nets and the bay rule, and the garden's resting places keep clear of each other's eyes.
+//    day, the retire preset's seven elders and the busy barn's (seven adults growing elder mid-errand, late, then
+//    falling due to retire mid-errand) each retire once, never before 30 days into the elder stage -- 30 days after the
+//    step it grew into an elder, however late that stage-up was -- and soon after, wait at a landing no longer than
+//    a barn dragon may (in a crowded barn too: ten adults, one elder retiring from a floor up), walk out through the
+//    Garden Gate (counted: #11) to a plot of their own soon enough, and the garden grows to
+//    hold them (plots = max(2, residents + retiring), the world 1304 + 176 a plot + 32 wide); all along, a retiree asks
+//    for nothing and holds no slot, a resident stays in the garden with no barn slot, everyone keeps to their nets and
+//    the bay rule, and the garden's resting places keep clear of each other's eyes and roomy (no two bodies overlapping
+//    more than REST_OVERLAP).
 // 16. The garden's residents (#10: "Here they will sleep a lot and move around - and not have a lot of needs"): the
 //    garden preset for 30 minutes of the real day -- each resident asks only for food and love, drains them at a
 //    quarter of an elder's rate, naps half its steps or more and every night step it is not being met, strolls, and is
-//    met where it rests by a keeper come out of the barn at its snout (the garden used); no resident at rest under
-//    another's body; the barn beside them keeps its service; the keeper visits per resident are printed.
+//    met where it rests by a keeper come out of the barn at its snout (the garden used); no resident at rest with its eye
+//    under another's body, nor two at rest lying one over the other (bodies overlapping REST_OVERLAP px at most); the
+//    barn beside them keeps its service; the keeper visits per resident are printed.
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
@@ -99,7 +105,7 @@ import { DragonAnimPlayer } from '../src/art/dragon/anim.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts';
 import { startSpec, buildSim, PRESETS } from '../src/game/presets.ts';
 import { serialize, barnKey, SaveVersionError, SAVE_VERSION } from '../src/game/save.ts';
-import { readClock, clockLabel, hourSteps, PHASE_ORDER, STAGE_DAYS, HATCH_DAYS } from '../src/game/clock.ts';
+import { readClock, clockLabel, hourSteps, PHASE_ORDER, STAGE_DAYS, HATCH_DAYS, RETIRE_DAYS } from '../src/game/clock.ts';
 import type { ClockRead } from '../src/game/clock.ts';
 import { skyBands, BACKDROPS } from '../src/game/surfaces.ts';
 import { lightsOf, nightness } from '../src/game/sky.ts';
@@ -113,7 +119,7 @@ import {
 } from '../src/game/layout.ts';
 import type { Spot, RoomKind } from '../src/game/layout.ts';
 import { NEEDS, FPS, OWN_NEED, GARDEN_NEEDS, GARDEN_RATE, hasNeed, drainRate } from '../src/game/needs.ts';
-import { retireDue, rests, restsClear, residentSpan, isNight } from '../src/game/garden.ts';
+import { retireDue, rests, restsClear, restsApart, restOverlap, REST_OVERLAP, residentSpan, isNight } from '../src/game/garden.ts';
 import type { Needs, NeedKind } from '../src/game/needs.ts';
 import { DRAGON_ELEMENTS } from '../src/art/dragon/palettes.ts';
 import type { DragonElement } from '../src/art/dragon/palettes.ts';
@@ -176,6 +182,12 @@ const CAPACITY_RIDES = [123, 30, 20] as const, CAPACITY8 = { waitAvgS: 136, wait
  * ride it), the hatchery's in S5 (eggs are laid and hatch in it).
  */
 const PLANNED: ReadonlySet<string> = new Set(['tack', 'bunks', 'maproom', 'aerie']);
+/** Section 10's adults past the start's seven (the eighth, ninth and tenth), also section 15's crowded barn. */
+const CROWD: readonly DragonPlace[] = [
+  { name: 'EIGHTH', element: 'fire', stage: 'adult', seed: 501, slot: { room: 'kitchen', i: 1 } },
+  { name: 'NINTH', element: 'water', stage: 'adult', seed: 502, slot: { room: 'romp', i: 1 } },
+  { name: 'TENTH', element: 'rock', stage: 'adult', seed: 503, slot: { room: 'bath', i: 1 } },
+];
 /**
  * Section 13 (plan S5): a stage-up waits until its dragon is settled, so its delay is the rest of whatever the dragon
  * was doing when it fell due (and, settled, a moment more while a keeper walks out of where its new body will be: it
@@ -189,12 +201,25 @@ const PLANNED: ReadonlySet<string> = new Set(['tack', 'bunks', 'maproom', 'aerie
  */
 const GROW_ALONE = 3600, GROW_BUSY = 10800, GROW_REAL = 3600;
 /**
- * Section 15 (plan S6): how long past its due (30 days into the elder stage) an elder may wait to retire -- the plan's
- * minute. It retires as soon as it may be sent somewhere new (not being met, not in the lift's hands or its bay:
+ * Section 15 (plan S6): how long past its due (30 days after it grew into an elder) an elder may wait to retire -- the
+ * plan's minute. It retires as soon as it may be sent somewhere new (not being met, not in the lift's hands or its bay:
  * travel.ts redirectable), so it waits at most the end of a keeper's job at it, or a ride: measured 0-928 steps with
- * the retire preset and 408-1092 in the busy barn over seeds 1-8 (seed 1: 0 and 683).
+ * the retire preset and 130-1998 in section 15's busy barn (adults grown elder mid-errand, up to 5788 steps late) over
+ * seeds 1-8 (seed 1: 0 and 1081).
  */
 const RETIRE_LATE = 3600;
+/**
+ * Section 15: how long a retiree may wait at a landing for the car (its one ride, down to the ground floor) -- S3's
+ * landing gate (GATE.liftWaitS) -- and take from setting off to arriving at its plot: the longest a barn dragon's job
+ * may wait (GATE.waitMaxS). A retiree asks for nothing on its way, so no need of its grows more pressing to raise its
+ * call as a barn caller's does; its call goes before the tiers once it has waited travel.ts OVERDUE (3600 steps), after
+ * the ride in hand and the eye clashes at a crowded landing. Measured at most at a landing: 66-73 s in 15 (c)'s
+ * crowded barn (seeds 1-3), 31-117 s in 15 (b)'s busy barn (seeds 1-8: seven retiring within minutes of each other, for
+ * one car), up to 79 s in the new game (seeds 1-4, a 600-step day) -- where it was 162 s in the crowded barn (seed 1:
+ * 15 (c) fails it), 114 s in the new game and 744 s in the over-full `full` preset before that rule; the longest walk
+ * out in a run 139 to 218 s.
+ */
+const RETIREE_LIFT_S = GATE.liftWaitS, RETIREE_WALK_S = GATE.waitMaxS;
 
 // ---------- 1. routes on both nets ----------
 if (MAIN) {
@@ -929,11 +954,7 @@ if (!MAIN) {
   // served (frozen: no need empty, its waits), nine or more are not. Frozen whatever the load: no keeper gives up on a
   // dragon, the car never stands still with work to do for a minute, and the car's throughput (rides, the lift's
   // capacity) stays within 20 % of what it measures.
-  const extra: DragonPlace[] = [
-    { name: 'EIGHTH', element: 'fire', stage: 'adult', seed: 501, slot: { room: 'kitchen', i: 1 } },
-    { name: 'NINTH', element: 'water', stage: 'adult', seed: 502, slot: { room: 'romp', i: 1 } },
-    { name: 'TENTH', element: 'rock', stage: 'adult', seed: 503, slot: { room: 'bath', i: 1 } },
-  ];
+  const extra = CROWD;
   const runs = [
     { what: '8 adults', cast: [...START_DRAGONS, extra[0]], min: 30, rides: CAPACITY_RIDES[0] },
     { what: '10 adults', cast: [...START_DRAGONS, ...extra], min: 10, rides: CAPACITY_RIDES[1] },
@@ -1121,9 +1142,12 @@ if (MAIN) {
         if (e.kind !== 'grow') continue;
         const d = w.dragons.find((q) => q.id === e.dragon)!, was0 = was.get(d.id)!;
         if (e.stage !== nextStage(was0.stage) || d.stage !== e.stage) fail(`grow (${what}): ${d.name} grew from ${was0.stage} into ${e.stage} (now ${d.stage})`);
-        if (d.stageSince - was0.since !== LEN_OF(w)) fail(`grow (${what}): ${d.name}'s stage began ${d.stageSince - was0.since} steps after the last, not ${LEN_OF(w)} (exactly ${STAGE_DAYS} days)`);
+        // (a stage begins exactly one stage's length after the last -- but the elder stage, which has no next to keep in
+        // step with, begins the step it grows: its 30 days to the garden are its own, however late the stage-up)
+        const began = e.stage === 'elder' ? w.clock : was0.since + LEN_OF(w);
+        if (d.stageSince !== began) fail(`grow (${what}): ${d.name}'s ${e.stage} stage began at clock ${d.stageSince}, not ${began} (${e.stage === 'elder' ? 'the step it grew' : `exactly ${STAGE_DAYS} days after the last began`})`);
         if (pre.get(d) !== '') fail(`grow (${what}): ${d.name} grew ${e.stage} unsettled (${pre.get(d) ?? 'not due'})`);
-        grew.push({ t: w.tick, d, stage: e.stage, at: where(w, d), delay: w.clock - d.stageSince });
+        grew.push({ t: w.tick, d, stage: e.stage, at: where(w, d), delay: w.clock - (was0.since + LEN_OF(w)) });
         was.set(d.id, { stage: d.stage, since: d.stageSince });
         after.push({ d, needs: { ...d.needs } });
         if (d.hold !== happyLen(d.element, d.stage)) fail(`grow (${what}): ${d.name} grew ${d.stage} holding ${d.hold}, not its happy's ${happyLen(d.element, d.stage)} steps`);
@@ -1136,7 +1160,8 @@ if (MAIN) {
   const alone = new CareSim(START_ROOMS, [BURR], START_KEEPERS, { seed: 1, dayLen: SHORT }), burr = alone.dragons[0];
   const a = run(alone, 3 * LEN + GROW_ALONE + 60, 'alone', () => burr.stage === 'elder');
   if (a.grew.map((g) => g.stage).join() !== 'young,adult,elder') fail(`grow (alone): BURR grew ${a.grew.map((g) => g.stage).join(', ') || 'never'}, not young, adult, elder once each`);
-  if (burr.stageSince !== alone.clock0 + 3 * LEN) fail(`grow (alone): BURR's elder stage began at clock ${burr.stageSince}, not ${alone.clock0 + 3 * LEN} (three stages of exactly ${LEN} steps)`);
+  const eld = a.grew[2];
+  if (!eld || burr.stageSince !== alone.clock0 + 3 * LEN + eld.delay) fail(`grow (alone): BURR's elder stage began at clock ${burr.stageSince}, not ${alone.clock0 + 3 * LEN + (eld?.delay ?? 0)} (two stages of exactly ${LEN} steps, then the step it grew elder)`);
   if (alone.stats.growDelayMax > GROW_ALONE) fail(`grow (alone): a stage-up waited ${alone.stats.growDelayMax} steps to be applied (want <= ${GROW_ALONE})`);
   const young = a.grew[0];
   if (!young || !a.walked.has(burr) || young.at.startsWith('hatchery') || young.at.endsWith(':') || !young.d.slot || young.d.slot.baby) fail(`grow (alone): BURR grew young in the ${young?.at ?? '-'}${a.walked.has(burr) ? '' : ', never walking to a module slot first'}`);
@@ -1157,7 +1182,7 @@ if (MAIN) {
     real.step();
     for (const e of real.events) if (e.kind === 'grow') { if (e.dragon === ember.id) at = s; else fail(`grow (real): ${real.dragons.find((q) => q.id === e.dragon)?.name} grew too`); }
   }
-  if (dueIn !== 180 || at < 180 || ember.stage !== 'elder' || ember.stageSince - since0 !== STAGE_DAYS * DAY_STEPS) fail(`grow (real): EMBER, due in ${dueIn} steps, is ${ember.stage}${at > 0 ? ` from step ${at}` : ''} (want an elder from step 180 to ${180 + GROW_REAL}, its stage begun exactly ${STAGE_DAYS} days of ${DAY_STEPS} steps on)`);
+  if (dueIn !== 180 || at < 180 || ember.stage !== 'elder' || since0 + STAGE_DAYS * DAY_STEPS !== real.clock0 + 180 || ember.stageSince !== real.clock0 + at) fail(`grow (real): EMBER, due in ${dueIn} steps, is ${ember.stage}${at > 0 ? ` from step ${at}` : ''} (want an elder from step 180 to ${180 + GROW_REAL}, its adult stage ${STAGE_DAYS} days of ${DAY_STEPS} steps, its elder stage begun the step it grew)`);
   noteUse(real);
   // (d) a baby walking to grow up, asked for by a need in the room it is going to (its module slot's room) and Rushed
   // there -- or choosing it at a landing while the car serves another: either way travel.ts goFor gives it a slot in
@@ -1293,27 +1318,37 @@ if (MAIN) {
 if (MAIN) {
   const SHORT = 600;
   /**
-   * Step a world until every elder in it has retired and arrived (and `after` steps more), checking as it goes: a
-   * retire event only ever at or after the elder's due (30 days into its stage), once each; a retiree asks for nothing,
-   * holds no slot and heads for its own plot; a resident lives in the garden (on the ground floor, inside the garden's
-   * walk, no barn slot) with jobs for food and love only; every dragon on its net; nobody in the bay while the car moves;
-   * the garden's resting places clear of each other's eyes; and plots = max(2, residents + retiring) all along.
+   * Step a world until every elder in it has retired and arrived (and 600 steps more), checking as it goes: a retire
+   * event only ever at or after the elder's due (30 days into its stage), once each -- and, for one seen growing into an
+   * elder, 30 days or more after that step (however late the stage-up); a retiree asks for nothing, holds no slot, heads
+   * for its own plot and waits at a landing at most RETIREE_LIFT_S; a resident lives in the garden (on the ground floor,
+   * inside the garden's walk, no barn slot) with jobs for food and love only; every dragon on its net; nobody in the bay
+   * while the car moves; the garden's resting places apart (clear of each other's eyes, and roomy); and plots = max(2,
+   * residents + retiring) all along.
    */
-  const retireRun = (w: CareSim, steps: number, what: string) => {
-    const retired = new Map<number, { t: number; late: number }>(), arrived = new Map<number, number>();
-    let last = -1, plotsSeen = w.garden.plots;
-    for (let s = 1; s <= steps && !(arrived.size === w.dragons.length && s > last + 600); s++) {
+  const retireRun = (w: CareSim, steps: number, what: string, leavers = w.dragons.length) => {
+    const retired = new Map<number, { t: number; late: number; span: number | null }>(), arrived = new Map<number, number>(), grew = new Map<number, { clock: number; late: number }>();
+    let last = -1, plotsSeen = w.garden.plots, callMax = 0, walkMax = 0, restMax = -Infinity;
+    const due0 = new Map(w.dragons.map((d) => [d.id, d.stageSince + STAGE_DAYS * w.dayLen]));
+    for (let s = 1; s <= steps && !(arrived.size === leavers && s > last + 600); s++) {
       w.step();
       for (const e of w.events) {
         const d = w.dragons.find((q) => q.id === e.dragon)!;
+        if (e.kind === 'grow' && e.stage === 'elder') grew.set(d.id, { clock: w.clock, late: w.clock - due0.get(d.id)! });
         if (e.kind === 'retire') {
           if (retired.has(d.id)) fail(`retire (${what}): ${d.name} retired twice`);
-          const late = w.clock - retireDue(w, d);
+          const late = w.clock - retireDue(w, d), g = grew.get(d.id), span = g ? w.clock - g.clock : null;
           if (late < 0 || d.stage !== 'elder') fail(`retire (${what}): ${d.name} (${d.stage}) retired ${-late} steps before its 30 days as an elder were up`);
-          retired.set(d.id, { t: s, late });
+          if (span != null && span < RETIRE_DAYS * w.dayLen) fail(`retire (${what}): ${d.name} retired ${span} steps after it grew into an elder (${g!.late} steps late), not ${RETIRE_DAYS} days (${RETIRE_DAYS * w.dayLen})`);
+          retired.set(d.id, { t: s, late, span });
         }
-        if (e.kind === 'garden') { arrived.set(d.id, s); last = s; if (!retired.has(d.id)) fail(`retire (${what}): ${d.name} arrived in the garden without retiring`); }
+        if (e.kind === 'garden') {
+          arrived.set(d.id, s); last = s;
+          if (!retired.has(d.id)) fail(`retire (${what}): ${d.name} arrived in the garden without retiring`);
+          else walkMax = Math.max(walkMax, s - retired.get(d.id)!.t);
+        }
       }
+      for (const d of w.dragons) if (d.goal === 'retire' && d.move === 'call') callMax = Math.max(callMax, d.waited);
       const need = Math.max(2, w.dragons.filter((d) => d.place === 'garden' || d.goal === 'retire').length);
       if (w.garden.plots !== need || w.worldW !== worldWOf(need) || w.garden.plots < plotsSeen) fail(`retire (${what}), step ${w.tick}: ${w.garden.plots} plots (world ${w.worldW} wide) for ${need}`);
       plotsSeen = w.garden.plots;
@@ -1330,9 +1365,14 @@ if (MAIN) {
       for (const k of w.keepers) if (!k.climbing && spanOf(k.f, k.x, w.nets.keeper) < 0) fail(`retire (${what}), step ${w.tick}: ${k.name} stands off floor ${k.f} at x ${k.x.toFixed(1)}`);
       if (w.lift.moving) { const r = liftRange(w)!, who = inTheBay(w, r[0], r[1]); if (who) fail(`retire (${what}), step ${w.tick}: ${who} is in the lift bay while the car moves floors ${r[0]}-${r[1]}`); }
       const rs = rests(w);
-      for (let i = 0; i < rs.length; i++) for (let k = i + 1; k < rs.length; k++) if (!restsClear(rs[i], rs[k])) fail(`retire (${what}), step ${w.tick}: the garden keeps two resting places over an eye (${rs[i].who?.name ?? `plot ${rs[i].plot}`} at ${rs[i].x}, ${rs[k].who?.name ?? `plot ${rs[k].plot}`} at ${rs[k].x})`);
+      for (let i = 0; i < rs.length; i++) for (let k = i + 1; k < rs.length; k++) {
+        if (rs[i].who?.place === 'garden' && rs[k].who?.place === 'garden') restMax = Math.max(restMax, restOverlap(rs[i], rs[k]));
+        if (!restsApart(rs[i], rs[k])) fail(`retire (${what}), step ${w.tick}: the garden keeps two resting places ${restsClear(rs[i], rs[k]) ? `${restOverlap(rs[i], rs[k]).toFixed(1)} px one over the other` : 'over an eye'} (${rs[i].who?.name ?? `plot ${rs[i].plot}`} at ${rs[i].x}, ${rs[k].who?.name ?? `plot ${rs[k].plot}`} at ${rs[k].x})`);
+      }
     }
-    return { retired, arrived };
+    if (callMax / FPS > RETIREE_LIFT_S) fail(`retire (${what}): a retiree waited ${(callMax / FPS).toFixed(1)} s at a landing for the car (want <= ${RETIREE_LIFT_S})`);
+    if (walkMax / FPS > RETIREE_WALK_S) fail(`retire (${what}): a retiree took ${(walkMax / FPS).toFixed(1)} s from setting off to arriving at its plot (want <= ${RETIREE_WALK_S})`);
+    return { retired, arrived, grew, callMax, walkMax, restMax };
   };
   // (a) the retire preset: all seven starters elders 29.9 days in, on a short day: each retires at its due or after, soon
   const spec = startSpec('retire'), pre = new CareSim(spec.rooms, spec.dragons, spec.keepers, { seed: 1, dayLen: SHORT });
@@ -1343,13 +1383,23 @@ if (MAIN) {
   if ((pre.stats.used.gate ?? 0) < n) fail(`retire (preset): the Garden Gate was passed ${pre.stats.used.gate ?? 0} times, fewer than the ${n} who walked out`);
   if (pre.garden.plots !== n || res !== n || pre.worldW !== GARDEN_X0 + n * GARDEN_PLOT + GARDEN_END || pre.worldW !== 2568) fail(`retire (preset): ${pre.garden.plots} plots, ${res} residents, the world ${pre.worldW} wide (want 7, 7, 2568)`);
   noteUse(pre);
-  // (b) the busy barn: the seven adults elders falling due 5 s apart from a minute in, every one mid-errand
-  const busy = new CareSim(START_ROOMS, START_DRAGONS.map((p, i) => ({ ...p, stage: 'elder' as const, days: STAGE_DAYS - (3600 + 300 * i) / SHORT })), START_KEEPERS, { seed: 1, dayLen: SHORT });
-  const b = retireRun(busy, 40000, 'busy');
-  if (b.retired.size !== n || b.arrived.size !== n) fail(`retire (busy): ${b.retired.size} of ${n} retired, ${b.arrived.size} arrived`);
+  // (b) the busy barn: the seven adults falling due to grow elder 5 s apart from 10 s in, every one mid-errand (so most
+  // grow late: section 13's busy barn), then, 30 days on, due to retire mid-errand; each retires 30 days after the step it
+  // grew, never 30 days after it fell due to (the elder stage has no next to keep in step with: life.ts)
+  const busy = new CareSim(START_ROOMS, START_DRAGONS.map((p, i) => ({ ...p, days: STAGE_DAYS - (600 + 300 * i) / SHORT })), START_KEEPERS, { seed: 1, dayLen: SHORT });
+  const b = retireRun(busy, 60000, 'busy');
+  if (b.grew.size !== n || b.retired.size !== n || b.arrived.size !== n) fail(`retire (busy): ${b.grew.size} of ${n} grew into elders, ${b.retired.size} retired, ${b.arrived.size} arrived`);
+  if (![...b.grew.values()].some((g) => g.late > 0)) fail('retire (busy): no elder grew late, so the busy run shows nothing of a late stage-up');
   if (busy.stats.retireDelayMax > RETIRE_LATE) fail(`retire (busy): a retirement waited ${busy.stats.retireDelayMax} steps past its due (want <= ${RETIRE_LATE})`);
   noteUse(busy);
-  // (c) the real day: the retire preset's first elder under the Garden Gate's arch, its root at the arches' middle (the
+  // (c) the crowded barn: section 10's ten adults (the car busy all the time, the barn's calls all pressing), ECHO among
+  // them an elder due to retire 600 steps in, in the Grooming Parlour a floor up: it waits for the car at most the barn's
+  // landing gate -- with no OVERDUE rule of its own, its call ranking under every pressing one, it waited 161.9 s here
+  const crowd = new CareSim(START_ROOMS, [...START_DRAGONS, ...CROWD].map((p) => (p.name === 'ECHO' ? { ...p, stage: 'elder' as const, days: RETIRE_DAYS - 600 / DAY_STEPS } : p)), START_KEEPERS, { seed: 1 });
+  const cr = retireRun(crowd, 30000, 'crowded', 1);
+  if (cr.arrived.size !== 1) fail(`retire (crowded): ECHO ${cr.retired.size ? 'retired but never arrived' : 'never retired'}`);
+  noteUse(crowd);
+  // (d) the real day: the retire preset's first elder under the Garden Gate's arch, its root at the arches' middle (the
   // base_gate shot's step: tools/shots.ts)
   const real = buildSim(startSpec('retire'), 1);
   let under = '';
@@ -1357,7 +1407,9 @@ if (MAIN) {
   if (!under) fail('retire (real day): no elder passed under the Garden Gate\'s arch in 10000 steps');
   noteUse(real);
   const fmt = (w: CareSim, r: typeof a) => w.dragons.map((d) => `${d.name} ${r.retired.get(d.id)?.late ?? '-'}/${r.arrived.get(d.id) ?? '-'}`).join(', ');
-  console.log(`  15 retirement (a ${SHORT}-step day): the retire preset, steps late / arrived: ${fmt(pre, a)} (at most ${pre.stats.retireDelayMax}, gate ${RETIRE_LATE}); the Garden Gate passed ${pre.stats.used.gate} times; ${pre.garden.plots} plots, ${res} residents, the world ${pre.worldW} wide; the busy barn (seven elders falling due 5 s apart, mid-errand): ${fmt(busy, b)} (at most ${busy.stats.retireDelayMax}); the real day, the first under the gate's arch: ${under}`);
+  const over = (v: number) => (v > 0 ? `overlapping at most ${v.toFixed(1)} px` : `${(-v).toFixed(1)} px apart at least`);
+  const spans = [...b.retired.entries()].map(([id, r]) => `${busy.dragons.find((d) => d.id === id)!.name} ${b.grew.get(id)!.late}/${((r.span ?? 0) / SHORT).toFixed(2)}`).join(', ');
+  console.log(`  15 retirement (a ${SHORT}-step day): the retire preset, steps late / arrived: ${fmt(pre, a)} (at most ${pre.stats.retireDelayMax}, gate ${RETIRE_LATE}); a retiree at a landing at most ${(a.callMax / FPS).toFixed(1)} s, walking out at most ${(a.walkMax / FPS).toFixed(1)} s; the Garden Gate passed ${pre.stats.used.gate} times; ${pre.garden.plots} plots, ${res} residents, the world ${pre.worldW} wide, resting bodies ${over(a.restMax)} (gate ${REST_OVERLAP}); the busy barn (seven adults growing elder 5 s apart, mid-errand), steps it grew late / days an elder: ${spans} (each ${RETIRE_DAYS} or more), steps it retired late / arrived: ${fmt(busy, b)} (at most ${busy.stats.retireDelayMax}), a retiree at a landing at most ${(b.callMax / FPS).toFixed(1)} s, walking out at most ${(b.walkMax / FPS).toFixed(1)} s; the crowded barn (ten adults, ECHO retiring): ECHO at a landing ${(cr.callMax / FPS).toFixed(1)} s (gate ${RETIREE_LIFT_S}), walking out ${(cr.walkMax / FPS).toFixed(1)} s (gate ${RETIREE_WALK_S}); the real day, the first under the gate's arch: ${under}`);
 }
 
 // ---------- 16. the garden's residents (#10) ----------
@@ -1369,7 +1421,7 @@ if (MAIN) {
   /** Each resident's food and love over each 5000-step window with no act on it: [start value, act seen]. */
   const win = new Map(R.map((d) => [d, new Map(GARDEN_NEEDS.map((k) => [k, { v: d.needs[k], act: false }]))]));
   const drains: string[] = [];
-  let worstDrain = 0, cover = 0, gardenMet = 0;
+  let worstDrain = 0, cover = 0, gardenMet = 0, restMax = -Infinity;
   const [k0, k1] = gardenSpan(w.worldW, null);
   for (let s = 1; s <= steps; s++) {
     w.step();
@@ -1399,6 +1451,12 @@ if (MAIN) {
     // (no resident at rest with its eye under another's body: the garden keeps their resting places apart)
     const still = R.filter((d) => !(walking(d) && d.gaitT > 0) && d.move !== 'turn');
     for (const a of still) for (const b of still) if (a !== b && eyeSpan(a.stage, a.facing, a.x)[1] >= dragonSpan(b)[0] && eyeSpan(a.stage, a.facing, a.x)[0] <= dragonSpan(b)[1]) cover++;
+    // (nor two at rest lying one over the other: their bodies overlap REST_OVERLAP px at most)
+    const resting = still.filter((d) => d.garden!.mode !== 'stroll');
+    for (let i = 0; i < resting.length; i++) for (let k = i + 1; k < resting.length; k++) {
+      const [p, q] = [resting[i], resting[k]].map((d) => ({ x: d.x, facing: d.facing, who: d, plot: null }));
+      restMax = Math.max(restMax, restOverlap(p, q));
+    }
   }
   const st = w.stats, avg = st.waitSum / Math.max(1, st.started) / FPS, max = st.waitMax / FPS, kAvg = st.keeperWaitSum / Math.max(1, st.keeperWaits) / FPS;
   for (const d of R) {
@@ -1411,13 +1469,14 @@ if (MAIN) {
   if (!gardenMet || (st.used.garden ?? 0) !== gardenMet) fail(`residents: ${gardenMet} resident jobs met, the garden used ${st.used.garden ?? 0} times`);
   if (worstDrain === 0 || drains.length < R.length * 2) fail(`residents: the drain was measured on ${drains.length} needs, not every resident's food and love`);
   if (cover) fail(`residents: a resident at rest had its eye under another's body for ${cover} steps`);
+  if (restMax > REST_OVERLAP) fail(`residents: two residents at rest lay ${restMax.toFixed(1)} px one over the other (want <= ${REST_OVERLAP})`);
   // (the barn's service beside them: the S3 gates a dragon feels, per run)
   if (st.emptySteps) fail(`residents: a need sat at 0 for ${st.emptySteps} dragon-steps`);
   if (st.waitTimeouts) fail(`residents: ${st.waitTimeouts} keepers gave up waiting`);
   if (avg > GATE.waitAvgS || max > GATE.waitMaxS || kAvg > GATE.keeperWaitAvgS || st.liftWaitMax / FPS > GATE.liftWaitS) fail(`residents: jobs waited ${avg.toFixed(1)} s on average, ${max.toFixed(1)} s at most, keepers ${kAvg.toFixed(1)} s at the stand spot, a landing ${(st.liftWaitMax / FPS).toFixed(1)} s (want <= ${GATE.waitAvgS}, ${GATE.waitMaxS}, ${GATE.keeperWaitAvgS}, ${GATE.liftWaitS})`);
   noteUse(w);
   const perHour = (n: number) => (n * 60 / MIN).toFixed(0);
-  console.log(`  16 residents (the garden preset, ${MIN} min of the real day): ${R.map((d) => { const p = per.get(d)!; return `${d.name} napped ${(p.nap / steps * 100).toFixed(0)} % (every one of ${p.night} night steps), strolled ${p.strolls} times, ${p.visits.length} keeper visits (${p.visits.join(', ') || 'none'}; ${perHour(p.visits.length)} an hour)`; }).join('; ')}; jobs for food and love only, draining at a quarter of an elder's (per step x 1e6: ${drains.join(', ')}; within ${(worstDrain * 100).toFixed(3)} %); the barn beside them: ${st.done} jobs done, wait avg ${avg.toFixed(1)} s, max ${max.toFixed(1)} s, ${st.emptySteps} steps with a need at 0, the Garden Gate passed ${st.used.gate ?? 0} times`);
+  console.log(`  16 residents (the garden preset, ${MIN} min of the real day): ${R.map((d) => { const p = per.get(d)!; return `${d.name} napped ${(p.nap / steps * 100).toFixed(0)} % (every one of ${p.night} night steps), strolled ${p.strolls} times, ${p.visits.length} keeper visits (${p.visits.join(', ') || 'none'}; ${perHour(p.visits.length)} an hour)`; }).join('; ')}; jobs for food and love only, draining at a quarter of an elder's (per step x 1e6: ${drains.join(', ')}; within ${(worstDrain * 100).toFixed(3)} %); two at rest overlapping at most ${restMax.toFixed(1)} px (gate ${REST_OVERLAP}); the barn beside them: ${st.done} jobs done, wait avg ${avg.toFixed(1)} s, max ${max.toFixed(1)} s, ${st.emptySteps} steps with a need at 0, the Garden Gate passed ${st.used.gate ?? 0} times`);
 }
 
 // ---------- 10 (its worker's result) ----------
