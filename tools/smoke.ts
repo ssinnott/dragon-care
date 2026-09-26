@@ -360,6 +360,63 @@ function gardenIs(residents: number, plots: number) {
   };
 }
 
+/**
+ * The Map Room's table (plan S8): the overlay open is `screen`, with the board's three missions (day 1: THE LOST NEST
+ * first) and the coin on the hook; the map shows a pin per mission, the chooser its BEST TEAM, SEND and BACK.
+ */
+function tableIs(screen: 'map' | 'mission') {
+  return (b: BaseHook): string[] => {
+    const out: string[] = [];
+    if (!b.ui || b.ui.screen !== screen) out.push(`the table's screen is ${b.ui?.screen}, not ${screen}`);
+    if (!Array.isArray(b.board) || b.board.length !== 3 || b.board[0].title !== 'THE LOST NEST') out.push(`the board is ${JSON.stringify(b.board?.map((m) => m.title))}, not three missions with THE LOST NEST first`);
+    if (b.coin !== 0 || b.trip !== null) out.push(`coin ${b.coin}, trip ${JSON.stringify(b.trip)}: a new game has none`);
+    if (screen === 'map' && (b.ui?.pins.length !== 3 || !b.ui.buttons.back)) out.push(`the map has ${b.ui?.pins.length} pins and buttons ${Object.keys(b.ui?.buttons ?? {})}`);
+    if (screen === 'mission' && (!b.ui?.buttons.best || !b.ui.buttons.send || !b.ui.buttons.back || b.ui.mission !== b.board[0]?.id)) out.push(`the chooser shows mission ${b.ui?.mission} with buttons ${Object.keys(b.ui?.buttons ?? {})}`);
+    return out;
+  };
+}
+/** The muster preset at the step its team all stands on the Aerie deck (npm run sim section 20): leaving now, every dragon in the barn's world (none away yet). */
+function mustered(b: BaseHook): string[] {
+  const t = b.trip, team = t ? t.pairs.map((p) => b.dragons.find((d) => d.id === p.dragon)) : [];
+  if (!t || t.state !== 'depart' || t.mission !== 'THE LOST NEST') return [`the trip is ${JSON.stringify(t)}, not THE LOST NEST departing`];
+  return team.every((d) => d && d.f === 5 && d.place === 'barn') ? [] : [`the team is ${team.map((d) => d && `${d.name} f${d.f} ${d.place}`).join(', ')}, not on the Aerie`];
+}
+/**
+ * view=base, live (save=0): the Map Room's table (plan S8, #5.6). MAP eases the camera to the Map Room and opens the
+ * map (within 2 s); a tap on the first pin opens its mission's chooser; BEST TEAM puts a team together; SEND sends it
+ * -- the table closes, the trip is mustering, and the camera is at the Aerie within 2 s.
+ */
+async function baseMission(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (r: { x: number; y: number; w: number; h: number }) => page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  await click((await st()).buttons.map);
+  try { await page.waitForFunction(() => (window as any).__dragonCare?.base?.ui?.screen === 'map', null, { timeout: 2000 }); } catch { return [`MAP did not open the map within 2 s (screen ${(await st()).ui.screen})`]; }
+  const tick = (await st()).tick;
+  await page.waitForTimeout(300);
+  if ((await st()).tick !== tick) out.push(`the world ran on under the map (tick ${tick} -> ${(await st()).tick})`);
+  const pin = (await st()).ui.pins[0];
+  if (!pin) return [...out, 'the map has no pin'];
+  await click(pin);
+  await page.waitForTimeout(100);
+  const m = await st();
+  if (m.ui.screen !== 'mission' || !m.ui.buttons.best) return [...out, `the pin opened ${m.ui.screen}, not a mission's chooser`];
+  await click(m.ui.buttons.best);
+  await page.waitForTimeout(100);
+  const team = (await st()).ui.pairs;
+  if (!team.length) out.push('BEST TEAM put nobody on the team');
+  await click((await st()).ui.buttons.send);
+  await page.waitForTimeout(100);
+  const s = await st();
+  if (!s.trip || s.trip.state !== 'muster' || s.ui.screen !== 'none') out.push(`after SEND the trip is ${JSON.stringify(s.trip?.state)} and the table ${s.ui.screen}`);
+  try { await page.waitForFunction(() => ((window as any).__dragonCare?.base?.camY ?? 999) <= 200, null, { timeout: 2000 }); } catch { out.push(`the camera is at y ${(await st()).camY} 2 s after SEND, not at the Aerie (<= 200)`); }
+  if (!(await st()).ui.buttons.chip) out.push('no TEAM OUT chip with the team out');
+  if (!out.length) console.log(`        mission: MAP, pin 1 (${m.board[0].title}), BEST TEAM (${team.length} pairs), SEND: mustering, camera at y ${(await st()).camY}`);
+  return out;
+}
+
 /** The base's dragons include every stage. */
 function everyStage(b: BaseHook): string[] {
   const st = new Set(b.dragons.map((d) => d.stage)), missing = AGE_STAGES.filter((s) => !st.has(s));
@@ -522,6 +579,12 @@ const CASES: Case[] = [
   // night (napping, the lanterns lit)
   { query: 'view=base&preset=garden&cam=1304,376&t=600', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...travels(b)] },
   { query: 'view=base&preset=garden&cam=1304,376&t=600&hour=22', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...timeFields('night', false)(b)] },
+  // missions (plan S8): the Map Room's world map and a mission's chooser (frozen, the world stepped first), the muster
+  // preset's team all on the Aerie deck, and live, MAP -> a pin -> BEST TEAM -> SEND
+  { query: 'view=base&t=60&panel=map', minColours: 100, allScales: false, check: tableIs('map') },
+  { query: 'view=base&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: tableIs('mission') },
+  { query: 'view=base&preset=muster&t=2860&cam=0,20', minColours: 150, allScales: false, check: (b) => [...mustered(b), ...travels(b)] },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseMission },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);

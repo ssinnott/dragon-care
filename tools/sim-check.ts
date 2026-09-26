@@ -28,13 +28,16 @@
 //    boarding, mid-ride and alighting (and one at the first ride of all); and on a short day, with eggs incubating (plan
 //    S5), a baby walking to the module slot it will grow up in, an egg just hatched and a dragon just grown up; and with
 //    the garden (plan S6): residents napping, sitting, strolling, waiting and being met, elders setting off, riding down,
-//    passing the gate and arriving; a save survives JSON unchanged, every field is in it; another version throws.
+//    passing the gate and arriving; and with a mission's team out (plan S8): mid-muster, departing, away, landing (the
+//    egg carried down, the saddles hung back) and resting; a save survives JSON unchanged, every field is in it; another
+//    version throws, and so does one whose missions this build can't run.
 // 7. rngAt: the same keys give the same draws, different tags different ones, and the draws are even.
 // 8. Rooms (#11): every room kind and structure has a purpose, each need is met in exactly one kind of room, the plates
 //    name only rooms and structures there are (none on a bare slot), placing rooms and dragons keeps the building's
 //    rules (no room on the lift; a slot per dragon, fitting its stage), a keeper waits clear of every slot's body; and
-//    (checked at the end, over the whole suite) every named room, the lift and the Aerie were used (sim.stats.used),
-//    unless their mechanic is still PLANNED -- and a PLANNED one that shows a use fails, so its entry must go.
+//    (checked at the end, over the whole suite) every named room, the lift, the Aerie, the gate and the garden were used
+//    (sim.stats.used), unless their mechanic is still PLANNED -- and a PLANNED one that shows a use fails, so its entry
+//    must go; since S8 nothing is PLANNED (#11: every named, furnished room has a real purpose, proven used).
 // 9. Gait (#7: dragons walk by their anims' own root motion): every walk's table is the same whatever the seed, it
 //    moves as its anim table's frames and an anim player playing it say (a walk with an intro too, wrapping and caught
 //    up as the view does), and a dragon walked by the simulation moves exactly as far as the anim player playing its
@@ -83,13 +86,35 @@
 //    met where it rests by a keeper come out of the barn at its snout (the garden used); no resident at rest with its eye
 //    under another's body, nor two at rest lying one over the other (bodies overlapping REST_OVERLAP px at most); the
 //    barn beside them keeps its service; the keeper visits per resident are printed.
+// 17. The Map Room's board (#5.1, #5.2): the same twice for seeds 1-5 and days 1-10; day 1 starts with THE LOST NEST;
+//    three missions at most, one an explored region; no baddie before day 3; each difficulty's road its length, from
+//    its region's pool; a world rolls it at its start and at every 05:00.
+// 18. The odds (#5.3): a table of hand-computed teams (the plan's two examples, the top clamp, the least a pair has).
+// 19. Who may go: no baby, no young dragon on a normal or hard road, no garden resident; a keeper taken by hand is
+//    never an auto rider (seams.ts isTaken, stubbed); two riders at most, two keepers always home; one team out.
+// 20. A full trip (#5.4, #5.6, #11): THE LOST NEST with RIPPLE and ECHO -- the Map Room, the Tack Room, the lift up
+//    and the Aerie; the muster in 3600 steps or fewer; away, the team asks for nothing and its needs wait; back at
+//    returnAt exactly, food and sleep down; the egg laid in its reserved nest (and hatched two days on), the saddles
+//    back, the Bunks, the riders on duty again, the coin paid, the neighbour revealed at the next dawn. And the step the
+//    muster preset's team stands on the deck (the base_muster shot).
+// 21. A failure: a low-odds send that fails turns back at its first unmet stop, with half the coin and no egg.
+// 22. A trip's outcome is its seed's: the same send on 20 seeds, twice, the same outcome, egg and road.
+// 23. Care while a team is away (P13: two keepers home are enough): a two-pair team away 30 minutes of the real day;
+//    no need at home ever empties, and the barn's service holds (the average wait within 25 % of section 2's gate).
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
 import { CareSim, REACH, DAY_STEPS, START_HOUR } from '../src/game/sim.ts';
 import { nextStage, stageDue, inTheWayOfGrowing, HATCH_FOOD } from '../src/game/life.ts';
 import { NAMES, NAME_MAX, hatchName } from '../src/game/names.ts';
-import { GROWUP_IN, HATCH_IN, EGGS_PRESET } from '../src/game/presets.ts';
+import { GROWUP_IN, HATCH_IN, EGGS_PRESET, sendLostNest } from '../src/game/presets.ts';
+import {
+  boardFor, oddsOf, autoRider, bestTeam, dragonReason, canSend, send, onTrip, DIFFICULTY, BADDIE_FROM_DAY, BOARD_MAX, LOST_NEST, HOME_KEEPERS,
+} from '../src/game/missions.ts';
+import type { Taken } from '../src/game/missions.ts';
+import { REGIONS, regionOf } from '../src/game/regions.ts';
+import type { RegionId, ChallengeId, BaddieId } from '../src/game/missiondata.ts';
+import type { Mission, Trip } from '../src/game/trip.ts';
 import type { DragonPlace } from '../src/game/start.ts';
 import type { Keeper, Dragon } from '../src/game/sim.ts';
 import {
@@ -115,10 +140,10 @@ import { rngAt, mix32, TAG } from '../src/game/rand.ts';
 import {
   route, spanOf, postX, placeRooms, platesOf, standSpot, fitsSlot, slotBody, feetY, floorTop, nestX, ROOM_INFO, ROOM_KINDS, STRUCTURES,
   makeNets, worldWOf, gardenSpan, plotMid, plotX, GARDEN_X0, GARDEN_PLOT, GARDEN_END, GATE_MID, GATE_X0, GATE_X1,
-  AERIE_F, BARN_X, TOWER_R, TOWER_L, TOWER_W, DECK_X0, DECK_X1, LIFT_X0, LIFT_X1, LIFT_CX, LIFT_STOPS, CLIMB_COST, WALL_H, DRAGON_PAD, PITCH,
+  AERIE_F, BARN_X, TOWER_R, TOWER_L, TOWER_W, DECK_X0, DECK_X1, BRIDGE_X0, LIFT_X0, LIFT_X1, LIFT_CX, LIFT_STOPS, CLIMB_COST, WALL_H, DRAGON_PAD, PITCH,
 } from '../src/game/layout.ts';
 import type { Spot, RoomKind } from '../src/game/layout.ts';
-import { NEEDS, FPS, OWN_NEED, GARDEN_NEEDS, GARDEN_RATE, hasNeed, drainRate } from '../src/game/needs.ts';
+import { NEEDS, FPS, OWN_NEED, GARDEN_NEEDS, GARDEN_RATE, hasNeed, drainRate, moodOf } from '../src/game/needs.ts';
 import { retireDue, rests, restsClear, restsApart, restOverlap, REST_OVERLAP, residentSpan, isNight } from '../src/game/garden.ts';
 import type { Needs, NeedKind } from '../src/game/needs.ts';
 import { DRAGON_ELEMENTS } from '../src/art/dragon/palettes.ts';
@@ -178,10 +203,12 @@ const GATE = { done: 120, waitAvgS: 100, waitMaxS: 360, keeperWaitAvgS: 20, lift
 const CAPACITY_RIDES = [123, 30, 20] as const, CAPACITY8 = { waitAvgS: 136, waitMaxS: 338 } as const;
 /**
  * The rooms and structures whose mechanic a later slice builds (plan 3.9): they must show no use yet, and each entry
- * goes when its mechanic lands (S8 the tack room, the bunks, the map room, the Aerie). The lift's landed in S3 (dragons
- * ride it), the hatchery's in S5 (eggs are laid and hatch in it).
+ * goes when its mechanic lands. The lift's landed in S3 (dragons ride it), the hatchery's in S5 (eggs are laid and hatch
+ * in it), and the tack room's, the bunks', the map room's and the Aerie's in S8 (missions: sent from the Map Room's
+ * table, saddles from the Tack Room, the team off and back over the Aerie, the riders' rest in the Bunks). None is left:
+ * every named, furnished room has a real purpose, proven used (#11).
  */
-const PLANNED: ReadonlySet<string> = new Set(['tack', 'bunks', 'maproom', 'aerie']);
+const PLANNED: ReadonlySet<string> = new Set([]);
 /** Section 10's adults past the start's seven (the eighth, ninth and tenth), also section 15's crowded barn. */
 const CROWD: readonly DragonPlace[] = [
   { name: 'EIGHTH', element: 'fire', stage: 'adult', seed: 501, slot: { room: 'kitchen', i: 1 } },
@@ -279,14 +306,15 @@ if (MAIN) {
   const trip = route({ f: 0, x: 792 }, { f: AERIE_F, x: 280 }, sim.nets.dragon.adult);
   if (!trip || trip.legs.map(at).join(' / ') !== `f0 x ${LIFT_CX} / f5 x ${LIFT_CX} / f5 x 280`) fail(`the lift from the ground floor to the Aerie: ${trip ? trip.legs.map(at).join(' / ') : 'no route'}, not one ride`);
   // no dragon net reaches a tower but through the Garden Gate: every span of every stage's net lies inside the barn
-  // (floors 1-2), the barn and on through the gate to the garden's end (floor 0), or on the deck (floor 5), floors 3 and
+  // (floors 1-2), the barn and on through the gate to the garden's end (floor 0), or on the deck and its sky bridge off the
+  // world's west edge (floor 5: plan S8, the missions' way out), floors 3 and
   // 4 have none, and no route reaches another tower room on the floors where the towers open into the barn -- the
   // gate's arches are the one tower door a dragon fits (every stage walks through it); and no keeper rides the lift
   for (const st of STAGES) {
     const net = sim.nets.dragon[st];
     net.spans.forEach((sp, f) => {
-      const [lo, hi] = f === 0 ? [BARN_X, sim.worldW - GARDEN_END] : f <= 2 ? [BARN_X, TOWER_R] : f === AERIE_F ? [DECK_X0, DECK_X1] : [Infinity, -Infinity];
-      for (const [a, b] of sp) if (a < lo || b > hi) fail(`${st}: the dragon net's floor ${f} runs ${a}..${b}, outside ${f === 0 ? 'the barn and the garden' : f <= 2 ? 'the barn' : f === AERIE_F ? 'the deck' : 'any floor a dragon has'}`);
+      const [lo, hi] = f === 0 ? [BARN_X, sim.worldW - GARDEN_END] : f <= 2 ? [BARN_X, TOWER_R] : f === AERIE_F ? [BRIDGE_X0, DECK_X1] : [Infinity, -Infinity];
+      for (const [a, b] of sp) if (a < lo || b > hi) fail(`${st}: the dragon net's floor ${f} runs ${a}..${b}, outside ${f === 0 ? 'the barn and the garden' : f <= 2 ? 'the barn' : f === AERIE_F ? 'the deck and the sky bridge' : 'any floor a dragon has'}`);
     });
     for (const t of [{ f: 0, x: TOWER_L + TOWER_W / 2 }, { f: 1, x: TOWER_L + TOWER_W / 2 }, { f: 1, x: TOWER_R + TOWER_W / 2 }, { f: 3, x: TOWER_L + TOWER_W / 2 }]) {
       if (spanOf(t.f, t.x, net) >= 0 || route({ f: 0, x: 792 }, t, net)) fail(`${st}: a dragon can reach the tower room at ${at(t)}`);
@@ -772,6 +800,58 @@ if (MAIN) {
   console.log(`  6 saves (the garden): ${said.join('; ')} step on 5000 to the same world; ${bad.length} saves whose garden can't be kept (${bad.map(([w]) => w).join(', ')}) throw`);
 }
 
+if (MAIN) {
+  // missions (plan S8): THE LOST NEST sent on a short day (seed 2: a success, an egg), saved the first step it is seen
+  // mustering (a rider on the way up with a saddle), departing over the bridge, away, landing with the egg carried down,
+  // a saddle being hung back, and a rider resting in the Bunks -- each loaded through JSON and stepped 5000 on in
+  // lockstep with the run it came from, to the same world; and a save whose missions this build can't run throws
+  const through = <T>(v: T): T => JSON.parse(JSON.stringify(v));
+  const mk = () => { const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 2, dayLen: 600 }); sendLostNest(w); return w; };
+  const ref = mk(), forks: { sim: CareSim; at: number; what: string; used: Record<string, number> }[] = [], seen = new Set<string>();
+  const want = ['muster', 'depart', 'away', 'egg', 'tack', 'rest'];
+  const kinds = (w: CareSim): string[] => {
+    const t = w.missions.trip, out: string[] = [];
+    if (t?.state === 'muster' && w.keepers.some((k) => k.phase === 'muster' && k.carrying === 'saddle' && k.legs.length)) out.push('muster');
+    if (t?.state === 'depart') out.push('depart');
+    if (t?.state === 'away') out.push('away');
+    for (const k of w.keepers) {
+      if (k.phase === 'deliver' && k.carrying === 'egg') out.push('egg');
+      if (k.phase === 'deliver' && k.carrying === 'saddle' && k.t > 0) out.push('tack');
+      if (k.phase === 'rest') out.push('rest');
+    }
+    return out;
+  };
+  for (let s = 1; s <= 20000 && (seen.size < want.length || forks.some((f) => s <= f.at + 5000)); s++) {
+    ref.step();
+    for (const f of forks) if (s <= f.at + 5000) f.sim.step();
+    for (const f of forks) if (s === f.at + 5000 && f.sim.digest() !== ref.digest()) fail(`save (missions): a world saved at step ${f.at} (${f.what}) and loaded drifted by step ${s}`);
+    const now = [...new Set(kinds(ref))].filter((k) => want.includes(k) && !seen.has(k));
+    if (!now.length) continue;
+    const sim = CareSim.fromSave(through(serialize(ref)));
+    if (sim.missions === ref.missions || !isDeepStrictEqual(sim.missions, ref.missions) || (ref.missions.trip && sim.missions.trip === ref.missions.trip)) fail(`save (missions): the missions were not saved and loaded as their own copy (step ${s})`);
+    forks.push({ sim, at: s, what: now.join('+'), used: { ...sim.stats.used } });
+    for (const k of now) seen.add(k);
+  }
+  for (const k of want) if (!seen.has(k)) fail(`save (missions): no save caught a world with ${k}`);
+  noteUse(ref);
+  for (const f of forks) noteUse(f.sim, f.used);
+  // (saves whose missions can't be run: a mission in a region there isn't, a team of a dragon there isn't, a keeper away with no team, none at all)
+  const good = serialize(mk()), bad: [string, (b: any) => void][] = [
+    ['a mission in Atlantis', (b) => { b.missions.board[0].region = 'atlantis'; }],
+    ['a team of a dragon there isn\'t', (b) => { b.missions.trip.pairs[0].dragon = 99; }],
+    ['a keeper away with no team', (b) => { b.missions.trip = null; b.missions.deck = []; }],
+    ['a dragon mustering with no team', (b) => { b.missions.trip.pairs.pop(); b.missions.deck.pop(); for (const k of b.keepers) if (k.phase === 'muster' && !b.missions.trip.pairs.some((p: any) => p.keeper === k.id)) k.phase = 'idle'; }],
+    ['no missions', (b) => { delete b.missions; }],
+  ];
+  for (const [what, f] of bad) {
+    const b = through(good); f(b);
+    let threw = false;
+    try { CareSim.fromSave(b); } catch { threw = true; }
+    if (!threw) fail(`save: one with ${what} loaded`);
+  }
+  console.log(`  6 saves (missions, a 600-step day): ${forks.map((f) => `step ${f.at} (${f.what})`).join(', ')} step on 5000 to the same world; ${bad.length} saves whose missions can't be run (${bad.map(([w]) => w).join(', ')}) throw`);
+}
+
 // ---------- 7. rngAt: stateless draws ----------
 if (MAIN) {
   const seq = (r: { next(): number }) => Array.from({ length: 100 }, () => r.next());
@@ -983,9 +1063,31 @@ if (!MAIN) {
     out.push(`${run.what} (${n}), ${run.min} min: ${st.done} jobs done, wait avg ${(st.waitSum / Math.max(1, st.started) / FPS).toFixed(1)} s, max ${(st.waitMax / FPS).toFixed(1)} s; ${st.emptySteps} steps with a need at 0; the car busy ${(busy / steps * 100).toFixed(0)} %, ${st.liftRides} rides, a landing wait at most ${(st.liftWaitMax / FPS).toFixed(1)} s`);
     noteUse(sim);
   }
+  // ---------- 23. care while a team is away (P13: two keepers home are enough) ----------
+  // (in this worker too: 30 minutes of the real day beside the rest.) THE LOST NEST's two pairs (RIPPLE and ECHO, with
+  // their riders) sent at once, away 30 minutes (a test's own length: missions.ts send's awaySteps); from the send until
+  // it lands, the five dragons home and the two keepers home: no need empties, no keeper gives up, a rider is never
+  // given a job, and the waits keep section 2's gates -- the average within 25 % over its gate (plan S8)
+  const away = newSim(1), AWAY_STEPS = 30 * 60 * FPS;
+  sendLostNest(away, { awaySteps: AWAY_STEPS });
+  const trip = away.missions.trip!, riderIds = new Set(trip.pairs.map((p) => p.keeper));
+  let awaySteps = 0, riderJobs = 0;
+  for (let s = 0; s < AWAY_STEPS + 20000 && away.missions.trip?.state !== 'return'; s++) {
+    away.step();
+    if (away.missions.trip?.state === 'away') awaySteps++;
+    for (const k of away.keepers) if (riderIds.has(k.id) && k.job) riderJobs++;
+  }
+  const ast = away.stats, aAvg = ast.waitSum / Math.max(1, ast.started) / FPS, aMax = ast.waitMax / FPS, aK = ast.keeperWaitSum / Math.max(1, ast.keeperWaits) / FPS;
+  if (awaySteps !== AWAY_STEPS) fail(`away: the team was away ${awaySteps} steps, not ${AWAY_STEPS}`);
+  if (riderJobs) fail(`away: a rider on the trip had a job for ${riderJobs} steps`);
+  if (ast.emptySteps) fail(`away: a need at home sat at 0 for ${ast.emptySteps} dragon-steps with two keepers home`);
+  if (ast.waitTimeouts) fail(`away: ${ast.waitTimeouts} keepers gave up waiting`);
+  if (aAvg > GATE.waitAvgS * 1.25 || aMax > GATE.waitMaxS || aK > GATE.keeperWaitAvgS || ast.liftWaitMax / FPS > GATE.liftWaitS) fail(`away: jobs waited ${aAvg.toFixed(1)} s on average, ${aMax.toFixed(1)} s at most, keepers ${aK.toFixed(1)} s at the stand spot, a landing ${(ast.liftWaitMax / FPS).toFixed(1)} s (want <= ${GATE.waitAvgS * 1.25}, ${GATE.waitMaxS}, ${GATE.keeperWaitAvgS}, ${GATE.liftWaitS})`);
+  noteUse(away);
+  const awayLine = `  23 away: THE LOST NEST's two pairs away ${(awaySteps / FPS / 60).toFixed(0)} min of the real day (${away.tick} steps from the send to the landing), five dragons and two keepers home: ${ast.done} jobs done, wait avg ${aAvg.toFixed(1)} s (gate ${GATE.waitAvgS * 1.25}), max ${aMax.toFixed(1)} s, keepers at the stand spot ${aK.toFixed(1)} s, a landing ${(ast.liftWaitMax / FPS).toFixed(1)} s; ${ast.emptySteps} steps with a need at 0; no rider given a job`;
   // (this section runs in its own worker thread, beside the rest: its line, its failures and its rooms' uses go back to
   // the main thread, which prints and counts them at the end)
-  parentPort!.postMessage({ fails, used: USED, line: `  10 capacity: ${out.join('; ')}` });
+  parentPort!.postMessage({ fails, used: USED, line: `  10 capacity: ${out.join('; ')}\n${awayLine}` });
 }
 
 // ---------- 11. the clock ----------
@@ -1065,9 +1167,10 @@ if (MAIN) {
   if (day.clock === eve.clock || day.digest() === eve.digest()) fail('night: the two worlds should differ in their clocks (and so their saves)');
   const phases = new Set<string>();
   for (let s = 0; s <= 20000; s += 450) phases.add(readClock(eve.clock0 + s).phase);
-  // (the simulation's own modules: none reads the phase, the hour or the sky; only the view does -- and garden.ts, which
-  // is not in this list on purpose: plan G8's one exception so far, the residents' naps; it keeps its state out of
-  // barnKey, and these modules only call into it)
+  // (the simulation's own modules: none reads the phase, the hour or the sky; only the view does -- and garden.ts and
+  // missions.ts, which are not in this list on purpose: plan G8's two exceptions, the residents' naps and the Map Room's
+  // board rolled at dawn (05:00); each keeps its state out of barnKey (a world's missions are not the barn's care, and
+  // without a trip sent nothing they do touches it), and these modules only call into them)
   const SIM_FILES = ['sim.ts', 'travel.ts', 'needs.ts', 'layout.ts', 'gait.ts', 'save.ts', 'start.ts', 'presets.ts', 'rand.ts', 'life.ts', 'names.ts'];
   const reads = SIM_FILES.filter((f) => /\b(readClock|phaseOf|PHASE_HOURS|PHASE_ORDER|DayPhase|skyBands|nightness|dimness|skyPhase|lightsOf)\b/.test(fs.readFileSync(new URL(`../src/game/${f}`, import.meta.url), 'utf8')));
   if (reads.length) fail(`night: ${reads.join(', ')} read the day's phase (only the view may: plan G8)`);
@@ -1479,6 +1582,231 @@ if (MAIN) {
   console.log(`  16 residents (the garden preset, ${MIN} min of the real day): ${R.map((d) => { const p = per.get(d)!; return `${d.name} napped ${(p.nap / steps * 100).toFixed(0)} % (every one of ${p.night} night steps), strolled ${p.strolls} times, ${p.visits.length} keeper visits (${p.visits.join(', ') || 'none'}; ${perHour(p.visits.length)} an hour)`; }).join('; ')}; jobs for food and love only, draining at a quarter of an elder's (per step x 1e6: ${drains.join(', ')}; within ${(worstDrain * 100).toFixed(3)} %); two at rest overlapping at most ${restMax.toFixed(1)} px (gate ${REST_OVERLAP}); the barn beside them: ${st.done} jobs done, wait avg ${avg.toFixed(1)} s, max ${max.toFixed(1)} s, ${st.emptySteps} steps with a need at 0, the Garden Gate passed ${st.used.gate ?? 0} times`);
 }
 
+// ---------- 17. the Map Room's board (#5.1, #5.2) ----------
+if (MAIN) {
+  // the board is a pure function of the seed, the day and the map: the same twice; day 1 has THE LOST NEST first; three
+  // missions at most, one a region, each an explored region's; no baddie before day 3; each difficulty's road as long
+  // as it should be, from its region's pool, no challenge twice
+  const all = REGIONS.map((r) => r.id), start = REGIONS.filter((r) => r.start).map((r) => r.id);
+  let boards = 0, baddies = 0;
+  const kinds = new Map<string, number>();
+  for (let seed = 1; seed <= 5; seed++) for (let day = 1; day <= 10; day++) for (const map of [start, all]) {
+    const a = boardFor(seed, day, map, []), b = boardFor(seed, day, map, []);
+    boards++;
+    if (!isDeepStrictEqual(a, b)) fail(`board: seed ${seed} day ${day} rolled twice differs`);
+    if (day === 1 && (a[0]?.title !== LOST_NEST || a[0].region !== 'millbrook' || a[0].difficulty !== 'easy' || a[0].challenges.join() !== 'flood,lost' || !a[0].guaranteedEgg || a[0].coin !== 40)) fail(`board: seed ${seed} day 1 does not start with THE LOST NEST (${a[0]?.title})`);
+    if (a.length > BOARD_MAX || a.length !== Math.min(BOARD_MAX, map.length)) fail(`board: seed ${seed} day ${day} has ${a.length} missions for ${map.length} regions`);
+    if (new Set(a.map((m) => m.region)).size !== a.length || a.some((m) => !map.includes(m.region))) fail(`board: seed ${seed} day ${day} has two missions in a region, or one in an unexplored one`);
+    if (new Set(a.map((m) => m.id)).size !== a.length) fail(`board: seed ${seed} day ${day}'s missions share an id`);
+    for (const m of a) {
+      const D = DIFFICULTY[m.difficulty], pool = regionOf(m.region).pool;
+      kinds.set(m.difficulty, (kinds.get(m.difficulty) ?? 0) + 1);
+      if (m.baddie) baddies++;
+      if (m.baddie && day < BADDIE_FROM_DAY) fail(`board: seed ${seed} day ${day}: ${m.title} ends in a baddie before day ${BADDIE_FROM_DAY}`);
+      if (m.baddie && (m.difficulty !== 'hard' || m.baddie !== regionOf(m.region).baddie)) fail(`board: ${m.title}'s baddie ${m.baddie} is not its hard road's`);
+      const want = m.difficulty === 'hard' && !m.baddie ? D.challenges + 1 : D.challenges;
+      if (m.challenges.length !== want || new Set(m.challenges).size !== want || m.challenges.some((c) => !pool.includes(c))) fail(`board: seed ${seed} day ${day}: ${m.title} (${m.difficulty}) has ${m.challenges.join(', ')}`);
+      if (m.days !== D.days || m.coin !== D.coin || (m.title !== LOST_NEST && m.eggChance !== D.egg)) fail(`board: ${m.title}'s days, coin or egg chance are not its difficulty's`);
+    }
+  }
+  // (in a world: rolled at its start, and again at every 05:00 -- and only then)
+  const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1, dayLen: 600 }), rolls: number[] = [];
+  let last = JSON.stringify(w.missions.board);
+  if (w.missions.day !== 1 || w.missions.board[0]?.title !== LOST_NEST) fail(`board: a new world's board is day ${w.missions.day}'s, first ${w.missions.board[0]?.title}`);
+  for (let s = 1; s <= 1800; s++) {
+    w.step();
+    const now = JSON.stringify(w.missions.board);
+    if (now !== last) { rolls.push(w.clock); last = now; }
+  }
+  if (rolls.join() !== '725,1325,1925' || w.missions.day !== 4) fail(`board: rolled at clocks ${rolls.join(', ')} (day ${w.missions.day}), not at each 05:00 (725, 1325, 1925 on a 600-step day from 07:00)`);
+  noteUse(w);
+  console.log(`  17 board: ${boards} boards (seeds 1-5, days 1-10, the start's map and the whole) the same rolled twice, day 1's always THE LOST NEST first; ${[...kinds].map(([k, n]) => `${n} ${k}`).join(', ')}, ${baddies} ending in a baddie (none before day ${BADDIE_FROM_DAY}); a world's board rolled at clocks ${rolls.join(' and ')} (each 05:00)`);
+}
+
+// ---------- 18. the odds (#5.3: the team meets the road's challenges) ----------
+if (MAIN) {
+  // hand-computed cases (plan S8's formula: 0.20 + 0.15 a challenge met + 0.15 the baddie met + 0.05 a pair in good
+  // spirits + 0.05 a pair of partners, clamped to 0.05-0.95): moods set by hand (every need full: 0.8; one at 0.2: low)
+  const w = newSim(1), by = (n: string) => w.dragons.find((d) => d.name === n)!, keeper = (n: string) => w.keepers.find((k) => k.name === n)!.id;
+  const mood = (n: string, good: boolean) => { const d = by(n); for (const k of NEEDS) if (hasNeed(d.element, k)) d.needs[k] = 1; if (!good) d.needs.food = 0.2; d.mood = moodOf(d.element, d.needs); };
+  const nest = w.missions.board.find((m) => m.title === LOST_NEST)!;
+  const mission = (region: RegionId, challenges: ChallengeId[], baddie: BaddieId | null): Mission => ({ id: 999, region, title: 'TEST', difficulty: 'hard', challenges, baddie, days: 3, coin: 150, eggChance: 0.6, guaranteedEgg: false });
+  const cases: [string, Mission, [string, string][], Record<string, boolean>, number][] = [
+    ['THE LOST NEST, RIPPLE (a rider) and ECHO (TOMAS, partners), both in good spirits', nest, [['RIPPLE', 'IRIS'], ['ECHO', 'TOMAS']], { RIPPLE: true, ECHO: true }, 0.65],
+    ['THE LOST NEST, RIPPLE alone, in good spirits', nest, [['RIPPLE', 'IRIS']], { RIPPLE: true }, 0.40],
+    ['THE LOST NEST, RIPPLE alone, low', nest, [['RIPPLE', 'IRIS']], { RIPPLE: false }, 0.35],
+    ['THE LOST NEST, WICK (IRIS, partners) meeting nothing, low: the least a pair can have is the base and its partner', nest, [['WICK', 'IRIS']], { WICK: false }, 0.25],
+    ['THE LOST NEST, EMBER and a stranger, low, nothing met: the base alone', nest, [['EMBER', 'PIP']], { EMBER: false }, 0.20],
+    ['a hard road, all met, the Storm Roc too, both partnered and happy: 1.00, clamped', mission('highfold', ['storm', 'dark', 'gap'], 'stormroc'), [['ZAP', 'PIP'], ['WICK', 'IRIS']], { ZAP: true, WICK: true }, 0.95],
+    ['the Mole King needing CHARM too: WICK (IRIS) meets the dark, not the baddie', mission('oldmine', ['dark', 'heavy', 'lost'], 'moleking'), [['WICK', 'IRIS']], { WICK: true }, 0.45],
+    ['the Mole King met: WICK with BEA (charm), COBBLE with TOMAS', mission('oldmine', ['dark', 'heavy', 'lost'], 'moleking'), [['WICK', 'BEA'], ['COBBLE', 'TOMAS']], { WICK: true, COBBLE: false }, 0.2 + 0.30 + 0.15 + 0.05 + 0.05],
+  ];
+  const rows: string[] = [];
+  for (const [what, m, team, moods, want] of cases) {
+    for (const [n, good] of Object.entries(moods)) mood(n, good);
+    const pairs = team.map(([d, k]) => ({ dragon: by(d).id, keeper: keeper(k) })), got = oddsOf(w, m, pairs);
+    if (Math.abs(got - want) > 1e-9) fail(`odds: ${what}: ${got}, not ${want}`);
+    rows.push(`${(got * 100).toFixed(0)} %`);
+  }
+  if (oddsOf(w, nest, []) !== 0) fail('odds: an empty team has odds');
+  console.log(`  18 odds: ${cases.length} hand-computed teams, ${rows.join(', ')} (the plan's two examples 65 % and 40 %; 95 % the top clamp; 20 % the least a pair can have, above the bottom clamp's 5 %)`);
+}
+
+// ---------- 19. who may go (#5.3: dragons and people as solutions; P13: 2 keepers home) ----------
+if (MAIN) {
+  // a baby, a young dragon on a normal or hard road and a garden resident may not go; a keeper the player has taken is
+  // never an auto rider (seams.ts isTaken, stubbed here as S7's control will be: BEA taken), for any mission and any
+  // dragon; two riders at most, two keepers always home; one team out at a time
+  const ages = buildSim(startSpec('ages'), 1), gar = buildSim(startSpec('garden'), 1), easy = ages.missions.board.find((m) => m.difficulty === 'easy')!;
+  const hardOf = (m: Mission): Mission => ({ ...m, difficulty: 'hard' }), normalOf = (m: Mission): Mission => ({ ...m, difficulty: 'normal' });
+  for (const d of ages.dragons) {
+    const why = dragonReason(ages, d, easy);
+    if (d.stage === 'baby' ? why !== 'BABY' : why !== null) fail(`team: ${d.name} (${d.stage}) on an easy road: ${why}`);
+    for (const m of [normalOf(easy), hardOf(easy)]) { const w2 = dragonReason(ages, d, m); if (d.stage === 'young' ? w2 !== 'TOO YOUNG' : d.stage === 'baby' ? w2 !== 'BABY' : w2 !== null) fail(`team: ${d.name} (${d.stage}) on a ${m.difficulty} road: ${w2}`); }
+  }
+  const young = ages.dragons.find((d) => d.stage === 'young')!;
+  if (canSend(ages, normalOf(easy), [{ dragon: young.id, keeper: 0 }]) == null) fail('team: a young dragon could be sent on a normal road');
+  for (const d of gar.dragons.filter((q) => q.place === 'garden')) if (dragonReason(gar, d, easy) !== 'IN THE GARDEN') fail(`team: ${d.name}, in the garden, may go`);
+  const w = newSim(1), BEA = w.keepers.find((k) => k.name === 'BEA')!.id, taken: Taken = (_s, id) => id === BEA;
+  let asked = 0;
+  const IRIS = w.keepers.find((k) => k.name === 'IRIS')!.id;
+  for (let day = 1; day <= 10; day++) for (const m of boardFor(1, day, REGIONS.map((r) => r.id), [])) for (const d of w.dragons) for (const others of [[], [{ dragon: w.dragons.find((o) => o !== d)!.id, keeper: IRIS }]]) {
+    asked++;
+    const k = autoRider(w, d, m, others, taken);
+    if (k === BEA) fail(`team: ${d.name}'s auto rider for ${m.title} is BEA, whom the player has taken`);
+    if (k == null) fail(`team: ${d.name} has no auto rider for ${m.title} with BEA taken`);
+  }
+  for (const m of w.missions.board) for (const p of bestTeam(w, m, taken)) if (p.keeper === BEA) fail(`team: BEST TEAM for ${m.title} gave BEA a pair while taken`);
+  // (two riders at most: a third pair is refused, and autoRider has nobody for it -- two keepers stay home)
+  const nest = w.missions.board.find((m) => m.title === LOST_NEST)!, ids = (n: string) => w.dragons.find((d) => d.name === n)!.id;
+  const three = [{ dragon: ids('RIPPLE'), keeper: 0 }, { dragon: ids('ECHO'), keeper: 1 }, { dragon: ids('WICK'), keeper: 2 }];
+  if (canSend(w, nest, three) !== 'NOT ENOUGH KEEPERS HOME') fail(`team: three pairs: ${canSend(w, nest, three)}`);
+  if (autoRider(w, w.dragons[6], nest, three.slice(0, 2)) != null) fail('team: a third rider was found (two keepers must stay home)');
+  if (canSend(w, nest, []) !== 'PICK A DRAGON') fail('team: an empty team could be sent');
+  const t = send(w, nest.id, three.slice(0, 2));
+  if (typeof t === 'string') fail(`team: THE LOST NEST refused: ${t}`);
+  const other = w.missions.board[0], again = other ? send(w, other.id, [{ dragon: ids('WICK'), keeper: 2 }]) : 'none';
+  if (again !== 'A TEAM IS ALREADY OUT') fail(`team: a second team was sent (${typeof again === 'string' ? again : 'sent'})`);
+  if (w.missions.board.some((m) => m.id === nest.id)) fail('team: the mission sent is still on the board');
+  const home = w.keepers.filter((k) => !onTrip(k)).length;
+  if (home < HOME_KEEPERS) fail(`team: ${home} keepers home with a team out`);
+  if (dragonReason(w, w.dragons.find((d) => d.name === 'RIPPLE')!, other ?? null) !== 'AWAY') fail('team: a dragon on the team out could go again');
+  noteUse(w);
+  console.log(`  19 team: babies, the young on normal and hard roads and garden residents may not go; with BEA taken by hand, ${asked} auto riders (10 days of boards x 7 dragons, alone and beside a pair) and BEST TEAM never chose her; a third pair refused (two keepers stay home: ${home} home with the team out); a second send refused while one is out`);
+}
+
+// ---------- 20. a full trip: THE LOST NEST (#5.4, #5.6, #11) ----------
+let musterAt = 0;
+if (MAIN) {
+  // (a) the muster preset's world (the real day, seed 1): the step everyone stands on the deck (the base_muster shot)
+  {
+    const w = buildSim(startSpec('muster'), 1);
+    while (w.missions.trip?.state === 'muster' && w.tick < 20000) w.step();
+    musterAt = w.tick;
+    if (w.missions.trip?.state !== 'depart') fail(`trip: the muster preset's team never left (${w.missions.trip?.state} at step ${w.tick})`);
+    noteUse(w);
+  }
+  // (b) THE LOST NEST with RIPPLE and ECHO on a short day (seed 2: a success with an egg), stepped through: the muster
+  // (the Map Room, the Tack Room and the Aerie used; both up by the lift; 3600 steps or fewer), away (no job for the team,
+  // no job for its riders, the needs frozen), back at returnAt exactly with food and sleep down, the egg in its reserved
+  // nest, the saddles hung back, the riders rested in the Bunks and back on duty, the coin paid, the trip over, and the
+  // region's neighbour revealed at the next dawn
+  const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 2, dayLen: 600 });
+  const rides0 = w.stats.liftRides, used0 = { ...w.stats.used };
+  sendLostNest(w);
+  const t = w.missions.trip!, team = t.pairs.map((p) => w.dragons.find((d) => d.id === p.dragon)!), riders = t.pairs.map((p) => w.keepers.find((k) => k.id === p.keeper)!);
+  if (!t.success || !t.egg || t.nest == null) fail(`trip: seed 2's LOST NEST should succeed with an egg (${t.success}, ${t.egg}, nest ${t.nest})`);
+  let departed = -1, awayAt = -1, landedAt = -1, overAt = -1, laid = -1, frozen: string | null = null, landNeeds = '', revealed = '';
+  const upBy = new Set<number>();
+  for (let s = 1; s <= 30000 && (overAt < 0 || riders.some((k) => k.phase === 'rest') || s < overAt + 10); s++) {
+    const before = t.state, eggs = w.eggs.length;
+    const pre = team.map((d) => ({ food: d.needs.food, sleep: d.needs.sleep }));
+    w.step();
+    for (const d of team) if (d.move === 'ride' && w.lift.target === 5) upBy.add(d.id);
+    if (t.state === 'depart' && before === 'muster') departed = w.tick;
+    if (t.state === 'away' && before === 'depart') { awayAt = w.tick; frozen = JSON.stringify(team.map((d) => d.needs)); }
+    if (t.state === 'away') {
+      if (w.jobs.some((j) => team.includes(j.dragon))) fail(`trip, step ${w.tick}: a job for a dragon away`);
+      if (JSON.stringify(team.map((d) => d.needs)) !== frozen) fail(`trip, step ${w.tick}: an away dragon's needs moved`);
+      if (team.some((d) => d.place !== 'away')) fail(`trip, step ${w.tick}: the team is away but a dragon is ${team.map((d) => d.place)}`);
+    }
+    if (riders.some((k) => onTrip(k) && k.job)) fail(`trip, step ${w.tick}: a rider on the trip has a job`);
+    if (t.state === 'return' && before === 'away') {
+      landedAt = w.tick;
+      if (w.clock !== t.returnAt) fail(`trip: landed at clock ${w.clock}, not returnAt ${t.returnAt}`);
+      team.forEach((d, i) => { for (const k of ['food', 'sleep'] as const) if (Math.abs(d.needs[k] - Math.min(pre[i][k], 0.45)) > 1e-9) fail(`trip: ${d.name}'s ${k} landed at ${d.needs[k]}, not min(${pre[i][k]}, 0.45)`); });
+      landNeeds = team.map((d) => `${d.name} food ${d.needs.food.toFixed(2)} sleep ${d.needs.sleep.toFixed(2)}`).join(', ');
+    }
+    if (w.eggs.length > eggs) laid = w.tick;
+    if (!w.missions.trip && overAt < 0) {
+      overAt = w.tick;
+      // (the success: the region's first, and its unexplored neighbour to be revealed at the next dawn -- not before)
+      revealed = JSON.stringify({ first: w.missions.firstSuccess, pending: w.missions.pendingReveal, frost: w.missions.explored.includes('frostmere') });
+      if (revealed !== JSON.stringify({ first: ['millbrook'], pending: ['frostmere'], frost: false })) fail(`trip: as it ended, ${revealed}`);
+    }
+    if (overAt > 0 && w.clock % w.dayLen === 125 && !w.missions.explored.includes('frostmere')) fail('trip: FROSTMERE was not revealed at the dawn after the success');
+  }
+  const used = (k: string) => (w.stats.used[k] ?? 0) - (used0[k] ?? 0);
+  if (departed < 0 || departed > 3600) fail(`trip: the muster took ${departed} steps (want <= 3600)`);
+  if (w.stats.liftRides - rides0 < 2 || upBy.size !== 2) fail(`trip: the team rode up to the Aerie ${upBy.size} of 2 (rides ${w.stats.liftRides - rides0})`);
+  for (const k of ['maproom', 'tack', 'aerie', 'bunks']) if (!used(k)) fail(`trip: the ${k} was not used`);
+  if (used('aerie') !== 2 || used('tack') !== 4 || used('maproom') !== 1) fail(`trip: used the Aerie ${used('aerie')}, the Tack Room ${used('tack')}, the Map Room ${used('maproom')} times (want 2, 4, 1)`);
+  if (awayAt < 0 || landedAt < 0 || landedAt - awayAt !== w.dayLen) fail(`trip: away at ${awayAt}, landed at ${landedAt} (want a day, ${w.dayLen} steps, apart)`);
+  const egg = w.eggs.find((e) => e.nest === t.nest) ?? null;
+  if (laid < 0 || (egg && egg.element !== t.egg)) fail(`trip: the ${t.egg} egg was not laid in nest ${t.nest} (${JSON.stringify(w.eggs)})`);
+  if (w.missions.trip || overAt < 0) fail('trip: the trip never ended');
+  if (w.missions.coin !== 40) fail(`trip: the coin is ${w.missions.coin}, not 40`);
+  if (riders.some((k) => onTrip(k) || k.phase === 'rest' || k.carrying === 'saddle' || k.carrying === 'egg')) fail(`trip: the riders are ${riders.map((k) => `${k.name} ${k.phase} ${k.carrying}`).join(', ')}, not back on duty`);
+  if (team.some((d) => d.place !== 'barn' || d.goal === 'muster')) fail(`trip: the team is ${team.map((d) => `${d.name} ${d.place} ${d.goal}`).join(', ')}, not home`);
+  const dawn = () => w.clock % w.dayLen === 125;
+  while (!dawn()) w.step();
+  if (!w.missions.explored.includes('frostmere') || w.missions.pendingReveal.length) fail(`trip: FROSTMERE was not revealed at the next dawn (explored ${w.missions.explored})`);
+  // (and the egg hatches, two days after it was laid, into a baby of its element)
+  const baby = () => w.dragons.find((d) => d.stage === 'baby' && d.element === t.egg);
+  while (!baby() && w.tick < laid + 2 * w.dayLen + 3000) w.step();
+  if (!baby()) fail(`trip: the ${t.egg} egg never hatched`);
+  noteUse(w, used0);
+  console.log(`  20 trip: the muster preset (the real day, seed 1) all on the deck at step ${musterAt}; THE LOST NEST (seed 2, a 600-step day) with ${t.pairs.map((p, i) => `${team[i].name} and ${riders[i].name}`).join(', ')}: odds ${(t.odds * 100).toFixed(0)} %, ${t.success ? 'a success' : 'a failure'}, a ${t.egg} egg for nest ${t.nest}; mustered in ${departed} steps (both up by the lift), away at ${awayAt}, landed at ${landedAt} (returnAt, exactly: ${landNeeds}), the egg laid at ${laid}, over at ${overAt}; the Map Room used ${used('maproom')}, the Tack Room ${used('tack')}, the Aerie ${used('aerie')}, the Bunks ${used('bunks')}; coin ${w.missions.coin}; FROSTMERE revealed at the next dawn; ${baby()?.name} hatched`);
+}
+
+// ---------- 21. a failure: turning back (#5.3) ----------
+if (MAIN) {
+  // a low-odds send (RIPPLE alone on THE LOST NEST: nobody meets the lost things) that fails, from seeds 1-200: it turns
+  // back at the first unmet stop, brings half the coin and no egg, and reveals nothing
+  let seed = 0, t: Trip | null = null, w: CareSim | null = null, tried = 0;
+  for (let s = 1; s <= 200 && !t; s++) {
+    tried++;
+    const sim = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: s, dayLen: 600 }), m = sim.missions.board[0], d = sim.dragons.find((q) => q.name === 'RIPPLE')!;
+    const r = send(sim, m.id, [{ dragon: d.id, keeper: autoRider(sim, d, m, [])! }]);
+    if (typeof r !== 'string' && !r.success) { seed = s; t = r; w = sim; }
+  }
+  if (!t || !w) fail('failure: no seed in 1-200 fails RIPPLE alone on THE LOST NEST');
+  else {
+    const first = t.stops.findIndex((s) => !s.covered);
+    if (t.turnBack !== first || first !== 1 || !/TURN BACK/.test(t.stops[first].log) || t.egg || t.nest != null || t.exit) fail(`failure: turns back at ${t.turnBack} (${t.stops[first]?.log}), egg ${t.egg}`);
+    const eggs = w.eggs.length;
+    for (let s = 0; s < 20000 && w.missions.trip; s++) w.step();
+    if (w.missions.trip || w.missions.coin !== 20 || w.eggs.length !== eggs || w.missions.pendingReveal.length || w.missions.firstSuccess.length) fail(`failure: the trip ended with ${w.missions.coin} coin, ${w.eggs.length} eggs, reveals ${w.missions.pendingReveal}`);
+    noteUse(w);
+    console.log(`  21 failure: seed ${seed} (of ${tried} tried) fails RIPPLE alone on THE LOST NEST at ${(t.odds * 100).toFixed(0)} %: it turns back at stop ${t.turnBack} ("${t.stops[t.turnBack!].log}"), home with ${w.missions.coin} coin (half) and no egg, nothing revealed`);
+  }
+}
+
+// ---------- 22. a trip's outcome is the seed's ----------
+if (MAIN) {
+  // the same send on 20 seeds, twice: the same outcome, egg and road each time (rolled once, at SEND, from rngAt)
+  const run = (seed: number) => { const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed, dayLen: 600 }); sendLostNest(w); const t = w.missions.trip!; return JSON.stringify({ s: t.success, e: t.egg, n: t.nest, r: t.stops.map((s) => s.log), b: t.turnBack }); };
+  let wins = 0, eggs = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const a = run(seed), b = run(seed), p = JSON.parse(a);
+    if (a !== b) fail(`outcome: seed ${seed}'s send differs run to run`);
+    if (p.s) wins++;
+    if (p.e) eggs++;
+    if (!!p.e !== p.s) fail(`outcome: seed ${seed}'s ${p.s ? 'success' : 'failure'} ${p.e ? 'brought' : 'did not bring'} an egg (a first success always does, a failure never)`);
+  }
+  console.log(`  22 outcome: 20 seeds' LOST NEST, each the same twice: ${wins} successes, ${eggs} eggs (the first success in a region: always one)`);
+}
+
 // ---------- 10 (its worker's result) ----------
 if (MAIN) {
   const r = await capacity!;
@@ -1496,7 +1824,9 @@ if (MAIN) {
     if (PLANNED.has(k) ? n > 0 : n === 0) fail(PLANNED.has(k) ? `rooms: the ${k} is PLANNED but was used ${n} times: its mechanic has landed, take it off PLANNED` : `rooms: the ${k} is named and furnished but nothing used it (#11)`);
   }
   for (const k of PLANNED) if (!named.includes(k)) fail(`rooms: PLANNED names ${k}, which the building hasn't got`);
-  console.log(`  8 rooms used over the suite: ${named.filter((k) => !PLANNED.has(k)).map((k) => `${k} ${USED[k] ?? 0}`).join(', ')}; planned: ${[...PLANNED].join(', ')}`);
+  // (plan S8: every mechanic has landed, so nothing is planned any more -- #11 is closed)
+  if (PLANNED.size !== 0) fail(`rooms: PLANNED still names ${[...PLANNED].join(', ')} (S8 lands the last of them)`);
+  console.log(`  8 rooms used over the suite: ${named.filter((k) => !PLANNED.has(k)).map((k) => `${k} ${USED[k] ?? 0}`).join(', ')}; planned: ${[...PLANNED].join(', ') || 'none'}`);
 }
 
 if (MAIN) {

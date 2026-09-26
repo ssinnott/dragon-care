@@ -54,12 +54,19 @@ interface Window {
      * element, its nest 0-2 and how far on it is, 0 laid to 1 due); and the name of the dragon whose card is open, or
      * null. The elder garden (S6): each dragon's `place` (`barn`, or retired, `garden`), and the garden's residents, its
      * plots (one a resident or a retiree, at least two) and the world's walkable width out to its end (world px: 1688
-     * with two plots, 176 more a plot). Gone once the base is detached (the page left it).
+     * with two plots, 176 more a plot). Missions (S8): a dragon's place may be `away` (with a team out: not drawn);
+     * the coin the missions have brought home; the Map Room's board (each mission's id, region, title, difficulty,
+     * challenges, baddie or null, days and coin); the trip out, or null (its state -- muster, depart, away, return --
+     * its mission's title and region, its outcome and egg (rolled when it was sent), its pairs by dragon and keeper id,
+     * the clocks it left and lands at, and how far along the road it is, 0..1); and the Map Room table's overlay
+     * (`ui`): the screen open (`none`, `map` or `mission`), the mission chosen (id) and the team being put together,
+     * the map's pins (canvas px, board order) and the named buttons on screen (canvas px: `back`, `best`, `send`, and
+     * `chip`, the TEAM OUT chip while a team is out). Gone once the base is detached (the page left it).
      */
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
       chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[];
       digest: string;
-      dragons: { id: number; name: string; element: string; stage: string; place: 'barn' | 'garden'; f: number; x: number; move: string; room: string | null; slot: string | null;
+      dragons: { id: number; name: string; element: string; stage: string; place: 'barn' | 'garden' | 'away'; f: number; x: number; move: string; room: string | null; slot: string | null;
         waiting: boolean; head: { x: number; y: number } | null }[];
       lift: { y: number; rider: number | null };
       walked: number;
@@ -70,7 +77,13 @@ interface Window {
       buttons: Record<string, { x: number; y: number; w: number; h: number }>;
       eggs: { element: string; nest: number; progress: number }[];
       card: string | null;
-      garden: { residents: number; plots: number; worldW: number } };
+      garden: { residents: number; plots: number; worldW: number };
+      coin: number;
+      board: { id: number; region: string; title: string; difficulty: string; challenges: string[]; baddie: string | null; days: number; coin: number }[];
+      trip: { state: string; mission: string; region: string; success: boolean; egg: string | null; pairs: { dragon: number; keeper: number }[];
+        departAt: number | null; returnAt: number | null; progress: number } | null;
+      ui: { screen: 'none' | 'map' | 'mission'; mission: number | null; pairs: { dragon: number; keeper: number }[];
+        pins: { x: number; y: number; w: number; h: number }[]; buttons: Record<string, { x: number; y: number; w: number; h: number }> } };
     /**
      * view=base, live and saving (src/game/base.ts attach, only when the page loads and saves the player's barn): save
      * the barn now, and return the step it was saved at. Gone once the base is detached.

@@ -82,6 +82,14 @@ const pairs: string[] = [
   'shots/base_garden.png=view=base&preset=garden&cam=1304,376&t=600',
   'shots/base_garden_night.png=view=base&preset=garden&cam=1304,376&t=600&hour=22',
   'shots/base_gate.png=view=base&preset=retire&cam=1060,376&t=2564',
+  // missions (plan S8): the Map Room table's world map (the three start regions, the fog hatched over the rest, the
+  // roads, HOME, the board's three pins) and THE LOST NEST's chooser (the climate picture, the challenges and who at
+  // home meets them, the dragons, the odds) -- each over the world stepped a second -- and the muster preset's team all
+  // on the Aerie deck, each rider beside its dragon, the step before they walk off over the sky bridge (step 2860: npm
+  // run sim section 20)
+  'shots/base_map.png=view=base&panel=map&t=60',
+  'shots/base_mission.png=view=base&panel=mission&mission=0&t=60',
+  'shots/base_muster.png=view=base&preset=muster&t=2860&cam=0,20',
 ];
 for (const el of ['fire', 'rock', 'slinkwing']) {
   for (const stage of ['elder', 'adult', 'young', 'baby']) {

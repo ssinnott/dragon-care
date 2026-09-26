@@ -18,6 +18,7 @@ import type { Room, RoomKind, Slot, Spot } from './layout.ts';
 import type { Stage } from '../art/dragon/stages.ts';
 import { gaitOf, moveAt } from './gait.ts';
 import type { CareSim, Dragon, Job, LiftCall } from './sim.ts';
+import { missionCall } from './missions.ts';
 
 /** The room that meets each need (one kind each: layout.ts ROOM_INFO's `meets`): food the kitchen, bath the bathhouse, play the romp room, love the grooming parlour, sleep the lamp dorm. */
 export const NEED_ROOM: Readonly<Record<NeedKind, RoomKind>> = Object.freeze(Object.fromEntries(
@@ -366,7 +367,7 @@ function standingIn(sim: CareSim, d: Dragon): Room | null {
  * on out).
  */
 function free(sim: CareSim, d: Dragon): boolean {
-  return d.place === 'barn' && d.goal !== 'retire' && !d.act && d.asleep === 0 && d.hold === 0 && sim.lift.rider !== d.id && !['board', 'ride', 'alight', 'bay', 'turn'].includes(d.move) && !dragonInBay(d);
+  return d.place === 'barn' && d.goal !== 'retire' && d.goal !== 'muster' && !d.act && d.asleep === 0 && d.hold === 0 && sim.lift.rider !== d.id && !['board', 'ride', 'alight', 'bay', 'turn'].includes(d.move) && !dragonInBay(d);
 }
 
 /**
@@ -402,11 +403,11 @@ function choose(sim: CareSim, d: Dragon): void {
 
 /**
  * Whether a barn dragon may be sent somewhere new at once, mid-walk too (a Rush; an elder retiring): not in the garden
- * or already on its way there, no act, awake, not holding still to grow up, never once the lift has it (called for,
+ * or already on its way there, nor with a mission's team (missions.ts: they route it), no act, awake, not holding still to grow up, never once the lift has it (called for,
  * boarding, riding, alighting) or inside the bay.
  */
 export function redirectable(sim: CareSim, d: Dragon): boolean {
-  return d.place === 'barn' && d.goal !== 'retire' && !d.act && d.asleep === 0 && d.hold === 0 && sim.lift.rider !== d.id && !['board', 'ride', 'alight'].includes(d.move) && !dragonInBay(d);
+  return d.place === 'barn' && d.goal !== 'retire' && d.goal !== 'muster' && !d.act && d.asleep === 0 && d.hold === 0 && sim.lift.rider !== d.id && !['board', 'ride', 'alight'].includes(d.move) && !dragonInBay(d);
 }
 
 /**
@@ -425,6 +426,8 @@ export function retarget(sim: CareSim, d: Dragon, j: Job): void {
 export function walking(d: Dragon): boolean { return d.move === 'walk' || d.move === 'board' || d.move === 'alight' || (d.move === 'call' && d.gaitT > 0); }
 
 function startTurn(d: Dragon): void { d.move = 'turn'; d.turn = 0; d.gaitT = 0; }
+/** A dragon standing still with no route turns (a paper turn) to face `facing` (missions.ts: a team on the deck faces the bridge). */
+export function faceWay(d: Dragon, facing: 1 | -1): void { if (d.move === 'still' && !d.legs.length && d.turn < 0 && d.facing !== facing) startTurn(d); }
 /** Held at the bay's edge (the bay rule), standing (its wait, `waited`, counts on until it walks on, into the bay if it crosses). */
 function hold(d: Dragon): void { d.move = 'bay'; d.gaitT = 0; }
 
@@ -618,15 +621,18 @@ function settle(d: Dragon): void {
   if (d.move !== 'turn') { d.move = 'still'; d.gaitT = 0; }
   const s = d.slot;
   if (s && d.move === 'still' && d.f === s.f && d.x === s.x && d.facing !== s.facing) { startTurn(d); return; }
-  if (d.goal === 'evict' && d.move === 'still') d.goal = null;
+  // (a move on is over; and a grown dragon's walk to a free slot -- back from a mission: missions.ts -- is over too; a
+  // baby's settle goal stays until it grows up: life.ts)
+  if ((d.goal === 'evict' || (d.goal === 'settle' && d.stage !== 'baby')) && d.move === 'still') d.goal = null;
 }
 
 function callLift(sim: CareSim, d: Dragon, to: number): void {
   d.move = 'call'; d.gaitT = 0; d.waited = 0;
   sim.lift.calls.push({ dragon: d.id, f: d.f, to, tick: sim.tick, prio: callPrio(sim, d) });
 }
-/** A call's priority: 1 for a rushed job (a mission's muster or return is 2: S8), else 0. */
+/** A call's priority: 2 for a mission's (the muster up to the Aerie, the way down after landing: missions.ts), 1 for a rushed job, else 0. */
 function callPrio(sim: CareSim, d: Dragon): 0 | 1 | 2 {
+  if (missionCall(sim, d)) return 2;
   const j = d.goalJob == null ? null : sim.jobs.find((q) => q.id === d.goalJob);
   return j && j.rushed ? 1 : 0;
 }

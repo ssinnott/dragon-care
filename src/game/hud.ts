@@ -1,5 +1,6 @@
 // The base's screen furniture (docs/BASE_DESIGN.md 4.8, 7): the top bar -- the time of day (a sun or a moon and
-// `DAY 3 14:00`), the open jobs, a badge per keeper and the buttons (NEW, pause, speed) with their hit rects -- the
+// `DAY 3 14:00`), the open jobs, a badge per keeper (busy, away on a mission, resting after one), the coin the missions
+// have brought home, and the buttons (NEW, pause, speed, MAP: the Map Room's table) with their hit rects -- the
 // toasts over the barn, the hint at the bottom right, and a dragon's card (its name, element, stage, its day of the
 // stage's 30 and its needs: a tap on a dragon with nothing waiting opens it). House style: every box a 1 px #1a1018 outline, flat fills,
 // the engine's 5 x 7 font (it has no dot or arrow glyphs, so those are little inked sprites: icons.ts drawSprite).
@@ -20,13 +21,16 @@ import type { KeeperId } from '../art/keeper/cast.ts';
 export const BAR_H = 15;
 const TEXT = '#f3e6c8', FACE = '#3a2e34', ACTIVE = '#6b4a34', HINT = '#b8ac8e';
 
-/** The top bar's buttons (screen px, 640 x 360): NEW (tap twice), pause, and the speed that cycles 1x, 2x, 4x, 8x. */
-export type ButtonName = 'new' | 'pause' | 'speed';
+/** The top bar's buttons (screen px, 640 x 360): NEW (tap twice), pause, the speed that cycles 1x, 2x, 4x, 8x, and MAP (the Map Room's table: plan S8). */
+export type ButtonName = 'new' | 'pause' | 'speed' | 'map';
 export const BUTTONS: Readonly<Record<ButtonName, Rect>> = Object.freeze({
   new: { x: 528, y: 1, w: 26, h: 13 },
   pause: { x: 558, y: 1, w: 16, h: 13 },
   speed: { x: 578, y: 1, w: 28, h: 13 },
+  map: { x: 610, y: 1, w: 26, h: 13 },
 });
+/** Where the coin the missions have brought home is shown (after the keepers' badges, which end at 328). */
+export const COIN_X = 334;
 /** The keepers' badges: 46 x 13 each from x 138, 48 apart (display only; S7 makes them tappable). */
 export const BADGE_X0 = 138, BADGE_DX = 48, BADGE_W = 46;
 /** The clock's x, and JOBS's while the clock is short (to day 9). */
@@ -47,14 +51,21 @@ const SKY_ICONS: Readonly<Record<'sun' | 'low' | 'moon', Sprite>> = Object.freez
   low: { rows: SUN_ROWS, colors: { s: '#f0905a' } },
   moon: { rows: ['...mmmm..', '..mmm....', '.mmm.....', '.mm......', '.mm......', '.mm......', '.mmm.....', '..mmm....', '...mmmm..'], colors: { m: '#f0ecd8' } },
 });
-/** A keeper's state on their badge: at a job (the font has no dot: a 3 x 3 one). */
+/** A keeper's state on their badge: at a job (the font has no dot: a 3 x 3 one); away on a mission (an arrow up and away); resting after one (a small z). */
 const BUSY: Sprite = { rows: ['bbb', 'bbb', 'bbb'], colors: { b: '#e3b23e' } };
+const AWAY: Sprite = { rows: ['.aaa', '..aa', '.a.a', 'a...'], colors: { a: '#8ecaf0' } };
+const REST: Sprite = { rows: ['zzz', '.z.', 'zzz'], colors: { z: '#c8b8e8' } };
 
 /** What the top bar shows. */
 export interface TopBar {
   clock: ClockRead;
   jobs: number;
-  keepers: readonly { name: string; look: KeeperId; busy: boolean }[];
+  /** Each keeper: at a job; and on a mission's trip (`away`, from the muster to the landing) or resting after one (`rest`). */
+  keepers: readonly { name: string; look: KeeperId; busy: boolean; trip?: 'away' | 'rest' | null }[];
+  /** The coin the missions have brought home. */
+  coin?: number;
+  /** The Map Room's overlay is open (the MAP button shows it). */
+  map?: boolean;
   /** World steps a frame: 0 paused, else the rate. */
   speed: Speed;
   /** The rate the speed button shows (and play resumes at). */
@@ -88,11 +99,15 @@ export function drawTopBar(ctx: CanvasRenderingContext2D, s: TopBar): void {
     ctx.fillStyle = INK; ctx.fillRect(x + 2, 3, 7, 9);
     ctx.fillStyle = KEEPER_PALETTES[k.look].primary; ctx.fillRect(x + 3, 4, 5, 7);
     text(ctx, k.name, x + 10, 4);
-    if (k.busy) drawSprite(ctx, BUSY, x + 43, 7.5);
+    if (k.trip === 'away') drawSprite(ctx, AWAY, x + 42, 7.5);
+    else if (k.trip === 'rest') drawSprite(ctx, REST, x + 42.5, 7.5);
+    else if (k.busy) drawSprite(ctx, BUSY, x + 43, 7.5);
   });
+  if (s.coin != null) text(ctx, `COIN ${s.coin}`, COIN_X, 4, '#f2d36a');
   button(ctx, BUTTONS.new, 'NEW', s.armed);
   button(ctx, BUTTONS.pause, 'II', s.speed === 0);
   button(ctx, BUTTONS.speed, `>${s.rate}X`, s.speed > 1);
+  button(ctx, BUTTONS.map, 'MAP', !!s.map);
 }
 
 /** The button under a screen point, if any. */

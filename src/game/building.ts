@@ -1,7 +1,7 @@
 // The base's building, drawn once (docs/BASE_DESIGN.md 2): the ground, the two stone towers with their window slits,
 // every room with its props, the gambrel roof over the hayloft, the Dragon Lift's shaft from the ground floor up
 // through the roof to its headframe over the Aerie, the keepers' centre ladder bay, and the Aerie deck on its gantry
-// over the roof, and the Garden Gate in the right tower's ground floor (plan S6: an 84 px arch in both its walls, the one
+// over the roof (its west end running on as the sky bridge a mission's team leaves by: plan S8), and the Garden Gate in the right tower's ground floor (plan S6: an 84 px arch in both its walls, the one
 // tower door a dragon fits, a straw floor straight through it, its gate leaf open against the back wall) -- transparent
 // above the ground and around its walls, where the view draws the sky (sky.ts: in screen space, behind it, so the day
 // turns without redrawing this); the garden beyond the gate is gardenArt.ts's. Greybox:
@@ -449,6 +449,12 @@ export function drawBuilding(rooms: readonly Room[]): HTMLCanvasElement {
   rect(g, gx0, deck - 20, gx1 - gx0, 4, INK); rect(g, gx0 + 1, deck - 19, gx1 - gx0 - 2, 2, TIMBER);
   rect(g, DECK_X0 - 1, deck - 1, DECK_X1 - DECK_X0 + 2, BAND + SLAB + 1, INK);
   floor(g, DECK_X0, DECK_X1, deck);
+  // (the sky bridge, plan S8: the deck's straw planks run on west past the world's edge -- a mission's team walks off
+  // it and lands on it: missions.ts -- with a rope rail on posts, the first one at the deck's end)
+  rect(g, 0, deck - 1, DECK_X0, BAND + SLAB + 1, INK);
+  floor(g, 0, DECK_X0 + 1, deck);
+  post(g, 3, deck - 16, deck);
+  rect(g, 0, deck - 15, 3, 3, INK); rect(g, 0, deck - 14, 3, 1, '#b89868');
   // (the flag, at the deck's west end)
   box(g, DECK_X0 + 1, deck - 40, 3, 40, TIMBER_DK, false); poly(g, [DECK_X0 + 3, deck - 40, DECK_X0 + 25, deck - 34, DECK_X0 + 3, deck - 28], '#f2c14e');
   // the lift's headframe over its head: two legs on the housing's posts, the beam a room's height over the deck, and

@@ -1,7 +1,7 @@
 // Starts built in code (view=base&preset=<name>): a world other than the new game's, for views and checks that need
 // what a new game has not got yet -- every stage at once, a dragon about to grow up, eggs in the nests (one about to
-// hatch), every baby sub-slot taken, elders in the garden and elders about to retire to it, and later (each slice
-// adds its own) a team away. A preset is always code, never a
+// hatch), every baby sub-slot taken, elders in the garden and elders about to retire to it, and a team mustering for
+// its mission (S9 adds a team away on the road). A preset is always code, never a
 // save and never hundreds of thousands of steps, so a frozen view of it (t=) is as quick and as deterministic as the
 // new game's.
 import { CareSim } from './sim.ts';
@@ -10,6 +10,8 @@ import { STAGE_DAYS, HATCH_DAYS, RETIRE_DAYS } from './clock.ts';
 import { NEEDS, hasNeed, moodOf } from './needs.ts';
 import { NAMES } from './names.ts';
 import { settleInGarden } from './garden.ts';
+import { send, autoRider, LOST_NEST } from './missions.ts';
+import type { Pair } from './trip.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from './start.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
@@ -74,6 +76,26 @@ export const GARDEN_RESIDENTS: readonly string[] = Object.freeze(['BRAMBLE', 'CO
 /** How far into its elder stage each of the `retire` preset's elders is: RETIRE_DAYS less a tenth of a day (18 s at 1x, 60 steps on a 600-step day). */
 export const RETIRE_AT = RETIRE_DAYS - 0.1;
 
+/** The `muster` preset's team: the two starters who meet THE LOST NEST (RIPPLE the flood, ECHO the lost things). */
+export const MUSTER_TEAM: readonly string[] = Object.freeze(['RIPPLE', 'ECHO']);
+/**
+ * Send THE LOST NEST (day 1's first mission) with MUSTER_TEAM, each with its auto rider (missions.ts): the muster
+ * starts at once. The `muster` preset's last touch, and sim-check's full trip (section 20) -- so the step it measures
+ * the team all on the deck at is the step the preset's shot shows.
+ */
+export function sendLostNest(sim: CareSim, opts: { awaySteps?: number } = {}): void {
+  const m = sim.missions.board.find((q) => q.title === LOST_NEST);
+  if (!m) throw new Error('muster: THE LOST NEST is not on the board');
+  const pairs: Pair[] = [];
+  for (const name of MUSTER_TEAM) {
+    const d = sim.dragons.find((q) => q.name === name)!, k = autoRider(sim, d, m, pairs);
+    if (k == null) throw new Error(`muster: no rider for ${name}`);
+    pairs.push({ dragon: d.id, keeper: k });
+  }
+  const t = send(sim, m.id, pairs, opts);
+  if (typeof t === 'string') throw new Error(`muster: ${t}`);
+}
+
 /** The presets by name (view=base&preset=<name>). */
 export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze({
   /** Every stage at once: the base's first twelve-dragon cast. */
@@ -112,6 +134,11 @@ export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze(
    * somewhere new (travel.ts redirectable), and walks out to the garden.
    */
   retire: () => ({ ...newGame(), dragons: START_DRAGONS.map((p): DragonPlace => ({ ...p, stage: 'elder', days: RETIRE_AT })) }),
+  /**
+   * The new game with THE LOST NEST sent at once (sendLostNest): RIPPLE and ECHO leave their rooms for the Dragon Lift
+   * and the Aerie, their riders fetch their saddles from the Tack Room and climb the left tower to the deck beside them.
+   */
+  muster: () => ({ ...newGame(), after: (sim) => sendLostNest(sim) }),
 });
 
 /** A preset's start by name; no name, or one no preset has, is the new game. */

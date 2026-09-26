@@ -5,6 +5,8 @@
 // This file never touches storage: src/game/storage.ts will (S4), and only from BaseView.attach().
 import type { CareSim, Dragon, Keeper, Job, SimStats, LiftState, Egg } from './sim.ts';
 import type { RoomPlace } from './layout.ts';
+import { copyMissions } from './missions.ts';
+import type { MissionsState } from './missions.ts';
 
 /**
  * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded.
@@ -17,8 +19,12 @@ import type { RoomPlace } from './layout.ts';
  * 6 (S6): the elder garden: its plots; a dragon's place (the barn or the garden), its plot (`home`) and a resident's
  * rhythm (`garden`: its mode, when a nap or a sit ends, its resting place), the `retire` goal; the longest retirement
  * delay (stats.retireDelayMax).
+ * 7 (S8): the missions -- the board and its day, the map (explored, to be revealed, first successes), the coin, the
+ * trip out (its mission, pairs, outcome, road and times) and each pair's deck spot; a dragon away (place `away`) or
+ * with a team (goal `muster`); a keeper's mission phases (muster, depart, away, deliver, rest) and what they carry
+ * (a saddle, the egg).
  */
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }
@@ -50,6 +56,8 @@ export interface SaveV {
   eggs: Egg[];
   /** The elder garden: its plots (its residents are dragons, above). */
   garden: { plots: number };
+  /** The missions (missions.ts): the board, the map, the coin, the trip out (its pairs by id). */
+  missions: MissionsState;
   stats: SimStats;
 }
 
@@ -81,6 +89,7 @@ export function serialize(sim: CareSim): SaveV {
     lift: { ...sim.lift, calls: sim.lift.calls.map((c) => ({ ...c })) },
     eggs: sim.eggs.map((e) => ({ ...e })),
     garden: { plots: sim.garden.plots },
+    missions: copyMissions(sim.missions),
     stats: { ...sim.stats, used: { ...sim.stats.used } },
   };
 }
