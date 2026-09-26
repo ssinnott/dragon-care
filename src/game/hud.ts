@@ -117,8 +117,8 @@ export function buttonAt(sx: number, sy: number): ButtonName | null {
 }
 
 /** A toast: outlined text centred over the barn under the top bar. */
-export function drawToast(ctx: CanvasRenderingContext2D, s: string): void {
-  drawTextOutlined(ctx, s, ctx.canvas.width / 2, 20, { size: 1, color: TEXT, outline: INK, thickness: 1, align: 'center', shadow: false });
+export function drawToast(ctx: CanvasRenderingContext2D, s: string, y = 20): void {
+  drawTextOutlined(ctx, s, ctx.canvas.width / 2, y, { size: 1, color: TEXT, outline: INK, thickness: 1, align: 'center', shadow: false });
 }
 
 /**

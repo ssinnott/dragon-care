@@ -412,7 +412,9 @@ be moved on, and in 80 000 steps its egg never finds a sub-slot while needs sit 
 - **The Map Room's table** (5.1): the world map and a mission's chooser, over the world (8, 18, 624 x 318) and under
   the top bar; the world waits while it is open. **The TEAM OUT chip** (520, 19, 114 x 15), while a team is out:
   MUSTER, TEAM OUT - 14H (game hours to go) or LANDING; a tap opens the trip's progress card (8, 20, 300 x 120: each
-  stop met, unmet, still ahead or never reached, the trip log's latest lines, the time left), a tap on it closes it.
+  stop met, unmet, still ahead or never reached -- a stop is shown as never reached only once the team has turned back,
+  so the card never tells a failure early -- the trip log's latest lines, the time left), a tap on it closes it. A toast
+  shown while the card or the table is open goes under the card or low in the table's panel, clear of their words.
 - **Bubbles** over the dragons.
 - **The job strip** along the bottom: the top five jobs in order, numbered, each chip in its tier's colour with a
   check or an hourglass. Tapping a chip pans to that dragon and rushes the job.
@@ -426,7 +428,7 @@ be moved on, and in 80 000 steps its egg never finds a sub-slot while needs sit 
   it gives way when the strip reaches it.
 - **Toasts**, centred under the top bar for 3 s: "SURE? TAP AGAIN", "A NEW BARN", "NEW BARN: THE OLD SAVE DIDN'T FIT",
   a grow-up ("EMBER IS AN ELDER NOW!"), a mission sent ("THE LOST NEST: THE TEAM MUSTERS ON THE AERIE") or landed
-  ("THE LOST NEST: HOME SAFE WITH 40 COIN AND AN EGG", or "... HOME EARLY WITH 20 COIN. NOBODY IS HURT.") and the dawn's tip at 05:00 ("3 DRAGONS GROW UP IN 2 DAYS": the dragons whose
+  ("THE LOST NEST: HOME SAFE WITH 40 COIN AND AN EGG", or "... BACK HOME WITH 20 COIN. NOBODY IS HURT.") and the dawn's tip at 05:00 ("3 DRAGONS GROW UP IN 2 DAYS": the dragons whose
   stage-up falls due within two game days). Life's news (the grow-ups, the tip) waits its turn behind the toast
   showing, never cutting it short, and grow-ups into one stage still waiting to be shown share one toast ("EMBER AND
   ZAP ARE ELDERS NOW!", "EMBER, BRAMBLE AND 2 MORE ARE ELDERS NOW!": the new game's seven all fall due at once).
@@ -509,7 +511,10 @@ stand spot <= 20 s, the bay's edge <= 60 s.
   A keeper the player has taken by hand is never picked. Babies stay home; the young go only on the easy missions;
   elders go (steadier, never weaker: D21); garden residents stay in the garden. SEND starts the **muster**: the team's
   dragons leave what they were doing (a keeper at work finishes) and ride the Dragon Lift up to the Aerie, first in the
-  car's calls, each to the westmost free spot on the deck; the riders fetch their saddles from the **Tack Room** and
+  car's calls, each to the westmost free spot on the deck (the car still carries one dragon at a time, so the muster
+  takes 2860 steps in a fresh barn -- 48 s at 1x -- and longer when the car is under way or a team dragon is being met:
+  sends in the middle of play measured median 3946, 90th percentile 5211 and at most 7308 steps over 360 sends, and
+  after landing both dragons are off the deck in median 4489, at most 8435 steps: a faster car is a follow-up); the riders fetch their saddles from the **Tack Room** and
   climb the left tower's ladder to stand beside them. All there, the team walks west off the deck over the **sky
   bridge** and is away: the bridge stands in for `fly`, which is not built (and rock and the young can't fly anyway).
   Away, the team is not drawn, its dragons' needs wait (and their stage-ups and retirement with them), and its riders
@@ -539,7 +544,10 @@ stand spot <= 20 s, the bay's edge <= 60 s.
 - **5.5 The outcome** is rolled when the team is sent (seeded, `rngAt(seed, MISSION, id)`), and so is the whole road:
   each challenge sits at (i + 1) / (n + 1) of 85 % of the way, the baddie at 90 %, each met or not and by whom.
   - success: the full coin, and the egg;
-  - failure: half the coin, no egg; the team turns back at the first stop nobody met (or the last, if every one was).
+  - failure: half the coin, no egg; the team turns back at the first stop nobody met (or the last, if every one was:
+    then its log says the weather turned). The trip still runs its full length.
+  - **Day 1's LOST NEST** is the first mission: a team that meets both of its challenges always succeeds (and brings
+    its sure egg home), whatever the seed's roll -- on seed 1, the default page's, the roll alone would fail it.
 
   Nobody is hurt: the team lands tired and hungry (food and sleep at most 45 % on a success, 30 % on a failure), so a
   mission always ends in a burst of bubbles in the barn.
@@ -807,7 +815,9 @@ stand spot <= 20 s, the bay's edge <= 60 s.
    preset's team too, on the real day, seed 1), away at 4100, landed at 4700 exactly (food and sleep down to at most
    45 %), the spike egg laid in its nest 1964 steps later and hatched two days on; the Map Room used once, the Tack Room
    4 times, the Aerie twice, the Bunks twice; 40 coin; FROSTMERE revealed at the next dawn. RIPPLE alone fails on seed 1
-   at 35 % and turns back at the lost things, with 20 coin and no egg. With the two pairs away 30 minutes of the real
+   at 35 % and turns back at the lost things, with 20 coin and no egg; met in full, the LOST NEST succeeds on all 20
+   seeds tried (BEST TEAM included). Musters sent in the middle of play (BEST TEAM, seeds 1-6, 600 and 1500 steps in)
+   take median 4243 and at most 5885 steps (the check's bound 9000). With the two pairs away 30 minutes of the real
    day, the five dragons and two keepers home did 104 jobs, a job waited 50.1 s on average (158.5 s at most), and no
    need ever emptied.
 2. **Rooms you build:** place, merge and upgrade rooms; move dragons between them; ~~save and load~~ (built: 7).

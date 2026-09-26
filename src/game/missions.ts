@@ -86,6 +86,8 @@ export const RIDER_SPOTS: readonly number[] = Object.freeze([211, 371]);
 export const BRIDGE_X = BRIDGE_X0, DEPART_X = -120;
 /** On landing, the lead dragon (the one going furthest along the deck) starts this far along the bridge (still off screen), the other at its end. */
 export const LAND_LEAD_X = -60;
+/** On landing, the lead pair's rider starts this far behind its dragon (the other rider at the bridge's end, 110 px behind). */
+export const RIDER_LAND_GAP = 30;
 /** Steps a rider takes a saddle down or hangs it back (sim.ts PICKUP's length), and rests in the Bunks after a trip (15 s). */
 export const SADDLE_STEPS = 40, REST_STEPS = 900;
 /** Needs on landing: food and sleep at most this (a success, a failure): the trip was long. */
@@ -279,16 +281,19 @@ export function canSend(sim: CareSim, m: Mission | null, pairs: readonly Pair[],
 
 // ---------- sending ----------
 
-/** The trip log's line for a stop. */
+/** Whether a mission is day 1's LOST NEST (the tutorial: met in full, it always succeeds). */
+export function tutorial(m: Mission): boolean { return m.title === LOST_NEST && m.region === 'millbrook' && m.id < 8; }
+
+/** The trip log's line for a stop (a failure met at every stop turns back at the last one, and says why: the weather). */
 function logLine(stop: Stop, turn: boolean, success: boolean): string {
-  const back = turn ? '. THEY TURN BACK FOR HOME' : '';
   if (stop.kind === 'baddie') {
     const b = BADDIES[stop.baddie!];
     if (!success) return `${b.name} KEEPS THE ROAD. HOME FOR TEA. NOBODY IS HURT.`;
     return stop.covered ? `${b.name} - ${stop.by.join(' AND ')}: IT ${b.how}` : `${b.name} - NOBODY COULD HELP, BUT IT ${b.how}`;
   }
   const c = CHALLENGES[stop.challenge!];
-  return stop.covered ? `${c.name} - ${stop.by[0]} ${c.met}${back}` : `${c.name} - NOBODY COULD HELP: ${turn ? 'THEY TURN BACK FOR HOME' : 'THEY WAIT IT OUT'}`;
+  if (turn && stop.covered) return `${c.name} - ${stop.by[0]} ${c.met}. THEN THE WEATHER TURNS: THEY HEAD HOME`;
+  return stop.covered ? `${c.name} - ${stop.by[0]} ${c.met}` : `${c.name} - NOBODY COULD HELP: ${turn ? 'THEY TURN BACK FOR HOME' : 'THEY WAIT IT OUT'}`;
 }
 
 /**
@@ -317,7 +322,9 @@ export function send(sim: CareSim, missionId: number, pairs: readonly Pair[], op
   const m = sim.missions.board.find((q) => q.id === missionId) ?? null;
   const why = canSend(sim, m, pairs, opts.taken);
   if (why) return why;
-  const mission = m!, odds = oddsOf(sim, mission, pairs), success = rngAt(sim.seed, TAG.MISSION, mission.id).next() < odds;
+  const mission = m!, odds = oddsOf(sim, mission, pairs);
+  // (day 1's LOST NEST is the first mission: a team meeting both of its challenges always brings its sure egg home)
+  const success = (tutorial(mission) && coverage(sim, mission, pairs).covered === mission.challenges.length) || rngAt(sim.seed, TAG.MISSION, mission.id).next() < odds;
   const region = regionOf(mission.region), nest = freeNest(sim);
   let egg: DragonElement | null = null;
   if (success && nest != null && (mission.guaranteedEgg || rngAt(sim.seed, TAG.EGG, mission.id).next() < mission.eggChance)) egg = region.eggs[rngAt(sim.seed, TAG.EGG, mission.id, 1).int(0, region.eggs.length - 1)];
@@ -461,7 +468,8 @@ function land(sim: CareSim, t: Trip): void {
   });
   t.pairs.forEach((p, i) => {
     const k = keeperOf(sim, p.keeper);
-    k.phase = 'deliver'; k.f = AERIE_F; k.x = BRIDGE_X; k.y = feetY(AERIE_F); k.facing = 1; k.t = 0;
+    // (the lead pair's rider lands a little behind its dragon, the other at the bridge's end: never one on the other)
+    k.phase = 'deliver'; k.f = AERIE_F; k.x = i === order[0] && order.length > 1 ? LAND_LEAD_X - RIDER_LAND_GAP : BRIDGE_X; k.y = feetY(AERIE_F); k.facing = 1; k.t = 0;
     k.carrying = t.egg && i === 0 ? 'egg' : 'saddle';
     sim.walkTo(k, k.carrying === 'egg' ? nestSpot(sim, t) : tackSpot(sim));
   });

@@ -102,33 +102,53 @@ const MOOD_DOT = (c: string): Sprite => ({ rows: ['.mm.', 'mmmm', 'mmmm', '.mm.'
 
 // ---------- the map ----------
 
-/** The polygon's path. */
-function polyPath(ctx: CanvasRenderingContext2D, pts: readonly number[]): void {
-  ctx.beginPath(); ctx.moveTo(pts[0], pts[1]);
-  for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
-  ctx.closePath();
+/**
+ * A polygon rasterised as pixel art: a mask over its bounding box of the pixels whose centre lies inside it (even-odd),
+ * so a land is whole pixels with no anti-aliased edge (G6: flat fills), and its ink is the mask's own edge.
+ */
+interface Mask { x0: number; y0: number; w: number; h: number; in: Uint8Array }
+function rasterise(pts: readonly number[]): Mask {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i < pts.length; i += 2) { x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]); y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]); }
+  x0 = Math.floor(x0); y0 = Math.floor(y0);
+  const w = Math.ceil(x1) - x0 + 1, h = Math.ceil(y1) - y0 + 1, m: Mask = { x0, y0, w, h, in: new Uint8Array(w * h) }, n = pts.length;
+  for (let r = 0; r < h; r++) {
+    const yc = y0 + r + 0.5, xs: number[] = [];
+    for (let i = 0; i < n; i += 2) {
+      const ax = pts[i], ay = pts[i + 1], bx = pts[(i + 2) % n], by = pts[(i + 3) % n];
+      if ((ay <= yc) !== (by <= yc)) xs.push(ax + ((yc - ay) * (bx - ax)) / (by - ay));
+    }
+    xs.sort((a, b) => a - b);
+    for (let i = 0; i + 1 < xs.length; i += 2) for (let x = Math.ceil(xs[i] - 0.5); x < Math.ceil(xs[i + 1] - 0.5); x++) m.in[r * w + x - x0] = 1;
+  }
+  return m;
+}
+/**
+ * Paint a mask row by row in runs of one colour: a pixel on its edge (a 4-neighbour outside) is 1 px ink, the rest
+ * `fill(x, y)`'s colour.
+ */
+function paintMask(ctx: CanvasRenderingContext2D, m: Mask, fill: (x: number, y: number) => string): void {
+  const at = (c: number, r: number) => c >= 0 && r >= 0 && c < m.w && r < m.h && m.in[r * m.w + c] === 1;
+  for (let r = 0; r < m.h; r++) {
+    let run: string | null = null, from = 0;
+    for (let c = 0; c <= m.w; c++) {
+      const col = c < m.w && at(c, r) ? (at(c - 1, r) && at(c + 1, r) && at(c, r - 1) && at(c, r + 1) ? fill(m.x0 + c, m.y0 + r) : INK) : null;
+      if (col === run) continue;
+      if (run) { ctx.fillStyle = run; ctx.fillRect(m.x0 + from, m.y0 + r, c - from, 1); }
+      run = col; from = c;
+    }
+  }
 }
 /** A region's land: a flat 2-band cel (its climate's fill, the lower third its shadow tone), inked. */
 function landFill(ctx: CanvasRenderingContext2D, pts: readonly number[], c: string): void {
-  let y0 = Infinity, y1 = -Infinity, x0 = Infinity, x1 = -Infinity;
-  for (let i = 0; i < pts.length; i += 2) { x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]); y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]); }
-  ctx.save();
-  polyPath(ctx, pts); ctx.fillStyle = c; ctx.fill(); ctx.clip();
-  const band = Math.round(y0 + (y1 - y0) * 0.68);
-  ctx.fillStyle = makeTones(c).sh; ctx.fillRect(x0 - 2, band, x1 - x0 + 4, y1 - band + 2);
-  ctx.restore();
-  polyPath(ctx, pts); ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.stroke();
+  let y0 = Infinity, y1 = -Infinity;
+  for (let i = 1; i < pts.length; i += 2) { y0 = Math.min(y0, pts[i]); y1 = Math.max(y1, pts[i]); }
+  const band = Math.round(y0 + (y1 - y0) * 0.68), sh = makeTones(c).sh;
+  paintMask(ctx, rasterise(pts), (_x, y) => (y >= band ? sh : c));
 }
 /** An unexplored region: plain fog, hatched with 2 px diagonals every 6 px (no alpha: the fog never fades), inked, a "?". */
 function fogFill(ctx: CanvasRenderingContext2D, pts: readonly number[], pin: readonly [number, number]): void {
-  let y0 = Infinity, y1 = -Infinity, x0 = Infinity, x1 = -Infinity;
-  for (let i = 0; i < pts.length; i += 2) { x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]); y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]); }
-  ctx.save();
-  polyPath(ctx, pts); ctx.fillStyle = FOG; ctx.fill(); ctx.clip();
-  ctx.fillStyle = HATCH;
-  for (let y = Math.floor(y0); y <= y1; y++) for (let x = Math.floor(x0) - ((Math.floor(x0) + y) % 6 + 6) % 6; x <= x1; x += 6) ctx.fillRect(x, y, 2, 1);
-  ctx.restore();
-  polyPath(ctx, pts); ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.stroke();
+  paintMask(ctx, rasterise(pts), (x, y) => ((((x + y) % 6) + 6) % 6 < 2 ? HATCH : FOG));
   drawTextOutlined(ctx, '?', pin[0], pin[1] - 3, { size: 1, color: '#f3e6c8', outline: INK, thickness: 1, align: 'center', shadow: false });
 }
 /** A dotted road: 2 x 2 dots every 6 px from a to b, clear of both ends by `pad`. */
@@ -349,10 +369,13 @@ export function tripProgress(sim: CareSim, t: Trip): number {
   if (t.state !== 'away') return 1;
   return Math.max(0, Math.min(1, (sim.clock - t.departAt) / (t.returnAt - t.departAt)));
 }
-/** Where each stop is: reached and met, reached and unmet, not reached yet, or never (past the turn-back). */
+/**
+ * Where each stop is: reached and met, reached and unmet, not reached yet, or never (past the turn-back) -- shown only
+ * once the team has reached the turn-back stop, so the card never tells a failure before it happens.
+ */
 export function stopStates(sim: CareSim, t: Trip): ('met' | 'unmet' | 'ahead' | 'never')[] {
-  const e = tripProgress(sim, t);
-  return t.stops.map((s, i) => (t.turnBack != null && i > t.turnBack ? 'never' : e >= s.at ? (s.covered ? 'met' : 'unmet') : 'ahead'));
+  const e = tripProgress(sim, t), turned = t.turnBack != null && e >= t.stops[t.turnBack].at;
+  return t.stops.map((s, i) => (turned && i > t.turnBack! ? 'never' : e >= s.at ? (s.covered ? 'met' : 'unmet') : 'ahead'));
 }
 
 /** The words fitted to a width (cut on a space), as lines. */

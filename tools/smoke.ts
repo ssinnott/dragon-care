@@ -86,6 +86,8 @@ interface Case {
   act?: (page: any) => Promise<string[]>;
   /** Before the page loads (a save planted in its storage). */
   init?: (page: any) => Promise<void>;
+  /** The Map Room's panel (inside its border, screen px 12-628 x 22-332): at most this many colours (flat pixel-art fills, no anti-aliased edges: G6). */
+  maxPanelColours?: number;
   /** Hash the frame (an in-page FNV-1a over the canvas's pixels) for TINT: the whole frame, and the world between the HUD's bars (rows 16-338). */
   hash?: boolean;
 }
@@ -581,7 +583,7 @@ const CASES: Case[] = [
   { query: 'view=base&preset=garden&cam=1304,376&t=600&hour=22', minColours: 150, allScales: false, check: (b) => [...gardenIs(3, 3)(b), ...timeFields('night', false)(b)] },
   // missions (plan S8): the Map Room's world map and a mission's chooser (frozen, the world stepped first), the muster
   // preset's team all on the Aerie deck, and live, MAP -> a pin -> BEST TEAM -> SEND
-  { query: 'view=base&t=60&panel=map', minColours: 100, allScales: false, check: tableIs('map') },
+  { query: 'view=base&t=60&panel=map', minColours: 100, maxPanelColours: 40, allScales: false, check: tableIs('map') },
   { query: 'view=base&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: tableIs('mission') },
   { query: 'view=base&preset=muster&t=2860&cam=0,20', minColours: 150, allScales: false, check: (b) => [...mustered(b), ...travels(b)] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseMission },
@@ -674,6 +676,15 @@ for (const c of CASES) {
       for (let i = 0; i < d.length; i += 4) seen.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
       return [...seen];
     });
+    if (c.maxPanelColours != null) {
+      const n: number = await page.evaluate(() => {
+        const cv = document.getElementById('stage') as HTMLCanvasElement, s = cv.width / 640;
+        const d = cv.getContext('2d')!.getImageData(Math.round(12 * s), Math.round(22 * s), Math.round(616 * s), Math.round(310 * s)).data, seen = new Set<number>();
+        for (let i = 0; i < d.length; i += 4) seen.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
+        return seen.size;
+      });
+      if (n > c.maxPanelColours) errors.push(`the map's panel has ${n} colours (want <= ${c.maxPanelColours}): anti-aliased edges?`);
+    }
     const set = new Set(colours);
     if (colours.length < c.minColours) errors.push(`only ${colours.length} distinct colours (want >= ${c.minColours}): were dragons drawn?`);
     if (c.keepers) {

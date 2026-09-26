@@ -66,7 +66,7 @@ import type { KeeperAgent } from '../care/keeper.ts';
 import { drawBubble, drawChip, hit } from './icons.ts';
 import type { Rect } from './icons.ts';
 import { send, onTrip } from './missions.ts';
-import { newUi, drawMapScreen, drawMissionScreen, editTeam, drawTeamChip, drawTripCard, hitAt, chosen, tripProgress, CHIP, TRIP_CARD } from './maptable.ts';
+import { newUi, drawMapScreen, drawMissionScreen, editTeam, drawTeamChip, drawTripCard, hitAt, chosen, tripProgress, CHIP, TRIP_CARD, PANEL } from './maptable.ts';
 import type { MapUi, Hit } from './maptable.ts';
 
 const INK = '#1a1018';
@@ -384,7 +384,7 @@ export class BaseView {
     const t = sim.missions.trip, now = t?.state ?? null;
     if (t && now === 'return' && this.tripWas === 'away') {
       const c = t.success ? t.mission.coin : Math.floor(t.mission.coin / 2);
-      this.news.push({ text: t.success ? `${t.mission.title}: HOME SAFE WITH ${c} COIN${t.egg ? ' AND AN EGG' : ''}` : `${t.mission.title}: HOME EARLY WITH ${c} COIN. NOBODY IS HURT.` });
+      this.news.push({ text: t.success ? `${t.mission.title}: HOME SAFE WITH ${c} COIN${t.egg ? ' AND AN EGG' : ''}` : `${t.mission.title}: BACK HOME WITH ${c} COIN. NOBODY IS HURT.` });
     }
     this.tripWas = now;
     if (sim.clock % sim.dayLen === PHASE_HOURS.dawn * hourSteps(sim.dayLen)) {
@@ -547,7 +547,8 @@ export class BaseView {
       // the Map Room table's overlays, over the world and under the top bar's line
       if (this.ui.screen === 'map') this.uiHits = drawMapScreen(ctx, this.sim);
       else if (this.ui.screen === 'mission') this.uiHits = drawMissionScreen(ctx, this.sim, this.ui);
-      if (this.toast) drawToast(ctx, this.toast.text);
+      // (the toast under the trip's card, or low in an open overlay's panel, so it never runs over their words)
+      if (this.toast) drawToast(ctx, this.toast.text, this.ui.screen !== 'none' ? PANEL.y + PANEL.h - 14 : this.ui.card && this.sim.missions.trip ? TRIP_CARD.y + TRIP_CARD.h + 6 : 20);
     }
     if (typeof window !== 'undefined' && window.__dragonCare) {
       const st = this.sim.stats, chip = this.chipRect as Rect | null;

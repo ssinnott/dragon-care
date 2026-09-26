@@ -96,9 +96,13 @@
 //    and the Aerie; the muster in 3600 steps or fewer; away, the team asks for nothing and its needs wait; back at
 //    returnAt exactly, food and sleep down; the egg laid in its reserved nest (and hatched two days on), the saddles
 //    back, the Bunks, the riders on duty again, the coin paid, the neighbour revealed at the next dawn. And the step the
-//    muster preset's team stands on the deck (the base_muster shot).
-// 21. A failure: a low-odds send that fails turns back at its first unmet stop, with half the coin and no egg.
-// 22. A trip's outcome is its seed's: the same send on 20 seeds, twice, the same outcome, egg and road.
+//    muster preset's team stands on the deck (the base_muster shot). And musters sent in the middle of play (BEST TEAM
+//    on a board mission, seeds 1-6, 600 and 1500 steps in): each done within MUSTER_MID_MAX (the lift serves one dragon
+//    at a time, so a car already under way, or a team dragon at work, makes it longer than a fresh world's).
+// 21. A failure: a low-odds send that fails turns back at its first unmet stop, with half the coin and no egg; a failure
+//    that met every stop turns back at the last and says why (the weather).
+// 22. A trip's outcome is its seed's: the same sends on 20 seeds, twice, the same outcome, egg and road; day 1's LOST
+//    NEST met in full always succeeds (the tutorial: seed 1's roll alone would fail it), BEST TEAM on it included.
 // 23. Care while a team is away (P13: two keepers home are enough): a two-pair team away 30 minutes of the real day;
 //    no need at home ever empties, and the barn's service holds (the average wait within 25 % of section 2's gate).
 import { isDeepStrictEqual } from 'node:util';
@@ -109,7 +113,7 @@ import { nextStage, stageDue, inTheWayOfGrowing, HATCH_FOOD } from '../src/game/
 import { NAMES, NAME_MAX, hatchName } from '../src/game/names.ts';
 import { GROWUP_IN, HATCH_IN, EGGS_PRESET, sendLostNest } from '../src/game/presets.ts';
 import {
-  boardFor, oddsOf, autoRider, bestTeam, dragonReason, canSend, send, onTrip, DIFFICULTY, BADDIE_FROM_DAY, BOARD_MAX, LOST_NEST, HOME_KEEPERS,
+  boardFor, oddsOf, autoRider, bestTeam, dragonReason, canSend, send, onTrip, roadOf, tutorial, DIFFICULTY, BADDIE_FROM_DAY, BOARD_MAX, LOST_NEST, HOME_KEEPERS,
 } from '../src/game/missions.ts';
 import type { Taken } from '../src/game/missions.ts';
 import { REGIONS, regionOf } from '../src/game/regions.ts';
@@ -1697,6 +1701,8 @@ if (MAIN) {
 
 // ---------- 20. a full trip: THE LOST NEST (#5.4, #5.6, #11) ----------
 let musterAt = 0;
+/** The longest a muster sent in the middle of play may take (2.5 min at 1x; a fresh world's is 2860 steps). */
+const MUSTER_MID_MAX = 9000;
 if (MAIN) {
   // (a) the muster preset's world (the real day, seed 1): the step everyone stands on the deck (the base_muster shot)
   {
@@ -1766,6 +1772,20 @@ if (MAIN) {
   while (!baby() && w.tick < laid + 2 * w.dayLen + 3000) w.step();
   if (!baby()) fail(`trip: the ${t.egg} egg never hatched`);
   noteUse(w, used0);
+  // (c) musters in the middle of play: BEST TEAM on a board mission, seeds 1-6, 600 and 1500 steps into a 600-step day
+  const mids: number[] = [];
+  for (let seed = 1; seed <= 6; seed++) for (const off of [600, 1500]) {
+    const v = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed, dayLen: 600 });
+    for (let s = 0; s < off; s++) v.step();
+    const m = v.missions.board[seed % v.missions.board.length], r = send(v, m.id, bestTeam(v, m), { awaySteps: 300 });
+    if (typeof r === 'string') { fail(`trip: seed ${seed}, ${off} steps in: BEST TEAM on ${m.title} refused: ${r}`); continue; }
+    let s = 0;
+    while (r.state === 'muster' && s < MUSTER_MID_MAX + 1) { v.step(); s++; }
+    if (r.state === 'muster') fail(`trip: seed ${seed}, ${off} steps in: ${m.title}'s muster took over ${MUSTER_MID_MAX} steps`);
+    mids.push(s);
+  }
+  mids.sort((a, b) => a - b);
+  console.log(`  20 trip: mid-play musters (BEST TEAM, seeds 1-6, 600 and 1500 steps in): median ${mids[mids.length >> 1]}, max ${mids[mids.length - 1]} steps (bound ${MUSTER_MID_MAX})`);
   console.log(`  20 trip: the muster preset (the real day, seed 1) all on the deck at step ${musterAt}; THE LOST NEST (seed 2, a 600-step day) with ${t.pairs.map((p, i) => `${team[i].name} and ${riders[i].name}`).join(', ')}: odds ${(t.odds * 100).toFixed(0)} %, ${t.success ? 'a success' : 'a failure'}, a ${t.egg} egg for nest ${t.nest}; mustered in ${departed} steps (both up by the lift), away at ${awayAt}, landed at ${landedAt} (returnAt, exactly: ${landNeeds}), the egg laid at ${laid}, over at ${overAt}; the Map Room used ${used('maproom')}, the Tack Room ${used('tack')}, the Aerie ${used('aerie')}, the Bunks ${used('bunks')}; coin ${w.missions.coin}; FROSTMERE revealed at the next dawn; ${baby()?.name} hatched`);
 }
 
@@ -1788,6 +1808,11 @@ if (MAIN) {
     for (let s = 0; s < 20000 && w.missions.trip; s++) w.step();
     if (w.missions.trip || w.missions.coin !== 20 || w.eggs.length !== eggs || w.missions.pendingReveal.length || w.missions.firstSuccess.length) fail(`failure: the trip ended with ${w.missions.coin} coin, ${w.eggs.length} eggs, reveals ${w.missions.pendingReveal}`);
     noteUse(w);
+    // (a failure that met every stop turns back at the last, and its log says why)
+    const v = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1, dayLen: 600 }), m = v.missions.board[0];
+    const road = roadOf(v, m, bestTeam(v, m), false), last = road.stops[road.stops.length - 1];
+    if (!road.stops.every((s) => s.covered) || road.turnBack !== road.stops.length - 1 || !/WEATHER TURNS/.test(last.log)) fail(`failure: met in full, it turns back at ${road.turnBack} ("${last.log}")`);
+    console.log(`  21 failure: met in full and still failing, the last stop says why: "${last.log}"`);
     console.log(`  21 failure: seed ${seed} (of ${tried} tried) fails RIPPLE alone on THE LOST NEST at ${(t.odds * 100).toFixed(0)} %: it turns back at stop ${t.turnBack} ("${t.stops[t.turnBack!].log}"), home with ${w.missions.coin} coin (half) and no egg, nothing revealed`);
   }
 }
@@ -1795,16 +1820,31 @@ if (MAIN) {
 // ---------- 22. a trip's outcome is the seed's ----------
 if (MAIN) {
   // the same send on 20 seeds, twice: the same outcome, egg and road each time (rolled once, at SEND, from rngAt)
-  const run = (seed: number) => { const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed, dayLen: 600 }); sendLostNest(w); const t = w.missions.trip!; return JSON.stringify({ s: t.success, e: t.egg, n: t.nest, r: t.stops.map((s) => s.log), b: t.turnBack }); };
-  let wins = 0, eggs = 0;
+  // (the LOST NEST by the muster team; the LOST NEST by BEST TEAM; and the day's second mission by BEST TEAM: a real roll)
+  const trip = (w: CareSim) => { const t = w.missions.trip!; return { s: t.success, e: t.egg, n: t.nest, r: t.stops.map((s) => s.log), b: t.turnBack }; };
+  const world = (seed: number) => new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed, dayLen: 600 });
+  const run = (seed: number) => {
+    const a = world(seed); sendLostNest(a);
+    const b = world(seed), bm = b.missions.board[0]; send(b, bm.id, bestTeam(b, bm));
+    const c = world(seed), cm = c.missions.board[1]; send(c, cm.id, bestTeam(c, cm));
+    return JSON.stringify([trip(a), trip(b), c.missions.trip ? trip(c) : null]);
+  };
+  let wins = 0, eggs = 0, rolled = 0, rolledWins = 0;
   for (let seed = 1; seed <= 20; seed++) {
     const a = run(seed), b = run(seed), p = JSON.parse(a);
-    if (a !== b) fail(`outcome: seed ${seed}'s send differs run to run`);
-    if (p.s) wins++;
-    if (p.e) eggs++;
-    if (!!p.e !== p.s) fail(`outcome: seed ${seed}'s ${p.s ? 'success' : 'failure'} ${p.e ? 'brought' : 'did not bring'} an egg (a first success always does, a failure never)`);
+    if (a !== b) fail(`outcome: seed ${seed}'s sends differ run to run`);
+    if (!p[0].s || !p[1].s) fail(`outcome: seed ${seed}'s LOST NEST met in full failed (the muster team ${p[0].s}, BEST TEAM ${p[1].s})`);
+    for (const q of p) {
+      if (!q) continue;
+      if (q.s) wins++;
+      if (q.e) eggs++;
+      if (!!q.e !== q.s) fail(`outcome: seed ${seed}'s ${q.s ? 'success' : 'failure'} ${q.e ? 'brought' : 'did not bring'} an egg (a first success always does, a failure never)`);
+    }
+    if (p[2]) { rolled++; if (p[2].s) rolledWins++; }
   }
-  console.log(`  22 outcome: 20 seeds' LOST NEST, each the same twice: ${wins} successes, ${eggs} eggs (the first success in a region: always one)`);
+  const nest1 = world(1), m1 = nest1.missions.board[0];
+  if (!tutorial(m1) || tutorial(nest1.missions.board[1])) fail('outcome: only day 1\'s LOST NEST is the tutorial');
+  console.log(`  22 outcome: 20 seeds, three sends each, the same twice: ${wins} successes, ${eggs} eggs (a first success in a region always brings one); the LOST NEST met in full succeeded on all 20 (seed 1's BEST TEAM at ${Math.round(oddsOf(nest1, m1, bestTeam(nest1, m1)) * 100)} %), the day's second mission by BEST TEAM ${rolledWins} of ${rolled}`);
 }
 
 // ---------- 10 (its worker's result) ----------
