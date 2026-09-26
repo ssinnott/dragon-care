@@ -38,7 +38,8 @@ export const PATH_EDGE = '#c2baa2';
 /**
  * The mission scene's ground under and below its road (plan S9, missionview.ts): the road band's back edge (a 1 px
  * line), the road's slab, the strip of grass below the slab in the green climates (never underfoot: D3), and the
- * earth down to the screen's bottom. Gate (w), as backdrops: a dragon walking the road is seen against them.
+ * earth down to the screen's bottom. Gate (w), as backdrops: a dragon walking the road is seen against them. Drawn as
+ * they are at every hour, never through NIGHT: not the barn.
  */
 export const ROAD_SCENE = Object.freeze({ edge: '#c4bca8', slab: '#b8ab90', grass: '#8fae76', earth: '#a88e6e' });
 
@@ -162,14 +163,12 @@ const NIGHT_MOONLIT: readonly string[] = [
 /**
  * Day colours that are the same at night, on purpose (so they are in NIGHT, mapped to themselves): the nests' and the
  * garden's mounds' straw (and the dorm's mattresses: the same colour), which is straw like the floor and keeps the egg
- * gate's contrast; the hearth's firebox and the doorways' dark, already the dark of a mouth; and the mission scene's
- * ground (ROAD_SCENE: the road's edge line, its slab, the earth), which is not the barn -- the watch overlay draws it
- * (missionview.ts) the same at every hour, never into the building's or the garden's canvases, and its night is its
- * region's climate picture's, drawn per phase (artseams.ts drawClimate; the art kit's, S9a); its edge line lies along
- * the road, a floor, like the straw's seam. (The scene's grass strip is the garden lawn's hex, BACKDROPS.lawn: its
- * entry is the lawn's, moonlit, and stays so -- a keep here would stop the lawn turning at night.)
+ * gate's contrast; the hearth's firebox and the doorways' dark, already the dark of a mouth. (The mission scene's
+ * ground, ROAD_SCENE, is in neither list: it is not the barn -- the watch overlay draws it (missionview.ts) as it is at
+ * every hour, never through this table nor into the building's or the garden's canvases, and its night is its region's
+ * climate picture's, drawn per phase (artseams.ts drawClimate; the art kit's, S9a). Gate (w) gates it by day only.)
  */
-const NIGHT_KEEPS: readonly string[] = [NEST, PROPS.mattress, PROPS.firebox, '#3a2a26', ROAD_SCENE.edge, ROAD_SCENE.slab, ROAD_SCENE.earth];
+const NIGHT_KEEPS: readonly string[] = [NEST, PROPS.mattress, PROPS.firebox, '#3a2a26'];
 /**
  * The ONE night table: a day colour to its night colour (plan S6c N4). The building (building.ts) and the garden
  * (gardenArt.ts) are drawn through it -- every fill, and the cel tones made from it -- at the night's step (sky.ts

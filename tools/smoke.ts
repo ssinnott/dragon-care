@@ -417,10 +417,12 @@ function sceneIs(want: Partial<NonNullable<BaseHook['scene']>>) {
 /**
  * view=base&preset=trip, live (save=0; plan S9): a team is out, so the TEAM OUT chip shows under the top bar; a tap on
  * it opens the scene over the barn (the world stepping on underneath), and BACK TO BARN closes it. Then the watch
- * overlay beside taking a keeper (plan S7; the merge): BEA taken by her badge and the scene opened, she stays held but
- * stands still under it -- d held walks her nowhere, and the line over the pad is gone -- a tap on the pad's arrow or on
- * the world is the overlay's (swallowed: never a pad press, nor empty space letting her go), Esc goes back to the barn
- * with her still held, and over the scene again TOMAS's badge goes back to the barn and takes him.
+ * overlay beside taking a keeper (plan S7; the merge), with keepers who are not on the trip (its riders, BEA and IRIS,
+ * are away on the road once S8's trips are in, and never taken): TOMAS taken by his badge and the scene opened, he
+ * stays held but stands still under it -- d held walks him nowhere, and the line over the pad is gone -- a tap on the
+ * pad's arrow or on the world is the overlay's (swallowed: never a pad press, nor empty space letting him go), Esc goes
+ * back to the barn with him still held and walking on with d still down, and over the scene again PIP's badge goes
+ * back to the barn and takes him.
  */
 async function baseWatch(page: any): Promise<string[]> {
   const out: string[] = [];
@@ -446,33 +448,39 @@ async function baseWatch(page: any): Promise<string[]> {
   const click = (x: number, y: number) => page.mouse.click(box.x + x * k, box.y + y * k);
   const held = (name: string | null) => page.waitForFunction((n: string | null) => (window as any).__dragonCare?.base?.controlled === n, name, { timeout: 5000 }).then(() => true, () => false);
   const screen = (want: string) => page.waitForFunction((w: string) => (window as any).__dragonCare?.base?.ui?.screen === w, want, { timeout: 5000 }).then(() => true, () => false);
-  const beaX = (h: BaseHook) => h.keepers.find((q) => q.name === 'BEA')!.x;
-  const bb = d.badges.BEA, tb = d.badges.TOMAS;
-  await click(bb.x + bb.w / 2, bb.y + bb.h / 2);
-  if (!(await held('BEA'))) return [...out, `a tap on BEA's badge: controlled is ${(await st()).controlled}`];
+  const tomasX = (h: BaseHook) => h.keepers.find((q) => q.name === 'TOMAS')!.x;
+  const tb = d.badges.TOMAS, pb = d.badges.PIP;
+  await click(tb.x + tb.w / 2, tb.y + tb.h / 2);
+  if (!(await held('TOMAS'))) return [...out, `a tap on TOMAS's badge: controlled is ${(await st()).controlled}`];
   await page.waitForTimeout(200);
   await click(chip.x + chip.w / 2, chip.y + chip.h / 2);
-  if (!(await screen('watch'))) return [...out, `BEA held, the TEAM OUT chip left the overlay ${(await st()).ui?.screen}`];
-  const e = await st(), ex = beaX(e);
-  if (e.controlled !== 'BEA' || e.action !== null) out.push(`the scene opened with BEA held: controlled ${e.controlled}, the line ${JSON.stringify(e.action)}`);
-  await page.keyboard.down('d'); await page.waitForTimeout(400); await page.keyboard.up('d');
+  if (!(await screen('watch'))) return [...out, `TOMAS held, the TEAM OUT chip left the overlay ${(await st()).ui?.screen}`];
+  const e = await st(), ex = tomasX(e);
+  if (e.controlled !== 'TOMAS' || e.action !== null) out.push(`the scene opened with TOMAS held: controlled ${e.controlled}, the line ${JSON.stringify(e.action)}`);
+  // (d stays down from here until TOMAS has walked on in the barn)
+  await page.keyboard.down('d'); await page.waitForTimeout(400);
   const pr = e.pad.right;
   await click(pr.x + pr.w / 2, pr.y + pr.h / 2);
   await click(320, 200);
   await page.waitForTimeout(150);
-  const f = await st(), fx = beaX(f);
-  if (Math.abs(fx - ex) > 0.5) out.push(`over the scene, d and a tap on the pad's arrow walked BEA from x ${ex.toFixed(1)} to ${fx.toFixed(1)}`);
-  if (f.ui?.screen !== 'watch' || f.controlled !== 'BEA') out.push(`taps on the pad and the world over the scene: the overlay ${f.ui?.screen}, controlled ${f.controlled}`);
+  const f = await st(), fx = tomasX(f);
+  if (Math.abs(fx - ex) > 0.5) out.push(`over the scene, d and a tap on the pad's arrow walked TOMAS from x ${ex.toFixed(1)} to ${fx.toFixed(1)}`);
+  if (f.ui?.screen !== 'watch' || f.controlled !== 'TOMAS') out.push(`taps on the pad and the world over the scene: the overlay ${f.ui?.screen}, controlled ${f.controlled}`);
   await page.keyboard.press('Escape');
   if (!(await screen('none'))) out.push(`Esc over the scene left the overlay ${(await st()).ui?.screen}`);
-  if ((await st()).controlled !== 'BEA') out.push(`Esc over the scene let go of BEA (controlled ${(await st()).controlled})`);
+  if ((await st()).controlled !== 'TOMAS') out.push(`Esc over the scene let go of TOMAS (controlled ${(await st()).controlled})`);
+  const g0 = tomasX(await st());
+  await page.waitForTimeout(400);
+  const gx = tomasX(await st());
+  await page.keyboard.up('d');
+  if (!(gx > g0 + 5)) out.push(`back in the barn with d still down, TOMAS stood (x ${g0.toFixed(1)} -> ${gx.toFixed(1)})`);
   await click(chip.x + chip.w / 2, chip.y + chip.h / 2);
   if (!(await screen('watch'))) out.push(`the TEAM OUT chip again left the overlay ${(await st()).ui?.screen}`);
-  await click(tb.x + tb.w / 2, tb.y + tb.h / 2);
-  if (!(await screen('none')) || !(await held('TOMAS'))) out.push(`over the scene, TOMAS's badge: the overlay ${(await st()).ui?.screen}, controlled ${(await st()).controlled}`);
+  await click(pb.x + pb.w / 2, pb.y + pb.h / 2);
+  if (!(await screen('none')) || !(await held('PIP'))) out.push(`over the scene, PIP's badge: the overlay ${(await st()).ui?.screen}, controlled ${(await st()).controlled}`);
   await page.keyboard.press('Escape');
   if (!(await held(null))) out.push(`back in the barn, Esc left ${(await st()).controlled} held`);
-  if (!out.length) console.log(`        watch: the chip opened the scene (${b.scene?.stop ?? 'on the road'}, ${Math.round((b.scene?.progress ?? 0) * 100)} % along), the world stepped on under it, BACK returned to the barn; BEA held under the scene stood still (x ${ex.toFixed(0)} -> ${fx.toFixed(0)} through d, the pad and a tap on the world), Esc back to the barn with her held, TOMAS's badge over the scene back to the barn and him taken`);
+  if (!out.length) console.log(`        watch: the chip opened the scene (${b.scene?.stop ?? 'on the road'}, ${Math.round((b.scene?.progress ?? 0) * 100)} % along), the world stepped on under it, BACK returned to the barn; TOMAS (not a rider) held under the scene stood still (x ${ex.toFixed(0)} -> ${fx.toFixed(0)} through d, the pad and a tap on the world), Esc back to the barn with him held, walking on with d still down (x ${g0.toFixed(0)} -> ${gx.toFixed(0)}), PIP's badge over the scene back to the barn and him taken`);
   return out;
 }
 

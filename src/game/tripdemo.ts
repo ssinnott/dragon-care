@@ -13,6 +13,7 @@ import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
 import { OWN_NEED } from './needs.ts';
 import { rngAt, TAG } from './rand.ts';
+import { isTaken } from './seams.ts';
 
 /** What meets a challenge: a dragon of an element, or a rider with a skill (plan S8's counters). */
 export interface Counter { element?: DragonElement; skill?: Skill }
@@ -73,13 +74,13 @@ export function demoMission(sim: CareSim, region: RegionId, difficulty: Difficul
   return { id: 900 + ri, region, title, difficulty, challenges: out, baddie: difficulty === 'hard' ? R.baddie : null, days: D.days, coin: D.coin, eggChance: D.egg, guaranteedEgg: true };
 }
 
-/** Riders picked as S8's auto-pick does: each dragon's partner (the keeper whose specialty is its own need) if free, else one who counters a challenge still uncovered, else anyone free (lowest id first); at most keepers - 2. */
+/** Riders picked as S8's auto-pick does: each dragon's partner (the keeper whose specialty is its own need) if free, else one who counters a challenge still uncovered, else anyone free (lowest id first); at most keepers - 2. Free: not picked yet, and not taken by the player's hand (seams.ts isTaken: plan S8's contract). */
 function autoRiders(sim: CareSim, m: Mission, dragons: readonly Dragon[]): (Keeper | null)[] {
   const taken = new Set<Keeper>(), out: (Keeper | null)[] = [];
   const max = Math.max(0, sim.keepers.length - 2);
   for (const d of dragons) {
     if (taken.size >= max) { out.push(null); continue; }
-    const free = sim.keepers.filter((k) => !taken.has(k));
+    const free = sim.keepers.filter((k) => !taken.has(k) && !isTaken(sim, k.id));
     const team = dragons, riders = [...taken];
     const uncovered = m.challenges.filter((c) => !team.some((q) => meets(CHALLENGE_DATA[c].counter, q, null)) && !riders.some((k) => meets(CHALLENGE_DATA[c].counter, null, k)));
     const pick = free.find((k) => k.specialty === OWN_NEED[d.element])

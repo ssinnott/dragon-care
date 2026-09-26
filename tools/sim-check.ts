@@ -105,7 +105,7 @@
 //    the frame's move, within 1e-9), a baddie's face only one of the four, and its exit (calmed, outwitted, driven off)
 //    shown on a success; the view's team (ScenePets), synced by clock jumps of 1, 8 and 40 and across a 1000-step gap,
 //    playing the walk frame the road says on every travel step; the trip preset puts a team exactly that far along at
-//    the frozen step.
+//    the frozen step; the preview's rider pick (tripdemo.ts) passes over a keeper taken by hand (seams.ts isTaken).
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
@@ -1881,7 +1881,15 @@ if (MAIN) {
     const t = currentTrip(w), f = t && sceneAt(w, t);
     if (!f || f.E !== Math.round(p * f.L)) fail(`scene: trip=${q} at t=60 is at E ${f?.E} of ${f?.L}, not ${p}`);
   }
-  console.log(`  24 scene: ${lines.join('; ')}; ${frames} steps read, ${travelSteps} travel steps without a skate, the baddie in view ${inFrame} of them; the scene's types have no hurt state, and exits only calmed, outwitted or driven off`);
+  // (the preview's rider pick asks the missions' seam, as S8's must: BEA, a rider of the Old Mine Road's best team,
+  // taken by hand first, rides no more)
+  {
+    const w = newSim(1), bea = w.keepers.find((k) => k.name === 'BEA')!, rides = () => demoTrip(w, 'oldmine', 'hard', true).pairs.some((p) => p.keeper === bea.id);
+    const before = rides();
+    w.command({ kind: 'take', keeper: bea.id }); w.step();
+    if (!before || !isTaken(w, bea.id) || rides()) fail(`scene: the rider pick with BEA taken: she rode ${before} before, taken ${isTaken(w, bea.id)}, rides ${rides()}`);
+  }
+  console.log(`  24 scene: ${lines.join('; ')}; ${frames} steps read, ${travelSteps} travel steps without a skate, the baddie in view ${inFrame} of them; the scene's types have no hurt state, and exits only calmed, outwitted or driven off; a keeper taken by hand is never picked to ride (seams.ts isTaken)`);
 }
 
 // ---------- 10 (its worker's result) ----------

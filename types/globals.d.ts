@@ -61,8 +61,9 @@ interface Window {
      * 'manual' while held by hand and free -- what they carry, and their tap box in canvas px), the keeper held by hand
      * (or taken at work, finishing it first) by name or null, the keepers' badges in the top bar (canvas px, by name: a
      * tap takes that keeper or lets go of the one held), the touch pad's buttons (canvas px, by name: `up`, `left`,
-     * `right`, `down`, `act`, `letgo`; drawn and live only while a keeper is held), the line under the pad (who is held,
-     * what they carry and what E does) or null and its ink strip (canvas px) or null, and the jobs done by hand so far,
+     * `right`, `down`, `act`, `letgo`; published always, drawn and live only while a keeper is held and the barn is on
+     * screen: never over the watch overlay), the line under the pad (who is held, what they carry and what E does) or
+     * null (null over the watch overlay too) and its ink strip (canvas px) or null, and the jobs done by hand so far,
      * by keeper name. The keeper held counts takes and releases still waiting for the next world step in the line and
      * the badges, but not in `controlled` (the simulation's).
      * The watchable scene (S9): `ui` -- the overlay on screen (`none`, the barn, or

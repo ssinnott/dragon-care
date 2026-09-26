@@ -65,7 +65,8 @@
 //                   black: a dark dragon on the Aerie at night still shows) and a wall is never the colour of a dark
 //                   body; a big prop may lie either way (the hearth's firebox is a dark mouth behind kitchen slot 0).
 //                   (The garden's green is the hedge and the lawn behind the path, the grass strip below it: never a
-//                   floor. Its path is FLOORS.path, gated by (i) and (Ki) with the straw.)
+//                   floor. Its path is FLOORS.path, gated by (i) and (Ki) with the straw.) The mission scene's ground
+//                   (surfaces.ts ROAD_SCENE) is gated as it is drawn, at every hour: never through the night table.
 // EGGS (counted apart, its own RESULT line: EGGS):
 //   (egg) eggs    : every element's egg (src/game/eggs.ts: its shell is the element's BABY scale colour, inked round)
 //                   keeps >= 25 % luminance from the Hatchery's nest straw it lies in (src/game/surfaces.ts NEST), so a
@@ -848,11 +849,15 @@ function lighterBy(a: string, b: string): number {
   list.push(['road edge', ROAD_SCENE.edge], ['road slab', ROAD_SCENE.slab], ['road grass', ROAD_SCENE.grass], ['road earth', ROAD_SCENE.earth]);
   const props: [string, string][] = Object.entries(PROPS).map(([k, hex]) => [`prop ${k}`, hex]);
   // (night, plan S6c: every wall, the stone, the garden and every prop by moonlight -- surfaces.ts NIGHT -- and each of
-  // the two stepped mixes toward it, gated like the day's; the sky, hills, clouds and rings have their own phases)
+  // the two stepped mixes toward it, gated like the day's; the sky, hills, clouds and rings have their own phases, and
+  // the mission scene's ground is not the barn's: the watch overlay draws ROAD_SCENE as it is at every hour, never
+  // through NIGHT (missionview.ts drawRoad), so it needs no night entry and has no night steps -- its night is its
+  // region's climate picture's, S9a's)
   const phased = (what: string) => /^(sky|hills|clouds|lamp ring|hearth ring|lantern ring) /.test(`${what} `);
+  const scene = (what: string) => what.startsWith('road ');
   const nights: [string, string, boolean][] = [];
   const noNight: string[] = [];
-  for (const [what, hex, apart] of [...list.filter(([w]) => !phased(w)).map(([w, h]) => [w, h, false] as const), ...props.map(([w, h]) => [w, h, true] as const)]) {
+  for (const [what, hex, apart] of [...list.filter(([w]) => !phased(w) && !scene(w)).map(([w, h]) => [w, h, false] as const), ...props.map(([w, h]) => [w, h, true] as const)]) {
     if (NIGHT[hex] === undefined) { noNight.push(`${what} ${hex}`); continue; }
     if (NIGHT[hex] !== hex) for (const k of [1, 2, 3]) nights.push([`${what} night ${k}/3`, nightColour(hex, k), apart]);
   }
@@ -877,7 +882,7 @@ function lighterBy(a: string, b: string): number {
   const moonlit = Object.entries(NIGHT).filter(([d, n]) => d !== n).length;
   head(`(w) NIGHT  (plan S6c: the one night table, a day colour to its night colour -- ${Object.keys(NIGHT).length} entries, ${moonlit} moonlit, ${Object.keys(NIGHT).length - moonlit} the same on purpose; each night colour and its two stepped mixes are gated above, "night k/3")`);
   const miss = wcount('(w) every wall, backdrop and prop colour has a night colour', noNight.length === 0);
-  out.push(`${miss ? '  ok  ' : '  FAIL'} night entries: ${miss ? `every wall, backdrop and prop colour (${needs.length} fields, and every colour gated above) has one` : `none for ${[...new Set(noNight)].join(', ')} (add it to surfaces.ts NIGHT)`}`);
+  out.push(`${miss ? '  ok  ' : '  FAIL'} night entries: ${miss ? `every wall, backdrop and prop colour (${needs.length} fields, and every barn and garden colour gated above) has one` : `none for ${[...new Set(noNight)].join(', ')} (add it to surfaces.ts NIGHT)`}`);
   const floors: [string, string][] = [...Object.entries(FLOORS).map(([k, h]) => [`FLOORS.${k}`, h] as [string, string]), ['STRAW_SEAM', STRAW_SEAM], ['PATH_EDGE', PATH_EDGE]];
   const moved = floors.filter(([, h]) => NIGHT[h] !== undefined && NIGHT[h] !== h);
   const kept = wcount('(w) no floor changes at night', moved.length === 0);
