@@ -18,12 +18,13 @@ trip from the Aerie, the watchable scene (5, 6). Section 8 says what each part i
 is still open.
 
 **Issues #5 to #11: what implements each.**
-- **#5 Missions:** the Map Room's table (5.1: the world map with fogged regions revealed by success, the chooser with
-  its climate picture), the team and its riders (5.2), challenges met by elements and rider skills, shown up front and
-  met on the road (5.3), the odds and the seeded outcome (5.4, 5.5), coin and eggs brought home to the Hatchery (5.6),
-  big baddies calmed, outwitted or driven off (5.3, 6; a baddie's road is on the board every fourth day from day 3:
-  5.1), sent from the Aerie (the muster, the sky bridge, the landing),
-  and the watchable scene (6) -- `missions.ts`, `regions.ts`, `maptable.ts`, `missionview.ts` and the mission art kit;
+- **#5 Missions:** the Map Room's table (5.1: the world map -- a little island of places to visit, each mission met at
+  one, the regions under cloud revealed by success -- the chooser with its climate picture), the team and its riders
+  (5.2), challenges met by elements and rider skills, shown up front and met on the road (5.3), the odds and the
+  seeded outcome (5.4, 5.5), coin and eggs brought home to the Hatchery (5.6), big baddies calmed, outwitted or driven
+  off (5.3, 6; a baddie's road is on the board every fourth day from day 3: 5.1), sent from the Aerie (the muster, the
+  sky bridge, the landing), and the watchable scene (6) -- `missions.ts`, `regions.ts`, `worldmap.ts`, `maptable.ts`,
+  `missionview.ts` and the mission art kit;
   `npm run sim` sections 17 to 24 and 26.
 - **#6 Take a keeper:** a tap, a badge or Tab takes one; WASD or the arrows walk and climb; E or Space picks up,
   serves and puts back; Esc, LET GO or a tap on empty space lets go; a touch pad (4.10) -- `control.ts`; section 25.
@@ -741,21 +742,40 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
 
 ## 5. Missions
 
+![The world map: the island, its places, and the day's missions pinned at them](base/world_map.png)
+
 ![The mission table: pick the pairs, counter the challenges, see the odds](base/mission_table.png)
 
-- **5.1 The board** (`src/game/missions.ts`, `regions.ts`, `maptable.ts`). The Map Room's table (the left
-  tower's floor 4: tap it, or MAP on the top bar, or M) opens the **world map**: six regions, three explored from the
-  start (MILLBROOK, OLD MINE ROAD, BRAMBLEWOOD) and three under hatched fog (HIGHFOLD, FROSTMERE, EMBERFELL) until a
-  success in a neighbour reveals them at the next dawn, dotted roads between neighbours and from HOME, and a numbered pin
-  for each mission on the board. The board is rolled at 05:00 each day (and at a new game's start): one mission for
+- **5.1 The board** (`src/game/missions.ts`, `regions.ts`, `worldmap.ts`, `maptable.ts`). The Map Room's table (the left
+  tower's floor 4: tap it, or MAP on the top bar, or M) opens the **world map**: a little painted island -- the sea round
+  its coast and its islets, a lake in the middle, the brook down from the Highfold snows through the lake to the sea --
+  of six regions, each its own land (Millbrook's fields, hedges and trees, Bramblewood's close wood, the Highfold peaks,
+  the Old Mine Road's mesas, Frostmere's snow, pines and frozen mere, Emberfell's smoking cones and cinders), three
+  explored from the start (MILLBROOK, OLD MINE ROAD, BRAMBLEWOOD) and three under cloud (HIGHFOLD, FROSTMERE,
+  EMBERFELL) until a success in a neighbour clears it at the next dawn (a tap on a cloud names the neighbours whose
+  success would; cleared and waiting for the dawn, it says CLEARS AT DAWN). Each region has its **places**
+  (`regions.ts` Place): little landmarks where its missions are met -- Millbrook's THE MILL RACE (the mill by the
+  brook), WILLOW POND and THE BROOK BRIDGE; the Old Mine Road's THE DEEP SEAM, LANTERN RUN, THE OLD CART TRACK and
+  THE MOLE KING'S HALL; Bramblewood's THE THICKET, MOSSY HOLLOW and THE OWL WOOD; Highfold's THE HIGH PASS, THUNDER
+  RIDGE, THE GOAT PATH and THE STORM ROC'S CRAG; Frostmere's THE ICE ROAD, THE FROZEN FALLS, SNOWBOUND and THE FROST
+  GIANT'S PASS; Emberfell's THE CINDER FIELDS, THE HOT SPRINGS and ASHFALL. A mission's title is its place's name (a
+  hard road ending in a big baddie leads to its lair; day 1's LOST NEST is met at WILLOW POND), and roads join the
+  places: from HOME to the start regions, and between the regions' neighbours. Each mission on the board is pinned at
+  its place with a plate -- its number, its title, the road's challenge icons (a baddie's crown last) and its days --
+  and a tap on the plate or the landmark opens its chooser; a tap on a place with no mission today says what it is.
+  While a team is out, its road from HOME is dotted in red, a flag planted at its place, and the team's own flag walks
+  the road at the watchable scene's pace (`missionview.ts` roadFraction: standing through a stop, and at the place by
+  the road's end whatever the outcome, which the flag, like the scene, never tells). The board is rolled at 05:00 each
+  day (and at a new game's start): one mission for
   each explored region, up to three, each easy (2 challenges, 1 game day, 40 coin), normal (3, 2 days, 80 coin) or
   hard (3 and the region's big baddie from day 3, else 4; 3 days; 150 coin) -- 3, 6 or 9 minutes of play at 1x. On
   day 3 and every fourth day after (7, 11, ...), the first region on the board that has a baddie shows its hard road,
   so a big baddie is there to meet early (`missions.ts` `baddieDay`). Day 1
   always has THE LOST NEST (Millbrook, easy: a spring flood and lost things, a sure egg), which two of the seven
   starters meet (RIPPLE and ECHO). A pin opens the **mission chooser**: the region's **climate picture** (a meadow,
-  caves, a forest, peaks, a frozen lake or ash hills: the mission art's, drawn without dragons), the rewards, each
-  challenge with what meets it and, under GOOD, the dragons at home and the free keepers who could (a tap adds them),
+  caves, a forest, peaks, a frozen lake or ash hills: the mission art's, drawn without dragons) with the place's
+  landmark standing in it (twice its size on the map; the place named under the title when it isn't the title), the
+  rewards, each challenge with what meets it and, under GOOD, the dragons at home and the free keepers who could (a tap adds them),
   a tick once the team does; the big baddie's portrait and its two counters; the team; the odds; BEST TEAM; SEND FROM
   THE AERIE. The world waits while the table is open.
 - **5.2 The team.** 1 or 2 **pairs**, each a dragon and its rider -- the riders are the four keepers (KEEPERS.md 2),
@@ -1108,7 +1128,8 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    **Taking a keeper is built too** (4.10; #6): tap a keeper or their badge, walk them with WASD or the arrows (or the
    touch pad), and E fetches, feeds, bathes, plays, grooms and tucks in; the page also takes `take=bea` (that keeper
    held from the first step: `view=base&t=120&take=bea` is the frozen picture of it).
-   **Missions are built too** (5; #5, #11): MAP (or M, or a tap on the Map Room's table) opens the world map; a pin opens
+   **Missions are built too** (5; #5, #11): MAP (or M, or a tap on the Map Room's table) opens the world map (the
+   island, its places, the day's missions pinned at them); a pin opens
    its mission's chooser (the climate picture, the challenges and who at home meets them, the team, the odds); BEST
    TEAM and SEND FROM THE AERIE send it -- the team musters on the Aerie (the dragons by the lift, the riders with their
    saddles from the Tack Room), walks off west over the sky bridge, comes back its game days later with coin and
@@ -1135,10 +1156,11 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    | `src/game/hud.ts` | the top bar (the clock, the jobs, the keepers' badges -- tappable: 4.10 -- the coin, the barn's dragons against its cap, NEW, pause, the speed, MAP), the toasts, the hint, and while a keeper is held the touch pad, the line over it and the portrait line |
    | `src/game/storage.ts` | the only code that touches the browser's storage: load the barn (or set aside one that doesn't fit), save it, forget it |
    | `src/game/start.ts` | the starting base: the rooms of section 3 (a need's rooms repeated on the floors), seven newly adult dragons (one per element, 0 days into adulthood), each in a slot of its own need's room, and the four named keepers at their fixed stations |
-   | `src/game/presets.ts` | code-built starts for views that need what a new game hasn't got (`ages`: every stage; `twelve`: the capacity benchmark, the barn at its cap; `capped`: it with an egg waiting in plain view; `growup`, `eggs`, `hatch`, `full` (forced over the cap); `garden`: three residents; `retire`: seven elders about to retire; `muster`: THE LOST NEST sent; `trip`: a team away on a hard mission, that far along its road: 6) |
-   | `src/game/regions.ts` | the missions' world: the six regions (climate, challenge pool, eggs, baddie, neighbours, titles, their land and pin on the map), the eleven challenges and what meets each, the baddies' two counters and cozy exits, the keepers' rider skills |
+   | `src/game/presets.ts` | code-built starts for views that need what a new game hasn't got (`ages`: every stage; `twelve`: the capacity benchmark, the barn at its cap; `capped`: it with an egg waiting in plain view; `growup`, `eggs`, `hatch`, `full` (forced over the cap); `garden`: three residents; `retire`: seven elders about to retire; `muster`: THE LOST NEST sent; `trip`: a team away on a hard mission, that far along its road: 6; `explored`: every region out from under its cloud: 5.1) |
+   | `src/game/regions.ts` | the missions' world: the six regions (climate, challenge pool, eggs, baddie, neighbours, titles, their places -- the landmarks a mission is met at, `placeOf` -- and where their land grows from on the map), the eleven challenges and what meets each, the baddies' two counters and cozy exits, the keepers' rider skills |
    | `src/game/missions.ts` | the missions, DOM-free: the board rolled at dawn, who may go, auto riders, the odds, BEST TEAM, sending (the outcome, the egg and the road rolled at once), the trip (the muster, the departure over the sky bridge, away, the landing, the egg, the saddles, the rest), and the save's checks |
-   | `src/game/maptable.ts` | the Map Room's table, drawn: the world map (hatched fog, roads, HOME, pins), the mission chooser, the TEAM OUT chip and the trip's log (over the watch overlay); their tap targets |
+   | `src/game/worldmap.ts` | the world map's picture (5.1): the island generated from seeded noise (the coast, the regions' land, the lake, the brook, the roads), what grows on it, every place's landmark and HOME, cloud over the regions not explored yet, and its living parts (glints, the mill's sails, smoke); the team's route; the layout's self-check (`mapProblems`) |
+   | `src/game/maptable.ts` | the Map Room's table, drawn: the world map (worldmap.ts's picture, the regions' names, each mission's pin and plate at its place, the team's road and flag), the mission chooser, the TEAM OUT chip and the trip's log (over the watch overlay); their tap targets |
    | `src/game/sim.ts` | the care simulation: the queue, the keepers' trips and jobs (fetch, go, wait at the stand spot, work), and Rush; no drawing, seeded, deterministic; dragons with stable ids, a clock, and its options (seed, day length, start time) |
    | `src/game/travel.ts` | the dragons on the move: each chooses a room meeting its need (on its own floor first) and takes a slot there (moving a lingerer on to its own lowest need's room, or bumping a holder for a Rush), walks and turns (lively on and off the car and across the bay: the one hurry), waits in a landing's line where it covers no eye, and rides the Dragon Lift; the lift's car and its calls; the bay rule (the shaft guard among it), and one dragon at a time in the shaft; how deep each dragon is drawn |
    | `src/game/gait.ts` | each element's walk at each stage as a table of per-frame root motion, the pace the simulation walks a dragon at |

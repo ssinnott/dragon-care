@@ -2180,12 +2180,46 @@ All in the house style: a 1 px `#1a1018` ink, flat cel bands lit from the top le
   the eleven challenges (a crescent moon, a boulder, a snowflake, a storm cloud, water, a bramble, a "?", a windmill,
   a sticking plaster, fog bands, two rocks), the four skills (a speech bubble with a heart, a first-aid cross, a compass,
   a feather), a saddle (11 x 7), and the egg a rider carries home (the Hatchery's egg, whole: `carriedEgg`, `drawCarriedEgg`).
+- **The world map** (`src/game/worldmap.ts`; the Map Room's map, BASE_DESIGN 5.1): a little island at 1x filling the Map
+  Room panel (616 x 310), every mark whole pixels -- no anti-aliased edge, no alpha, never a gradient (the smoke run
+  holds the map's panel to 110 colours, 96 in the new game's frame) -- each shape ringed in 1 px ink, flat fills lit
+  from the top left. The land is generated once from seeded value noise, never `Math.random` (the same map in every
+  game): a rounded coast roughened by noise, with bays, headlands and islets, inked all round, a shallow band of sea
+  along it and a pale strand inside it; the regions' borders a weighted nearest-site split over a warp, each region's
+  ground a base and a patch tone; the lake in the middle and Frostmere's frozen mere (pale ice with long cracks); the
+  brook from the Highfold snows through the lake to the sea, inked along both banks; the roads, gentle curves 2 px wide
+  with an edge either side and a plank bridge wherever one crosses the brook. What grows and stands on the land sits on
+  seeded jittered grids, sorted back to front by its foot, each on its own region's dry land and clear of the roads, the
+  brook and the places: Millbrook's fields (four crops, a hedge along their tops) and hedgerow trees, Bramblewood's
+  close wood of round crowns and pines, the Highfold peaks (snow on their top two fifths, the left side lit), the Old
+  Mine Road's mesas (a pale top, banded sides) and rocks, Frostmere's snowy pines and drifts, Emberfell's cones (a
+  glowing crater and a lava streak), cinders and dead trees -- and a few big shapes set by hand (a great peak, three
+  smoking cones, three tall mesas). **The places** (`PLACE_ART`, one for each of regions.ts's 21 places, 13-19 px wide
+  in the `icons.ts` sprite format): the mill (its sails turn), the willow over its pond, the stone bridge on the brook;
+  the deep seam's timbered mouth and rails, the lamps along Lantern Run, the ore cart on its track, the Mole King's
+  crowned door among molehills; the bramble thicket and its berries, the mossy log and its mushrooms, the owl's great
+  oak (two lamp-yellow eyes in the hollow); the high pass's notch and cairn, Thunder Ridge under its storm cloud (its
+  bolt flashes), the goat on its crag, the Storm Roc's spire and the big egg in its nest; the ice road's red-and-white
+  stakes and a sledge, the frozen falls, the snowbound hut (lamplit, its chimney smoking), the Frost Giant's pass
+  between two ice crags, giant footprints before it; the cinder field's glowing rocks, the steaming turquoise springs,
+  the ash-roofed cottages of Ashfall; and HOME (the barn in small: its red gable between the Aerie's tower, the yellow
+  flag, and the blue-spired tower). **Cloud** over a region not explored yet (its places under it, every pixel): a flat
+  mass over its land (and its places' landmarks) grown by 2 px, lumps every 11 px along its edge for a scalloped rim,
+  ringed in ink, and a few big lumps inside, each lump's upper rim over the one behind in the cloud's shade, lit inside
+  its top left and shaded along its bottom. **The living parts** (`drawAlive`, from the view's own frame count, so the
+  map lives while the world waits): the sea's glints, the mill's sails a quarter turn in four steps, smoke from the
+  cones and from Ashfall's and Snowbound's chimneys, steam off the springs, the ridge's bolt lit white for 8 frames in
+  150. Over it (maptable.ts): each explored region's name on a parchment ribbon, a "?" on each cloud, and each mission's
+  pin and plate; the chooser stands the place's landmark in the climate picture at twice its size (`drawLandmark`). The
+  gallery lays the landmarks and the growths out on `view=missionart&sheet=places` (shot `missionart_places`).
 
 **Status:** built as above. The watchable scene (5.11) draws them from the kit's own modules: the climate in parallax
 behind the road, the set pieces, the baddies' beats and exits,
 the miller at the `miller` stop (grumpy until the Charm rider's moment has talked him round) and the riders' saddles.
-The Map Room's chooser (BASE_DESIGN 5) draws the climate picture (each region's, by day), the challenge and skill
-icons and the baddies' portraits from the same modules, and the riders carry the saddle in the barn's muster and landing too.
+The Map Room's chooser (BASE_DESIGN 5) draws the climate picture (each region's, by day) with the mission's place standing
+in it, the challenge and skill icons and the baddies' portraits from the same modules, and the riders carry the saddle in
+the barn's muster and landing too. The Map Room's world map draws the island above (worldmap.ts), the missions pinned at
+their places.
 Follow-ups:
 the rain and snow are placed, not falling (a frozen scene's weather moves only with `scroll`); the miller has no walk.
 

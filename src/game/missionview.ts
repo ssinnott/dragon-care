@@ -199,6 +199,22 @@ export function stopShownAt(sim: CareSim, trip: Trip): number[] {
 }
 
 /**
+ * How far along its road the team out is at the world's clock (or `clock`), 0..1 -- the Map Room map's flag on the road
+ * (maptable.ts): 0 until it has left the Aerie and again once it lands, 1 at the road's end. By the scene's own walking
+ * time (the share of the road's walking the scene has done, every stop's beat stood), so the flag stands still while the
+ * team stands at a stop's beat and never goes back: the team walks the whole road, whatever the outcome, and the flag,
+ * like the scene, never reads the outcome.
+ */
+export function roadFraction(sim: CareSim, trip: Trip, clock: number = sim.clock): number {
+  if (trip.state !== 'away' || trip.departAt == null) return 0;
+  const L = tripLen(sim, trip), E = Math.max(0, Math.min(L, clock - trip.departAt)), stops = trip.stops;
+  const starts = stops.map((s) => Math.round(s.at * L)), lens = stops.map((s) => (s.kind === 'baddie' ? baddieBeatLen(L) : beatLen(L)));
+  const nAt = (e: number) => { let n = e; for (let j = 0; j < stops.length; j++) if (starts[j] <= e) n -= Math.min(e - starts[j], lens[j]); return n; };
+  const full = nAt(L);
+  return full > 0 ? Math.max(0, Math.min(1, nAt(E) / full)) : 0;
+}
+
+/**
  * The scene at the world's clock (or at `clock`): pure -- the same trip and clock give the same frame, always. It never
  * reads the trip's outcome (success, egg): a team that will fail walks the same road, meets the same stops and watches
  * the same baddie leave as one that will succeed, frame for frame, until the result card (drawResultCard) tells which.

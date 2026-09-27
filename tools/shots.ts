@@ -133,13 +133,20 @@ const pairs: string[] = [
   'shots/missionart_baddies.png=view=missionart&sheet=baddies&t=30',
   'shots/missionart_people.png=view=missionart&sheet=people&t=50',
   'shots/missionart_icons.png=view=missionart&sheet=icons&t=0',
-  // missions (BASE_DESIGN 5): the Map Room table's world map (the three start regions, the fog hatched over the rest, the
-  // roads, HOME, the board's three pins) and THE LOST NEST's chooser (the climate picture, the challenges and who at
-  // home meets them, the dragons, the odds) -- each over the world stepped a second -- and the muster preset's team all
+  // the world map's landmarks (every place's, and HOME) at 2x, and its land's growths (BASE_DESIGN 5.1)
+  'shots/missionart_places.png=view=missionart&sheet=places&t=0',
+  // missions (BASE_DESIGN 5): the Map Room table's world map (the island: the three start regions, cloud over the rest,
+  // the roads, the places' landmarks, HOME, the board's three missions pinned at their places, each with its plate) and
+  // THE LOST NEST's chooser (the climate picture with WILLOW POND standing in it, the challenges and who at home meets
+  // them, the dragons, the odds) -- each over the world stepped a second -- the whole map explored (preset=explored:
+  // every region out from under its cloud), the map with a team out (its red road from HOME to THE MOLE KING'S HALL, its
+  // flag half way along), and the muster preset's team all
   // on the Aerie deck, each rider beside its dragon, the last step of the muster (the chip still MUSTER; they walk off at step 2186: npm
   // run sim section 20)
   'shots/base_map.png=view=base&panel=map&t=60',
   'shots/base_mission.png=view=base&panel=mission&mission=0&t=60',
+  'shots/base_map_explored.png=view=base&preset=explored&panel=map&t=60',
+  'shots/base_map_trip.png=view=base&preset=trip&trip=oldmine:0.5&panel=map&t=60',
   // and the chooser over a full barn (the twelve preset: BARN 12/12): THE LOST NEST's sure egg says BARN FULL: THE EGG
   // WILL WAIT (it still comes home, and waits in its nest until a dragon leaves: BASE_DESIGN 4.7)
   'shots/base_mission_full.png=view=base&preset=twelve&panel=mission&mission=0&t=60',
