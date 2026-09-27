@@ -63,6 +63,7 @@ import type { Rect } from './icons.ts';
 import { canSend, onTrip, LOST_NEST } from './missions.ts';
 import { newUi, drawMapScreen, drawMissionScreen, editTeam, drawTeamChip, drawTripCard, drawLogButton, hitAt, chosen, eggNotice, tripProgress, TRIP_CARD, PANEL, LOG_BUTTON } from './maptable.ts';
 import type { MapUi, Hit, Screen } from './maptable.ts';
+import { worldCanvas } from './worldmap.ts';
 
 const INK = '#1a1018';
 export const VIEW_W = 640, VIEW_H = 360;
@@ -246,6 +247,8 @@ export class BaseView {
   /** World steps drawn (the ambient budget's clock), and frames shown (the UI's: toasts, NEW's second tap, the autosave). */
   private frame = 0;
   private uiFrame = 0;
+  /** Attached to a live page (attach()): the map's picture is made ahead there. */
+  private live = false;
   /**
    * The toast showing and the frames it has left; life's news waiting to be shown, in turn; NEW's frames left to be
    * tapped again (0: not asked).
@@ -416,6 +419,9 @@ export class BaseView {
     if (!this.toast && this.news.length) this.say(newsText(this.news.shift()!));
     if (this.newArmed > 0) this.newArmed--;
     if (this.saving && this.uiFrame % AUTOSAVE_FRAMES === 0) this.save();
+    // (a live page makes the Map Room's picture ahead -- a few hundred ms, once for each set of regions explored -- so
+    // the map opens at once; worldCanvas keeps it)
+    if (this.live && this.uiFrame % 300 === 120 && this.ui.screen === 'none') worldCanvas(this.sim.missions.explored);
   }
 
   /** One world step, and the view kept in step with it (a grow-up's `happy`, a hatch's shell bits, the dawn's tip). */
@@ -665,8 +671,8 @@ export class BaseView {
       // (a panel= page's overlay opens at its first frame, once its t steps are done)
       if (this.pendingPanel) this.openPanel();
       // the Map Room table's overlays, over the world and under the top bar's line
-      if (this.ui.screen === 'map') this.uiHits = drawMapScreen(ctx, this.sim);
-      else if (this.ui.screen === 'mission') this.uiHits = drawMissionScreen(ctx, this.sim, this.ui);
+      if (this.ui.screen === 'map') this.uiHits = drawMapScreen(ctx, this.sim, this.uiFrame);
+      else if (this.ui.screen === 'mission') this.uiHits = drawMissionScreen(ctx, this.sim, this.ui, this.uiFrame);
       // (the toast low in an open table overlay's panel, so it never runs over its words; and one too long to clear the
       // TEAM OUT chip, under it)
       if (this.toast) {
@@ -775,7 +781,10 @@ export class BaseView {
         trip: this.tripHook(),
         ui: { screen: this.ui.screen, mission: this.ui.mission, pairs: this.ui.pairs.map((p) => ({ ...p })),
           pins: this.uiHits.filter((h) => h.name?.startsWith('pin')).map((h) => ({ ...h.r })),
-          buttons: Object.fromEntries([...this.uiHits.filter((h) => h.name && !h.name.startsWith('pin')).map((h) => [h.name!, { ...h.r }] as const), ...(chip ? [['chip', { ...chip }] as const] : [])]),
+          buttons: Object.fromEntries([...this.uiHits.filter((h) => h.name && !/^(pin|place:|cloud:)/.test(h.name)).map((h) => [h.name!, { ...h.r }] as const), ...(chip ? [['chip', { ...chip }] as const] : [])]),
+          // (the map's places with no mission today, and its regions under cloud: a tap on one says what it is)
+          places: Object.fromEntries(this.uiHits.filter((h) => h.name?.startsWith('place:')).map((h) => [h.name!.slice(6), { ...h.r }])),
+          clouds: Object.fromEntries(this.uiHits.filter((h) => h.name?.startsWith('cloud:')).map((h) => [h.name!.slice(6), { ...h.r }])),
           chip: chip ? { ...chip } : null, back: this.ui.screen === 'watch' ? { ...BACK_BUTTON } : null, log: this.ui.screen === 'watch' && this.ui.card,
           // (the chooser's line about the egg, as drawMissionScreen draws it: only while a mission's chooser is open)
           notice: this.ui.screen === 'mission' && chosen(this.sim, this.ui) ? eggNotice(this.sim) : null },
@@ -978,6 +987,7 @@ export class BaseView {
     const act = hitAt(this.uiHits, sx, sy);
     if (act.kind === 'back') { if (this.ui.screen === 'mission') { this.ui.mission = null; this.ui.pairs = []; this.setScreen('map'); } else this.closeTable(); }
     else if (act.kind === 'pin') { this.ui.mission = act.mission; this.ui.pairs = []; this.setScreen('mission'); }
+    else if (act.kind === 'note') this.say(act.text);
     else if (act.kind === 'send') {
       const m = chosen(this.sim, this.ui), why = m ? canSend(this.sim, m, this.ui.pairs) : 'PICK A MISSION';
       if (why || !m) { this.say(why ?? 'PICK A MISSION'); return; }
@@ -1134,6 +1144,7 @@ export class BaseView {
    * hidden or left, and lends the page window.__dragonCare.baseSaveNow.
    */
   attach(canvas: HTMLCanvasElement): void {
+    this.live = true;
     if (this.persist) {
       const { save, note } = loadSave();
       if (save) {

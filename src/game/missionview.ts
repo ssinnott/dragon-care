@@ -197,6 +197,26 @@ export function stopShownAt(sim: CareSim, trip: Trip): number[] {
 }
 
 /**
+ * How far along its road the team out is at the world's clock (or `clock`), 0..1 -- the Map Room map's flag on the road
+ * (maptable.ts): 0 until it has left the Aerie and again once it lands, 1 at the road's end. By the scene's own walking
+ * time, so the flag stands still while the team stands at a stop's beat; on a failure it climbs to the turn-back and falls
+ * again after it, the team walking home (the fraction of the whole road, every stop's beat stood, that the scene has walked).
+ */
+export function roadFraction(sim: CareSim, trip: Trip, clock: number = sim.clock): number {
+  if (trip.state !== 'away' || trip.departAt == null) return 0;
+  const L = tripLen(sim, trip), E = Math.max(0, Math.min(L, clock - trip.departAt)), stops = trip.stops, all = stops.length - 1;
+  const last = trip.success ? all : Math.min(all, trip.turnBack ?? all);
+  const starts = stops.map((s) => Math.round(s.at * L)), lens = stops.map((s) => (s.kind === 'baddie' ? baddieBeatLen(L) : beatLen(L)));
+  const nAt = (e: number, upTo: number) => { let n = e; for (let j = 0; j <= upTo; j++) if (starts[j] <= e) n -= Math.min(e - starts[j], lens[j]); return n; };
+  const full = nAt(L, all), n = nAt(E, last);
+  if (full <= 0) return 0;
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+  if (trip.success || E < starts[last] + lens[last]) return clamp01(n / full);
+  const nb = nAt(starts[last], last);
+  return clamp01((nb - (n - nb)) / full);
+}
+
+/**
  * The scene at the world's clock (or at `clock`): pure -- the same trip and clock give the same frame, always.
  */
 export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): SceneFrame {

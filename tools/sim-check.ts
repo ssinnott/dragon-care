@@ -103,7 +103,12 @@
 // 17. The Map Room's board (#5: "a world map with different places to explore", "a mission chooser"): the same twice
 //    for seeds 1-5 and days 1-10; day 1 starts with THE LOST NEST; three missions at most, one an explored region; no
 //    baddie before day 3, and a road ending in one on every baddie's day (3, 7, ...); each difficulty's road its length, from
-//    its region's pool; a world rolls it at its start and at every 05:00.
+//    its region's pool; a world rolls it at its start and at every 05:00. The world map's places: every region's titles
+//    and its baddie's are its places (a landmark each), every board mission is met at one of its own region's places
+//    (THE LOST NEST at WILLOW POND), the map's layout is sound (worldmap.ts mapProblems: each landmark on its own
+//    region's dry land, clear of the brook and of every other, each region's name on its land, every big shape placed,
+//    no road over the water, every place reached by road from HOME), and under the new game's clouds no pixel of a
+//    place shows.
 // 18. The odds (#5: challenges met by good solutions): a table of hand-computed teams (BASE_DESIGN 5.4's two examples,
 //    the top clamp, the least a pair has).
 // 19. Who may go: no baby, no young dragon on a normal or hard road, no garden resident; a keeper taken by hand is
@@ -142,7 +147,9 @@
 //    the frozen step, the world's own trip, away (its dragons off the map, its riders away), its world saved exactly
 //    though its team left before the world's clock 0 (a departAt below 0); the preset's road is the
 //    missions' own (missions.ts roadOf: every stop's log `NAME - WHO WHAT`) and its rider pick too (autoRider), which
-//    passes over a keeper taken by hand (missions.ts isTaken).
+//    passes over a keeper taken by hand (missions.ts isTaken). The Map Room map's flag on the team's road
+//    (missionview.ts roadFraction) at every step: 0 until it leaves, climbing while the team walks on, still through
+//    every beat, falling after a turn-back, never outside 0..1, and at the road's end (1) when it was walked whole.
 // 25. Taking a keeper (#6: "choose a person - then you will control them and be able to do this chores", "WASD
 //    controls - and a button to feed/collect stuff"; BASE_DESIGN 4.10): BEA taken by a command is held by hand after one step,
 //    walks to the nearest hearth, takes the bowl (E, 40 steps), feeds EMBER in its kitchen slot from its stand spot
@@ -180,7 +187,8 @@ import {
   boardFor, oddsOf, autoRider, bestTeam, dragonReason, canSend, send, onTrip, roadOf, tutorial, baddieDay, isTaken, DIFFICULTY, BADDIE_FROM_DAY, BOARD_MAX, LOST_NEST, HOME_KEEPERS,
 } from '../src/game/missions.ts';
 import type { Taken } from '../src/game/missions.ts';
-import { REGIONS, CHALLENGES, BADDIES, regionOf } from '../src/game/regions.ts';
+import { REGIONS, CHALLENGES, BADDIES, regionOf, placeOf } from '../src/game/regions.ts';
+import { mapProblems, worldRaster, footprint, PLACES, MAP_COLOURS } from '../src/game/worldmap.ts';
 import type { RegionId, ChallengeId, BaddieId } from '../src/game/missiondata.ts';
 import type { Mission, Trip } from '../src/game/trip.ts';
 import type { DragonPlace } from '../src/game/start.ts';
@@ -218,7 +226,7 @@ import { DRAGON_ELEMENTS } from '../src/art/dragon/palettes.ts';
 import type { DragonElement } from '../src/art/dragon/palettes.ts';
 import type { Stage } from '../src/art/dragon/stages.ts';
 import { STAGES } from '../src/art/dragon/stages.ts';
-import { sceneAt, beatLen, baddieBeatLen, walkDist, frameAt, PAIR_BACK, RIDER_AHEAD, ScenePets } from '../src/game/missionview.ts';
+import { sceneAt, beatLen, baddieBeatLen, walkDist, frameAt, roadFraction, PAIR_BACK, RIDER_AHEAD, ScenePets } from '../src/game/missionview.ts';
 import type { SceneFrame } from '../src/game/missionview.ts';
 import { demoTrip } from '../src/game/tripdemo.ts';
 import { stopStates } from '../src/game/maptable.ts';
@@ -2007,6 +2015,29 @@ if (MAIN) {
       if (m.days !== D.days || m.coin !== D.coin || (m.title !== LOST_NEST && m.eggChance !== D.egg)) fail(`board: ${m.title}'s days, coin or egg chance are not its difficulty's`);
     }
   }
+  // the world map's places (BASE_DESIGN 5.1): every region's titles and its baddie's are its places, in order; THE LOST
+  // NEST is met at WILLOW POND; every board mission above is at one of its own region's places
+  for (const r of REGIONS) {
+    const names = r.places.map((p) => p.name), want = [...r.titles, ...(r.baddieTitle ? [r.baddieTitle] : [])];
+    if (names.join('|') !== want.join('|')) fail(`map: ${r.name}'s places (${names.join(', ')}) are not its titles (${want.join(', ')})`);
+  }
+  if (placeOf({ region: 'millbrook', title: LOST_NEST }).name !== 'WILLOW POND') fail(`map: THE LOST NEST is met at ${placeOf({ region: 'millbrook', title: LOST_NEST }).name}, not WILLOW POND`);
+  for (let seed = 1; seed <= 5; seed++) for (let day = 1; day <= 10; day++) for (const m of boardFor(seed, day, all, [])) {
+    if (!regionOf(m.region).places.includes(placeOf(m)) || (m.title !== LOST_NEST && placeOf(m).name !== m.title)) fail(`map: ${m.title} (${m.region}) is met at ${placeOf(m).name}`);
+  }
+  // the map's layout (worldmap.ts mapProblems): every landmark on its own region's dry land, clear of the brook and of
+  // every other, every region's name on its land, every big shape placed, no road over the water, every place reached
+  // by road from HOME -- and under a region's cloud, nothing of its places shows: the new game's three clouded regions'
+  // landmarks are cloud, every pixel
+  for (const p of mapProblems()) fail(`map: ${p}`);
+  const clouded = REGIONS.filter((r) => !r.start).map((r) => r.id), R = worldRaster(clouded);
+  const cloudPx = new Set([MAP_COLOURS.cloud, MAP_COLOURS.cloudLit, MAP_COLOURS.cloudShade, '#1a1018'].map((h) => parseInt(h.slice(1), 16)));
+  for (const p of PLACES.filter((q) => clouded.includes(q.region))) {
+    const f = footprint(p.art, p.at);
+    let shows = 0;
+    for (let y = f.y; y < f.y + f.h; y++) for (let x = f.x; x < f.x + f.w; x++) if (!cloudPx.has(R.get(x, y))) shows++;
+    if (shows) fail(`map: ${shows} px of ${p.name} show through ${regionOf(p.region).name}'s cloud`);
+  }
   // (in a world: rolled at its start, and again at every 05:00 -- and only then)
   const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1, dayLen: 600 }), rolls: number[] = [];
   let last = JSON.stringify(w.missions.board);
@@ -2018,7 +2049,7 @@ if (MAIN) {
   }
   if (rolls.join() !== '725,1325,1925' || w.missions.day !== 4) fail(`board: rolled at clocks ${rolls.join(', ')} (day ${w.missions.day}), not at each 05:00 (725, 1325, 1925 on a 600-step day from 07:00)`);
   noteUse(w);
-  console.log(`  17 board: ${boards} boards (seeds 1-5, days 1-10, the start's map and the whole) the same rolled twice, day 1's always THE LOST NEST first; ${[...kinds].map(([k, n]) => `${n} ${k}`).join(', ')}, ${baddies} ending in a baddie (none before day ${BADDIE_FROM_DAY}; ${baddieDays} on a baddie's day, one on every such board with a baddie's region); a world's board rolled at clocks ${rolls.join(' and ')} (each 05:00)`);
+  console.log(`  17 board: ${boards} boards (seeds 1-5, days 1-10, the start's map and the whole) the same rolled twice, day 1's always THE LOST NEST first; ${[...kinds].map(([k, n]) => `${n} ${k}`).join(', ')}, ${baddies} ending in a baddie (none before day ${BADDIE_FROM_DAY}; ${baddieDays} on a baddie's day, one on every such board with a baddie's region); a world's board rolled at clocks ${rolls.join(' and ')} (each 05:00); the world map's ${PLACES.length} places each a title of its region, every board mission at its place (THE LOST NEST at WILLOW POND), its layout sound and every place under the new game's clouds hidden`);
 }
 
 // ---------- 18. the odds (#5: the team meets the road's challenges; BASE_DESIGN 5.4) ----------
@@ -2391,6 +2422,7 @@ if (ROLE === 'service') {
     if (trip.turnBack !== b) fail(`${what}: turns back at stop ${trip.turnBack}, not the first uncovered (${b})`);
     const starts = trip.stops.map((q) => Math.round(q.at * L)), lens = trip.stops.map((q) => (q.kind === 'baddie' ? baddieBeatLen(L) : beatLen(L)));
     let prev: SceneFrame | null = null, nb: number | null = null, turnAt: number | null = null, exitSeen: string | null = null, lastOff: number | null = null;
+    let prevU: number | null = null, flagBad = 0;
     const lastStop = b ?? trip.stops.length - 1;
     let logAhead = 0;
     const z = sceneAt(sim, trip, trip.departAt);
@@ -2422,6 +2454,16 @@ if (ROLE === 'service') {
         if (f.xs.some((x) => x + RIDER_AHEAD >= f.baddie!.x)) fail(`${what}: the baddie (${trip.exit}, ${f.baddie.pose} at x ${f.baddie.x}) is not ahead of the team (${f.xs.map((x) => x + RIDER_AHEAD).join(', ')}) at E ${E}`);
         lastOff = f.baddie.x - f.camX;
       }
+      // (the Map Room map's flag on the road, missionview.ts roadFraction: 0 until the team leaves, climbing while it walks
+      // on, standing still through a beat, falling after a turn-back, never outside 0..1)
+      const u = roadFraction(sim, trip, c);
+      if ((u < 0 || u > 1 || (E <= 0 && u !== 0)) && flagBad++ < 3) fail(`${what}: the map's flag is ${u} of the way at E ${E}`);
+      if (prev && prevU != null) {
+        if (f.stop != null && prev.stop === f.stop && u !== prevU && flagBad++ < 3) fail(`${what}: the map's flag moved in stop ${f.stop}'s beat, at E ${E}`);
+        if (f.facing === 1 && u < prevU - 1e-12 && flagBad++ < 3) fail(`${what}: the map's flag went back before the turn-back, at E ${E}`);
+        if (f.facing === -1 && prev.facing === -1 && u > prevU + 1e-12 && flagBad++ < 3) fail(`${what}: the map's flag went on after the turn-back, at E ${E}`);
+      }
+      prevU = u;
       if (prev) {
         if (f.n < prev.n) fail(`${what}: n fell from ${prev.n} to ${f.n} at E ${E}`);
         for (let i = 0; i < f.xs.length; i++) {
@@ -2449,6 +2491,9 @@ if (ROLE === 'service') {
       const want = starts[b] + lens[b];
       if (turnAt !== want) fail(`${what}: turned back at E ${turnAt}, not at the end of stop ${b}'s beat (${want})`);
     } else if (turnAt != null) fail(`${what}: turned back at E ${turnAt} on a success`);
+    // (a road walked whole ends with the flag at its place; a turned-back one short of it, on its way home)
+    const uEnd = roadFraction(sim, trip, trip.returnAt);
+    if (success ? Math.abs(uEnd - 1) > 1e-9 : !(uEnd < roadFraction(sim, trip, trip.departAt + starts[b!] + lens[b!]))) fail(`${what}: the map's flag ends ${uEnd} of the way`);
     if (success && trip.mission.baddie) {
       if (!trip.exit || !EXITS.includes(trip.exit)) fail(`${what}: the baddie's exit is ${trip.exit}`);
       if (exitSeen !== trip.exit) fail(`${what}: the baddie's exit (${trip.exit}) was never shown`);
