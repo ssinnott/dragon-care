@@ -65,7 +65,7 @@ shows it.*
 | B2 | **Care is managerial by default; you may take any one keeper by hand** (4.10). Dragons have needs that drain over time; keepers (the humans) walk over and meet them. The player's one per-dragon action is **Rush**; a keeper taken by hand is walked by the player and does the chores the player picks (#6). | Tapping every dragon every few minutes is a chore, not a game (the user's words: "that doesn't sound very fun"). The hands-on care of the art bible (spike's chin, dusk's tuck-in) becomes what keepers *do*, animated. |
 | B3 | **Needs show as thought bubbles** over the dragons and as a **prioritised job queue** along the bottom of the screen. | The bubble says *which* dragon wants *what* at a glance; the queue says *what's next*. |
 | B4 | **Missions are set and forget,** a mission table in the style of World of Warcraft: pick a team, the dragons' elements and the riders' skills counter the mission's challenges, a success chance, a reward. The challenges are shown up front, with who at home meets each (the chooser: 5), and met on the road (the scene: 6). | Simple at this stage, by the user's choice; no choices mid-mission. |
-| B5 | **Missions are watchable:** an animated side-scrolling scene of the team completing it. **The scene is the timer.** (Built and confirmed, 6: the scene is a pure function of the trip and the world's clock and lasts exactly as long as the trip; its result card shows when the trip's time is up.) | The user wants to see the team at work; the side-view walk the rig already has makes it cheap. |
+| B5 | **Missions are watchable:** an animated side-scrolling scene of the team completing it. **The scene is the timer.** (Built and confirmed, 6: the scene is a pure function of the trip and the world's clock and lasts exactly as long as the trip; its result card shows when the trip's time is up.) (Amended: "On a mission you never turn back; the pass fail happens at the end" -- every team walks its whole road, and only the result card, at the road's end, tells a success from a failure: 5.5, 6.) | The user wants to see the team at work; the side-view walk the rig already has makes it cheap. |
 | B6 | **Everything runs only while the game is open.** One clock drives care, missions and hatching; closing the game pauses the world. | No coming back to a barn of red bubbles; no offline catch-up to build. Missions therefore last minutes of play, not hours. |
 | B7 | **Humans are assigned automatically:** keepers to jobs, riders to the dragons you send (each pair's rider is filled in for you, and you may swap it: 5.2) -- unless you take one (4.10): the keeper you hold is left out of every automatic pick, riders included, until you let go. | Fewer clicks; the player's choices are *which dragons* and *what to build*. |
 | B8 | **Cozy:** no combat, and nobody is hurt. Missions have hazards, and some end in a big baddie that is outwitted, calmed or driven off, never fought or killed. Old age is never decline (D21); retiring to the garden is the elder's reward, a place and never a farewell (3, The Garden). The Arena's bouts are sparring, never fighting (B9). | The game's face set has no angry face (D18) and the elder is a reward. (Amended for #5: "Some of the missions might end with a big baddie" -- a baddie, but a cozy one. Amended for the Arena: "These fights should happen in an arena" -- a bout is a spar: a move costs the other puff, its breath, never its health, and whoever is out of puff lies down for a nap; no hurt pose, no knockback, nothing flung, the one a move lands on only looks surprised, and both come home with XP: 10.) |
@@ -584,9 +584,9 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
   the top bar; the world waits while it is open. **The TEAM OUT chip** (394, 19, 114 x 15; first drawn at x 520, where it
   covered a plate at the start camera: at 394 it sits over the lift shaft's and the ladder bay's tops), while a team is out: MUSTER, TEAM OUT - 14H (game hours to go), then LANDING while a team dragon is still coming onto the deck, EGG TO THE NEST while its rider carries the egg down, and HOME until the saddles are hung up; a tap opens the watch overlay (6),
   where a TRIP LOG button (124, 338, 64 x 16, beside BACK TO BARN) opens the trip's log (8, 34, 300 x 120: each stop met,
-  unmet, still ahead or never reached -- each stop told only once the scene has shown how it went, at its banner's
-  moment (missionview.ts `stopShownAt`: the scene is the timer), and one never reached only once the turn-back stop's
-  has, so the log never tells a stop, or a failure, early -- the log's latest lines, the time left), drawn over the result card, and a tap on it (or TRIP LOG again) closes it.
+  unmet or still ahead -- each stop told only once the scene has shown how it went, at its banner's
+  moment (missionview.ts `stopShownAt`: the scene is the timer), so the log never tells a stop early, and never the
+  outcome at all -- the log's latest lines, the time left), drawn over the result card, and a tap on it (or TRIP LOG again) closes it.
   A toast shown while the table is open goes low in its panel, and one too long to clear the chip goes under it.
 - **The Arena** (10.5): its chooser over the world and under the top bar (the world waits while it is open, as under
   the table), and a bout watched over the world with the camera on the Arena (the world steps on, but waits while the
@@ -832,9 +832,12 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   happy: 65 %; RIPPLE alone: 40 %.
 - **5.5 The outcome** is rolled when the team is sent (seeded, `rngAt(seed, MISSION, id)`), and so is the whole road:
   each challenge sits at (i + 1) / (n + 1) of 85 % of the way, the baddie at 90 %, each met or not and by whom.
+  **On a mission you never turn back; the pass or fail happens at the end.** Whatever the roll, the team walks the
+  whole road -- each stop met, or waited out; the baddie met, or waited out until it leaves by its own exit -- and the
+  road is the same either way (`missions.ts` `roadOf` never sees the roll: every stop's line says how that stop went,
+  never how the trip will end). The outcome is told at the road's end, on the result card (6), and nowhere before it.
   - success: the full coin, and the egg;
-  - failure: half the coin, no egg; the team turns back at the first stop nobody met (or the last, if every one was:
-    then its log says the weather turned). The trip still runs its full length.
+  - failure: half the coin, no egg.
   - **Day 1's LOST NEST** is the first mission: a team that meets both of its challenges always succeeds (and brings
     its sure egg home), whatever the seed's roll -- on seed 1, the default page's, the roll alone would fail it.
 
@@ -868,9 +871,8 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
     breathe, rock heaves (`happy`), slinkwing calls; a rider waves (Charm), kneels to pet (Medic), hushes (Navigator)
     or cheers (Nimble). Half way through, the set piece shows the challenge met (the miller, grumpy until then, is
     talked round).
-  - **Uncovered:** on a success they wait it out ("SPRING FLOOD - NOBODY COULD HELP: THEY WAIT IT OUT"); on a failure
-    the first uncovered stop (or the last, if all were covered) is where they turn back: after its beat the team faces
-    home and walks back the way it came ("... THEY TURN BACK FOR HOME").
+  - **Uncovered:** they wait it out ("SPRING FLOOD - NOBODY COULD HELP: THEY WAIT IT OUT") and walk on, whether the
+    trip will succeed or fail: the team never turns back, and walks every stop to the road's end.
 - **The pace** (no skating paw, as in the barn: 2). The team walks at the slowest dragon's mean pace V. Each dragon's walk plays at
   speed s = V / its own mean (1 or less), and its body moves by D(s n), the distance its walk carries it by anim time
   s n (the frames' moves summed, the last one's in part): each step exactly s times the move of the frame it is in.
@@ -878,16 +880,18 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   depth, walking at V. The camera keeps the team's middle 260 px from the left edge. The road's feet are at y 300.
 - **The big baddie** (a hard mission in Old Mine Road, Highfold or Frostmere): its beat is split 25 / 35 / 40 %. It
   walks in from the right to 200 px ahead of the lead, grumpy; turns surprised as its two counters have their moments
-  in turn (the dragon's, then the rider's); then, on a success, it takes its exit -- the Mole King **calmed** (sits and
+  in turn (the dragon's, then the rider's); then it takes its exit -- the Mole King **calmed** (sits and
   dozes off, "z"s stepping up), the Storm Roc **outwitted** (turns and wanders off the wrong way) or the Frost Giant
   **driven off** (shuffles off to colder hills, grumbling, dust at its feet). Each exit is the art kit's own
   (`exitLook`): the two that leave go up the road ahead of the team, on until they are off the screen's right edge, never
-  back through the team. On a failure it keeps the road, grumpy:
-  "THE MOLE KING KEEPS THE ROAD. HOME FOR TEA. NOBODY IS HURT." -- and the team turns back. No knockback, no hurt pose,
-  nothing flung (B8).
+  back through the team. It takes it on every trip, a failure's too: a baddie nobody met leaves the same way in its
+  own time ("THE MOLE KING - NOBODY COULD HELP, BUT IT CURLS UP AND DOZES"), and the team walks on to the road's end.
+  No knockback, no hurt pose, nothing flung (B8).
 - **What you see.** A banner at the top names the stop as it is reached, then how it went (with a check mark when it
-  was met), and stays up until the next stop. When the trip's time is up, a **result card**: HOME SAFE! or HOME EARLY,
-  the coin (half on a failure) and the egg if one was won, and "NOBODY IS HURT."; a tap puts it away.
+  was met), and stays up until the next stop. When the trip's time is up, at the road's end, a **result card**: the
+  pass or the fail, told here and nowhere before -- HOME SAFE! or NOT THIS TIME -- the coin (half on a failure) and
+  the egg if one was won, and "NOBODY IS HURT."; a tap puts it away. Until then a team that will fail is drawn exactly
+  as one that will succeed (`sceneAt` never reads the outcome: sim-check 24 reads both at every step of eight trips).
 - **Leaving.** The scene is an overlay over the barn (under the top bar, which stays); the world keeps stepping under
   it at the chosen speed, and its toasts (life's news, a landing, the dawn's tip) show over the scene too, low on the
   verge under the road. "← BACK TO BARN" (or Esc) closes it, and the TEAM OUT chip under the top bar (a trip out:
@@ -1142,7 +1146,8 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    the stops and their beats, the banners, the big baddie's beat and its cozy exit, the result card, the trip's log
    (TRIP LOG) and BACK TO BARN. `preset=trip&trip=<region>:<progress>[:fail]` puts a team away on a hard mission that far
    along (`trip=oldmine:0.906&panel=watch&t=60`: the Mole King in its beat; `oldmine:0.921` dozing off; `highfold`,
-   `frostmere` the Storm Roc and the Frost Giant; `bramblewood:0.7:fail` turned back; `oldmine:1` the result card).
+   `frostmere` the Storm Roc and the Frost Giant; `bramblewood:0.7:fail` a team that will fail, on its road just where
+   the one that succeeds is; `oldmine:1` the result card, `bramblewood:1:fail` a failure's).
    **The Arena is built too** (10): ARENA (or B, or a tap on the Arena's deck) opens its chooser; tap your dragon, then
    its sparring partner, and START BOUT -- the two ride up to the roof and face each other, you pick your dragon's
    moves (or AUTO), and both come home with XP, levels and new skills. The page also takes `panel=arena` or `panel=bout`
@@ -1180,7 +1185,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    | `src/game/garden.ts` | the elder garden: retiring (30 days into the elder stage), the plots it grows, the residents' nap, sit and stroll (napping only at night: the one simulation module that reads the day's phase), their resting places kept apart (clear of each other's eyes, no two bodies overlapping more than 20 px), their jobs met where they rest |
    | `src/game/gardenArt.ts` | the garden, drawn: a plot's tile (the hedge, the lawn, an apple tree on every other, a nest mound, a lantern, flowers on stalks; the path, the kerb, the ground), drawn only where it is on screen; the fence at the world's end; the lanterns' rings at night, clipped to the hedge's own shape; the GARDEN sign |
    | `src/game/control.ts` | taking a keeper by hand (4.10): the player's commands (take, steer, act, let go; the Map Room's send; and the Arena's bout, skill and coach: 10), applied at the start of a step; walking and climbing by hand under the bay rule; what E does (pick up, serve, put back) and the line that says so; a keeper held saved as let go; a rider on a mission's trip never taken |
-   | `src/game/missionview.ts` | the watchable scene: the scene as a pure function of the trip and the clock (`sceneAt`: the beats, the pace from each walk's own root motion, the turn back, the baddie's beat), the team's characters played to it (the riders with their saddles), and its drawing (the climate, the road, the set pieces, the miller, the baddie, the banner, the result card) |
+   | `src/game/missionview.ts` | the watchable scene: the scene as a pure function of the trip and the clock (`sceneAt`: the beats, the pace from each walk's own root motion, the baddie's beat -- never the outcome), the team's characters played to it (the riders with their saddles), and its drawing (the climate, the road, the set pieces, the miller, the baddie, the banner, the result card) |
    | The mission art kit (`src/game/backdrops.ts`, `setpieces.ts`, `baddies.ts`, `npcs.ts`, `missionicons.ts`, `cel.ts`, `missionart.ts`) | the missions' pictures (ART_BIBLE 5.10): each region's climate at every phase of the day in parallax layers, the eleven set pieces, the three big baddies (their faces, poses and cozy exits) and their portraits, the grumpy miller on the keepers' rig, the challenge and skill icons and the saddle; the gallery's `view=missionart` lays them out; the scene and the Map Room draw them from these modules |
    | `src/game/tripdemo.ts` | the `trip` preset's mission and team: a region's mission at a difficulty from `regions.ts`, the best two pairs with the missions' own auto riders, odds and road (`missions.ts`), the outcome asked |
    | `src/game/training.ts` | the Arena's rules (10.4), pure: levels and XP, each element's stats by stage and level, the spirits, the ring of the seven elements, the skills and the levels they are learned at, a move's outcome from its rolls, who moves first, the coach's pick, the XP a bout brings |
@@ -1254,12 +1259,13 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    seed 1: 2186), away at 3774, landed at 4374 exactly (food and sleep down to at most 45 %), the spike egg laid in its
    nest 2164 steps later (its rider down the left tower and up the centre ladder to the hayloft's Hatchery) and hatched
    two days on; the Map Room used once, the Tack Room 4 times, the Aerie twice, the Bunks twice; 40 coin; FROSTMERE
-   revealed at the next dawn. RIPPLE alone fails on seed 1 at 35 % and turns back at the lost things, with 20 coin and
-   no egg; met in full, the LOST NEST succeeds on all 20 seeds tried (BEST TEAM included). Musters sent in the middle of
+   revealed at the next dawn. RIPPLE alone fails on seed 1 at 35 %: it waits out the lost things and walks on to the
+   road's end, never a step back, where the result card says NOT THIS TIME, home with 20 coin and no egg; met in full, the LOST NEST succeeds on all 20 seeds tried (BEST TEAM included). Musters sent in the middle of
    play (BEST TEAM, seeds 1-6, 600 and 1500 steps in) take median 2456 and at most 2845 steps (the check's bound 9000).
    With the two pairs away 30 minutes of the real day, the five dragons and two keepers home did 111 jobs, a job waited
    23.2 s on average (89.5 s at most), and no need ever emptied. The watchable scene (section 24): eight trips read at
-   every one of 194 456 steps, 179 669 of them travel steps without a skating paw, the baddie in view on 4870; the view's
+   every one of 194 456 steps, each the very scene its trip ending the other way draws, 177 566 of them travel steps
+   without a skating paw, the baddie in view on 7633; the view's
    walks on the road's frame at 2748 synced steps. Taking a keeper (section 25): BEA feeds EMBER by hand (149 steps at
    work), climbs the centre ladder up and down in 141 steps each, is held 10 251 steps while 20 Rushes go on open jobs
    and is never given a job, and walks home in 515 steps once let go. The cap (section 26): the twelve at the cap send

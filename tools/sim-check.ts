@@ -31,7 +31,9 @@
 //    and with the garden (BASE_DESIGN 3, The Garden): residents napping, sitting, strolling, waiting and being met, elders
 //    setting off, riding down, passing the gate and arriving; and with a mission's team out (BASE_DESIGN 5): mid-muster,
 //    departing, away, landing (the egg carried down, the saddles hung back) and resting; a save survives JSON unchanged,
-//    every field is in it; another version throws, and so does one whose missions this build can't run.
+//    every field is in it; another version throws, and so does one whose missions this build can't run; and a failing
+//    trip saved the way a build from before teams walked every road whole saved it (its turn-back, lines telling the
+//    failure, no exit) loads told as this build tells it, and steps on the same.
 // 7. rngAt: the same keys give the same draws, different tags different ones, and the draws are even.
 // 8. Rooms (#11): every room kind and structure has a purpose, each need is met in exactly one kind of room (its rooms
 //    repeated on the floors: the barn room by room as BASE_DESIGN 3's table says -- floor, module, post, the keepers'
@@ -122,8 +124,11 @@
 //    mid-act (seeds 1-6): a keeper at work with a team dragon finishes the job, the dragon asleep sleeps on, and each
 //    keeps its slot, nobody else in it, until it sets off; a rider taken mid-tuck-in leaves the dragon asleep, its
 //    sleep job done, never tucked in twice.
-// 21. A failure: a low-odds send that fails turns back at its first unmet stop, with half the coin and no egg; a failure
-//    that met every stop turns back at the last and says why (the weather).
+// 21. A failure (the user's rule: "on a mission you never turn back; the pass fail happens at the end"): a low-odds
+//    send that fails walks the whole road -- its stops' lines say how each went, the one nobody met waited out, and the
+//    scene's team never takes a step back, reaching every stop and the road's end -- the TRIP LOG telling each stop and
+//    never the outcome, which the result card tells there (NOT THIS TIME); it lands with half the coin and no egg, and
+//    reveals nothing. Met in full, a road's lines tell no outcome either.
 // 22. A trip's outcome is its seed's: the same sends on 20 seeds, twice, the same outcome, egg and road; day 1's LOST
 //    NEST met in full always succeeds (the tutorial: seed 1's roll alone would fail it), BEST TEAM on it included.
 // 23. Care while a team is away (BASE_DESIGN 5.2: two keepers home are enough): a two-pair team away 30 minutes of the real day;
@@ -131,13 +136,14 @@
 // 24. The watchable scene (#5: the challenges on the road, "end with a big baddie"; BASE_DESIGN 6): an easy, a normal and a hard mission (Old
 //    Mine Road's, Highfold's and Frostmere's, each with its baddie), each way it can end, read from the scene's pure
 //    function at every step of the trip: the team at its places as it leaves and done when its time is up, its travel
-//    time never falling, its dragons never walking back before they turn back nor on after, standing still through
-//    every stop's beat, turning back at the end of the first uncovered stop's beat on a failure (never on a success),
-//    each travel step moving each dragon by exactly its walk's distance over that step at its speed (no skate: s times
-//    the frame's move, within 1e-9), a baddie's face only one of the four, and its exit (calmed, outwitted, driven off)
-//    shown on a success, the baddie only ever moving the way it faces, and one that walks off (outwitted, driven off:
-//    the art kit's exitLook) ahead of every rider until it is off the screen's right edge; the TRIP LOG telling each
-//    stop (met, unmet, never past a turn-back) at exactly the step the scene's banner has shown it; the view's team (ScenePets), synced by clock jumps of 1, 8 and 40 and across a 1000-step gap,
+//    time never falling, its dragons never walking back (a team never turns back: every stop reached, a failure's too),
+//    standing still through every stop's beat, each travel step moving each dragon by exactly its walk's distance over
+//    that step at its speed (no skate: s times the frame's move, within 1e-9), a baddie's face only one of the four,
+//    and its exit (calmed, outwitted, driven off) shown on every trip, the baddie only ever moving the way it faces, and
+//    one that walks off (outwitted, driven off: the art kit's exitLook) ahead of every rider until it is off the
+//    screen's right edge; the scene never telling the outcome -- its road the other outcome's, and every step's frame
+//    the very frame of the same trip ending the other way (egg and nest too), the result card's title alone telling
+//    them apart; the TRIP LOG telling each stop (met, unmet) at exactly the step the scene's banner has shown it; the view's team (ScenePets), synced by clock jumps of 1, 8 and 40 and across a 1000-step gap,
 //    playing the walk frame the road says on every travel step; the trip preset puts a team exactly that far along at
 //    the frozen step, the world's own trip, away (its dragons off the map, its riders away), its world saved exactly
 //    though its team left before the world's clock 0 (a departAt below 0); the preset's road is the
@@ -247,7 +253,7 @@ import { DRAGON_ELEMENTS } from '../src/art/dragon/palettes.ts';
 import type { DragonElement } from '../src/art/dragon/palettes.ts';
 import type { Stage } from '../src/art/dragon/stages.ts';
 import { STAGES } from '../src/art/dragon/stages.ts';
-import { sceneAt, beatLen, baddieBeatLen, walkDist, frameAt, PAIR_BACK, RIDER_AHEAD, ScenePets } from '../src/game/missionview.ts';
+import { sceneAt, beatLen, baddieBeatLen, walkDist, frameAt, resultTitle, PAIR_BACK, RIDER_AHEAD, ScenePets } from '../src/game/missionview.ts';
 import type { SceneFrame } from '../src/game/missionview.ts';
 import { demoTrip } from '../src/game/tripdemo.ts';
 import { stopStates } from '../src/game/maptable.ts';
@@ -1015,6 +1021,7 @@ if (ROLE === 'saves') {
     ['a team of a dragon there isn\'t', (b) => { b.missions.trip.pairs[0].dragon = 99; }],
     ['a keeper away with no team', (b) => { b.missions.trip = null; b.missions.deck = []; }],
     ['a dragon mustering with no team', (b) => { b.missions.trip.pairs.pop(); b.missions.deck.pop(); for (const k of b.keepers) if (k.phase === 'muster' && !b.missions.trip.pairs.some((p: any) => p.keeper === k.id)) k.phase = 'idle'; }],
+    ['a stop on the road there isn\'t', (b) => { b.missions.trip.stops[0].challenge = 'volcano'; }],
     ['no missions', (b) => { delete b.missions; }],
   ];
   for (const [what, f] of bad) {
@@ -1023,7 +1030,18 @@ if (ROLE === 'saves') {
     try { CareSim.fromSave(b); } catch { threw = true; }
     if (!threw) fail(`save: one with ${what} loaded`);
   }
-  console.log(`  6 saves (missions, a 600-step day): ${forks.map((f) => `step ${f.at} (${f.what})`).join(', ')} step on 5000 to the same world; ${bad.length} saves whose missions can't be run (${bad.map(([w]) => w).join(', ')}) throw`);
+  // (a save from before teams walked every road whole -- a failing trip away with the stop it turned back at, that
+  // stop's line and the baddie's telling the failure, and no exit -- loads told as this build tells it: the very world
+  // this build makes, stepping on to the same world)
+  const was = buildSim(tripStart('oldmine:0.5:fail'), 1), now = serialize(was), old = through(now) as any, ot = old.missions.trip;
+  ot.turnBack = 0; ot.exit = null;
+  ot.stops[0].log = `${ot.stops[0].log.split(' - ')[0]} - NOBODY COULD HELP: THEY TURN BACK FOR HOME`;
+  ot.stops[ot.stops.length - 1].log = `${BADDIES[ot.mission.baddie as BaddieId].name} - IT KEEPS THE ROAD. HOME FOR TEA. NOBODY IS HURT.`;
+  const retold = CareSim.fromSave(old);
+  if (!isDeepStrictEqual(serialize(retold), now)) fail(`save (missions): a failing trip saved before the whole road loaded as ${JSON.stringify(serialize(retold).missions.trip?.stops.map((s) => s.log))}, exit ${serialize(retold).missions.trip?.exit}`);
+  for (let i = 0; i < 2000; i++) { was.step(); retold.step(); }
+  if (retold.digest() !== was.digest()) fail('save (missions): a failing trip saved before the whole road, loaded, drifted from this build\'s within 2000 steps');
+  console.log(`  6 saves (missions, a 600-step day): ${forks.map((f) => `step ${f.at} (${f.what})`).join(', ')} step on 5000 to the same world; ${bad.length} saves whose missions can't be run (${bad.map(([w]) => w).join(', ')}) throw; the trip preset's failing Old Mine Road team, saved as a build before the whole road would have (turned back at stop 0, the Mole King keeping the road, no exit), loads as this build's own trip and steps on the same`);
 }
 if (ROLE === 'saves') {
   // missions and a keeper held by hand together (BASE_DESIGN 7, Saves: mid-muster and mid-away, the hand let go on
@@ -2343,10 +2361,13 @@ if (MAIN) {
   console.log(`  20 trip: the muster preset (the real day, seed 1) all on the deck at step ${musterAt}; THE LOST NEST (seed 2, a 600-step day) with ${t.pairs.map((p, i) => `${team[i].name} and ${riders[i].name}`).join(', ')}: odds ${(t.odds * 100).toFixed(0)} %, ${t.success ? 'a success' : 'a failure'}, a ${t.egg} egg for nest ${t.nest}; mustered in ${departed} steps (both up by the lift), away at ${awayAt}, landed at ${landedAt} (returnAt, exactly: ${landNeeds}), the egg laid at ${laid}, over at ${overAt}; the Map Room used ${used('maproom')}, the Tack Room ${used('tack')}, the Aerie ${used('aerie')}, the Bunks ${used('bunks')}; coin ${w.missions.coin}; FROSTMERE revealed at the next dawn; ${baby()?.name} hatched`);
 }
 
-// ---------- 21. a failure: turning back (#5: challenges on the road) ----------
+// ---------- 21. a failure: the whole road, and the outcome at its end (#5: challenges on the road) ----------
 if (MAIN) {
-  // a low-odds send (RIPPLE alone on THE LOST NEST: nobody meets the lost things) that fails, from seeds 1-200: it turns
-  // back at the first unmet stop, brings half the coin and no egg, and reveals nothing
+  // a low-odds send (RIPPLE alone on THE LOST NEST: nobody meets the lost things) that fails, from seeds 1-200: it never
+  // turns back -- its road is the one the team would walk to a success, each stop's line how the stop went, and the
+  // scene's team walks on up it through every stop to its end, the TRIP LOG telling each stop and never the outcome --
+  // and only at the end is the failure told (the result card's NOT THIS TIME); it lands with half the coin and no egg,
+  // and reveals nothing
   let seed = 0, t: Trip | null = null, w: CareSim | null = null, tried = 0;
   for (let s = 1; s <= 200 && !t; s++) {
     tried++;
@@ -2356,18 +2377,32 @@ if (MAIN) {
   }
   if (!t || !w) fail('failure: no seed in 1-200 fails RIPPLE alone on THE LOST NEST');
   else {
-    const first = t.stops.findIndex((s) => !s.covered);
-    if (t.turnBack !== first || first !== 1 || !/TURN BACK/.test(t.stops[first].log) || t.egg || t.nest != null || t.exit) fail(`failure: turns back at ${t.turnBack} (${t.stops[first]?.log}), egg ${t.egg}`);
+    const unmet = t.stops.findIndex((s) => !s.covered), told = /TURN|HEAD HOME|KEEPS THE ROAD|HOME FOR TEA/;
+    if ('turnBack' in t || unmet !== 1 || !/ - NOBODY COULD HELP: THEY WAIT IT OUT$/.test(t.stops[unmet].log) || t.stops.some((s) => told.test(s.log)) || t.egg || t.nest != null || t.exit)
+      fail(`failure: its road is ${JSON.stringify(t.stops.map((s) => s.log))} (turnBack ${'turnBack' in t}), egg ${t.egg}, exit ${t.exit}`);
     const eggs = w.eggs.length;
-    for (let s = 0; s < 20000 && w.missions.trip; s++) w.step();
+    // (the scene read at every step the team is out: never a step back, every stop reached, done at the road's end;
+    // the TRIP LOG with every stop met or waited out by then, and the result card's title the failure's)
+    let reached = -1, back = 0, logged = '', title: string | null = null, prev: SceneFrame | null = null;
+    for (let s = 0; s < 20000 && w.missions.trip; s++) {
+      w.step();
+      const tr = w.missions.trip;
+      if (!tr || (tr.state !== 'away' && tr.state !== 'return')) continue;
+      const f = sceneAt(w, tr);
+      if (prev && f.xs.some((x, i) => x < prev!.xs[i] - 1e-9)) back++;
+      reached = Math.max(reached, f.last ?? -1);
+      if (f.done && title == null) { title = resultTitle(tr); logged = stopStates(w, tr).join(', '); }
+      prev = f;
+    }
+    if (back || reached !== t.stops.length - 1 || !prev?.done) fail(`failure: the team stepped back on ${back} steps, reached stop ${reached} of ${t.stops.length}, done ${prev?.done}`);
+    if (title !== 'NOT THIS TIME' || logged !== 'met, unmet') fail(`failure: at the road's end the result card says ${title}, the TRIP LOG ${logged}`);
     if (w.missions.trip || w.missions.coin !== 20 || w.eggs.length !== eggs || w.missions.pendingReveal.length || w.missions.firstSuccess.length) fail(`failure: the trip ended with ${w.missions.coin} coin, ${w.eggs.length} eggs, reveals ${w.missions.pendingReveal}`);
     noteUse(w);
-    // (a failure that met every stop turns back at the last, and its log says why)
+    // (met in full, a failure -- a roll -- walks the same road: its lines say only how each stop went)
     const v = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1, dayLen: 600 }), m = v.missions.board[0];
-    const road = roadOf(v, m, bestTeam(v, m), false), last = road.stops[road.stops.length - 1];
-    if (!road.stops.every((s) => s.covered) || road.turnBack !== road.stops.length - 1 || !/WEATHER TURNS/.test(last.log)) fail(`failure: met in full, it turns back at ${road.turnBack} ("${last.log}")`);
-    console.log(`  21 failure: met in full and still failing, the last stop says why: "${last.log}"`);
-    console.log(`  21 failure: seed ${seed} (of ${tried} tried) fails RIPPLE alone on THE LOST NEST at ${(t.odds * 100).toFixed(0)} %: it turns back at stop ${t.turnBack} ("${t.stops[t.turnBack!].log}"), home with ${w.missions.coin} coin (half) and no egg, nothing revealed`);
+    const road = roadOf(v, m, bestTeam(v, m));
+    if (!road.every((s) => s.covered && !told.test(s.log))) fail(`failure: met in full, its road is ${JSON.stringify(road.map((s) => s.log))}`);
+    console.log(`  21 failure: seed ${seed} (of ${tried} tried) fails RIPPLE alone on THE LOST NEST at ${(t.odds * 100).toFixed(0)} %: it waits out stop ${unmet} ("${t.stops[unmet].log}") and walks on, never a step back, through all ${t.stops.length} stops to the road's end, where the result card says ${title} (the TRIP LOG: ${logged}); home with ${w.missions.coin} coin (half) and no egg, nothing revealed; met in full, the road's lines tell no outcome ("${road[road.length - 1].log}")`);
   }
 }
 
@@ -2375,7 +2410,7 @@ if (MAIN) {
 if (MAIN) {
   // the same send on 20 seeds, twice: the same outcome, egg and road each time (rolled once, at SEND, from rngAt)
   // (the LOST NEST by the muster team; the LOST NEST by BEST TEAM; and the day's second mission by BEST TEAM: a real roll)
-  const trip = (w: CareSim) => { const t = w.missions.trip!; return { s: t.success, e: t.egg, n: t.nest, r: t.stops.map((s) => s.log), b: t.turnBack }; };
+  const trip = (w: CareSim) => { const t = w.missions.trip!; return { s: t.success, e: t.egg, n: t.nest, r: t.stops.map((s) => s.log), x: t.exit }; };
   const world = (seed: number) => new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed, dayLen: 600 });
   const run = (seed: number) => {
     const a = world(seed); sendLostNest(a);
@@ -2416,15 +2451,15 @@ if (ROLE === 'service') {
     const sim = newSim(1), trip = demoTrip(sim, region, diff, success), L = trip.mission.days * sim.dayLen, what = `scene: ${region} ${diff} (${success ? 'success' : 'failure'})`;
     trip.departAt = sim.clock; trip.returnAt = sim.clock + L;
     // (the trip's road is the missions' own -- missions.ts roadOf -- and every stop's log is `NAME - WHO WHAT`: the
-    // banner shows the name alone as the stop is reached)
+    // banner shows the name alone as the stop is reached; it is the same road whatever the outcome, no turn-back in it)
     for (const q of trip.stops) { const name = q.kind === 'baddie' ? BADDIES[q.baddie!].name : CHALLENGES[q.challenge!].name; if (!q.log.startsWith(`${name} - `) || q.log.length <= name.length + 3) fail(`${what}: the stop's log "${q.log}" is not NAME - WHO WHAT`); }
+    if ('turnBack' in trip || !isDeepStrictEqual(trip.stops, demoTrip(sim, region, diff, !success).stops)) fail(`${what}: its road is not the other outcome's (turnBack ${'turnBack' in trip})`);
     const team = trip.pairs.map((p) => sim.dragons.find((d) => d.id === p.dragon)!), gaits = team.map((d) => gaitOf(d.element, d.stage));
-    const first = trip.stops.findIndex((q) => !q.covered), b = success ? null : first >= 0 ? first : trip.stops.length - 1;
-    if (trip.turnBack !== b) fail(`${what}: turns back at stop ${trip.turnBack}, not the first uncovered (${b})`);
-    const starts = trip.stops.map((q) => Math.round(q.at * L)), lens = trip.stops.map((q) => (q.kind === 'baddie' ? baddieBeatLen(L) : beatLen(L)));
-    let prev: SceneFrame | null = null, nb: number | null = null, turnAt: number | null = null, exitSeen: string | null = null, lastOff: number | null = null;
-    const lastStop = b ?? trip.stops.length - 1;
-    let logAhead = 0;
+    // (the scene never tells the outcome: the same trip ending the other way -- its egg and nest too -- is the same
+    // scene at every step; only the result card, drawn once the trip is done, tells them apart)
+    const twin: Trip = { ...trip, success: !success, egg: trip.egg ? null : 'fire', nest: trip.nest == null ? 0 : null };
+    let prev: SceneFrame | null = null, exitSeen: string | null = null, lastOff: number | null = null, reached = -1;
+    let logAhead = 0, told = 0;
     const z = sceneAt(sim, trip, trip.departAt);
     if (z.xs.some((x, i) => x !== -PAIR_BACK * i) || z.n !== 0 || z.done) fail(`${what}: at E = 0 the team is at ${z.xs.join(', ')} (n ${z.n}, done ${z.done}), not at its places`);
     if (!isDeepStrictEqual(sceneAt(sim, trip, trip.departAt + 12345), sceneAt(sim, trip, trip.departAt + 12345))) fail(`${what}: two reads of one clock differ`);
@@ -2432,16 +2467,17 @@ if (ROLE === 'service') {
       const f = sceneAt(sim, trip, c), E = c - trip.departAt;
       frames++;
       if (f.done !== (E >= L)) fail(`${what}: done is ${f.done} at E ${E} of ${L}`);
-      if (f.facing === -1 && turnAt == null) { turnAt = E; nb = f.n; }
       if (f.baddie) inFrame++;
-      // (the TRIP LOG tells a stop -- met or unmet, and the stops past a turn-back never -- exactly when the scene has
-      // shown how it went, its banner past the stop's name: maptable.ts stopStates by missionview.ts stopShownAt)
+      if (f.last != null) reached = Math.max(reached, f.last);
+      if (!isDeepStrictEqual(f, sceneAt(sim, twin, c)) && told++ < 3) fail(`${what}: the scene at E ${E} tells the outcome (the same trip ending the other way draws another frame)`);
+      // (the TRIP LOG tells a stop -- met or unmet (waited out) -- exactly when the scene has shown how it went, its
+      // banner past the stop's name: maptable.ts stopStates by missionview.ts stopShownAt)
       const st = stopStates(sim, trip, c), seen = (i: number) => {
         const head = trip.stops[i].log.split(' - ')[0];
-        return i <= lastStop && f.last != null && (i < f.last || (i === f.last && f.banner !== head && f.banner !== `${head}!`));
+        return f.last != null && (i < f.last || (i === f.last && f.banner !== head && f.banner !== `${head}!`));
       };
       for (let i = 0; i < trip.stops.length; i++) {
-        const want = i > lastStop ? (seen(b!) ? 'never' : 'ahead') : seen(i) ? (trip.stops[i].covered ? 'met' : 'unmet') : 'ahead';
+        const want = seen(i) ? (trip.stops[i].covered ? 'met' : 'unmet') : 'ahead';
         if (st[i] !== want && logAhead++ < 3) fail(`${what}: the TRIP LOG says stop ${i} is ${st[i]} at E ${E}, the scene ${want} (banner "${f.banner}")`);
       }
       if (f.baddie && trip.exit && f.baddie.pose === EXIT_LOOK[trip.exit].pose && f.baddie.face === EXIT_LOOK[trip.exit].face) exitSeen = trip.exit;
@@ -2458,17 +2494,16 @@ if (ROLE === 'service') {
         if (f.n < prev.n) fail(`${what}: n fell from ${prev.n} to ${f.n} at E ${E}`);
         for (let i = 0; i < f.xs.length; i++) {
           const dx = f.xs[i] - prev.xs[i];
-          if (f.facing === 1 && dx < -1e-9) fail(`${what}: pair ${i} went back ${dx} before turning back, at E ${E}`);
-          if (f.facing === -1 && prev.facing === -1 && dx > 1e-9) fail(`${what}: pair ${i} went on ${dx} after turning back, at E ${E}`);
+          if (dx < -1e-9) fail(`${what}: pair ${i} went back ${dx} at E ${E} (a team never turns back)`);
           if (f.stop != null && prev.stop === f.stop && dx !== 0) fail(`${what}: pair ${i} moved ${dx} in stop ${f.stop}'s beat, at E ${E}`);
         }
         // (no skate: a travel step moves each dragon by its walk's distance over that step at its speed -- s times the
         // move of the frame it is in, when the step stays in one frame)
-        if (f.stop == null && prev.stop == null && !f.done && f.facing === prev.facing && f.n === prev.n + 1) {
+        if (f.stop == null && prev.stop == null && !f.done && f.n === prev.n + 1) {
           travelSteps++;
           for (let i = 0; i < f.xs.length; i++) {
-            const g = gaits[i], s = f.speeds[i], t0 = s * (prev.n - (f.facing < 0 ? nb! : 0)), t1 = s * (f.n - (f.facing < 0 ? nb! : 0));
-            const want = f.facing * (walkDist(g, t1) - walkDist(g, t0)), dx = f.xs[i] - prev.xs[i];
+            const g = gaits[i], s = f.speeds[i], t0 = s * prev.n, t1 = s * f.n;
+            const want = walkDist(g, t1) - walkDist(g, t0), dx = f.xs[i] - prev.xs[i];
             if (Math.abs(dx - want) > 1e-9) fail(`${what}: pair ${i} moved ${dx} at E ${E}, its walk says ${want}`);
             const fr = frameAt(g, t0);
             if (fr === frameAt(g, t1 - 1e-9) && Math.abs(Math.abs(dx) - s * g.frames[fr].move) > 1e-9) fail(`${what}: pair ${i} skated at E ${E}: moved ${dx}, its frame's move x speed is ${s * g.frames[fr].move}`);
@@ -2477,17 +2512,17 @@ if (ROLE === 'service') {
       }
       prev = f;
     }
-    if (b != null) {
-      const want = starts[b] + lens[b];
-      if (turnAt !== want) fail(`${what}: turned back at E ${turnAt}, not at the end of stop ${b}'s beat (${want})`);
-    } else if (turnAt != null) fail(`${what}: turned back at E ${turnAt} on a success`);
-    if (success && trip.mission.baddie) {
+    // (every stop reached, the road walked to its end; the result card's title, there, the outcome's)
+    if (reached !== trip.stops.length - 1 || !prev?.done) fail(`${what}: the team reached stop ${reached} of ${trip.stops.length} (done ${prev?.done})`);
+    if (resultTitle(trip) !== (success ? 'HOME SAFE!' : 'NOT THIS TIME')) fail(`${what}: the result card says ${resultTitle(trip)}`);
+    // (a baddie always leaves the road, met or waited out, by its own exit: the team walks on past where it stood)
+    if (trip.exit !== (trip.mission.baddie ? BADDIES[trip.mission.baddie].exit : null)) fail(`${what}: the baddie's exit is ${trip.exit}`);
+    if (trip.mission.baddie) {
       if (!trip.exit || !EXITS.includes(trip.exit)) fail(`${what}: the baddie's exit is ${trip.exit}`);
       if (exitSeen !== trip.exit) fail(`${what}: the baddie's exit (${trip.exit}) was never shown`);
       if (trip.exit !== 'calmed' && (lastOff == null || lastOff <= 640)) fail(`${what}: the baddie (${trip.exit}) was last seen at screen x ${lastOff}, not off the right edge`);
     }
-    if (!success && trip.exit != null) fail(`${what}: a failure has an exit (${trip.exit})`);
-    lines.push(`${region} ${diff} ${success ? 'home safe' : `home early (turned at stop ${b}, E ${turnAt})`}${trip.mission.baddie ? `, ${trip.mission.baddie} ${trip.exit ?? 'keeps the road'}${lastOff != null ? ` (off ahead of the team, last seen at screen x ${lastOff.toFixed(0)})` : ''}` : ''}`);
+    lines.push(`${region} ${diff} (${success ? 'a success' : 'a failure'}): all ${trip.stops.length} stops walked, ${resultTitle(trip)} at the end${trip.mission.baddie ? `, ${trip.mission.baddie} ${trip.exit}${lastOff != null ? ` (off ahead of the team, last seen at screen x ${lastOff.toFixed(0)})` : ''}` : ''}`);
   }
   // (the view keeps to the road: the team's pets, synced by clock jumps of 1, 8 and 40 steps and across a 1000-step gap
   // -- a watch closed and reopened -- play on every travel step the very walk frame the road's walk distance is in)
@@ -2498,19 +2533,19 @@ if (ROLE === 'service') {
       trip.departAt = sim.clock; trip.returnAt = sim.clock + L;
       const team = trip.pairs.map((p) => sim.dragons.find((d) => d.id === p.dragon)!), gaits = team.map((d) => gaitOf(d.element, d.stage));
       const cast = new ScenePets(sim, trip), what = `scene view: ${region} ${diff} (${success ? 'success' : 'failure'}), steps of ${plan.join(', ')}`;
-      // (two stretches of the road, to keep to the suite's 30 s: the start, and from the turn back -- or the first stop -- on)
-      const j = success ? 0 : trip.turnBack!, T = Math.round(trip.stops[j].at * L) + (trip.stops[j].kind === 'baddie' ? baddieBeatLen(L) : beatLen(L));
+      // (two stretches of the road, to keep to the suite's 30 s: the start, and from the first stop on -- or, the
+      // failure's, from the last stop on to the road's end, which a failing team walks as a succeeding one does)
+      const j = success ? 0 : trip.stops.length - 1, T = Math.round(trip.stops[j].at * L) + (trip.stops[j].kind === 'baddie' ? baddieBeatLen(L) : beatLen(L));
       const inside = (E: number) => E < 4000 || (E >= T - 500 && E < T + 3500);
-      let nb: number | null = null, k = 0, bad = 0;
+      let k = 0, bad = 0;
       for (let c = trip.departAt; c <= trip.returnAt; c += inside(c - trip.departAt) ? plan[k++ % plan.length] : 1) {
         if (!inside(c - trip.departAt)) continue;
         const f = sceneAt(sim, trip, c);
-        if (f.facing === -1 && nb == null) { for (let q = c; ; q--) { const g = sceneAt(sim, trip, q); if (g.facing === 1) { nb = g.n; break; } } }
         cast.sync(f, c);
         if (f.stop != null || f.done) continue;
         cast.dragonFrames().forEach((fi, i) => {
           petChecks++;
-          const want = frameAt(gaits[i], f.speeds[i] * (f.n - (f.facing < 0 ? nb! : 0)));
+          const want = frameAt(gaits[i], f.speeds[i] * f.n);
           if (fi !== want && bad++ < 3) fail(`${what}: pair ${i} plays walk frame ${fi} at E ${f.E}, the road says ${want}`);
         });
       }
@@ -2545,7 +2580,7 @@ if (ROLE === 'service') {
     w.command({ kind: 'take', keeper: bea.id }); w.step();
     if (!before || !isTaken(w, bea.id) || rides()) fail(`scene: the rider pick with BEA taken: she rode ${before} before, taken ${isTaken(w, bea.id)}, rides ${rides()}`);
   }
-  console.log(`  24 scene: ${lines.join('; ')}; ${frames} steps read, ${travelSteps} travel steps without a skate, the baddie in view ${inFrame} of them; the scene's types have no hurt state, and exits only calmed, outwitted or driven off; the trip preset's worlds saved exactly (${presetSaves.join(', ')}); a keeper taken by hand is never picked to ride (missions.ts isTaken)`);
+  console.log(`  24 scene: ${lines.join('; ')}; ${frames} steps read, each the same scene whichever way its trip ends, ${travelSteps} travel steps without a skate, the baddie in view ${inFrame} of them; the scene's types have no hurt state, and exits only calmed, outwitted or driven off; the trip preset's worlds saved exactly (${presetSaves.join(', ')}); a keeper taken by hand is never picked to ride (missions.ts isTaken)`);
 }
 
 // ---------- 25. taking a keeper (#6) ----------

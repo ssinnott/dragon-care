@@ -1,8 +1,8 @@
 // The `trip` preset's missions (BASE_DESIGN 6: view=base&preset=trip&trip=<region>:<progress>[:fail]): a region's mission
 // built from the Map Room's own tables (regions.ts REGIONS, CHALLENGES, BADDIES, KEEPER_SKILL), a team of two pairs of
 // the new game's dragons with their riders picked by the missions' own auto-pick (missions.ts autoRider), the odds
-// and the road -- its stops, who meets each, the trip log's lines and the turn-back -- as missions.ts send would make
-// them (oddsOf, roadOf): so the scene (missionview.ts) watched on a preset and on a team the Map Room sent reads the
+// and the road -- its stops, who meets each and the trip log's lines -- as missions.ts send would make them (oddsOf,
+// roadOf): so the scene (missionview.ts) watched on a preset and on a team the Map Room sent reads the
 // same trip. The only preset-made parts: which mission (a region's at a difficulty, not the day's board), which team
 // (the best two pairs that can meet its baddie, so its beat is watched whole), and the outcome (asked, not rolled).
 // DOM-free.
@@ -10,8 +10,8 @@ import type { CareSim, Dragon } from './sim.ts';
 import type { Trip, Mission, Pair } from './trip.ts';
 import type { RegionId, ChallengeId, Difficulty } from './missiondata.ts';
 import { rngAt, TAG } from './rand.ts';
-import { REGIONS, BADDIES, REGION_IDS, regionOf } from './regions.ts';
-import { DIFFICULTY, autoRider, oddsOf, roadOf, freeNest, dragonReason } from './missions.ts';
+import { REGIONS, REGION_IDS, regionOf } from './regions.ts';
+import { DIFFICULTY, autoRider, oddsOf, roadOf, exitOf, freeNest, dragonReason } from './missions.ts';
 
 /**
  * The mission a region's board could show at a difficulty (BASE_DESIGN 5.1: missions.ts DIFFICULTY): its challenges
@@ -32,10 +32,10 @@ function demoMission(sim: CareSim, region: RegionId, difficulty: Difficulty): Mi
  * grown barn dragons, each with its auto rider beside the other (missions.ts autoRider: the partner, else a skill the
  * team lacks, else anyone free; never a keeper taken by hand), the highest odds (missions.ts oddsOf) among the teams
  * that meet the mission's baddie, when any can (the preview is for watching the beat, both counters' moments and its
- * cozy exit), ties to lower ids; its road (missions.ts roadOf: the stops, the log lines, the turn-back); and the
- * outcome as asked (not rolled: a preview shows the road it is told to). On a success it brings the region's egg home
- * (its first success there is sure) to the lowest free nest, and the baddie takes its exit. Not departed: the caller
- * sends it away (missions.ts awayNow) or sets `departAt` / `returnAt` itself.
+ * cozy exit), ties to lower ids; its road (missions.ts roadOf: the stops and the log lines, the same either way) and its
+ * baddie's exit (missions.ts exitOf); and the outcome as asked (not rolled: a preview ends the way it is told to). On a
+ * success it brings the region's egg home (its first success there is sure) to the lowest free nest. Not departed: the
+ * caller sends it away (missions.ts awayNow) or sets `departAt` / `returnAt` itself.
  */
 export function demoTrip(sim: CareSim, region: RegionId, difficulty: Difficulty, success: boolean): Trip {
   const m = demoMission(sim, region, difficulty);
@@ -46,18 +46,16 @@ export function demoTrip(sim: CareSim, region: RegionId, difficulty: Difficulty,
     const pairs: Pair[] = [];
     for (const d of [able[a], able[b]]) { const k = autoRider(sim, d, m, pairs); if (k != null) pairs.push({ dragon: d.id, keeper: k }); }
     if (pairs.length < 2) continue;
-    const odds = oddsOf(sim, m, pairs), meets = !!m.baddie && roadOf(sim, m, pairs, true).stops.some((s) => s.kind === 'baddie' && s.covered);
+    const odds = oddsOf(sim, m, pairs), meets = !!m.baddie && roadOf(sim, m, pairs).some((s) => s.kind === 'baddie' && s.covered);
     if (!best || (meets && !best.meets) || (meets === best.meets && odds > best.odds)) best = { pairs, odds, meets };
   }
   if (!best) throw new Error('trip: no two dragons can go');
   const { pairs, odds } = best;
-  const { stops, turnBack } = roadOf(sim, m, pairs, success);
   const R = regionOf(region), nest = freeNest(sim);
   const egg = success && nest != null ? R.eggs[rngAt(sim.seed, TAG.EGG, m.id, 1).int(0, R.eggs.length - 1)] : null;
   return {
-    mission: m, pairs, odds, success, egg, nest: egg ? nest : null, stops, turnBack,
-    state: 'away', departAt: null, returnAt: null,
-    exit: success && m.baddie ? BADDIES[m.baddie].exit : null,
+    mission: m, pairs, odds, success, egg, nest: egg ? nest : null, stops: roadOf(sim, m, pairs),
+    state: 'away', departAt: null, returnAt: null, exit: exitOf(m),
   };
 }
 

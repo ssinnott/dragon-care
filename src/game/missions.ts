@@ -16,8 +16,10 @@
 // lightning, Iris for dusk; water has none): a pair of partners goes 5 % better. A challenge is met by a team dragon of
 // its element or a rider of its skill (the chooser shows who, up front); a big baddie needs both of its counters.
 //
-// Sending (send) rolls the whole road at once (the outcome, the egg, the stops and the turn-back), counts the Map Room
-// used, and starts the muster: the team's dragons leave whatever they were doing once they may (a keeper at work
+// Sending (send) rolls the whole trip at once (the outcome, the egg and the road's stops), counts the Map Room used,
+// and starts the muster. The road never depends on the outcome: a team never turns back, it walks every stop (meeting
+// what it can, waiting out the rest) and the outcome is told only at the road's end (missionview.ts, the result card).
+// The muster: the team's dragons leave whatever they were doing once they may (a keeper at work
 // finishes; a ride in hand is ridden) and ride the Dragon Lift up to the Aerie at the car's first priority, each to
 // the westmost free spot on the deck as it gets there; the riders walk to the Tack Room, take their saddles (the Tack
 // Room used) and climb the left tower's ladder to the deck, beside their dragons. All there, the team walks west off
@@ -38,7 +40,7 @@ import type { Room, RoomKind } from './layout.ts';
 import { routeTo, nearestFree, sendTo, dragonInBay, faceWay, raiseCall } from './travel.ts';
 import { CHALLENGES, BADDIES, REGIONS, KEEPER_SKILL, regionOf } from './regions.ts';
 import type { Counter } from './regions.ts';
-import type { RegionId, ChallengeId, Difficulty } from './missiondata.ts';
+import type { RegionId, ChallengeId, Difficulty, BaddieExit } from './missiondata.ts';
 import type { Mission, Pair, Stop, Trip } from './trip.ts';
 import type { CareSim, Dragon, Keeper } from './sim.ts';
 // (a value read only while stepping, never as this module loads: sim.ts imports this one)
@@ -307,41 +309,40 @@ export function canSend(sim: CareSim, m: Mission | null, pairs: readonly Pair[],
 export function tutorial(m: Mission): boolean { return m.title === LOST_NEST && m.region === 'millbrook' && m.id < 8; }
 
 /**
- * The trip log's line for a stop (a failure met at every stop turns back at the last one, and says why: the weather),
- * always `NAME - WHO WHAT`: the watchable scene's banner shows the part before ` - ` as the stop is reached
- * (missionview.ts), and the whole line once it is met.
+ * The trip log's line for a stop, always `NAME - WHO WHAT`: a challenge met and by whom, or waited out; the baddie met
+ * and by whom, or waited out till it leaves the road its own way. Never the outcome (the road's end tells that): a team
+ * never turns back. The watchable scene's banner shows the part before ` - ` as the stop is reached (missionview.ts),
+ * and the whole line once it is met.
  */
-function logLine(stop: Stop, turn: boolean, success: boolean): string {
+function logLine(stop: Stop): string {
   if (stop.kind === 'baddie') {
     const b = BADDIES[stop.baddie!];
-    if (!success) return `${b.name} - IT KEEPS THE ROAD. HOME FOR TEA. NOBODY IS HURT.`;
     return stop.covered ? `${b.name} - ${stop.by.join(' AND ')}: IT ${b.how}` : `${b.name} - NOBODY COULD HELP, BUT IT ${b.how}`;
   }
   const c = CHALLENGES[stop.challenge!];
-  if (turn && stop.covered) return `${c.name} - ${stop.by[0]} ${c.met}. THEN THE WEATHER TURNS: THEY HEAD HOME`;
-  return stop.covered ? `${c.name} - ${stop.by[0]} ${c.met}` : `${c.name} - NOBODY COULD HELP: ${turn ? 'THEY TURN BACK FOR HOME' : 'THEY WAIT IT OUT'}`;
+  return stop.covered ? `${c.name} - ${stop.by[0]} ${c.met}` : `${c.name} - NOBODY COULD HELP: THEY WAIT IT OUT`;
 }
 
 /**
  * The road a team would meet on mission m (BASE_DESIGN 5): each challenge at (i + 1) / (n + 1) of ROAD_SPAN of the way, the
- * baddie at BADDIE_AT, each with whether the team meets it and who; on a failure, the stop it turns back at (the first
- * one unmet, else the last); and each stop's log line.
+ * baddie at BADDIE_AT, each with whether the team meets it and who, and its log line. The same whatever the outcome:
+ * the team walks all of it.
  */
-export function roadOf(sim: CareSim, m: Mission, pairs: readonly Pair[], success: boolean): { stops: Stop[]; turnBack: number | null } {
+export function roadOf(sim: CareSim, m: Mission, pairs: readonly Pair[]): Stop[] {
   const cov = coverage(sim, m, pairs), n = m.challenges.length;
   const stops: Stop[] = m.challenges.map((c, i) => ({ kind: 'challenge', challenge: c, baddie: null, at: ((i + 1) / (n + 1)) * ROAD_SPAN, covered: cov.challenges[i].length > 0, by: cov.challenges[i].slice(0, 1), log: '' }));
   if (m.baddie) stops.push({ kind: 'baddie', challenge: null, baddie: m.baddie, at: BADDIE_AT, covered: !!cov.baddie, by: cov.baddie ?? [], log: '' });
-  let turnBack: number | null = null;
-  if (!success) { const u = stops.findIndex((s) => !s.covered); turnBack = u >= 0 ? u : stops.length - 1; }
-  for (let i = 0; i < stops.length; i++) (stops[i] as { log: string }).log = logLine(stops[i], i === turnBack, success);
-  return { stops, turnBack };
+  return stops.map((s) => ({ ...s, log: logLine(s) }));
 }
+
+/** How a mission's baddie leaves the road (met or waited out, it always does), or null: no baddie. */
+export function exitOf(m: Mission): BaddieExit | null { return m.baddie ? BADDIES[m.baddie].exit : null; }
 
 /**
  * Send a team on board mission `missionId` (the Map Room table's SEND): refused with canSend's reason, else
  * the whole trip rolled now -- the outcome (rngAt(seed, MISSION, id) under the odds), the nest reserved and the egg
  * (sure on a region's first success, else rngAt(seed, EGG, id) under its chance; its element one of the region's), the
- * road and its turn-back -- the mission taken off the board, the Map Room counted, and the muster begun (musterStart).
+ * road -- the mission taken off the board, the Map Room counted, and the muster begun (musterStart).
  * `awaySteps`: a test's own trip length (else the mission's days).
  */
 export function send(sim: CareSim, missionId: number, pairs: readonly Pair[], opts: { taken?: Taken; awaySteps?: number } = {}): Trip | string {
@@ -354,9 +355,7 @@ export function send(sim: CareSim, missionId: number, pairs: readonly Pair[], op
   const region = regionOf(mission.region), nest = freeNest(sim);
   let egg: DragonElement | null = null;
   if (success && nest != null && (mission.guaranteedEgg || rngAt(sim.seed, TAG.EGG, mission.id).next() < mission.eggChance)) egg = region.eggs[rngAt(sim.seed, TAG.EGG, mission.id, 1).int(0, region.eggs.length - 1)];
-  const { stops, turnBack } = roadOf(sim, mission, pairs, success);
-  const exit = success && mission.baddie ? BADDIES[mission.baddie].exit : null;
-  const trip: Trip & { awaySteps?: number } = { mission, pairs: pairs.map((p) => ({ ...p })), odds, success, egg, nest: egg ? nest : null, stops, turnBack, state: 'muster', departAt: null, returnAt: null, exit };
+  const trip: Trip & { awaySteps?: number } = { mission, pairs: pairs.map((p) => ({ ...p })), odds, success, egg, nest: egg ? nest : null, stops: roadOf(sim, mission, pairs), state: 'muster', departAt: null, returnAt: null, exit: exitOf(mission) };
   if (opts.awaySteps != null) trip.awaySteps = opts.awaySteps;
   const ms = sim.missions;
   ms.board = ms.board.filter((q) => q.id !== mission.id);
@@ -629,8 +628,9 @@ export function copyMissions(m: MissionsState): MissionsState { return JSON.pars
 
 /**
  * A save's missions, checked and copied (CareSim.fromSave): a board of real missions (known regions, challenges and
- * baddies), a map of known regions, whole coin, and a trip whose pairs are dragons and keepers the save has -- else it
- * throws, and the view starts a new barn (base.ts load).
+ * baddies), a map of known regions, whole coin, and a trip whose pairs are dragons and keepers the save has and whose
+ * stops are real ones -- else it throws, and the view starts a new barn (base.ts load). The trip's road is told again
+ * by this build (retell).
  */
 export function checkMissions(raw: unknown, dragons: readonly { id: number }[], keepers: readonly { id: number; phase: string }[]): MissionsState {
   const bad = (why: string): never => { throw new Error(`save: the missions ${why}`); };
@@ -641,11 +641,13 @@ export function checkMissions(raw: unknown, dragons: readonly { id: number }[], 
   if (!whole(m.day) || !whole(m.coin) || !whole(m.sent) || !regions(m.explored) || !regions(m.pendingReveal) || !regions(m.firstSuccess)) bad(`map (${JSON.stringify({ day: m.day, coin: m.coin, explored: m.explored })}) is not one this build knows`);
   const mission = (q: Mission) => q && typeof q === 'object' && whole(q.id) && ids.has(q.region) && typeof q.title === 'string' && q.difficulty in DIFFICULTY
     && Array.isArray(q.challenges) && q.challenges.every((c) => c in CHALLENGES) && (q.baddie === null || q.baddie in BADDIES) && whole(q.days, 1) && whole(q.coin) && typeof q.eggChance === 'number';
+  const stop = (s: Stop) => s && typeof s === 'object' && (s.kind === 'baddie' ? s.baddie! in BADDIES : s.kind === 'challenge' && s.challenge! in CHALLENGES)
+    && typeof s.at === 'number' && typeof s.covered === 'boolean' && Array.isArray(s.by) && s.by.every((w) => typeof w === 'string');
   if (!Array.isArray(m.board) || m.board.length > BOARD_MAX || !m.board.every(mission)) bad('board is not one this build can show');
   const t = m.trip;
   if (t !== null) {
     if (!t || typeof t !== 'object' || !mission(t.mission) || !['muster', 'depart', 'away', 'return'].includes(t.state) || !Array.isArray(t.pairs) || !t.pairs.length || t.pairs.length > MAX_PAIRS
-      || !t.pairs.every((p) => dragons.some((d) => d.id === p.dragon) && keepers.some((k) => k.id === p.keeper)) || !Array.isArray(t.stops)
+      || !t.pairs.every((p) => dragons.some((d) => d.id === p.dragon) && keepers.some((k) => k.id === p.keeper)) || !Array.isArray(t.stops) || !t.stops.every(stop)
       || !Array.isArray(m.deck) || m.deck.length !== t.pairs.length || !m.deck.every((s) => s === null || (whole(s) && s < DECK_SPOTS.length))
       // (away: whole clocks, the return after the leaving -- which may be before the world's clock 0: the trip preset's
       // team left before its world began, missions.ts awayNow)
@@ -653,5 +655,19 @@ export function checkMissions(raw: unknown, dragons: readonly { id: number }[], 
   }
   // (a keeper on a trip is the trip's rider)
   for (const k of keepers) if (TRIP_PHASES.has(k.phase) && !t?.pairs.some((p) => p.keeper === k.id)) bad(`have keeper ${k.id} ${k.phase} with no team`);
-  return copyMissions(m);
+  const out = copyMissions(m);
+  if (out.trip) retell(out.trip);
+  return out;
+}
+
+/**
+ * A saved trip's road told by this build: its stops, and who met each, as they were; every stop's line, and the
+ * baddie's exit, as roadOf and send tell them. (A save from before teams walked every road whole carries the stop it
+ * turned back at, and lines and an exit that told a failure early: so the team it holds walks the whole road too, and
+ * its outcome waits for the road's end. A save from this build is told the same, unchanged.)
+ */
+function retell(t: Trip): void {
+  delete (t as { turnBack?: unknown }).turnBack;
+  t.stops = t.stops.map((s) => ({ ...s, log: logLine(s) }));
+  t.exit = exitOf(t.mission);
 }

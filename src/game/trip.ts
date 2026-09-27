@@ -38,29 +38,30 @@ export interface Stop {
   covered: boolean;
   /** Who met it: dragon and keeper names, for the banner (empty if uncovered). */
   by: readonly string[];
-  /** The trip log's line for this stop, e.g. "PITCH DARK - WICK LIGHTS THE WAY". */
+  /** The trip log's line for this stop, e.g. "PITCH DARK - WICK LIGHTS THE WAY": how the stop went, never the outcome. */
   log: string;
 }
 
 export type TripState = 'muster' | 'depart' | 'away' | 'return' | 'home';
 
-/** A team out on a mission. The outcome is rolled when it is sent (seeded), so the whole road is known up front. */
+/**
+ * A team out on a mission. The outcome is rolled when it is sent (seeded), so the whole road is known up front; but the
+ * road is the same either way -- the team never turns back, it walks every stop -- and the outcome is told at its end.
+ */
 export interface Trip {
   mission: Mission;
   pairs: readonly Pair[];
-  /** The odds it was sent with (0.05..0.95), and the roll's result. */
+  /** The odds it was sent with (0.05..0.95), and the roll's result: told only at the road's end (the result card). */
   odds: number;
   success: boolean;
   /** The egg it brings home (its element) and the nest reserved for it at SEND, or null. */
   egg: DragonElement | null;
   nest: number | null;
   stops: readonly Stop[];
-  /** On a failure, the index of the stop where the team turns back (the first uncovered, else the last); null on a success. */
-  turnBack: number | null;
   state: TripState;
   /** Clock values (sim.clock) when the team left the Aerie and when it lands again; null until it has departed. */
   departAt: number | null;
   returnAt: number | null;
-  /** The baddie's exit on a success, or null (no baddie, or a failure). */
+  /** How the road's baddie leaves it (it always does, met or waited out: the team walks on), or null (no baddie). */
   exit: BaddieExit | null;
 }
