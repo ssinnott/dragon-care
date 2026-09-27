@@ -40,10 +40,10 @@ export const START_ROOMS: readonly RoomPlace[] = [
 
 /**
  * A dragon at home: which slot it stands in (a room kind -- the `n`th room of that kind, default the first -- and the
- * index into its slots: layout.ts slotsOf; it faces the slot's way), and `days`, how far into its stage it is (game days, default 0:
- * the stage has just begun).
+ * index into its slots: layout.ts slotsOf; it faces the slot's way), `days`, how far into its stage it is (game days, default 0:
+ * the stage has just begun), and `xp`, the XP its bouts have brought it (default 0: level 1; BASE_DESIGN 10).
  */
-export interface DragonPlace { name: string; element: DragonElement; stage: Stage; seed: number; slot: { room: RoomKind; i: number; n?: number }; days?: number }
+export interface DragonPlace { name: string; element: DragonElement; stage: Stage; seed: number; slot: { room: RoomKind; i: number; n?: number }; days?: number; xp?: number }
 /**
  * One of each element, in the art bible's order, every one at the very start of the adult stage (ids 0-6 in this
  * order), each in a slot of its own need's room: fire's food in the kitchen, water's bath in the bathhouse,

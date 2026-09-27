@@ -32,7 +32,8 @@
 // its pixels change, darker and cooler, and no floor pixel does (BASE_DESIGN 7: the sky, the lights and the moonlit
 // walls, never a dragon or a floor), and the walls step with the dusk and the dawn; live, the speed button and the keys 1-4 and p run the world faster, and pause it;
 // a frozen page with a save in storage neither loads nor writes it, and nor does a live page given hour=; a live page
-// that saves resumes its world after a reload, and one whose save doesn't fit -- another version, or one of this
+// that saves resumes its world after a reload, one with a version 9 save (before the Arena) loads it brought up to
+// date -- every dragon at LV 1 -- and saves it back as version 10, and one whose save doesn't fit -- another version, or one of this
 // version the view can't build or draw (an unknown element, keeper or need) -- starts a new barn without a page
 // error, keeps the old save aside, and never writes it back. Growing up and eggs (BASE_DESIGN 7): the growup preset's EMBER
 // is an elder a second in, the eggs preset shows its three eggs in the Hatchery's nests, the hatch preset's egg has
@@ -63,6 +64,14 @@
 // Barn capacity (BASE_DESIGN 4.7): the hook counts the barn's dragons against its cap (7 of 12 in the new game, the twelve
 // preset at the cap, the full preset forced over it with its due egg waiting in its nest, and the capped preset at the
 // cap with its due egg waiting in plain view, nobody in front of its nest).
+// The Arena (BASE_DESIGN 10): the sparring audit (view=arenaaudit) plays every sparring skill of every look against
+// every look in the other corner and fails any frame where one fighter covers the other's eye, or its own (ART_BIBLE
+// 1.4); frozen, the chooser (panel=arena) offers every dragon free to spar, and the bout preset's move menu
+// (preset=bout&panel=bout&t=90) shows EMBER's three skills with both fighters' heads on screen, clear of every panel;
+// live, b opens and closes the chooser, ARENA opens it (the world waits under it), two dragons tapped into the corners
+// and SWAP, START BOUT opens the bout, BACK TO BARN leaves it on under its chip and the chip opens it again, the world
+// waits for the player's pick, a skill tapped plays, AUTO lets the coach pick, and once decided the toasts, the result
+// card (tapped away) and the XP, and the pair home with the bout over.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -81,6 +90,7 @@ import { FLOORS, STRAW_SEAM, PATH_EDGE } from '../src/game/surfaces.ts';
 import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS } from '../src/game/missiondata.ts';
 import { PHASE_ORDER } from '../src/game/clock.ts';
 import { PLACES, growthSamples } from '../src/game/worldmap.ts';
+import { PLATES, LOG_LINE, MENU, AUTO, BOUT_BACK } from '../src/game/arenaui.ts';
 
 const require = createRequire(import.meta.url);
 function loadPlaywright(): any {
@@ -130,6 +140,8 @@ interface Case {
   hash?: boolean;
   /** Keep the frame's pixels (0xRRGGBB each) for TINT's day-and-night comparison (BASE_DESIGN 7). */
   pixels?: boolean;
+  /** view=arenaaudit (BASE_DESIGN 10): at least this many sparring skills played, none covering an eye. */
+  arena?: number;
 }
 
 type BaseHook = NonNullable<NonNullable<Window['__dragonCare']>['base']>;
@@ -269,6 +281,29 @@ async function liveOldSave(page: any): Promise<string[]> {
   return out;
 }
 const OLD_SAVE = JSON.stringify({ ...JSON.parse(PLANTED), v: 999, tick: 9999 });
+/** A version 9 save (before the Arena: BASE_DESIGN 7, Saves): the planted world less every dragon's XP and the Arena. */
+const V9_SAVE = JSON.stringify((() => {
+  const s = JSON.parse(PLANTED);
+  s.v = 9; delete s.arena;
+  for (const d of s.dragons) delete d.xp;
+  return s;
+})());
+/**
+ * view=base, live and saving, with a version 9 save in storage: it loads, brought up to date (save.ts migrateSave) --
+ * the world resumed, every dragon at LV 1 and no bout -- nothing is kept aside, and it is saved back as version 10.
+ */
+async function liveV9Save(page: any): Promise<string[]> {
+  const out: string[] = [];
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 5, null, { timeout: 15000 });
+  const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare.base);
+  if (b.tick < 5000) out.push(`the world is at tick ${b.tick}: the version 9 save was not loaded`);
+  if (b.dragons.some((d) => d.level !== 1 || d.xp !== 0) || b.arena.bout || b.arena.bouts) out.push(`loaded, the dragons are at ${b.dragons.map((d) => `${d.name} LV ${d.level} (${d.xp} XP)`).join(', ')}, the Arena ${JSON.stringify(b.arena)}`);
+  if ((await stored(page, BACKUP_KEY)) !== null) out.push('the version 9 save was kept aside as one that didn\'t fit');
+  await page.evaluate(() => (window as any).__dragonCare.baseSaveNow());
+  const saved = await stored(page, SAVE_KEY);
+  if (!saved || JSON.parse(saved).v !== 10) out.push(`saved again as version ${saved ? JSON.parse(saved).v : 'nothing'}, not 10`);
+  return out;
+}
 /**
  * Saves of this version that parse but that the view can't build (a dragon of an element no one knows, a keeper no one
  * knows) or draw (a job for a need no one knows: it builds, and only the load's trial draw finds it), or whose egg this
@@ -691,6 +726,117 @@ async function baseMapPlaces(page: any): Promise<string[]> {
 }
 
 /**
+ * view=base&panel=arena (BASE_DESIGN 10): the Arena's chooser, open over a world that waits, with a button for every
+ * dragon free to spar (every one, a minute into the new game), no corner filled and no bout on.
+ */
+function chooserIs(b: BaseHook): string[] {
+  const out: string[] = [], picks = b.dragons.filter((d) => b.ui.buttons[`fighter${d.id}`]);
+  if (b.ui.screen !== 'arena') out.push(`the screen is ${b.ui.screen}, not the Arena's chooser`);
+  if (picks.length !== b.dragons.length) out.push(`only ${picks.map((d) => d.name).join(', ') || 'nobody'} may be picked`);
+  for (const k of ['start', 'swap', 'back']) if (!b.ui.buttons[k]) out.push(`no ${k} button`);
+  if (b.ui.corners.some((c) => c != null) || b.arena.bout || b.arena.bouts) out.push(`the corners ${JSON.stringify(b.ui.corners)}, the bout ${JSON.stringify(b.arena.bout?.state ?? null)} (${b.arena.bouts} begun)`);
+  return out;
+}
+/**
+ * view=base&preset=bout&panel=bout&t=90 (BASE_DESIGN 10): the bout preset at its move menu -- EMBER (LV 3, the player's)
+ * in the west corner and BRAMBLE (LV 2) in the east, the pick waiting with AUTO off, a button for each of EMBER's three
+ * skills (its breath, the preen and the yawn), AUTO and BACK TO BARN -- and both fighters' heads on screen, under the
+ * top bar and clear of every panel by 8 px (ART_BIBLE 1.4: nothing covers an eye).
+ */
+function boutMenu(b: BaseHook): string[] {
+  const out: string[] = [], bt = b.arena.bout;
+  if (b.ui.screen !== 'bout' || !bt || bt.state !== 'pick' || bt.auto || bt.t !== 30) return [`the screen ${b.ui.screen}, the bout ${JSON.stringify(bt && { state: bt.state, t: bt.t, auto: bt.auto })}: not the move menu`];
+  const want = [['EMBER', 3, 0], ['BRAMBLE', 2, 1]] as const;
+  bt.fighters.forEach((f, i) => { if (f.name !== want[i][0] || f.level !== want[i][1] || f.corner !== want[i][2] || f.puff !== f.max) out.push(`fighter ${i} is ${f.name} LV ${f.level} in corner ${f.corner} (${f.puff}/${f.max} puff), not ${want[i][0]} LV ${want[i][1]} in corner ${want[i][2]}, fresh`); });
+  const skills = ['skill0', 'skill1', 'skill2', 'skill3'].filter((k) => b.ui.buttons[k]);
+  if (skills.length !== 3 || !b.ui.buttons.auto || !b.ui.buttons.boutBack) out.push(`the menu's buttons: ${Object.keys(b.ui.buttons).join(' ')} (want skill0-skill2, auto, boutBack)`);
+  const panels = [...PLATES, LOG_LINE, MENU, AUTO, BOUT_BACK], M = 8;
+  for (const f of bt.fighters) {
+    const h = b.dragons.find((d) => d.id === f.dragon)?.head;
+    if (!h) { out.push(`${f.name}'s head was not drawn`); continue; }
+    if (h.x < M || h.x > 640 - M || h.y - M < 16) out.push(`${f.name}'s head (${h.x.toFixed(0)}, ${h.y.toFixed(0)}) is off screen or under the top bar`);
+    for (const r of panels) if (h.x + M > r.x && h.x - M < r.x + r.w && h.y + M > r.y && h.y - M < r.y + r.h) out.push(`${f.name}'s head (${h.x.toFixed(0)}, ${h.y.toFixed(0)}) is under a panel at (${r.x}, ${r.y}, ${r.w} x ${r.h})`);
+  }
+  return out;
+}
+
+/**
+ * The Arena's loop, live (BASE_DESIGN 10): b opens the chooser and b again closes it; ARENA opens it (the world waits
+ * under it); EMBER then BRAMBLE tapped into the corners, SWAP and SWAP back; START BOUT opens the bout, its muster
+ * begun; BACK TO BARN leaves it on under its chip, and the chip opens it again; at 8x the pair up to their corners and
+ * the move menu -- the world waits for the pick; the breath tapped plays; AUTO lets the coach pick; decided, the toasts
+ * (who won, and the level and skill it brought), the result card (tapped away: the barn again), and at 8x the pair home,
+ * the bout over, the XP each got in the hook.
+ */
+async function baseArena(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  const until = (fn: string, ms: number) => page.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (r: { x: number; y: number; w: number; h: number }) => page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  await page.keyboard.press('b');
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "arena"', 3000))) return [`b did not open the Arena (screen ${(await st()).ui.screen})`];
+  await page.keyboard.press('b');
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "none"', 3000))) return [`b again did not close the Arena (screen ${(await st()).ui.screen})`];
+  await click((await st()).buttons.arena);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "arena"', 3000))) return [`ARENA did not open the chooser (screen ${(await st()).ui.screen})`];
+  let s = await st();
+  const t0 = s.tick, ember = s.dragons.find((d) => d.name === 'EMBER')!, bramble = s.dragons.find((d) => d.name === 'BRAMBLE')!;
+  if (!s.ui.buttons[`fighter${ember.id}`] || !s.ui.buttons[`fighter${bramble.id}`]) return [`EMBER or BRAMBLE can't be picked (${Object.keys(s.ui.buttons).join(' ')})`];
+  await click(s.ui.buttons[`fighter${ember.id}`]);
+  await click((await st()).ui.buttons[`fighter${bramble.id}`]);
+  await page.waitForTimeout(100);
+  s = await st();
+  if (s.ui.corners[0] !== ember.id || s.ui.corners[1] !== bramble.id) out.push(`EMBER then BRAMBLE tapped put ${JSON.stringify(s.ui.corners)} in the corners`);
+  await click(s.ui.buttons.swap);
+  await page.waitForTimeout(100);
+  if ((await st()).ui.corners[0] !== bramble.id) out.push(`SWAP left the corners ${JSON.stringify((await st()).ui.corners)}`);
+  await click((await st()).ui.buttons.swap);
+  await page.waitForTimeout(100);
+  if ((await st()).tick !== t0) out.push(`the world stepped under the chooser (tick ${t0} to ${(await st()).tick})`);
+  await click((await st()).ui.buttons.start);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "bout" && window.__dragonCare?.base?.arena?.bout?.state === "muster"', 3000))) return [...out, `START BOUT left the screen ${(await st()).ui.screen} and the bout ${JSON.stringify((await st()).arena.bout?.state ?? null)}`];
+  await click((await st()).ui.buttons.boutBack);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "none" && !!window.__dragonCare?.base?.ui?.boutChip', 3000))) out.push(`BACK TO BARN left the screen ${(await st()).ui.screen}, the bout's chip ${JSON.stringify((await st()).ui.boutChip)}`);
+  else {
+    await click((await st()).ui.boutChip!);
+    if (!(await until('window.__dragonCare?.base?.ui?.screen === "bout"', 3000))) out.push(`the bout's chip opened ${(await st()).ui.screen}, not the bout`);
+  }
+  // (8x: up to the corners, and the move menu: the world waits for the pick)
+  await page.keyboard.press('4');
+  if (!(await until('window.__dragonCare?.base?.arena?.bout?.state === "pick"', 60000))) return [...out, `the pair never stood in their corners (the bout ${(await st()).arena.bout?.state})`];
+  const up = await st();
+  await page.waitForTimeout(400);
+  if ((await st()).tick !== up.tick) out.push(`the world stepped on with the move menu up (tick ${up.tick} to ${(await st()).tick})`);
+  await page.keyboard.press('1');
+  await click((await st()).ui.buttons.skill0);
+  if (!(await until('window.__dragonCare?.base?.arena?.bout?.state === "play"', 3000))) out.push(`the breath tapped left the bout at ${(await st()).arena.bout?.state}`);
+  else if ((await st()).arena.bout?.moves.find((m) => m.by === 0)?.skill !== 'breath') out.push(`EMBER's move is ${(await st()).arena.bout?.moves.find((m) => m.by === 0)?.skill}, not the breath tapped`);
+  await click((await st()).ui.buttons.auto);
+  if (!(await until('window.__dragonCare?.base?.arena?.bout?.auto === true', 3000))) out.push('AUTO did not let the coach pick');
+  await page.keyboard.press('4');
+  if (!(await until('["over", "home"].includes(window.__dragonCare?.base?.arena?.bout?.state)', 60000))) return [...out, `the bout never ended (${(await st()).arena.bout?.state})`];
+  await page.keyboard.press('1');
+  const won = await until('/WINS THE BOUT|A DRAW/.test(window.__dragonCare?.base?.toast ?? "")', 5000);
+  const decided = await st(), bt = decided.arena.bout!, name = bt.winner == null ? null : bt.fighters[bt.winner].name;
+  if (!won) out.push(`no toast of the bout's end (the toast ${JSON.stringify(decided.toast)})`);
+  const levelled = name ? await until(`/${name} IS LEVEL 2! NEW SKILL: YAWN/.test(window.__dragonCare?.base?.toast ?? "")`, 8000) : true;
+  if (!levelled) out.push(`no toast of ${name}'s level and new skill (the toast ${JSON.stringify((await st()).toast)})`);
+  if (!(await st()).ui.buttons.result) out.push('no result card once the bout was decided');
+  else {
+    await click((await st()).ui.buttons.result);
+    if (!(await until('window.__dragonCare?.base?.ui?.screen === "none"', 3000))) out.push(`the result card tapped left the screen ${(await st()).ui.screen}`);
+  }
+  await page.keyboard.press('4');
+  if (!(await until('window.__dragonCare?.base?.arena?.bout === null', 60000))) return [...out, `the pair never got home (the bout ${(await st()).arena.bout?.state})`];
+  const home = await st(), xp = [ember, bramble].map((d) => home.dragons.find((q) => q.id === d.id)!);
+  if (xp[0].xp !== bt.xp[0] || xp[1].xp !== bt.xp[1] || home.arena.bouts !== 1 || home.ui.boutChip) out.push(`home: EMBER ${xp[0].xp} XP LV ${xp[0].level}, BRAMBLE ${xp[1].xp} XP LV ${xp[1].level} (the bout gave ${JSON.stringify(bt.xp)}); ${home.arena.bouts} bouts begun; the chip ${JSON.stringify(home.ui.boutChip)}`);
+  if (!out.length) console.log(`        arena: b open and shut, ARENA, EMBER and BRAMBLE tapped into the corners, SWAP and back, START BOUT, BACK TO BARN and the chip, the move menu at step ${up.tick} (the world waiting), the breath tapped, AUTO; ${name ?? 'nobody'} ${name ? 'won' : 'drew'} in ${bt.turn} turns (+${bt.xp.join(' and +')} XP), the toasts, the result card tapped away; the pair home by step ${home.tick}`);
+  return out;
+}
+
+/**
  * Barn capacity (BASE_DESIGN 4.7): the hook's count of the barn's dragons against its cap (life.ts BARN_CAP, 12) -- every
  * dragon not living in the garden -- as the top bar's `BARN n/12` shows it.
  */
@@ -942,6 +1088,7 @@ const CASES: Case[] = [
   { query: 'view=base&t=600', minColours: 150, allScales: false, init: plant(PLANTED), act: plantedFrozen },
   { query: 'view=base', minColours: 150, allScales: false, act: livePersist, timeout: 45000 },
   { query: 'view=base', minColours: 150, allScales: false, init: plant(OLD_SAVE), act: liveOldSave },
+  { query: 'view=base', minColours: 150, allScales: false, init: plant(V9_SAVE), act: liveV9Save },
   ...BROKEN_SAVES.map((b): Case => ({ query: 'view=base', minColours: 150, allScales: false, init: plant(b.blob), act: liveBrokenSave(b) })),
   { query: 'view=base&hour=22', minColours: 150, allScales: false, init: plant(PLANTED), act: liveHourNoSave },
   // growing up and eggs (BASE_DESIGN 7): EMBER grown an elder, three eggs in the Hatchery's nests, an egg hatched into a baby;
@@ -998,6 +1145,12 @@ const CASES: Case[] = [
   // the whole loop live (BASE_DESIGN 5, 6): MAP -> a pin -> BEST TEAM -> SEND -> the muster on the Aerie -> the TEAM
   // OUT chip -> the watch scene (its trip log) -> BACK
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseLoop },
+  // the Arena (BASE_DESIGN 10): the sparring audit (every look's every sparring skill against every look: no eye
+  // covered), the chooser and the bout preset's move menu frozen, and the loop live
+  { query: 'view=arenaaudit&t=0', minColours: 2, allScales: false, timeout: 300000, arena: 84 },
+  { query: 'view=base&t=60&panel=arena', minColours: 100, allScales: false, check: chooserIs },
+  { query: 'view=base&preset=bout&panel=bout&t=90', minColours: 150, allScales: false, check: boutMenu },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseArena, timeout: 60000 },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -1057,6 +1210,14 @@ for (const c of CASES) {
         if (r.covered > 0) errors.push(`${r.act} ${r.id}: the keeper covers ${r.covered} px of the eye at f${r.frame} (${r.phase})`);
         if (r.miss > REACH_MISS) errors.push(`${r.act} ${r.id}: the hand lands ${r.miss} px off its mark`);
         if (!r.done) errors.push(`${r.act} ${r.id}: the act never ends`);
+      }
+    }
+    if (c.arena) {
+      const rows: { id: string; covered: number; against: string; frame: number; reach: number; own: number; gap: number }[] = await page.evaluate(() => (window as any).__dragonCare?.arena ?? []);
+      if (rows.length < c.arena) errors.push(`the sparring audit played ${rows.length} skills, not ${c.arena}`);
+      for (const r of rows) {
+        if (r.covered > 0) errors.push(`${r.id} covers ${r.covered} px of ${r.against}'s eye at f${r.frame}`);
+        if (r.own > 0) errors.push(`${r.against} covers ${r.own} px of ${r.id}'s own eye at f${r.frame}`);
       }
     }
     if (c.base) {

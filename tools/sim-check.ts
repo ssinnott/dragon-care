@@ -179,6 +179,26 @@
 //    BARN FULL: THE EGG WILL WAIT -- life.ts barnRoom 0 -- and sends it all the same), away dragons still counted; the
 //    team lands, its rider carries the egg up to the Hatchery by the keepers' ladders and lays it in the reserved nest,
 //    where it waits past its due while the barn is full, and hatches within 2 steps of a retiree arriving in the garden.
+// 27. The Arena ("train dragons with one another ... they will gain skills and level up. These fights should happen in an
+//    arena"; BASE_DESIGN 10): the rules (training.ts) -- the ring of the seven elements one cycle, each strong against
+//    one and weak against one; level L at exactly xpFor(L) XP, 1 to 10; a win brings more XP than a draw and a draw more
+//    than a loss, more against a higher level, and a LV 1 sparring a LV 10 is LV 3 or more after one bout; the skills
+//    learned at their levels in the move menu's order, four at most, each one of the dragon's own one-shot anims at
+//    every stage that spars, landing inside it; the stats never less with a level, the young under the adult, the elder
+//    never weaker; the corners on the deck's net, snouts ARENA_GAP apart, neither's eye under the other's body. The
+//    balance: every pairing of the start's seven, each way round on four seeds (each element wins 35-65 % of its bouts,
+//    4.5-8 turns on average, few running out of turns), and the levels matter (a level up beats its own element, three
+//    up the element strong on it). A whole bout in the world by commands, the section 2 invariants checked every step:
+//    begun while a keeper is at work with one fighter and the other sleeps -- the keeper finishes, the sleeper sleeps on
+//    (the needs wait through a bout, a job or a nap under way doesn't), each keeps its slot until it sets off -- up the
+//    lift to the corners (the first up the east one), the Arena used once, the first pick the coach's after PICK_WAIT,
+//    skills not yet known refused and a pick mid-move ignored, picks by hand, then AUTO; each move its dragon's own anim,
+//    landing at its impact for exactly its cost; the XP, the level and the skill it brings, tired and hungry, the nap
+//    and the preen for exactly overLen; home, the west corner first, settled and asking again; no job opens for the two
+//    and nobody else sets foot on the Arena deck; the same twice, the same world, and saves taken at every state step on
+//    the same. Who may spar (each refusal in its own words, by the command itself); the bout preset; a version 9 save
+//    migrated to the same world; 15 bouts this build can't run refused; and no word of harm in any bout's lines or the
+//    Arena's text (nobody is hurt: the Decisions' B8, amended for the Arena).
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -189,10 +209,17 @@ import type { Command } from '../src/game/control.ts';
 import { nextStage, stageDue, inTheWayOfGrowing, staysOn, HATCH_FOOD, BARN_CAP, barnCount, barnFull, barnRoom } from '../src/game/life.ts';
 import { CASTS, parseCast, placeCast, runOne } from './capacity.ts';
 import { NAMES, NAME_MAX, hatchName } from '../src/game/names.ts';
-import { GROWUP_IN, HATCH_IN, EGGS_PRESET, RETIRE_AT, sendLostNest } from '../src/game/presets.ts';
+import { GROWUP_IN, HATCH_IN, EGGS_PRESET, RETIRE_AT, BOUT_PAIR, sendLostNest } from '../src/game/presets.ts';
 import {
-  boardFor, oddsOf, autoRider, bestTeam, dragonReason, canSend, send, onTrip, roadOf, tutorial, baddieDay, isTaken, DIFFICULTY, BADDIE_FROM_DAY, BOARD_MAX, LOST_NEST, HOME_KEEPERS,
+  boardFor, oddsOf, autoRider, bestTeam, dragonReason, canSend, send, onTrip, roadOf, tutorial, baddieDay, isTaken, standsAt, DIFFICULTY, BADDIE_FROM_DAY, BOARD_MAX, LOST_NEST, HOME_KEEPERS,
 } from '../src/game/missions.ts';
+import { boutNow, stepArena, canSpar, fighterReason, fighterIndex, boutLook, overLen, FACE_STEPS, PICK_WAIT, MAX_TURNS, NAP_STEPS, TIRED, FACE_FRAMES, LOW_NEED } from '../src/game/arena.ts';
+import type { BoutState } from '../src/game/arena.ts';
+import {
+  MAX_LEVEL, xpFor, levelOf, xpInto, boutXp, drawXp, BEATS, BEATS_WHY, STRONG, WEAK, typeMult, statsOf, STAT_NAMES, skillsOf, skillOf, learnedBetween, SKILL_KINDS, LEARN_AT,
+  STAGE_MIN, STAGE_MAX, spirits, stageMult,
+} from '../src/game/training.ts';
+import type { SkillKind } from '../src/game/training.ts';
 import type { Taken } from '../src/game/missions.ts';
 import { REGIONS, CHALLENGES, BADDIES, regionOf, placeOf } from '../src/game/regions.ts';
 import { mapProblems, worldRaster, footprint, PLACES, MAP_COLOURS } from '../src/game/worldmap.ts';
@@ -204,7 +231,7 @@ import {
   NEED_ROOM, TURN_STEPS, TURN_HALF, WAIT_MAX, LEAD_PX, arrived, inTheBay, liftRange, needRoom, dragonSpan, dragonInBay, depthOf, eyeSpan, walking,
   landingEdge, ridesLeft, remainingCost, nearestFree, inBay, KEEPER_HALF, bodySpan, landingLine, LIVELY, DRAGON_EYE,
 } from '../src/game/travel.ts';
-import { gaitOf, gaitFrom, moveAt, wrapT, happyLen } from '../src/game/gait.ts';
+import { gaitOf, gaitFrom, moveAt, wrapT, happyLen, animLen } from '../src/game/gait.ts';
 import { TURN_HALF as YARD_TURN_HALF } from '../src/care/dragon.ts';
 import { dragonBuild } from '../src/art/dragon/build.ts';
 import { dragonAnims, baseAnims } from '../src/art/dragon/anims.ts';
@@ -212,7 +239,8 @@ import { animTuning } from '../src/art/dragon/tuning.ts';
 import { DragonAnimPlayer } from '../src/art/dragon/anim.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts';
 import { startSpec, buildSim, PRESETS } from '../src/game/presets.ts';
-import { serialize, barnKey, SaveVersionError, SAVE_VERSION } from '../src/game/save.ts';
+import { serialize, barnKey, SaveVersionError, SAVE_VERSION, migrateSave } from '../src/game/save.ts';
+import type { SaveV } from '../src/game/save.ts';
 import { readClock, clockLabel, hourSteps, PHASE_ORDER, STAGE_DAYS, HATCH_DAYS, RETIRE_DAYS } from '../src/game/clock.ts';
 import type { ClockRead } from '../src/game/clock.ts';
 import { skyBands, BACKDROPS } from '../src/game/surfaces.ts';
@@ -224,9 +252,10 @@ import {
   route, spanOf, postX, waitX, placeRooms, platesOf, standSpot, fitsSlot, slotBody, feetY, floorTop, nestX, ROOM_INFO, ROOM_KINDS, STRUCTURES,
   makeNets, worldWOf, gardenSpan, plotMid, plotX, GARDEN_X0, GARDEN_PLOT, GARDEN_END, GATE_MID, GATE_X0, GATE_X1,
   AERIE_F, BARN_X, TOWER_R, TOWER_L, TOWER_W, DECK_X0, DECK_X1, BRIDGE_X0, HAND_DECK_X0, LADDER_M_X, LIFT_X0, LIFT_X1, LIFT_CX, LIFT_STOPS, CLIMB_COST, WALL_H, DRAGON_PAD, PITCH,
+  ARENA_X0, ARENA_X1, ARENA_GAP, arenaSpot, DRAGON_BODY,
 } from '../src/game/layout.ts';
 import type { Spot, RoomKind, RoomPlace } from '../src/game/layout.ts';
-import { NEEDS, FPS, OWN_NEED, GARDEN_NEEDS, GARDEN_RATE, hasNeed, drainRate, moodOf } from '../src/game/needs.ts';
+import { NEEDS, FPS, OWN_NEED, GARDEN_NEEDS, GARDEN_RATE, SOON, hasNeed, drainRate, moodOf } from '../src/game/needs.ts';
 import { retireDue, rests, restsClear, restsApart, restOverlap, REST_OVERLAP, residentSpan, isNight } from '../src/game/garden.ts';
 import type { Needs, NeedKind } from '../src/game/needs.ts';
 import { DRAGON_ELEMENTS } from '../src/art/dragon/palettes.ts';
@@ -247,7 +276,7 @@ import type { Difficulty } from '../src/game/missiondata.ts';
  * over-full `full` preset (21 dragons, 10 minutes); `babies`: section 10's barns of babies with 23 (care while a team
  * is away, 30 minutes of the real day); `service`: section 2 (thirty minutes of play on three seeds, checked every
  * step) with 24 (the watchable scene, read at every step of eight trips); `saves`: section 6 (the saves: every fork
- * stepped 5000 on) with 25 (taking a keeper) -- each worker runs its sections alone, exactly as the main thread would,
+ * stepped 5000 on) with 25 (taking a keeper) and 27 (the Arena) -- each worker runs its sections alone, exactly as the main thread would,
  * and sends back its lines, its failures and its rooms' uses (by kind and room by room), which the main thread prints
  * and counts before the suite's end (then the wall times). Nothing is checked less: a section's code is the same
  * wherever it runs, and no section reads another's results.
@@ -446,15 +475,16 @@ if (MAIN) {
   const trip = route({ f: 0, x: 792 }, { f: AERIE_F, x: 280 }, sim.nets.dragon.adult);
   if (!trip || trip.legs.map(at).join(' / ') !== `f0 x ${LIFT_CX} / f5 x ${LIFT_CX} / f5 x 280`) fail(`the lift from the ground floor to the Aerie: ${trip ? trip.legs.map(at).join(' / ') : 'no route'}, not one ride`);
   // no dragon net reaches a tower but through the Garden Gate: every span of every stage's net lies inside the barn
-  // (floors 1-2), the barn and on through the gate to the garden's end (floor 0), or on the deck and its sky bridge off the
-  // world's west edge (floor 5: BASE_DESIGN 5, the missions' way out), floors 3 and
+  // (floors 1-2), the barn and on through the gate to the garden's end (floor 0), or on the roof floor -- the deck and its
+  // sky bridge off the world's west edge (floor 5: BASE_DESIGN 5, the missions' way out), and the Arena east of the lift's
+  // head, short of the right tower (BASE_DESIGN 10) -- floors 3 and
   // 4 have none, and no route reaches another tower room on the floors where the towers open into the barn -- the
   // gate's arches are the one tower door a dragon fits (every stage walks through it); and no keeper rides the lift
   for (const st of STAGES) {
     const net = sim.nets.dragon[st];
     net.spans.forEach((sp, f) => {
-      const [lo, hi] = f === 0 ? [BARN_X, sim.worldW - GARDEN_END] : f <= 2 ? [BARN_X, TOWER_R] : f === AERIE_F ? [BRIDGE_X0, DECK_X1] : [Infinity, -Infinity];
-      for (const [a, b] of sp) if (a < lo || b > hi) fail(`${st}: the dragon net's floor ${f} runs ${a}..${b}, outside ${f === 0 ? 'the barn and the garden' : f <= 2 ? 'the barn' : f === AERIE_F ? 'the deck and the sky bridge' : 'any floor a dragon has'}`);
+      const [lo, hi] = f === 0 ? [BARN_X, sim.worldW - GARDEN_END] : f <= 2 ? [BARN_X, TOWER_R] : f === AERIE_F ? [BRIDGE_X0, ARENA_X1] : [Infinity, -Infinity];
+      for (const [a, b] of sp) if (a < lo || b > hi) fail(`${st}: the dragon net's floor ${f} runs ${a}..${b}, outside ${f === 0 ? 'the barn and the garden' : f <= 2 ? 'the barn' : f === AERIE_F ? 'the deck, its sky bridge and the Arena' : 'any floor a dragon has'}`);
     });
     for (const t of [{ f: 0, x: TOWER_L + TOWER_W / 2 }, { f: 1, x: TOWER_L + TOWER_W / 2 }, { f: 1, x: TOWER_R + TOWER_W / 2 }, { f: 3, x: TOWER_L + TOWER_W / 2 }]) {
       if (spanOf(t.f, t.x, net) >= 0 || route({ f: 0, x: 792 }, t, net)) fail(`${st}: a dragon can reach the tower room at ${at(t)}`);
@@ -1091,8 +1121,9 @@ if (MAIN) {
     const by = ROOM_KINDS.filter((k) => ROOM_INFO[k].meets === n);
     if (by.length !== 1) fail(`rooms: ${n} is met in ${by.length ? by.join(', ') : 'no room'}, not exactly one kind`);
   }
-  // the plates: one per room, the lift's and the Aerie's; each names a room placed or a structure, and sits on it (so
-  // never on a bare slot): a room's inside its wall, the lift's in its ground-floor bay, the Aerie's over the deck
+  // the plates: one per room, the lift's, the Aerie's, the garden's and the Arena's; each names a room placed or a
+  // structure, and sits on it (so never on a bare slot): a room's inside its wall, the lift's in its ground-floor bay,
+  // the Aerie's over the deck, the Arena's over its own deck, east of the lift's head
   const sim = newSim(), plates = platesOf(sim.rooms), nStructures = Object.keys(STRUCTURES).length;
   if (plates.length !== sim.rooms.length + nStructures) fail(`plates: ${plates.length} for ${sim.rooms.length} rooms and the ${nStructures} structures`);
   const inside = (p: { x: number; y: number; w: number; h: number }, x0: number, x1: number, y0: number, y1: number) => p.x >= x0 && p.x + p.w <= x1 && p.y >= y0 && p.y + p.h <= y1;
@@ -1102,6 +1133,7 @@ if (MAIN) {
     const ok = r ? r.kind === p.names && p.text === ROOM_INFO[r.kind].name && inside(p, r.x0, r.x1, floorTop(r.floor), floorTop(r.floor) + WALL_H)
       : p.names === 'lift' ? inside(p, LIFT_X0, LIFT_X1, floorTop(0), floorTop(0) + WALL_H)
       : p.names === 'garden' ? inside(p, GARDEN_X0, GARDEN_X0 + GARDEN_PLOT, floorTop(0) - PITCH, floorTop(0))
+      : p.names === 'arena' ? inside(p, ARENA_X0, ARENA_X1, 0, feetY(AERIE_F) - 8)
       : p.names === 'aerie' && inside(p, DECK_X0, DECK_X1, 0, feetY(AERIE_F) - 8);
     if (!ok) fail(`plates: "${p.text}" at (${p.x}, ${p.y}) is not on the ${p.names} it names`);
   }
@@ -1840,8 +1872,8 @@ if (MAIN) {
       w.step();
       for (const e of w.events) {
         // (the player's commands' events, a send or a refused take, are no dragon's: none in this run; nor an egg due
-        // in a full barn)
-        if (e.kind === 'send' || e.kind === 'refused' || e.kind === 'full') continue;
+        // in a full barn; nor the Arena's, none in this run either)
+        if (e.kind === 'send' || e.kind === 'refused' || e.kind === 'full' || e.kind === 'bout' || e.kind === 'boutEnd' || e.kind === 'level' || e.kind === 'learn') continue;
         const d = w.dragons.find((q) => q.id === e.dragon)!;
         if (e.kind === 'grow' && e.stage === 'elder') grew.set(d.id, { clock: w.clock, late: w.clock - due0.get(d.id)! });
         if (e.kind === 'retire') {
@@ -2966,7 +2998,460 @@ if (MAIN) {
   }
 }
 
-// ---------- 10 with 23, 2 with 24, 6 with 25 (the workers' results) ----------
+// ---------- 27. the Arena: training bouts (BASE_DESIGN 10) ----------
+if (ROLE === 'saves') {
+  const t27 = performance.now(), ELS = DRAGON_ELEMENTS, SPARS = ['young', 'adult', 'elder'] as const;
+  const named = (w: CareSim, name: string) => w.dragons.find((d) => d.name === name)!;
+  // (a) the rules (training.ts). The ring: one cycle through the seven elements, each strong against exactly one (the
+  // next), weak against exactly one (the one before) and even with the other five, itself among them
+  {
+    let e: DragonElement = ELS[0];
+    const seen: DragonElement[] = [];
+    for (let i = 0; i < ELS.length; i++) { seen.push(e); e = BEATS[e]; }
+    if (e !== ELS[0] || new Set(seen).size !== ELS.length) fail(`arena: the ring (training.ts BEATS) is not one cycle through the seven elements: ${seen.join(' > ')}`);
+    for (const a of ELS) {
+      const strong = ELS.filter((b) => typeMult(a, b) === STRONG), weak = ELS.filter((b) => typeMult(a, b) === WEAK), even = ELS.filter((b) => typeMult(a, b) === 1);
+      if (strong.length !== 1 || weak.length !== 1 || even.length !== ELS.length - 2 || !even.includes(a) || !BEATS_WHY[a]) fail(`arena: ${a}'s moves are strong on ${strong.join(', ') || 'nothing'} and weak on ${weak.join(', ') || 'nothing'} (want one each, and even with the rest)`);
+    }
+  }
+  // the levels: 1 to MAX_LEVEL, level L at exactly xpFor(L) XP (and not a point before), the XP a level takes growing
+  for (let l = 1; l <= MAX_LEVEL; l++) {
+    const x = xpInto(xpFor(l)), need = l < MAX_LEVEL ? xpFor(l + 1) - xpFor(l) : 0;
+    if (levelOf(xpFor(l)) !== l || (l > 1 && levelOf(xpFor(l) - 1) !== l - 1) || x.level !== l || x.into !== 0 || x.need !== need || (l > 1 && l < MAX_LEVEL && need <= xpFor(l) - xpFor(l - 1))) fail(`arena: LV ${l} is not reached at exactly ${xpFor(l)} XP, or the next level takes no more XP than this one (${need})`);
+  }
+  if (levelOf(0) !== 1 || levelOf(xpFor(MAX_LEVEL) * 100) !== MAX_LEVEL) fail(`arena: ${levelOf(0)} is not LV 1 at 0 XP, or a dragon past LV ${MAX_LEVEL} levels on`);
+  // the XP: a win brings more than a draw, and a draw more than a loss, against a partner of any level; more against a
+  // higher level; and a LV 1 sparring a LV 10 is LV 3 or more after one bout, however it goes (the young catch up)
+  for (let o = 1; o <= MAX_LEVEL; o++) for (let m = 1; m <= MAX_LEVEL; m++) {
+    const win = boutXp(m, o).winner, loss = boutXp(o, m).loser, draw = drawXp(o);
+    if (!(win > draw && draw > loss && loss > 0) || (o > 1 && (win <= boutXp(m, o - 1).winner || loss <= boutXp(o - 1, m).loser))) fail(`arena: LV ${m} against LV ${o} earns ${win} XP for a win, ${draw} for a draw and ${loss} for a loss`);
+  }
+  if (Math.min(levelOf(boutXp(10, 1).loser), levelOf(boutXp(1, 10).winner), levelOf(drawXp(10))) < 3) fail(`arena: a LV 1 sparring a LV 10 is only LV ${levelOf(boutXp(10, 1).loser)} after losing (want 3 or more)`);
+  // the skills: a breath and a preen at LV 1, the yawn from LEARN_AT.yawn, the show-off from LEARN_AT.show, the big
+  // breath in the breath's place from LEARN_AT.big, four at most, in the move menu's order; each element's names its own;
+  // each skill one of the dragon's own anims at every stage that spars, a one-shot, landing inside it; and the nap's
+  // sleep (a loop with its lie-down for an intro) and wake
+  const menuOf = (l: number): SkillKind[] => [l >= LEARN_AT.big ? 'big' : 'breath', ...(l >= LEARN_AT.show ? ['show' as const] : []), 'preen', ...(l >= LEARN_AT.yawn ? ['yawn' as const] : [])];
+  for (const el of ELS) {
+    for (let l = 1; l <= MAX_LEVEL; l++) {
+      const got = skillsOf(el, l).map((s) => s.kind);
+      if (!isDeepStrictEqual(got, menuOf(l)) || got.length > 4) fail(`arena: a LV ${l} ${el} knows ${got.join(' ')}, not ${menuOf(l).join(' ')}`);
+    }
+    const names = SKILL_KINDS.map((k) => skillOf(el, k).name), learned = learnedBetween(el, 1, MAX_LEVEL).map((s) => s.kind);
+    if (new Set(names).size !== names.length || !isDeepStrictEqual(learned, ['yawn', 'show', 'big'])) fail(`arena: ${el}'s skills ${names.join(', ')}, learned ${learned.join(' ')}`);
+    for (const st of SPARS) {
+      const b = dragonBuild({ element: el, stage: st, seed: 1 }), anims = dragonAnims(st, b.spec, b.dims);
+      for (const k of SKILL_KINDS) {
+        const s = skillOf(el, k), a = anims[s.anim], len = a ? animLen(el, st, s.anim) : 0;
+        if (!a || a.loop || len < 2 || Math.max(1, Math.round(len * s.impact)) >= len) fail(`arena: the ${st} ${el}'s ${s.name} plays ${a ? `${a.loop ? 'a loop' : 'a one-shot'} of ${len} steps` : `no ${s.anim}`} (want a one-shot it lands inside)`);
+      }
+      if (!anims.sleep?.loop || !(anims.sleep.loopFrom! > 0) || !anims.wake || anims.wake.loop) fail(`arena: the ${st} ${el} has no lie-down and wake for its nap`);
+    }
+  }
+  // the stats: never less with a level (and more PUFF every level), the young under the adult but for its speed, the
+  // elder never weaker (its puff and power the adult's, its guard more); the spirits, and a stage's weight
+  for (const el of ELS) for (let l = 1; l <= MAX_LEVEL; l++) {
+    for (const st of SPARS) {
+      const s = statsOf(el, st, l), p = l > 1 ? statsOf(el, st, l - 1) : null;
+      if (p && (STAT_NAMES.some((k) => s[k] < p[k]) || s.puff <= p.puff)) fail(`arena: a ${st} ${el} at LV ${l} (${JSON.stringify(s)}) is weaker than at LV ${l - 1} (${JSON.stringify(p)})`);
+    }
+    const y = statsOf(el, 'young', l), a = statsOf(el, 'adult', l), e = statsOf(el, 'elder', l);
+    if (y.puff > a.puff || y.power > a.power || y.guard > a.guard || e.puff < a.puff || e.power < a.power || e.guard <= a.guard) fail(`arena: at LV ${l} a young ${el} ${JSON.stringify(y)}, an adult ${JSON.stringify(a)}, an elder ${JSON.stringify(e)} (the young under the adult, the elder never weaker)`);
+  }
+  if (spirits(1) !== 1.1 || spirits(0.2) !== 1 || spirits(-0.5) !== 0.9 || !isDeepStrictEqual([-2, -1, 0, 1, 2].map(stageMult), [2 / 3, 4 / 5, 1, 5 / 4, 3 / 2]) || STAGE_MIN !== -2 || STAGE_MAX !== 2) fail('arena: the spirits or a stage\'s weight are not the table\'s');
+  // the corners: each stage's spot on the Arena deck, on its net, its body inside the deck; the two facing each other
+  // ARENA_GAP apart snout to snout, neither's eye under the other's body (the sim's model: travel.ts bodySpan, eyeSpan;
+  // the drawn moves, reach and all: the smoke's view=arenaaudit)
+  {
+    const nets = newSim(1).nets;
+    for (const s0 of SPARS) for (const s1 of SPARS) {
+      const x0 = arenaSpot(s0, 0), x1 = arenaSpot(s1, 1), b0 = bodySpan(s0, 1, x0), b1 = bodySpan(s1, -1, x1), e0 = eyeSpan(s0, 1, x0), e1 = eyeSpan(s1, -1, x1);
+      const gap = (x1 - DRAGON_BODY[s1].front) - (x0 + DRAGON_BODY[s0].front);
+      if (spanOf(AERIE_F, x0, nets.dragon[s0]) < 0 || spanOf(AERIE_F, x1, nets.dragon[s1]) < 0 || b0[0] < ARENA_X0 || b1[1] > ARENA_X1 || Math.abs(gap - ARENA_GAP) > 1
+        || (e0[1] > b1[0] && e0[0] < b1[1]) || (e1[1] > b0[0] && e1[0] < b0[1])) fail(`arena: a ${s0} in the west corner (x ${x0}) and a ${s1} in the east (x ${x1}): snouts ${gap} px apart, bodies ${b0.join('-')} and ${b1.join('-')} on the deck ${ARENA_X0}-${ARENA_X1}`);
+    }
+  }
+
+  // (b) the balance: every pairing of the start's seven (LV 1 adults, in good spirits), each way round, on SPAR_SEEDS
+  // seeds, AUTO -- each element wins BALANCE_WINS of its bouts, a bout lasts about BALANCE_TURNS turns and seldom runs out
+  // of them; and the levels matter: a dragon a level up wins against its own element a level down, and three levels up
+  // even against the element strong on it. Each bout is decided by the Arena's half of a step alone (arena.ts
+  // stepArena: nothing else in a world touches a bout from its face-off to its end -- its rolls are stateless and its
+  // fighters' numbers fixed at its start); the whole world's bouts are (c)'s
+  const SPAR_SEEDS = 4, BALANCE_WINS = [0.35, 0.65], BALANCE_TURNS = [4.5, 8], FULL_TURNS = 0.05, LEVEL_WINS = 0.9;
+  const lines27: string[] = [], logs: string[] = [];
+  const spar = (cast: readonly DragonPlace[], a: number, b: number, seed: number) => {
+    const w = new CareSim(START_ROOMS, cast, START_KEEPERS, { seed });
+    for (const d of w.dragons) { for (const k of NEEDS) d.needs[k] = 1; d.mood = moodOf(d.element, d.needs); }
+    const bt = boutNow(w, a, b);
+    bt.auto = true;
+    let ends = 0, winner: number | null = null;
+    for (let n = 0; bt.state !== 'over' && n < 40000; n++) {
+      w.events = [];
+      const had = bt.log.at(-1);
+      stepArena(w);
+      if (bt.log.at(-1) !== had) logs.push(bt.log.at(-1)!);
+      for (const e of w.events) if (e.kind === 'boutEnd') { ends++; winner = e.winner; }
+    }
+    if (bt.state !== 'over' || ends !== 1) fail(`arena (balance): ${w.dragons[a].name} and ${w.dragons[b].name} on seed ${seed}: the bout is at ${bt.state} with ${ends} ends`);
+    return { winner, turns: bt.turn };
+  };
+  {
+    const wins = new Map<DragonElement, number>(), hist: number[] = Array(MAX_TURNS + 1).fill(0);
+    let n = 0, turns = 0, draws = 0;
+    for (let seed = 1; seed <= SPAR_SEEDS; seed++) for (let i = 0; i < START_DRAGONS.length; i++) for (let j = 0; j < START_DRAGONS.length; j++) {
+      if (i === j) continue;
+      const r = spar(START_DRAGONS, i, j, seed * 100 + i * 7 + j);
+      n++; turns += r.turns; hist[r.turns]++;
+      if (r.winner == null) draws++;
+      else wins.set(START_DRAGONS[r.winner].element, (wins.get(START_DRAGONS[r.winner].element) ?? 0) + 1);
+    }
+    const each = 2 * (START_DRAGONS.length - 1) * SPAR_SEEDS, mean = turns / n;
+    for (const el of ELS) { const s = (wins.get(el) ?? 0) / each; if (s < BALANCE_WINS[0] || s > BALANCE_WINS[1]) fail(`arena (balance): ${el} won ${wins.get(el) ?? 0} of its ${each} bouts (want ${BALANCE_WINS[0] * 100}-${BALANCE_WINS[1] * 100} %)`); }
+    if (mean < BALANCE_TURNS[0] || mean > BALANCE_TURNS[1] || hist[MAX_TURNS] > FULL_TURNS * n) fail(`arena (balance): bouts last ${mean.toFixed(2)} turns on average (want ${BALANCE_TURNS.join('-')}), ${hist[MAX_TURNS]} of ${n} ran out of turns`);
+    // levels: a twin of each element's (a second adult) a level up against it, and each element three levels up against
+    // the element strong on it, each way round
+    let up1 = 0, up3 = 0, m1 = 0, m3 = 0;
+    for (let seed = 1; seed <= SPAR_SEEDS; seed++) for (let i = 0; i < START_DRAGONS.length; i++) {
+      const p = START_DRAGONS[i], twin: DragonPlace = { ...p, name: 'TWIN', seed: 900 + i, slot: { room: 'kitchen', i: 0, n: 1 }, xp: xpFor(2) };
+      const r = spar([...START_DRAGONS, twin], START_DRAGONS.length, i, seed * 100 + i); m1++; if (r.winner === START_DRAGONS.length) up1++;
+      const j = START_DRAGONS.findIndex((q) => BEATS[q.element] === p.element), cast = START_DRAGONS.map((q, k) => (k === i ? { ...q, xp: xpFor(4) } : q));
+      for (const [x, y, s] of [[i, j, seed * 100 + i], [j, i, seed * 100 + 50 + i]] as const) { const q = spar(cast, x, y, s); m3++; if (q.winner === i) up3++; }
+    }
+    if (up1 < LEVEL_WINS * m1 || up3 < LEVEL_WINS * m3) fail(`arena (levels): a level up won ${up1} of ${m1} against its own element; three levels up, ${up3} of ${m3} against the element strong on it (want ${LEVEL_WINS * 100} % or more)`);
+    lines27.push(`balance (${n} bouts: the start's seven, each pairing each way on ${SPAR_SEEDS} seeds, AUTO): wins of ${each} ${ELS.map((el) => `${el} ${wins.get(el) ?? 0}`).join(', ')}; ${mean.toFixed(2)} turns on average (${hist.map((c, t) => (c ? `${t}: ${c}` : '')).filter(Boolean).join(', ')}), ${draws} draws; a level up won ${up1}/${m1} against its own element, three up ${up3}/${m3} against the element strong on it`);
+  }
+
+  // (c) a whole bout in the world (seed 1, the real day), by commands, the section 2 invariants checked every step:
+  // begun at the first moment a keeper has just set to work with one dragon (the player's) while another sleeps (its
+  // partner), both free to spar -- the keeper finishes, the sleeper sleeps on (its nap running: the needs wait, the acts
+  // don't), each keeps its slot until it sets off; both ride up to their corners (the first up the east one), face each
+  // other (the Arena used, once) and spar: the first pick left to the coach after PICK_WAIT, the skills the player's
+  // doesn't know yet refused, a pick in the middle of a move ignored, a PREEN and a breath picked by hand, then AUTO. Each
+  // move its dragon's own anim, landing at its impact; the XP, the level and the skill it brings; tired and hungry; the
+  // nap and the preen; home, the west corner first, the bout over once both are off the deck, and both settle in slots
+  // with their needs draining again. The same script twice, the same world; saves taken mid-muster, riding up, at the
+  // face-off, at the first pick, mid-move, decided and walking home step on (loaded, through JSON) exactly as the world.
+  const MUSTER_MAX = 6000, HOME_MAX = 4000, FORK_STEPS = 600;
+  const NEXT: Readonly<Record<BoutState, readonly (BoutState | null)[]>> = { muster: ['face'], face: ['pick'], pick: ['play'], play: ['pick', 'over'], over: ['home'], home: [null] };
+  const inv = (w: CareSim, at: string) => {
+    for (const d of w.dragons) for (const k of NEEDS) if (!(d.needs[k] >= 0 && d.needs[k] <= 1)) fail(`${at}, step ${w.tick}: ${d.name}'s ${k} is ${d.needs[k]}`);
+    for (const j of w.jobs) if (j.keeper && j.keeper.job !== j) fail(`${at}, step ${w.tick}: job ${j.id}'s keeper ${j.keeper.name} is on another job`);
+    for (const k of w.keepers) {
+      if ((k.phase === 'idle') !== (!k.job && !k.legs.length)) fail(`${at}, step ${w.tick}: ${k.name} is ${k.phase} with ${k.job ? 'a job' : 'no job'}`);
+      if (!k.climbing && spanOf(k.f, k.x, w.nets.keeper) < 0) fail(`${at}, step ${w.tick}: ${k.name} stands off floor ${k.f} at x ${k.x.toFixed(1)}`);
+    }
+    if (w.lift.moving) { const r = liftRange(w)!, who = inTheBay(w, r[0], r[1]); if (who) fail(`${at}, step ${w.tick}: ${who} is in the lift bay while the car moves floors ${r[0]}-${r[1]}`); }
+    for (const d of w.dragons) {
+      if (d.move !== 'ride' && spanOf(d.f, d.x, w.nets.dragon[d.stage]) < 0) fail(`${at}, step ${w.tick}: ${d.name} stands off its floor`);
+      if (d.act && d.place === 'barn' && (!d.slot || Math.abs(d.x - d.slot.x) >= 0.5 || w.rooms[d.slot.room].kind !== NEED_ROOM[d.act.need])) fail(`${at}, step ${w.tick}: ${d.name} is met for ${d.act.need} away from its slot of the ${NEED_ROOM[d.act.need]}`);
+      // (nobody but the bout's two ever on the Arena deck)
+      if (d.f === AERIE_F && d.move !== 'ride' && d.x > ARENA_X0 && fighterIndex(w, d) < 0) fail(`${at}, step ${w.tick}: ${d.name}, not sparring, is on the Arena deck at x ${d.x.toFixed(1)}`);
+    }
+  };
+  const boutRun = (forks: boolean) => {
+    const w = newSim(1), at = 'arena (a bout)', fighters: Dragon[] = [];
+    const live: { sim: CareSim; left: number; what: string; since: Uses }[] = [], saved: string[] = [], seenStates = new Set<string>();
+    const out = { w, begun: '', musterSteps: -1, corners: [] as string[], pickWait: -1, picks: [] as string[], moves: 0, lookKeys: new Set<number>(), winner: '', xp: [0, 0], events: [] as string[], overSteps: -1, homeOrder: '', clearAt: -1, settledAt: -1, saved, met: -1, woke: -1, playTurns: 0 };
+    const cmd = (c: Command) => { w.command(c); for (const f of live) f.sim.command(c); };
+    const fork = (what: string) => {
+      if (!forks || seenStates.has(what)) return;
+      seenStates.add(what);
+      const sim = CareSim.fromSave(through(serialize(w)));
+      if (!isDeepStrictEqual(sim.arena, w.arena)) fail(`arena (saves): a save taken ${what} loaded another arena`);
+      live.push({ sim, left: FORK_STEPS, what, since: uses(sim) }); saved.push(`${what} (step ${w.tick})`);
+    };
+    const prevNeeds = new Map<number, Needs>();
+    let prevState: BoutState | null = null;
+    const step = () => {
+      const b0 = w.arena.bout, puff0 = b0 ? b0.fighters.map((f) => f.puff) : null, landed0 = b0?.state === 'play' ? b0.moves.map((m) => m.landed) : null;
+      w.step(); inv(w, at);
+      for (let i = live.length - 1; i >= 0; i--) {
+        const f = live[i];
+        f.sim.step();
+        if (--f.left > 0) continue;
+        if (f.sim.digest() !== w.digest()) fail(`arena (saves): a save taken ${f.what} stepped on to another world by step ${w.tick}`);
+        noteUse(f.sim, f.since); live.splice(i, 1);
+      }
+      const b = w.arena.bout;
+      // the state machine: only its own next states, the bout's two held to it
+      const st = b?.state ?? null;
+      if (st !== prevState) {
+        if (prevState && !NEXT[prevState].includes(st)) fail(`${at}, step ${w.tick}: the bout went from ${prevState} to ${st}`);
+        prevState = st;
+      }
+      if (!b) return;
+      for (const [i, f] of b.fighters.entries()) {
+        const d = fighters[i], prev = prevNeeds.get(d.id);
+        if (f.puff < 0 || f.puff > f.stats.puff || [f.power, f.guard, f.speed].some((v) => v < STAGE_MIN || v > STAGE_MAX) || b.turn > MAX_TURNS) fail(`${at}, step ${w.tick}: ${d.name}'s puff ${f.puff} of ${f.stats.puff}, stages ${f.power} ${f.guard} ${f.speed}, turn ${b.turn}`);
+        if (d.goal === 'bout') {
+          // (its needs wait -- a job under way runs on -- and fall once, to TIRED, the step the bout is decided; no job
+          // opens for it, and a keeper still on one is at work, finishing)
+          const decided = b.state === 'over' && b.t === 0;
+          if (prev && NEEDS.some((k) => d.needs[k] < prev[k] - 1e-12 && !(decided && (k === 'food' || k === 'sleep') && d.needs[k] <= TIRED))) fail(`${at}, step ${w.tick}: ${d.name}'s needs fell in its bout: ${JSON.stringify(prev)} to ${JSON.stringify(d.needs)}`);
+          if (w.jobs.some((j) => j.dragon === d && j.keeper?.phase !== 'work')) fail(`${at}, step ${w.tick}: ${d.name} has a job open in its bout`);
+        }
+        prevNeeds.set(d.id, { ...d.needs });
+        // (from the face-off to its end, both in their corners, facing each other, still)
+        if (['face', 'pick', 'play', 'over'].includes(b.state) && (f.corner == null || !standsAt(d, AERIE_F, arenaSpot(d.stage, f.corner)) || d.facing !== (f.corner === 0 ? 1 : -1))) fail(`${at}, step ${w.tick}: ${d.name} is not in its corner at ${b.state} (f${d.f} x ${d.x.toFixed(1)}, facing ${d.facing}, corner ${f.corner})`);
+        if (f.corner != null && !out.corners.includes(d.name)) out.corners.push(d.name);
+      }
+      if (b.state === 'play') {
+        const m = b.moves[b.cur], me = fighters[m.by], other = fighters[1 - m.by], sk = skillOf(me.element, m.skill);
+        if (m.len !== animLen(me.element, me.stage, sk.anim) || m.at !== Math.max(1, Math.round(m.len * sk.impact))) fail(`${at}, step ${w.tick}: ${me.name}'s ${sk.name} lasts ${m.len} and lands at ${m.at}`);
+        // (a move lands at its impact, costing the other exactly its loss)
+        if (landed0 && b.moves.length === landed0.length && m.landed && !landed0[b.cur]) {
+          out.moves++;
+          if (m.t !== m.at || b.fighters[1 - m.by].puff !== Math.max(0, puff0![1 - m.by] - m.loss) || (sk.type === 'status') !== (m.loss === 0 && m.hit)) fail(`${at}, step ${w.tick}: ${me.name}'s ${sk.name} landed at ${m.t} (its impact ${m.at}), ${other.name}'s puff ${puff0![1 - m.by]} to ${b.fighters[1 - m.by].puff} for a loss of ${m.loss}`);
+          logs.push(b.log.at(-1)!);
+        }
+        // (the view: the mover plays the skill's anim through, a new key each move; the other shows a face once it lands)
+        const look = boutLook(w, me), seen = boutLook(w, other);
+        if (m.t < m.len ? look?.anim !== sk.anim : look != null) fail(`${at}, step ${w.tick}: ${me.name} shows ${JSON.stringify(look)} at ${m.t} of its ${sk.name}'s ${m.len}`);
+        if (look) out.lookKeys.add(look.key);
+        if ((seen != null) !== (m.landed && m.t - m.at < FACE_FRAMES && m.skill !== 'preen' && (m.skill !== 'yawn' || !!m.moved))) fail(`${at}, step ${w.tick}: ${other.name} shows ${JSON.stringify(seen)} ${m.t - m.at} steps after ${me.name}'s ${sk.name} landed`);
+      }
+    };
+    // 1. the first moment a keeper has just set to work with one dragon while another sleeps, both free to spar
+    let keeper: Keeper | null = null;
+    for (let s = 0; s < 8000 && !fighters.length; s++) {
+      step();
+      const k = w.keepers.find((q) => q.phase === 'work' && q.job && q.t < 30 && !fighterReason(w, q.job.dragon));
+      const y = k && w.dragons.find((d) => d !== k.job!.dragon && d.act?.need === 'sleep' && d.asleep > 300 && !w.jobs.some((j) => j.dragon === d && j.keeper) && !fighterReason(w, d));
+      if (k && y) { keeper = k; fighters.push(k.job!.dragon, y); }
+    }
+    if (!keeper) { fail(`${at}: no keeper set to work with one dragon while another slept in 8000 steps`); return out; }
+    const [pl, pa] = fighters, need = keeper.job!.need, slots = fighters.map((d) => d.slot), done0 = w.stats.done;
+    out.begun = `${pl.name} being met for ${need} by ${keeper.name} and ${pa.name} asleep, at step ${w.tick}`;
+    cmd({ kind: 'bout', dragons: [pl.id, pa.id] });
+    step();
+    const ev = w.events.find((e) => e.kind === 'bout');
+    if (!ev || ev.kind !== 'bout' || ev.reason !== null || pl.goal !== 'bout' || pa.goal !== 'bout' || w.arena.bout?.state !== 'muster') fail(`${at}: the bout command gave ${JSON.stringify(ev)}, goals ${pl.goal} ${pa.goal}`);
+    fork('mid-muster');
+    // 2. the muster: the keeper finishes, the sleeper sleeps on, each keeps its slot until it sets off; then to the corners
+    const m0 = w.tick, nap0 = pa.act!.len - pa.act!.t, whoFirst: number[] = [];
+    for (let s = 0; s < MUSTER_MAX && w.arena.bout?.state === 'muster'; s++) {
+      const was = { met: pl.act ? pl.needs[pl.act.need] : -1, nap: pa.act?.need === 'sleep' ? pa.act.t : -1 };
+      step();
+      fighters.forEach((d, i) => {
+        if ((d.act || d.asleep > 0) && d.slot !== slots[i]) fail(`${at}, step ${w.tick}: ${d.name} let its slot go while ${d.act ? `met for ${d.act.need}` : 'asleep'}`);
+        const o = (d.act || d.asleep > 0) && w.dragons.find((q) => q !== d && q.slot === slots[i]);
+        if (o) fail(`${at}, step ${w.tick}: ${o.name} took ${d.name}'s slot while it was still in it`);
+      });
+      if (was.met >= 0 && pl.act && pl.needs[pl.act.need] <= was.met && pl.needs[pl.act.need] < 1) fail(`${at}, step ${w.tick}: ${pl.name}'s ${pl.act.need} stood at ${pl.needs[pl.act.need]} while it was met`);
+      if (was.nap >= 0 && pa.act?.need === 'sleep' && pa.act.t !== was.nap + 1) fail(`${at}, step ${w.tick}: ${pa.name}'s nap stood still in the muster (${was.nap} to ${pa.act.t})`);
+      if (out.met < 0 && !pl.act) out.met = w.tick - m0;
+      if (out.woke < 0 && !pa.act) out.woke = w.tick - m0;
+      for (const [i, f] of w.arena.bout!.fighters.entries()) if (f.corner != null && !whoFirst.includes(i)) whoFirst.push(i);
+      if (fighters.some((d) => d.move === 'ride')) fork('riding up');
+    }
+    out.musterSteps = w.tick - m0;
+    const b = w.arena.bout;
+    if (!b || b.state !== 'face') { fail(`${at}: the muster took more than ${MUSTER_MAX} steps (the bout at ${b?.state})`); return out; }
+    if (w.jobs.some((j) => fighters.includes(j.dragon)) || w.stats.done < done0 + 1 || pl.needs[need] !== 1 || keeper.job?.dragon === pl) fail(`${at}: ${keeper.name} did not finish with ${pl.name} (done ${w.stats.done - done0}, ${need} ${pl.needs[need]})`);
+    if (out.woke < 0 || out.woke < nap0 - 1) fail(`${at}: ${pa.name} woke ${out.woke} steps into the muster, its nap ${nap0} steps from its end`);
+    if (b.fighters[whoFirst[0]].corner !== 1 || b.fighters[whoFirst[1]].corner !== 0) fail(`${at}: the first up took the ${b.fighters[whoFirst[0]]?.corner === 0 ? 'west' : 'east'} corner (want the east)`);
+    if ((w.stats.used.arena ?? 0) !== 1) fail(`${at}: the Arena counted used ${w.stats.used.arena ?? 0} times at the face-off (want once)`);
+    const board = w.missions.board[0], others = w.dragons.filter((d) => !fighters.includes(d));
+    if (board && fighters.some((d) => dragonReason(w, d, board) !== 'SPARRING')) fail(`${at}: the Map Room's chooser says ${fighters.map((d) => dragonReason(w, d, board)).join(', ')} of the two sparring`);
+    if (canSpar(w, others[0].id, others[1].id) !== 'A BOUT IS ON') fail(`${at}: a second bout was not refused while one is on`);
+    fork('at the face-off');
+    // 3. the turns: the first pick waits PICK_WAIT for the player, then the coach picks
+    while (w.arena.bout?.state === 'face') step();
+    fork('at the first pick');
+    const p0 = w.tick;
+    while (w.arena.bout?.state === 'pick') step();
+    out.pickWait = w.tick - p0;
+    if (out.pickWait !== PICK_WAIT) fail(`${at}: the first pick waited ${out.pickWait} steps for the player (want PICK_WAIT, ${PICK_WAIT})`);
+    // (the bout's state now: read afresh, as a step moves it on)
+    const stateNow = (): BoutState | null => w.arena.bout?.state ?? null;
+    while (stateNow() === 'play' && !w.arena.bout!.moves[0].landed) step();
+    fork('mid-move');
+    // (the second turn: a pick in the middle of a move ignored, the skills the player's doesn't know yet refused; a PREEN
+    // by hand, then a breath, then AUTO)
+    if (stateNow() === 'play') { cmd({ kind: 'skill', skill: 'breath' }); step(); if (w.arena.bout?.pick) fail(`${at}: a pick in the middle of a move was taken`); }
+    const pickBy = (k: SkillKind): boolean => {
+      while (stateNow() && stateNow() !== 'pick' && stateNow() !== 'over') step();
+      const bt = w.arena.bout;
+      if (!bt || bt.state !== 'pick') return false;
+      for (const no of ['yawn', 'show', 'big'] as const) if (!skillsOf(pl.element, bt.fighters[0].level).some((s) => s.kind === no)) { cmd({ kind: 'skill', skill: no }); step(); if (stateNow() !== 'pick' || bt.pick) fail(`${at}: ${pl.name} at LV ${bt.fighters[0].level} was given ${no}, a skill it doesn't know`); }
+      cmd({ kind: 'skill', skill: k }); step();
+      const m = bt.moves.find((q) => q.by === 0);
+      if (stateNow() !== 'play' || m?.skill !== k) fail(`${at}: ${pl.name}'s pick of ${k} began a turn with ${m?.skill} (${stateNow()})`);
+      out.picks.push(k);
+      return true;
+    };
+    if (pickBy('preen')) pickBy('breath');
+    if (stateNow() && stateNow() !== 'over') {
+      cmd({ kind: 'coach', on: true });
+      // (AUTO: every pick that follows the coach's, at once)
+      while (stateNow() && stateNow() !== 'over') {
+        const was = stateNow();
+        step();
+        if (was === 'pick' && stateNow() === 'pick') fail(`${at}: with AUTO on, a pick waited for the player`);
+      }
+    }
+    // 4. decided: the winner, the XP, the level and skill it brings, tired and hungry; the nap and the preen
+    const bo = w.arena.bout;
+    if (!bo || bo.state !== 'over') { fail(`${at}: the bout never ended (${bo?.state})`); return out; }
+    out.playTurns = bo.turn;
+    const endE = w.events.find((e) => e.kind === 'boutEnd');
+    out.events = w.events.filter((e) => e.kind !== 'bout').map((e) => JSON.stringify(e));
+    const [p, q] = bo.fighters, lv = [p.level, q.level], wi = bo.winner;
+    const want: [number, number] = wi == null ? [drawXp(lv[1]), drawXp(lv[0])] : wi === 0 ? [boutXp(lv[0], lv[1]).winner, boutXp(lv[0], lv[1]).loser] : [boutXp(lv[1], lv[0]).loser, boutXp(lv[1], lv[0]).winner];
+    const decidedRight = wi === (p.puff <= 0 ? 1 : q.puff <= 0 ? 0 : wi);
+    if (!endE || endE.kind !== 'boutEnd' || !isDeepStrictEqual([...bo.xp], want) || !isDeepStrictEqual([...endE.xp], want) || endE.winner !== (wi == null ? null : fighters[wi].id) || !decidedRight
+      || pl.xp !== want[0] || pa.xp !== want[1]) fail(`${at}: the bout ended ${JSON.stringify(endE)} with XP ${JSON.stringify(bo.xp)} (want ${JSON.stringify(want)}; puff ${p.puff} and ${q.puff})`);
+    for (const [i, d] of fighters.entries()) {
+      const lvNow = levelOf(d.xp), lvE = w.events.filter((e) => e.kind === 'level' && e.dragon === d.id), learnE = w.events.filter((e) => e.kind === 'learn' && e.dragon === d.id).map((e) => (e.kind === 'learn' ? e.skill : ''));
+      if ((lvNow > lv[i]) !== (lvE.length === 1) || !isDeepStrictEqual(learnE, learnedBetween(d.element, lv[i], lvNow).map((s) => s.kind))) fail(`${at}: ${d.name} went from LV ${lv[i]} to ${lvNow} with ${lvE.length} level and ${learnE.join(' ') || 'no'} learn events`);
+      if (d.needs.food > TIRED || d.needs.sleep > TIRED) fail(`${at}: ${d.name} came out of its bout with food ${d.needs.food.toFixed(2)} and sleep ${d.needs.sleep.toFixed(2)} (want TIRED, ${TIRED}, or less)`);
+    }
+    out.winner = wi == null ? 'a draw' : fighters[wi].name; out.xp = [...bo.xp];
+    fork('decided');
+    const o0 = w.tick, loser = wi == null ? null : fighters[1 - wi], len = overLen(w, bo);
+    while (w.arena.bout?.state === 'over') {
+      step();
+      if (loser && w.arena.bout?.state === 'over') { const l = boutLook(w, loser); if (w.arena.bout.t < animLen(loser.element, loser.stage, 'sleep', true) + NAP_STEPS ? l?.anim !== 'sleep' : l != null) fail(`${at}, step ${w.tick}: ${loser.name}, out of puff, shows ${JSON.stringify(l)} at ${w.arena.bout.t} of its nap`); }
+    }
+    out.overSteps = w.tick - o0;
+    if (out.overSteps !== len) fail(`${at}: the two stayed in the ring ${out.overSteps} steps after the bout was decided (want overLen, ${len})`);
+    // 5. home: the west corner first, the east HOME_GAP later; the bout over once both are off the deck
+    fork('walking home');
+    if (canSpar(w, others[0].id, others[1].id) !== 'THE LAST PAIR IS WALKING HOME') fail(`${at}: a bout was not refused while the last pair walks home`);
+    const h0 = w.tick, west = fighters[p.corner === 0 ? 0 : 1], east = fighters[p.corner === 0 ? 1 : 0], off: number[] = [];
+    for (let s = 0; s < HOME_MAX && w.arena.bout; s++) {
+      step();
+      for (const d of [west, east]) if (d.goal !== 'bout' && !off.includes(d.id)) off.push(d.id);
+    }
+    out.clearAt = w.tick - h0;
+    out.homeOrder = off.map((id) => w.dragons.find((d) => d.id === id)!.name).join(' then ');
+    if (w.arena.bout || off[0] !== west.id || off.length !== 2) fail(`${at}: walking home, ${out.homeOrder || 'nobody'} set off (want the west corner's ${west.name} first), the bout ${w.arena.bout ? 'still on' : 'over'} after ${out.clearAt} steps`);
+    // (settled in slots, asking again: their needs drain)
+    const cleared = new Map(fighters.map((d) => [d.id, { ...d.needs }] as const));
+    let s2 = 0;
+    for (; s2 < HOME_MAX && !fighters.every((d) => d.slot && !d.legs.length && d.move === 'still' && d.goal !== 'settle'); s2++) step();
+    out.settledAt = s2;
+    if (fighters.some((d) => !d.slot) || fighters.some((d) => NEEDS.every((k) => !hasNeed(d.element, k) || d.needs[k] >= cleared.get(d.id)![k]))) fail(`${at}: back from the Arena, ${fighters.map((d) => `${d.name} ${d.slot ? `in the ${w.rooms[d.slot.room].kind}` : 'with no slot'}`).join(', ')}, its needs not draining`);
+    for (let s = 0; s < FORK_STEPS && live.length; s++) step();
+    if (live.length) fail(`arena (saves): ${live.length} saves were never compared`);
+    if (out.lookKeys.size < out.moves) fail(`${at}: ${out.moves} moves played with ${out.lookKeys.size} look keys (want a new one each)`);
+    noteUse(w);
+    return out;
+  };
+  const r1 = boutRun(true), r2 = boutRun(false);
+  if (r1.w.tick !== r2.w.tick || r1.w.digest() !== r2.w.digest()) fail(`arena: the same bout twice gave two worlds (steps ${r1.w.tick} and ${r2.w.tick})`);
+  lines27.push(`a bout (seed 1): begun with ${r1.begun} -- met ${r1.met} and woke ${r1.woke} steps into the muster, in their corners (${r1.corners.join(' first, then ')}) in ${r1.musterSteps} steps; the first pick waited ${r1.pickWait} steps, then ${r1.picks.join(' and ')} by hand and AUTO; ${r1.moves} moves in ${r1.playTurns} turns; ${r1.winner} won (+${r1.xp[0]} and +${r1.xp[1]} XP: ${r1.events.join(' ')}); ${r1.overSteps} steps in the ring after; home ${r1.homeOrder}, the bout over ${r1.clearAt} steps on, settled ${r1.settledAt} later; the same twice; saves ${r1.saved.join(', ')} stepped on ${FORK_STEPS} to the same world`);
+
+  // (d) who may spar (arena.ts canSpar, fighterReason): a bout of one dragon, of an unknown one, a baby, a garden
+  // resident, one away with a mission's team, and one with a need at its yellow bubble -- each word its own -- refused
+  // by the command itself (a `bout` event with the reason, nothing changed)
+  {
+    const refusals: string[] = [];
+    const refuse = (w: CareSim, a: number, b: number, want: string, what: string) => {
+      w.command({ kind: 'bout', dragons: [a, b] });
+      w.step();
+      const e = w.events.find((q) => q.kind === 'bout');
+      if (!e || e.kind !== 'bout' || e.reason !== want || w.arena.bout || w.arena.bouts !== 0 || w.dragons.some((d) => d.goal === 'bout')) fail(`arena (who may spar): ${what}: ${JSON.stringify(e)} (want refused: ${want})`);
+      else refusals.push(`${what} "${want}"`);
+    };
+    const w = newSim(1), [ember, bramble] = [named(w, 'EMBER'), named(w, 'BRAMBLE')];
+    refuse(w, ember.id, ember.id, 'PICK TWO DRAGONS', 'one dragon');
+    refuse(w, ember.id, 99, 'PICK TWO DRAGONS', 'an unknown one');
+    for (const [who, k] of [[ember, 'food'], [ember, 'sleep'], [ember, 'play'], [named(w, 'RIPPLE'), 'bath'], [bramble, 'love']] as const) {
+      const was = who.needs[k];
+      who.needs[k] = SOON - 0.02;
+      refuse(w, who.id, (who === bramble ? ember : bramble).id, `${who.name} IS ${LOW_NEED[k]}`, `${k} low`);
+      who.needs[k] = was;
+    }
+    const tw = buildSim(startSpec('twelve'), 1), baby = tw.dragons.find((d) => d.stage === 'baby')!;
+    refuse(tw, named(tw, 'EMBER').id, baby.id, `${baby.name} IS A BABY`, 'a baby');
+    const gw = buildSim(startSpec('garden'), 1), res = gw.dragons.find((d) => d.place === 'garden')!, home = gw.dragons.find((d) => d.place === 'barn')!;
+    refuse(gw, home.id, res.id, `${res.name} IS IN THE GARDEN`, 'a resident');
+    const mw = newSim(1);
+    sendLostNest(mw);
+    const away = mw.dragons.find((d) => d.goal === 'muster')!, other = mw.dragons.find((d) => d.goal !== 'muster')!;
+    refuse(mw, other.id, away.id, `${away.name} IS AWAY`, 'a mission\'s');
+    if (fighterReason(w, ember) !== null || canSpar(w, ember.id, bramble.id) !== null) fail(`arena (who may spar): EMBER and BRAMBLE, rested, were refused: ${canSpar(w, ember.id, bramble.id)}`);
+    lines27.push(`who may spar: refused ${refusals.join(', ')}; a second bout while one is on, and while its pair walks home (c)`);
+  }
+
+  // (e) saves: the bout preset (arena.ts boutNow) -- its pair in their corners at the face-off, nobody counted in the
+  // Arena, the move menu up at step 90 (the frozen shot) -- through JSON and back; a version-9 save (before the Arena)
+  // migrated (save.ts migrateSave) loads with every dragon at 0 XP and no bout, the same world; any other version is
+  // left alone and refused; and a save whose bout this build can't run throws
+  {
+    const pw = buildSim(startSpec('bout'), 1), pb = pw.arena.bout!;
+    const [pe, pbr] = BOUT_PAIR.map((q) => named(pw, q.name));
+    const posed = pb && pb.state === 'face' && pb.fighters.every((f, i) => f.corner === i) && [pe, pbr].every((d, i) => d.goal === 'bout' && standsAt(d, AERIE_F, arenaSpot(d.stage, i as 0 | 1)) && d.facing === (i === 0 ? 1 : -1) && levelOf(d.xp) === BOUT_PAIR[i].level);
+    if (!posed || (pw.stats.used.arena ?? 0) !== 0) fail(`arena (the bout preset): ${JSON.stringify({ state: pb?.state, corners: pb?.fighters.map((f) => f.corner), at: [pe, pbr].map((d) => [d.f, d.x, d.facing, levelOf(d.xp)]) })}, used ${pw.stats.used.arena ?? 0}`);
+    for (let s = 0; s < 90; s++) pw.step();
+    if (pw.arena.bout?.state !== 'pick' || pw.arena.bout.t !== 90 - FACE_STEPS) fail(`arena (the bout preset): at step 90 the bout is at ${pw.arena.bout?.state} ${pw.arena.bout?.t}, not the move menu`);
+    const back = CareSim.fromSave(through(serialize(pw)));
+    if (back.digest() !== pw.digest()) fail('arena (the bout preset): its save loaded another world');
+    // (the version 9 save: the world before the Arena, 300 steps in)
+    const w9 = newSim(2);
+    for (let s = 0; s < 300; s++) w9.step();
+    const s9 = through(serialize(w9)) as unknown as Record<string, unknown> & { dragons: Record<string, unknown>[] };
+    s9.v = 9; delete s9.arena; for (const d of s9.dragons) delete d.xp;
+    let threw9: unknown = null, threw8: unknown = null;
+    try { CareSim.fromSave(s9 as unknown as SaveV); } catch (e) { threw9 = e; }
+    const m9 = CareSim.fromSave(migrateSave(s9) as SaveV), s8 = { ...s9, v: 8 };
+    try { CareSim.fromSave(migrateSave(s8) as SaveV); } catch (e) { threw8 = e; }
+    if (!(threw9 instanceof SaveVersionError) || m9.digest() !== w9.digest() || m9.dragons.some((d) => d.xp !== 0) || m9.arena.bout || migrateSave(s8) !== s8 || !(threw8 instanceof SaveVersionError)) fail(`arena (saves): a version 9 save ${threw9 instanceof SaveVersionError ? 'refused as it is' : 'loaded as it is'}, migrated ${m9.digest() === w9.digest() ? 'the same world' : 'another world'}; version 8 ${threw8 instanceof SaveVersionError ? 'refused' : 'loaded'}`);
+    // (a bout this build can't run: each of these, made from a save taken mid-move, throws)
+    const mid = buildSim(startSpec('bout'), 1);
+    mid.arena.bout!.auto = true;
+    for (let s = 0; s < 200 && mid.arena.bout?.state !== 'play'; s++) mid.step();
+    const base = serialize(mid);
+    type RawBout = { id: number; state: string; turn: number; cur: number; xp: number[]; fighters: { dragon: number; corner: number | null; puff: number; guard: number; stats: { puff: number } }[]; moves: { skill: string }[] };
+    type RawSave = { arena?: { bouts: number; bout: RawBout | null }; dragons: { xp?: unknown }[] };
+    const bt = (s: RawSave) => s.arena!.bout!;
+    const broken: [string, (s: RawSave) => void][] = [
+      ['one dragon twice', (s) => { const b = bt(s); b.fighters[1].dragon = b.fighters[0].dragon; }],
+      ['a dragon it hasn\'t', (s) => { bt(s).fighters[0].dragon = 99; }],
+      ['more puff than its whole', (s) => { const f = bt(s).fighters[0]; f.puff = f.stats.puff + 1; }],
+      ['a stage past +2', (s) => { bt(s).fighters[1].guard = STAGE_MAX + 1; }],
+      ['a state it doesn\'t know', (s) => { bt(s).state = 'brawl'; }],
+      ['a turn past the last', (s) => { bt(s).turn = MAX_TURNS + 1; }],
+      ['three moves in a turn', (s) => { const m = bt(s).moves; m.push(m[0], m[0]); }],
+      ['a move of a skill it doesn\'t know', (s) => { bt(s).moves[0].skill = 'fireball'; }],
+      ['a move playing that isn\'t there', (s) => { bt(s).cur = 2; }],
+      ['an id not yet begun', (s) => { bt(s).id = s.arena!.bouts; }],
+      ['both in one corner', (s) => { for (const f of bt(s).fighters) f.corner = 1; }],
+      ['XP below 0', (s) => { bt(s).xp = [-1, 0]; }],
+      ['no arena', (s) => { delete s.arena; }],
+      ['a dragon in a bout there isn\'t', (s) => { s.arena!.bout = null; }],
+      ['a dragon\'s XP not whole', (s) => { s.dragons[0].xp = 1.5; }],
+    ];
+    const kept: string[] = [];
+    try { CareSim.fromSave(through(base)); } catch (e) { fail(`arena (saves): a save mid-move threw ${e}`); }
+    for (const [what, make] of broken) {
+      const s = through(base) as unknown as RawSave;
+      make(s);
+      try { CareSim.fromSave(s as unknown as SaveV); kept.push(what); } catch { /* refused, as it must be */ }
+    }
+    if (kept.length) fail(`arena (saves): a bout with ${kept.join(', ')} loaded`);
+    lines27.push(`saves: the bout preset (EMBER LV ${BOUT_PAIR[0].level} and BRAMBLE LV ${BOUT_PAIR[1].level} in their corners, the move menu at step 90) loaded the same; a version 9 save migrated to the same world, every dragon at 0 XP; ${broken.length} bouts this build can't run (${broken.map(([w]) => w).join(', ')}) threw`);
+  }
+
+  // (f) nobody is hurt (the Decisions' B8, amended for the Arena): no word of harm in any bout's lines (every line of (b)'s
+  // and (c)'s bouts) nor anywhere in the Arena's text (arena.ts, arenaui.ts, training.ts, comments aside) -- but "NOBODY
+  // IS HURT"
+  {
+    const HARM = /\b(HURTS?|HURTING|INJUR\w*|WOUND\w*|FAINT\w*|KNOCK\w*|KILL\w*|DEAD|DIES?|DEATH|BLOOD\w*|DAMAGE\w*|HEALTH|HP|PAIN\w*|DEFEAT\w*|BEATEN|BRUIS\w*|HARM\w*)\b/;
+    const bad = logs.filter((l) => HARM.test(l.replace(/NOBODY IS HURT/g, '')));
+    for (const f of ['arena.ts', 'arenaui.ts', 'training.ts']) {
+      const src = fs.readFileSync(new URL(`../src/game/${f}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
+      for (const [n, line] of src.split('\n').entries()) if (HARM.test(line.replace(/NOBODY IS HURT/g, ''))) bad.push(`${f}:${n + 1}: ${line.trim()}`);
+    }
+    if (bad.length || logs.length < 100) fail(`arena (nobody is hurt): ${bad.slice(0, 4).join(' | ') || `only ${logs.length} lines read`}`);
+    lines27.push(`nobody is hurt: ${logs.length} bout lines and the Arena's text read, no word of harm`);
+  }
+  console.log(`  27 the Arena (${((performance.now() - t27) / 1000).toFixed(1)} s): ${lines27.join('; ')}`);
+}
+
+// ---------- 10 with 23, 2 with 24, 6 with 25 and 27 (the workers' results) ----------
 if (MAIN) {
   const mainMs = performance.now() - T0, took: string[] = [];
   for (const [role, done] of WORKERS) {

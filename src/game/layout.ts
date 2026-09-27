@@ -48,6 +48,24 @@ export const BRIDGE_X0 = -200;
 export const HAND_DECK_X0 = DECK_X0 + 10;
 /** The gambrel roof over the hayloft (floor 2): its ridge, and the knee where the steep lower slope turns. */
 export const RIDGE_X = BARN_X + BARN_W / 2, RIDGE_Y = 276, KNEE_DX = 58, KNEE_Y = 360;
+/**
+ * The Arena (BASE_DESIGN 10): the roof floor (AERIE_F) running on east from the lift's head over the barn's east roof,
+ * the Aerie's twin -- a straw deck from x 648 to the right tower's cone roof (x 1184), on trestles over the roof's east
+ * slope -- where two dragons spar in a training bout. Dragons reach it by the Dragon Lift, walking off its car to the
+ * east; keepers never do (their ladders stop short of it: the left tower's reaches the Aerie, the right tower's its
+ * floor 4). The ring's middle (the deck's) and the gap between the two fighters' snouts: 40 px, so a breath's stream
+ * (25 to 45 px long) reaches toward the other's face and never over its eye (ART_BIBLE 1.4; the arena audit checks
+ * every move: tools/smoke.ts).
+ */
+export const ARENA_X0 = LIFT_X1, ARENA_X1 = TOWER_R - 8, ARENA_MID = (ARENA_X0 + ARENA_X1) / 2, ARENA_GAP = 40;
+/**
+ * Where a fighter of this stage stands (its root x) in corner 0 (the west, facing east) or 1 (the east, facing west):
+ * its snout ARENA_GAP / 2 from the ring's middle (DRAGON_BODY's front), to the whole px.
+ */
+export function arenaSpot(stage: Stage, corner: 0 | 1): number {
+  const front = DRAGON_BODY[stage].front;
+  return Math.round(corner === 0 ? ARENA_MID - ARENA_GAP / 2 - front : ARENA_MID + ARENA_GAP / 2 + front);
+}
 
 /** Top of floor f's room box (floor 0 is the ground floor; floor 5 is the Aerie's, over the towers' tops). */
 export function floorTop(f: number): number { return GROUND - (f + 1) * PITCH; }
@@ -107,12 +125,13 @@ export const ROOM_INFO: Readonly<Record<RoomKind, RoomInfo>> = Object.freeze({
   gate: { name: 'GARDEN GATE', purpose: 'the dragons\' way out to the garden: an arch in both walls, the one tower door a dragon fits' },
 });
 export const ROOM_KINDS = Object.freeze(Object.keys(ROOM_INFO) as RoomKind[]);
-/** The named parts of the base that are not rooms, with their purposes too: the lift, the Aerie deck and the garden. */
-export type Structure = 'lift' | 'aerie' | 'garden';
+/** The named parts of the base that are not rooms, with their purposes too: the lift, the Aerie deck, the garden and the Arena. */
+export type Structure = 'lift' | 'aerie' | 'garden' | 'arena';
 export const STRUCTURES: Readonly<Record<Structure, { name: string; purpose: string }>> = Object.freeze({
-  lift: { name: 'LIFT', purpose: 'carries dragons between the barn\'s floors and up to the Aerie' },
+  lift: { name: 'LIFT', purpose: 'carries dragons between the barn\'s floors and up to the Aerie and the Arena' },
   aerie: { name: 'AERIE', purpose: 'teams gather here, leave and land' },
   garden: { name: 'GARDEN', purpose: 'the retired elders\' home: they move here 30 days into the elder stage, and it grows a plot for each' },
+  arena: { name: 'ARENA', purpose: 'two dragons spar here in a training bout, and both gain XP and level up' },
 });
 
 export type Part = 'barn' | 'towerL' | 'towerR';
@@ -282,10 +301,11 @@ const NETS = new Map<number, Nets>();
  *   tower's ladder, and the deck runs on west over the sky bridge, off the world's edge (BRIDGE_X0: BASE_DESIGN 5). The
  *   three ladders (LADDERS); keepers never ride the lift.
  * - A dragon's, per stage: the barn's ground and upper floors wall to wall, the hayloft between modules 1 and 5 (clear
- *   of the low roof slopes), and the Aerie deck, each kept DRAGON_PAD in from its ends (the deck's west end runs on over
- *   the sky bridge to BRIDGE_X0, where a mission's team walks off the world); the ground floor goes on through
- *   the Garden Gate's arches (the one tower door a dragon fits) to the garden's end. No other tower span: the towers'
- *   other doors are human-sized. The one link is the lift.
+ *   of the low roof slopes), and the roof floor -- the Aerie deck, the lift's head and the Arena east of it (BASE_DESIGN
+ *   10) -- each kept DRAGON_PAD in from its ends (the deck's west end runs on over the sky bridge to BRIDGE_X0, where a
+ *   mission's team walks off the world); the ground floor goes on through the Garden Gate's arches (the one tower door
+ *   a dragon fits) to the garden's end. No other tower span: the towers' other doors are human-sized. The one link is
+ *   the lift.
  */
 export function makeNets(gardenEnd: number): Nets {
   const had = NETS.get(gardenEnd);
@@ -306,7 +326,7 @@ export function makeNets(gardenEnd: number): Nets {
     const P = DRAGON_PAD[stage], barn: Span = [BARN_X + P, TOWER_R - P];
     dragon[stage] = Object.freeze<Net>({
       // (a baby fits under the hayloft's west slope, tail to it, 60 px in: the Hatchery's corner, BASE_DESIGN 3)
-      spans: [[[BARN_X + P, gardenEnd - GARDEN_END - P]], [barn], [[stage === 'baby' ? BARN_X + 60 : modX(1) + P, modX(5) - P]], [], [], [[BRIDGE_X0, DECK_X1 - P]]],
+      spans: [[[BARN_X + P, gardenEnd - GARDEN_END - P]], [barn], [[stage === 'baby' ? BARN_X + 60 : modX(1) + P, modX(5) - P]], [], [], [[BRIDGE_X0, ARENA_X1 - P]]],
       links: [{ name: 'lift', x: LIFT_CX, stops: LIFT_STOPS }],
     });
   }
@@ -404,7 +424,8 @@ export const PLATE_H = 11;
 export const GARDEN_PLATE = { x: GARDEN_X0 + 20, y: floorTop(0) - 20 } as const;
 /**
  * Every plate the base shows: one per room (#11: a named room, and nothing on a bare slot), the lift's on its
- * ground-floor bay, the Aerie's over the deck's west end, and the garden's on its board over plot 0.
+ * ground-floor bay, the Aerie's over the deck's west end, the garden's on its board over plot 0, and the Arena's over
+ * its deck's east end.
  */
 export function platesOf(rooms: readonly Room[]): Plate[] {
   const mk = (text: string, x: number, y: number, names: RoomKind | Structure, room: number | null): Plate => ({ text, x, y, w: measureText(text, 1) + 6, h: PLATE_H, names, room });
@@ -420,5 +441,8 @@ export function platesOf(rooms: readonly Room[]): Plate[] {
   out.push(mk(STRUCTURES.lift.name, LIFT_X0 + 7, floorTop(0) + 3, 'lift', null));
   out.push(mk(STRUCTURES.aerie.name, 12, feetY(AERIE_F) - 24, 'aerie', null));
   out.push(mk(STRUCTURES.garden.name, GARDEN_PLATE.x, GARDEN_PLATE.y, 'garden', null));
+  // (the Arena's over its deck's east end, clear of the fighters -- the east corner's tail ends by x 1063 -- and of the
+  // right tower's cone roof, whose west edge is at x 1211 at the plate's height)
+  out.push(mk(STRUCTURES.arena.name, ARENA_X1 - measureText(STRUCTURES.arena.name, 1) - 16, feetY(AERIE_F) - 24, 'arena', null));
   return out;
 }

@@ -22,6 +22,7 @@ import type { Stage } from '../art/dragon/stages.ts';
 import { gaitOf, moveAt } from './gait.ts';
 import type { CareSim, Dragon, Job, LiftCall } from './sim.ts';
 import { missionCall } from './missions.ts';
+import { boutCall } from './arena.ts';
 
 /** The room that meets each need (one kind each: layout.ts ROOM_INFO's `meets`): food the kitchen, bath the bathhouse, play the romp room, love the grooming parlour, sleep the lamp dorm. */
 export const NEED_ROOM: Readonly<Record<NeedKind, RoomKind>> = Object.freeze(Object.fromEntries(
@@ -290,18 +291,18 @@ export function nearestFree(sim: CareSim, d: Dragon, stage: Stage = d.stage, not
 
 /**
  * A dragon standing still in its slot with nowhere to be, no act, no keeper coming, not holding still to grow up and
- * not with a mission's team (evictable: BASE_DESIGN 3, Slots), for room `room` -- never a baby with a job open: it walks at a third of an adult's pace, so a move
+ * not with a mission's team or in a bout (evictable: BASE_DESIGN 3, Slots), for room `room` -- never a baby with a job open: it walks at a third of an adult's pace, so a move
  * would cost it most of a need (BASE_DESIGN 4.7).
  */
 function lingerer(sim: CareSim, o: Dragon, room: Room): boolean {
   const g = o.goalJob == null ? null : sim.jobs.find((j) => j.id === o.goalJob) ?? null;
-  return o.goal !== 'muster' && (!g || NEED_ROOM[g.need] !== room.kind) && !o.act && o.asleep === 0 && o.hold === 0 && !o.legs.length && o.move === 'still'
+  return o.goal !== 'muster' && o.goal !== 'bout' && (!g || NEED_ROOM[g.need] !== room.kind) && !o.act && o.asleep === 0 && o.hold === 0 && !o.legs.length && o.move === 'still'
     && !sim.jobs.some((j) => j.dragon === o && (j.keeper || o.stage === 'baby'));
 }
 
-/** A holder a Rush may move on: no keeper at work with it, not holding still to grow up, not with a mission's team, and not in the lift's hands or in its bay. */
+/** A holder a Rush may move on: no keeper at work with it, not holding still to grow up, not with a mission's team or in a bout, and not in the lift's hands or in its bay. */
 function bumpable(sim: CareSim, o: Dragon): boolean {
-  return o.goal !== 'muster' && !o.act && o.asleep === 0 && o.hold === 0 && sim.lift.rider !== o.id && !['call', 'board', 'ride', 'alight', 'bay'].includes(o.move) && !dragonInBay(o);
+  return o.goal !== 'muster' && o.goal !== 'bout' && !o.act && o.asleep === 0 && o.hold === 0 && sim.lift.rider !== o.id && !['call', 'board', 'ride', 'alight', 'bay'].includes(o.move) && !dragonInBay(o);
 }
 
 /**
@@ -458,7 +459,7 @@ function standingIn(sim: CareSim, d: Dragon): Room | null {
  * on out).
  */
 function free(sim: CareSim, d: Dragon): boolean {
-  return d.place === 'barn' && d.goal !== 'retire' && d.goal !== 'muster' && !d.act && d.asleep === 0 && d.hold === 0 && sim.lift.rider !== d.id && !['board', 'ride', 'alight', 'bay', 'turn'].includes(d.move) && !dragonInBay(d);
+  return d.place === 'barn' && d.goal !== 'retire' && d.goal !== 'muster' && d.goal !== 'bout' && !d.act && d.asleep === 0 && d.hold === 0 && sim.lift.rider !== d.id && !['board', 'ride', 'alight', 'bay', 'turn'].includes(d.move) && !dragonInBay(d);
 }
 
 /**
@@ -494,11 +495,11 @@ function choose(sim: CareSim, d: Dragon): void {
 
 /**
  * Whether a barn dragon may be sent somewhere new at once, mid-walk too (a Rush; an elder retiring): not in the garden
- * or already on its way there, nor with a mission's team (missions.ts: they route it), no act, awake, not holding still to grow up, never once the lift has it (called for,
+ * or already on its way there, nor with a mission's team or in a bout (missions.ts, arena.ts: they route it), no act, awake, not holding still to grow up, never once the lift has it (called for,
  * boarding, riding, alighting) or inside the bay.
  */
 export function redirectable(sim: CareSim, d: Dragon): boolean {
-  return d.place === 'barn' && d.goal !== 'retire' && d.goal !== 'muster' && !d.act && d.asleep === 0 && d.hold === 0 && sim.lift.rider !== d.id && !['board', 'ride', 'alight'].includes(d.move) && !dragonInBay(d);
+  return d.place === 'barn' && d.goal !== 'retire' && d.goal !== 'muster' && d.goal !== 'bout' && !d.act && d.asleep === 0 && d.hold === 0 && sim.lift.rider !== d.id && !['board', 'ride', 'alight'].includes(d.move) && !dragonInBay(d);
 }
 
 /**
@@ -795,7 +796,7 @@ function callLift(sim: CareSim, d: Dragon, to: number): void {
 }
 /** A call's priority: 2 for a mission's (the muster up to the Aerie, the way down after landing: missions.ts), 1 for a rushed job, else 0. */
 function callPrio(sim: CareSim, d: Dragon): 0 | 1 | 2 {
-  if (missionCall(sim, d)) return 2;
+  if (missionCall(sim, d) || boutCall(sim, d)) return 2;
   const j = d.goalJob == null ? null : sim.jobs.find((q) => q.id === d.goalJob);
   return j && j.rushed ? 1 : 0;
 }

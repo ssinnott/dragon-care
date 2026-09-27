@@ -1,8 +1,8 @@
 // Starts built in code (view=base&preset=<name>): a world other than the new game's, for views and checks that need
 // what a new game has not got yet -- every stage at once, the barn at its cap (the capacity benchmark's twelve, and it
 // with an egg waiting), a dragon about to grow up, eggs in the nests (one about to hatch), every baby sub-slot taken
-// (forced over the cap), elders in the garden and elders about to retire to it, a team mustering for its mission, and a
-// team away on the road (so far along it). A preset is always code, never a save and never hundreds of thousands of
+// (forced over the cap), elders in the garden and elders about to retire to it, a team mustering for its mission, a
+// team away on the road (so far along it), and a bout in the Arena. A preset is always code, never a save and never hundreds of thousands of
 // steps, so a frozen view of it (t=) is as quick and as deterministic as the new game's.
 import { CareSim } from './sim.ts';
 import type { SimOptions } from './sim.ts';
@@ -14,6 +14,8 @@ import { send, autoRider, awayNow, rollBoard, LOST_NEST } from './missions.ts';
 import { REGIONS } from './regions.ts';
 import type { Pair } from './trip.ts';
 import { demoTrip, parseTripParam } from './tripdemo.ts';
+import { boutNow } from './arena.ts';
+import { xpFor } from './training.ts';
 import type { TripParam } from './tripdemo.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from './start.ts';
@@ -141,6 +143,12 @@ export function sendLostNest(sim: CareSim, opts: { awaySteps?: number } = {}): v
   if (typeof t === 'string') throw new Error(`muster: ${t}`);
 }
 
+/**
+ * The `bout` preset's two (BASE_DESIGN 10): EMBER, the player's, at LV 3 (fire: strong on spike), and BRAMBLE, its sparring
+ * partner, at LV 2 -- each at the start of its level (training.ts xpFor).
+ */
+export const BOUT_PAIR: readonly { name: string; level: number }[] = Object.freeze([{ name: 'EMBER', level: 3 }, { name: 'BRAMBLE', level: 2 }]);
+
 /** The presets by name (view=base&preset=<name>). */
 export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze({
   /** Every stage at once: the base's first twelve-dragon cast. */
@@ -203,6 +211,13 @@ export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze(
    * and the Aerie, their riders fetch their saddles from the Tack Room and climb the left tower to the deck beside them.
    */
   muster: () => ({ ...newGame(), after: (sim) => sendLostNest(sim) }),
+  /**
+   * A bout in the Arena from the first frame (BASE_DESIGN 10: arena.ts boutNow): BOUT_PAIR -- EMBER (LV 3), the player's,
+   * in the west corner, BRAMBLE (LV 2) in the east -- facing each other on the east roof, the first pick a second in
+   * (view=base&preset=bout&panel=bout&t=90: the move menu).
+   */
+  bout: () => ({ ...newGame(), dragons: START_DRAGONS.map((p): DragonPlace => { const b = BOUT_PAIR.find((q) => q.name === p.name); return b ? { ...p, xp: xpFor(b.level) } : p; }),
+    after: (sim) => { const [a, b] = BOUT_PAIR.map((q) => sim.dragons.find((d) => d.name === q.name)!); boutNow(sim, a.id, b.id); } }),
 });
 
 /** A preset's start by name; no name, or one no preset has, is the new game. */

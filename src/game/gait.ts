@@ -56,24 +56,33 @@ export function gaitOf(el: DragonElement, stage: Stage): Gait {
   return g;
 }
 
-const HAPPY = new Map<string, number>();
+const LENS = new Map<string, number>();
 
 /**
- * The steps an element's `happy` lasts at a stage, played from its start at speed 1 (its frames' durations summed): the
- * grow-up's cheer (life.ts), which the view plays as the dragon's one `happy` -- the simulation holds a dragon that has
- * just grown up where it stands for exactly this long, so nothing cuts the cheer short. Like the walk, read from the
- * table the pets play (a seed-1 build's dims), the same whatever the seed (sim-check 9), and built once.
+ * The steps an element's anim `name` lasts at a stage, played from its start at speed 1 (its frames' durations summed;
+ * a loop with an intro, `sleep`, its intro alone when `intro` is asked: the lie-down), read from the table the pets
+ * play (a seed-1 build's dims), the same whatever the seed (sim-check 9), and built once. The simulation holds a dragon
+ * still for exactly this long wherever the view is to play one through: a grow-up's cheer (happyLen) and a sparring
+ * move (arena.ts: the breath, the preen, the yawn, the show-off), the nap of a dragon out of puff and its wake.
  */
-export function happyLen(el: DragonElement, stage: Stage): number {
-  const key = `${el}:${stage}`, had = HAPPY.get(key);
+export function animLen(el: DragonElement, stage: Stage, name: string, intro = false): number {
+  const key = `${el}:${stage}:${name}:${intro ? 1 : 0}`, had = LENS.get(key);
   if (had != null) return had;
   const b = dragonBuild({ element: el, stage, seed: 1 });
-  const happy = dragonAnims(stage, b.spec, b.dims).happy;
-  if (!happy || !happy.frames.length) throw new Error(`happy: ${el} ${stage} has no happy`);
-  const len = happy.frames.reduce((n, f) => n + (f.dur || 1), 0);
-  HAPPY.set(key, len);
+  const a = dragonAnims(stage, b.spec, b.dims)[name];
+  if (!a || !a.frames.length) throw new Error(`anim: ${el} ${stage} has no ${name}`);
+  const frames = intro ? a.frames.slice(0, a.loopFrom ?? 0) : a.frames;
+  const len = frames.reduce((n, f) => n + (f.dur || 1), 0);
+  LENS.set(key, len);
   return len;
 }
+
+/**
+ * The steps an element's `happy` lasts at a stage (animLen): the grow-up's cheer (life.ts), which the view plays as the
+ * dragon's one `happy` -- the simulation holds a dragon that has just grown up where it stands for exactly this long, so
+ * nothing cuts the cheer short.
+ */
+export function happyLen(el: DragonElement, stage: Stage): number { return animLen(el, stage, 'happy'); }
 
 /**
  * Anim time t of a walk played from its start, folded into its first pass [0, len): the loop wraps at its length back

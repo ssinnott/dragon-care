@@ -182,6 +182,8 @@ export function partnerOf(sim: CareSim, d: Dragon): Keeper | null { return sim.k
 export function dragonReason(sim: CareSim, d: Dragon, m: Mission | null): string | null {
   if (d.place === 'garden' || d.goal === 'retire') return 'IN THE GARDEN';
   if (d.place === 'away' || d.goal === 'muster' || sim.missions.trip?.pairs.some((p) => p.dragon === d.id)) return 'AWAY';
+  // (in a bout in the Arena, from its start until it is on its way home: arena.ts)
+  if (d.goal === 'bout') return 'SPARRING';
   if (d.stage === 'baby') return 'BABY';
   if (d.stage === 'young' && m && m.difficulty !== 'easy') return 'TOO YOUNG';
   return null;
@@ -376,7 +378,7 @@ const teamRiders = (sim: CareSim, t: Trip): Keeper[] => t.pairs.map((p) => keepe
  * sleeping in. `atOnce` (a team sent away at once: awayNow): every keeper gives its job back, and the dragon's act and
  * nap end where they got to, its slot let go.
  */
-function leaveBarn(sim: CareSim, d: Dragon, atOnce = false): void {
+export function leaveBarn(sim: CareSim, d: Dragon, atOnce = false): void {
   const finishes = (k: Keeper | null) => !atOnce && !!k && k.phase === 'work';
   for (const k of sim.keepers) if (k.job && k.job.dragon === d && !finishes(k)) sim.drop(k);
   sim.jobs = sim.jobs.filter((j) => j.dragon !== d || finishes(j.keeper));
@@ -404,8 +406,8 @@ function tackSpot(sim: CareSim): { f: number; x: number } { const r = roomOf(sim
 /** Where a rider rests after a trip: the Bunks' post. */
 function bunksSpot(sim: CareSim): { f: number; x: number } { const r = roomOf(sim, 'bunks')!; return { f: r.floor, x: postX(r) }; }
 
-/** Whether a dragon may be sent somewhere new now (as travel.ts redirectable, whatever its goal): not being met, awake, not holding, not in the lift's hands or its bay. */
-function mayGo(sim: CareSim, d: Dragon): boolean {
+/** Whether a dragon may be sent somewhere new now (as travel.ts redirectable, whatever its goal): not being met, awake, not holding, not in the lift's hands or its bay. (The Arena's bout too: arena.ts.) */
+export function mayGo(sim: CareSim, d: Dragon): boolean {
   return !d.act && d.asleep === 0 && d.hold === 0 && sim.lift.rider !== d.id && !['board', 'ride', 'alight'].includes(d.move) && !dragonInBay(d);
 }
 
@@ -416,12 +418,12 @@ const headed = (d: { f: number; x: number; legs: readonly { f: number; x: number
 };
 
 /** A dragon standing at (f, x), done walking and turning. */
-const standsAt = (d: Dragon, f: number, x: number) => !d.legs.length && d.move === 'still' && d.turn < 0 && d.f === f && d.x === x;
+export const standsAt = (d: Dragon, f: number, x: number) => !d.legs.length && d.move === 'still' && d.turn < 0 && d.f === f && d.x === x;
 /** A keeper standing at (f, x). */
 const keeperAt = (k: Keeper, f: number, x: number) => !k.legs.length && !k.climbing && k.f === f && k.x === x;
 
-/** Route a dragon (once it may go) to (f, x), its lift calls at the car's first priority. */
-function dragonTo(sim: CareSim, d: Dragon, f: number, x: number): void {
+/** Route a dragon (once it may go) to (f, x), its lift calls at the car's first priority (a mission's team, and a bout's fighters: arena.ts). */
+export function dragonTo(sim: CareSim, d: Dragon, f: number, x: number): void {
   if (headed(d, f, x) || !mayGo(sim, d)) return;
   routeTo(sim, d, { f, x });
   raiseCall(sim, d);

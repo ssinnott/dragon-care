@@ -8,19 +8,23 @@ import type { RoomPlace } from './layout.ts';
 import { releasedState } from './control.ts';
 import { copyMissions } from './missions.ts';
 import type { MissionsState } from './missions.ts';
+import { copyArena, newArena } from './arena.ts';
+import type { ArenaState } from './arena.ts';
 
 /**
  * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded (the
- * page keeps it aside and starts a new barn: storage.ts). Version 9 (the earlier ones were never shipped) holds the
- * whole world: the rooms and their uses (stats.used by kind, stats.usedRoom by room id); every dragon -- its slot by
- * room id and index, its goal and that goal's job by id, its route, its walk and the speed it last played at (`gaitS`),
- * its turn, its `hold`, its act, its stage and the step it began, its place (barn, garden or away), its plot (`home`)
- * and a resident's rhythm (`garden`); every keeper -- their station and job by id, route, phase (a mission's phases
- * too), what they carry, and the hand-held state, always saved released (control.ts releasedState); the open jobs; the
- * lift (its car, its rider by id, its calls); the eggs in the Hatchery's nests; the garden's plots; the missions (the
- * board and its day, the map, the coin, the trip out and each pair's deck spot); and the stats.
+ * page keeps it aside and starts a new barn: storage.ts) -- but for the one before it, which migrateSave brings up to
+ * this one. Version 10 holds the whole world: the rooms and their uses (stats.used by kind, stats.usedRoom by room id);
+ * every dragon -- its slot by room id and index, its goal and that goal's job by id, its route, its walk and the speed
+ * it last played at (`gaitS`), its turn, its `hold`, its act, its stage and the step it began, its place (barn, garden
+ * or away), its plot (`home`), a resident's rhythm (`garden`) and its XP (`xp`: its level); every keeper -- their
+ * station and job by id, route, phase (a mission's phases too), what they carry, and the hand-held state, always saved
+ * released (control.ts releasedState); the open jobs; the lift (its car, its rider by id, its calls); the eggs in the
+ * Hatchery's nests; the garden's plots; the missions (the board and its day, the map, the coin, the trip out and each
+ * pair's deck spot); the Arena (the bout on, its fighters by id, and the bouts begun: arena.ts); and the stats.
+ * Version 9 (the first shipped) was the same less the XP and the Arena.
  */
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }
@@ -54,6 +58,8 @@ export interface SaveV {
   garden: { plots: number };
   /** The missions (missions.ts): the board, the map, the coin, the trip out (its pairs by id). */
   missions: MissionsState;
+  /** The Arena (arena.ts): the bout on (its fighters by dragon id), and the bouts begun. */
+  arena: ArenaState;
   stats: SimStats;
 }
 
@@ -90,8 +96,20 @@ export function serialize(sim: CareSim, exact = false): SaveV {
     eggs: sim.eggs.map((e) => ({ ...e })),
     garden: { plots: sim.garden.plots },
     missions: copyMissions(sim.missions),
+    arena: copyArena(sim.arena),
     stats: { ...sim.stats, used: { ...sim.stats.used }, usedRoom: [...sim.stats.usedRoom], doneBy: { ...sim.stats.doneBy } },
   };
+}
+
+/**
+ * A save of the version before this one brought up to this one (storage.ts loadSave, before the view loads it): version
+ * 9 had no XP and no Arena, so every dragon starts at 0 XP (level 1) and the Arena with no bout begun; the rest is
+ * unchanged. Any other save is returned as it is (a save of this version, or one CareSim.fromSave refuses).
+ */
+export function migrateSave(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || (raw as { v?: unknown }).v !== 9) return raw;
+  const s = raw as Omit<SaveV, 'arena'> & { dragons: unknown };
+  return { ...s, v: SAVE_VERSION, dragons: Array.isArray(s.dragons) ? s.dragons.map((d) => (d && typeof d === 'object' ? { ...d, xp: 0 } : d)) : s.dragons, arena: newArena() };
 }
 
 /**

@@ -29,24 +29,36 @@ import {
 } from './missions.ts';
 import type { Mission, Pair, Trip } from './trip.ts';
 import type { CareSim, Dragon, Keeper } from './sim.ts';
+import { newArenaPick } from './arenaui.ts';
+import type { ArenaPick } from './arenaui.ts';
+import type { SkillKind } from './training.ts';
 import { KEEPER_PALETTES } from '../art/keeper/palettes.ts';
 import { DRAGON_PALETTES } from '../art/dragon/palettes.ts';
 
-/** Which overlay is open: none, the map, a mission's chooser, or the team out watched on its road (BASE_DESIGN 6). */
-export type Screen = 'none' | 'map' | 'mission' | 'watch';
+/**
+ * Which overlay is open: none, the map, a mission's chooser, the team out watched on its road (BASE_DESIGN 6), or the
+ * Arena's chooser (`arena`) or its bout watched over the world (`bout`: BASE_DESIGN 10, arenaui.ts).
+ */
+export type Screen = 'none' | 'map' | 'mission' | 'watch' | 'arena' | 'bout';
 /**
  * The overlays' own state (the view's, never saved): the screen, the mission chosen (by id), the team being put
- * together for it, the frames left before the map opens (the camera easing to the Map Room first), and whether the
- * trip's log is open over the watch overlay.
+ * together for it, the frames left before the map (or the Arena's chooser: `opens`) opens (the camera easing there
+ * first), whether the trip's log is open over the watch overlay, and the Arena's corners being picked and whether its
+ * result card was tapped away (arenaui.ts ArenaPick).
  */
-export interface MapUi { screen: Screen; mission: number | null; pairs: Pair[]; opening: number; card: boolean }
-export function newUi(): MapUi { return { screen: 'none', mission: null, pairs: [], opening: 0, card: false }; }
+export interface MapUi { screen: Screen; mission: number | null; pairs: Pair[]; opening: number; opens: 'map' | 'arena'; card: boolean; arena: ArenaPick }
+export function newUi(): MapUi { return { screen: 'none', mission: null, pairs: [], opening: 0, opens: 'map', card: false, arena: newArenaPick() }; }
 
-/** What a tap on the table does. */
+/**
+ * What a tap on an overlay does: the table's (a pin, BEST TEAM, SEND, a dragon or a rider for the team, a rider cycled,
+ * a pair removed, a place's or a cloud's note) and the Arena's (a dragon for a corner, a corner emptied, SWAP, START
+ * BOUT, a skill picked, AUTO, the result card tapped away); BACK on either.
+ */
 export type UiAct =
   | { kind: 'back' } | { kind: 'pin'; mission: number } | { kind: 'best' } | { kind: 'send' }
   | { kind: 'dragon'; dragon: number } | { kind: 'rider'; keeper: number } | { kind: 'cycle'; pair: number } | { kind: 'remove'; pair: number }
   | { kind: 'note'; text: string }
+  | { kind: 'corner'; corner: 0 | 1 } | { kind: 'swap' } | { kind: 'start' } | { kind: 'skill'; skill: SkillKind } | { kind: 'auto' } | { kind: 'result' }
   | { kind: 'none' };
 /**
  * A tap target drawn this frame (screen px), with its name for the page's hook (a pin, BACK, BEST TEAM, SEND; on the map
