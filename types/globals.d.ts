@@ -89,8 +89,8 @@ interface Window {
      * The watchable scene (BASE_DESIGN 6): `scene`, while a trip is out (null
      * otherwise): the last stop the team reached (`baddie` or its challenge; null before the first), whether it was met,
      * whether its beat is playing, the banner, the baddie on the road (its id, face and pose; null when none is in view),
-     * its exit (on a success), the way the team faces (-1 after turning back), how far along the trip is (0..1), and
-     * once its time is up, the result card's title.
+     * its exit (once it is the last stop reached), how far along the trip is (0..1), and once its time is up, the result
+     * card's title (the trip's pass or fail: nothing before it tells which).
      * Barn capacity (BASE_DESIGN 4.7): the barn's dragons against its cap (`count`: every dragon not living in the garden,
      * those away on a mission too -- life.ts barnCount -- and `cap`, life.ts BARN_CAP; a preset may hold more than the
      * cap). The toast showing, if any (`toast`, its text).
@@ -131,7 +131,7 @@ interface Window {
         notice: 'HATCHERY FULL: NO EGG' | 'BARN FULL: THE EGG WILL WAIT' | null };
       scene: { stop: string | null; covered: boolean | null; beat: boolean; banner: string | null; baddie: 'moleking' | 'stormroc' | 'frostgiant' | null;
         face: 'neutral' | 'grumpy' | 'surprised' | 'sleepy' | null; pose: 'walk' | 'stand' | 'sit' | 'turn' | 'leave' | null;
-        exit: 'calmed' | 'outwitted' | 'drivenOff' | null; facing: 1 | -1; progress: number; done: boolean; result: string | null } | null;
+        exit: 'calmed' | 'outwitted' | 'drivenOff' | null; progress: number; done: boolean; result: string | null } | null;
       barn: { count: number; cap: number };
       /** The toast showing now, if any (its text). */
       toast: string | null };
