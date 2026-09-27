@@ -764,8 +764,9 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   its place with a plate -- its number, its title, the road's challenge icons (a baddie's crown last) and its days --
   and a tap on the plate or the landmark opens its chooser; a tap on a place with no mission today says what it is.
   While a team is out, its road from HOME is dotted in red, a flag planted at its place, and the team's own flag walks
-  the road at the watchable scene's pace (`missionview.ts` roadFraction: standing through a stop, heading home after a
-  turn-back). The board is rolled at 05:00 each day (and at a new game's start): one mission for
+  the road at the watchable scene's pace (`missionview.ts` roadFraction: standing through a stop, and at the place by
+  the road's end whatever the outcome, which the flag, like the scene, never tells). The board is rolled at 05:00 each
+  day (and at a new game's start): one mission for
   each explored region, up to three, each easy (2 challenges, 1 game day, 40 coin), normal (3, 2 days, 80 coin) or
   hard (3 and the region's big baddie from day 3, else 4; 3 days; 150 coin) -- 3, 6 or 9 minutes of play at 1x. On
   day 3 and every fourth day after (7, 11, ...), the first region on the board that has a baddie shows its hard road,

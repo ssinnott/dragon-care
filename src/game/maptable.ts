@@ -201,8 +201,8 @@ function drawCloudMark(ctx: CanvasRenderingContext2D, x: number, y: number, pend
 
 /**
  * The team out on the map: its road from HOME to the mission's place in red dots, a flag planted at the place, and the
- * team's own flag where it is on that road (roadFraction: the scene's own pace -- standing at a stop, walking home after a
- * turn-back, at HOME before it leaves and once it lands).
+ * team's own flag where it is on that road (roadFraction: the scene's own pace -- standing through a stop, at the place
+ * by the road's end whatever the outcome, at HOME before it leaves and once it lands).
  */
 function drawTeamRoad(ctx: CanvasRenderingContext2D, sim: CareSim, t: Trip, frame: number): void {
   const p = placeOf(t.mission), route = routeTo(p.name, sim.missions.explored);
