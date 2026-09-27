@@ -1,15 +1,16 @@
 // The player's barn in the browser (docs/BASE_DESIGN.md 7): the one file that touches localStorage. Only a live page
 // that may save uses it, and only from BaseView.attach() (a frozen page, t=, a preset page, save=0 and every headless
 // check never do: BASE_DESIGN 7, Saves). A save is save.ts's JSON under one key; one this build can't read -- another
-// version, or not a save at all -- is copied to a backup key and a new barn starts, without throwing. Storage that
+// version (but the one before it, MIGRATES_FROM, which CareSim.fromSave brings up to this one), or not a save at all --
+// is copied to a backup key and a new barn starts, without throwing. Storage that
 // isn't there (a private window, a quota, a blocked origin) reads as no save and writes as a failed write.
-import { SAVE_VERSION } from './save.ts';
+import { SAVE_VERSION, MIGRATES_FROM } from './save.ts';
 import type { SaveV } from './save.ts';
 
 /** Where the barn is kept, and where a save that didn't fit is kept aside. */
 export const SAVE_KEY = 'dragon-care/base', BACKUP_KEY = 'dragon-care/base.bak';
 
-/** What a load found: nothing; a save of this version; one of another version (`old`); something that isn't a save (`bad`). */
+/** What a load found: nothing; a save of this version (or of the one before it, brought up as it loads); one of another version (`old`); something that isn't a save (`bad`). */
 export type LoadNote = 'none' | 'ok' | 'old' | 'bad';
 
 function store(): Storage | null {
@@ -24,7 +25,8 @@ export function backupSave(): void {
 
 /**
  * The barn as saved: `ok` with the save, or no save and why -- `none` (never saved), `old` (another version) or `bad`
- * (not JSON, or not a save). An old or bad save is copied to BACKUP_KEY. Never throws. (A save of this version whose
+ * (not JSON, or not a save). An old or bad save is copied to BACKUP_KEY, and so is one of MIGRATES_FROM (returned `ok`:
+ * it loads, brought up to this version, and the backup keeps it as it was). Never throws. (A save of this version whose
  * insides are broken is found only when the view loads it -- BaseView's load(): CareSim.fromSave, then a trial step
  * and draw -- and the caller backs it up the same way: backupSave.)
  */
@@ -36,7 +38,9 @@ export function loadSave(): { save: SaveV | null; note: LoadNote } {
   let v: unknown;
   try { v = JSON.parse(raw); } catch { backupSave(); return { save: null, note: 'bad' }; }
   if (!v || typeof v !== 'object' || Array.isArray(v)) { backupSave(); return { save: null, note: 'bad' }; }
-  if ((v as { v?: unknown }).v !== SAVE_VERSION) { backupSave(); return { save: null, note: 'old' }; }
+  const ver = (v as { v?: unknown }).v;
+  if (ver === MIGRATES_FROM) backupSave();
+  else if (ver !== SAVE_VERSION) { backupSave(); return { save: null, note: 'old' }; }
   return { save: v as SaveV, note: 'ok' };
 }
 

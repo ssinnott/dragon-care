@@ -32,7 +32,9 @@
 // its pixels change, darker and cooler, and no floor pixel does (BASE_DESIGN 7: the sky, the lights and the moonlit
 // walls, never a dragon or a floor), and the walls step with the dusk and the dawn; live, the speed button and the keys 1-4 and p run the world faster, and pause it;
 // a frozen page with a save in storage neither loads nor writes it, and nor does a live page given hour=; a live page
-// that saves resumes its world after a reload, and one whose save doesn't fit -- another version, or one of this
+// that saves resumes its world after a reload, and one with a save of the version before (a v9 barn, written by the
+// build before the fights: tools/fixtures) resumes it brought up to this version, its board's roads ending in their
+// bosses, the v9 save kept aside; and one whose save doesn't fit -- another version, or one of this
 // version the view can't build or draw (an unknown element, keeper or need) -- starts a new barn without a page
 // error, keeps the old save aside, and never writes it back. Growing up and eggs (BASE_DESIGN 7): the growup preset's EMBER
 // is an elder a second in, the eggs preset shows its three eggs in the Hatchery's nests, the hatch preset's egg has
@@ -40,13 +42,14 @@
 // other heads on screen where it can be), a tap on the card closes it, and a tap on the head of one with a job waiting
 // opens its card and Rushes the job -- a head drawn over a keeper included. The elder garden (BASE_DESIGN 3): the new game's garden has its two empty plots; the garden preset's
 // three residents live on three plots, by day and by night (each dragon says where it lives: the barn or the garden).
-// The watchable scene (BASE_DESIGN 6): frozen with a team away (preset=trip&trip=...&panel=watch), the scene is on screen at
-// the baddie (the Mole King in view, dozing off calmed; in its beat, surprised; and dozing off just the same for a team
-// that will fail), at a challenge the team met (with its banner), on a failure just where the team that succeeds is
-// (it never turns back, and nothing tells the outcome early), and home with the result card (HOME SAFE!, or NOT THIS
-// TIME at a failure's end); live, the TEAM OUT chip opens the scene over the
-// barn, the world steps on under it, and BACK TO BARN closes it; beside a keeper held by hand (who stands still under
-// it), a badge or Esc goes back to the barn.
+// The watchable scene (BASE_DESIGN 6): frozen with a team away (preset=trip&trip=...&panel=watch), the scene is on screen in
+// a fight with a pack of little enemies (the foes in view, a bolt in flight), at the boss (the Mole King fighting, its
+// health bar part gone; knocked down, dazed, its bar empty -- and just the same for a team that will fail), at a
+// challenge the team met (with its banner), on a failure just where the team that succeeds is (it never turns back,
+// and nothing tells the outcome early), against a lone pair too weak for the Briar Boar (it stomps off unbeaten, its
+// bar never empty), and home with the result card (HOME SAFE!, or NOT THIS TIME at a failure's end); live, the TEAM
+// OUT chip opens the scene over the barn, the world steps on under it, and BACK TO BARN closes it; beside a keeper held
+// by hand (who stands still under it), a badge or Esc goes back to the barn.
 // Taking a keeper (BASE_DESIGN 4.10, #6; take= frames too): a tap on a keeper or their badge takes them, d and the pad's
 // arrows walk them, the pad and the line over it (what E does) show while one is held, Esc and LET GO let go, a touch
 // in the pad's gaps is the pad's, and a badge takes and lets go while paused; no dragon's head is under the pad or the
@@ -56,8 +59,8 @@
 // SEND starts the muster and eases the camera to the Aerie. The mission loop, live at 8x: the muster to the deck, the
 // TEAM OUT chip to the watch scene, TRIP LOG open and shut, BACK TO BARN.
 // The mission art kit (ART_BIBLE 5.10, view=missionart): every sheet -- the climates (and one as a scrolling road scene), the
-// set pieces, the baddies, the people (the miller beside the keepers) and the icons -- draws every item on it, with
-// no page error, in enough colours.
+// set pieces, the bosses, the little enemies, the fights' marks, the people (the miller beside the keepers) and the
+// icons -- draws every item on it, with no page error, in enough colours.
 // Barn capacity (BASE_DESIGN 4.7): the hook counts the barn's dragons against its cap (7 of 12 in the new game, the twelve
 // preset at the cap, the full preset forced over it with its due egg waiting in its nest, and the capped preset at the
 // cap with its due egg waiting in plain view, nobody in front of its nest).
@@ -76,7 +79,8 @@ import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts'
 import { serialize } from '../src/game/save.ts';
 import { SAVE_KEY, BACKUP_KEY } from '../src/game/storage.ts';
 import { FLOORS, STRAW_SEAM, PATH_EDGE } from '../src/game/surfaces.ts';
-import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS } from '../src/game/missiondata.ts';
+import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS, FOE_IDS } from '../src/game/missiondata.ts';
+import { MISSILES, SPARK_LEN, POOF_LEN } from '../src/game/fightfx.ts';
 import { PHASE_ORDER } from '../src/game/clock.ts';
 
 const require = createRequire(import.meta.url);
@@ -261,6 +265,28 @@ async function liveOldSave(page: any): Promise<string[]> {
   return out;
 }
 const OLD_SAVE = JSON.stringify({ ...JSON.parse(PLANTED), v: 999, tick: 9999 });
+/** A barn saved by the build before the fights (version 9: tools/fixtures/save-v9-away.json, a team away on the Mole King's road). */
+const V9_SAVE = fs.readFileSync(new URL('./fixtures/save-v9-away.json', import.meta.url), 'utf8');
+/**
+ * view=base, live and saving, with a version-9 save in storage (the build before the fights): it resumes, brought up to
+ * this version -- its world at the save's tick or on, persisting, every road on its board ending in its region's boss,
+ * its team still out -- the v9 save kept aside at the backup key as it was, and saving now writes this version.
+ */
+async function liveV9Save(page: any): Promise<string[]> {
+  const out: string[] = [], v9 = JSON.parse(V9_SAVE);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 5, null, { timeout: 15000 });
+  const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare.base);
+  if (!(b.tick >= v9.tick)) out.push(`the world is at tick ${b.tick}, before the v9 save's ${v9.tick}: it did not resume`);
+  if (b.persist !== true) out.push(`the v9 barn resumed with persist ${b.persist}`);
+  if (!b.board.length || b.board.some((m) => !m.baddie)) out.push(`the resumed board's roads: ${b.board.map((m) => `${m.title} to ${m.baddie}`).join(', ')}`);
+  if (!b.trip || b.trip.mission !== v9.missions.trip.mission.title) out.push(`the v9 barn's team out is ${JSON.stringify(b.trip?.mission)}`);
+  if ((await stored(page, BACKUP_KEY)) !== V9_SAVE) out.push('the v9 save was not kept at the backup key');
+  await page.evaluate(() => (window as any).__dragonCare.baseSaveNow());
+  const saved = await stored(page, SAVE_KEY), v = saved ? JSON.parse(saved).v : null;
+  if (v !== 10) out.push(`saved again, the barn is version ${v}`);
+  if (!out.length) console.log(`        v9: resumed at tick ${b.tick} (saved at ${v9.tick}), ${b.board.map((m) => `${m.title} to ${m.baddie}`).join(', ')}; ${b.trip?.mission} still out; the v9 save kept aside, saved again at version ${v}`);
+  return out;
+}
 /**
  * Saves of this version that parse but that the view can't build (a dragon of an element no one knows, a keeper no one
  * knows) or draw (a job for a need no one knows: it builds, and only the load's trial draw finds it), or whose egg this
@@ -434,8 +460,8 @@ function gardenIs(residents: number, plots: number) {
 
 /**
  * The watchable scene (BASE_DESIGN 6), frozen: the overlay is the scene, and the scene is as `want` says (the last stop
- * reached, whether it was met, the baddie in view, its exit, the way the team faces...), with a banner once a stop is
- * reached.
+ * reached, whether it was met, the boss in view, its face, pose and health bar, the way the team faces...), with a
+ * banner once a stop is reached.
  */
 function sceneIs(want: Partial<NonNullable<BaseHook['scene']>>) {
   return (b: BaseHook): string[] => {
@@ -453,33 +479,35 @@ function sceneIs(want: Partial<NonNullable<BaseHook['scene']>>) {
 /**
  * The scene a trip preset's page shows at its frozen step `t` for the team that SUCCEEDS on it (trip=<region>:<progress>),
  * read in Node from the scene's own pure function as the page's hook reports it (base.ts sceneHook): the last stop
- * reached, whether it was met, whether its beat is playing, the banner, and not done. The same page for a team that
- * fails must show just this: it never turns back, and nothing on the road tells the outcome.
+ * reached, whether it was met, whether its beat is playing, the banner, the boss (its face and pose) and its bar, the foes
+ * in view and what is in flight, and not done. The same page for a team that fails must show just this: it never turns
+ * back, its fights are the same fights, and nothing on the road tells the outcome.
  */
 function succeedingScene(trip: string, t: number): Partial<NonNullable<BaseHook['scene']>> {
   const w = buildSim(tripStart(trip, t), 1);
   for (let i = 0; i < t; i++) w.step();
   const tr = w.missions.trip!, f = sceneAt(w, tr), s = f.last == null ? null : tr.stops[f.last];
-  return { stop: s ? (s.kind === 'baddie' ? 'baddie' : s.challenge) : null, covered: s ? s.covered : null, beat: f.stop != null, banner: f.banner, done: false, result: null };
+  return { stop: s ? (s.kind === 'challenge' ? s.challenge : s.kind) : null, covered: s ? s.covered : null, beat: f.stop != null, banner: f.banner,
+    baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, bar: f.bar, foes: f.foes.length, shots: f.shots.length, done: false, result: null };
 }
 
 /**
  * view=base&preset=trip, live (save=0): a team is out, so the TEAM OUT chip shows under the top bar; a tap on
  * it opens the scene over the barn (the world stepping on underneath), and BACK TO BARN closes it. Then the watch
- * overlay beside taking a keeper (BASE_DESIGN 4.10), with keepers who are not on the trip (its riders, BEA and IRIS,
- * are away on the road, and never taken): TOMAS taken by his badge and the scene opened, he
- * stays held but stands still under it -- d held walks him nowhere, and the line over the pad is gone -- a tap on the
- * pad's arrow or on the world is the overlay's (swallowed: never a pad press, nor empty space letting him go), Esc goes
- * back to the barn with him still held and walking on with d still down, and over the scene again PIP's badge goes
- * back to the barn and takes him.
+ * overlay beside taking a keeper (BASE_DESIGN 4.10), with the two keepers who are not on the trip (its riders are away on
+ * the road, and never taken): the first taken by their badge and the scene opened, they stay held but stand still under
+ * it -- d held walks them nowhere, and the line over the pad is gone -- a tap on the pad's arrow or on the world is the
+ * overlay's (swallowed: never a pad press, nor empty space letting them go), Esc goes back to the barn with them still
+ * held and walking on with d still down, and over the scene again the second's badge goes back to the barn and takes them.
  */
 async function baseWatch(page: any): Promise<string[]> {
   const out: string[] = [];
   const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
   await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 10, null, { timeout: 15000 });
   const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
-  const a = await st(), chip = a.ui?.chip;
+  const a = await st(), chip = a.ui?.chip, home = a.keepers.filter((q) => q.phase !== 'away').map((q) => q.name), [ONE, TWO] = home;
   if (a.ui?.screen !== 'none' || !chip) return [`with a team out the overlay is ${a.ui?.screen} and the chip ${JSON.stringify(chip)}`];
+  if (home.length !== 2) return [`with a team out ${home.join(', ')} are home, not two keepers`];
   await page.mouse.click(box.x + (chip.x + chip.w / 2) * k, box.y + (chip.y + chip.h / 2) * k);
   await page.waitForTimeout(300);
   const b = await st();
@@ -497,39 +525,39 @@ async function baseWatch(page: any): Promise<string[]> {
   const click = (x: number, y: number) => page.mouse.click(box.x + x * k, box.y + y * k);
   const held = (name: string | null) => page.waitForFunction((n: string | null) => (window as any).__dragonCare?.base?.controlled === n, name, { timeout: 5000 }).then(() => true, () => false);
   const screen = (want: string) => page.waitForFunction((w: string) => (window as any).__dragonCare?.base?.ui?.screen === w, want, { timeout: 5000 }).then(() => true, () => false);
-  const tomasX = (h: BaseHook) => h.keepers.find((q) => q.name === 'TOMAS')!.x;
-  const tb = d.badges.TOMAS, pb = d.badges.PIP;
+  const tomasX = (h: BaseHook) => h.keepers.find((q) => q.name === ONE)!.x;
+  const tb = d.badges[ONE], pb = d.badges[TWO];
   await click(tb.x + tb.w / 2, tb.y + tb.h / 2);
-  if (!(await held('TOMAS'))) return [...out, `a tap on TOMAS's badge: controlled is ${(await st()).controlled}`];
+  if (!(await held(ONE))) return [...out, `a tap on ${ONE}'s badge: controlled is ${(await st()).controlled}`];
   await page.waitForTimeout(200);
   await click(chip.x + chip.w / 2, chip.y + chip.h / 2);
-  if (!(await screen('watch'))) return [...out, `TOMAS held, the TEAM OUT chip left the overlay ${(await st()).ui?.screen}`];
+  if (!(await screen('watch'))) return [...out, `${ONE} held, the TEAM OUT chip left the overlay ${(await st()).ui?.screen}`];
   const e = await st(), ex = tomasX(e);
-  if (e.controlled !== 'TOMAS' || e.action !== null) out.push(`the scene opened with TOMAS held: controlled ${e.controlled}, the line ${JSON.stringify(e.action)}`);
-  // (d stays down from here until TOMAS has walked on in the barn)
+  if (e.controlled !== ONE || e.action !== null) out.push(`the scene opened with ${ONE} held: controlled ${e.controlled}, the line ${JSON.stringify(e.action)}`);
+  // (d stays down from here until the one held has walked on in the barn)
   await page.keyboard.down('d'); await page.waitForTimeout(400);
   const pr = e.pad.right;
   await click(pr.x + pr.w / 2, pr.y + pr.h / 2);
   await click(320, 200);
   await page.waitForTimeout(150);
   const f = await st(), fx = tomasX(f);
-  if (Math.abs(fx - ex) > 0.5) out.push(`over the scene, d and a tap on the pad's arrow walked TOMAS from x ${ex.toFixed(1)} to ${fx.toFixed(1)}`);
-  if (f.ui?.screen !== 'watch' || f.controlled !== 'TOMAS') out.push(`taps on the pad and the world over the scene: the overlay ${f.ui?.screen}, controlled ${f.controlled}`);
+  if (Math.abs(fx - ex) > 0.5) out.push(`over the scene, d and a tap on the pad's arrow walked ${ONE} from x ${ex.toFixed(1)} to ${fx.toFixed(1)}`);
+  if (f.ui?.screen !== 'watch' || f.controlled !== ONE) out.push(`taps on the pad and the world over the scene: the overlay ${f.ui?.screen}, controlled ${f.controlled}`);
   await page.keyboard.press('Escape');
   if (!(await screen('none'))) out.push(`Esc over the scene left the overlay ${(await st()).ui?.screen}`);
-  if ((await st()).controlled !== 'TOMAS') out.push(`Esc over the scene let go of TOMAS (controlled ${(await st()).controlled})`);
+  if ((await st()).controlled !== ONE) out.push(`Esc over the scene let go of ${ONE} (controlled ${(await st()).controlled})`);
   const g0 = tomasX(await st());
   await page.waitForTimeout(400);
   const gx = tomasX(await st());
   await page.keyboard.up('d');
-  if (!(gx > g0 + 5)) out.push(`back in the barn with d still down, TOMAS stood (x ${g0.toFixed(1)} -> ${gx.toFixed(1)})`);
+  if (!(gx > g0 + 5)) out.push(`back in the barn with d still down, ${ONE} stood (x ${g0.toFixed(1)} -> ${gx.toFixed(1)})`);
   await click(chip.x + chip.w / 2, chip.y + chip.h / 2);
   if (!(await screen('watch'))) out.push(`the TEAM OUT chip again left the overlay ${(await st()).ui?.screen}`);
   await click(pb.x + pb.w / 2, pb.y + pb.h / 2);
-  if (!(await screen('none')) || !(await held('PIP'))) out.push(`over the scene, PIP's badge: the overlay ${(await st()).ui?.screen}, controlled ${(await st()).controlled}`);
+  if (!(await screen('none')) || !(await held(TWO))) out.push(`over the scene, ${TWO}'s badge: the overlay ${(await st()).ui?.screen}, controlled ${(await st()).controlled}`);
   await page.keyboard.press('Escape');
   if (!(await held(null))) out.push(`back in the barn, Esc left ${(await st()).controlled} held`);
-  if (!out.length) console.log(`        watch: the chip opened the scene (${b.scene?.stop ?? 'on the road'}, ${Math.round((b.scene?.progress ?? 0) * 100)} % along), the world stepped on under it, BACK returned to the barn; TOMAS (not a rider) held under the scene stood still (x ${ex.toFixed(0)} -> ${fx.toFixed(0)} through d, the pad and a tap on the world), Esc back to the barn with him held, walking on with d still down (x ${g0.toFixed(0)} -> ${gx.toFixed(0)}), PIP's badge over the scene back to the barn and him taken`);
+  if (!out.length) console.log(`        watch: the chip opened the scene (${b.scene?.stop ?? 'on the road'}, ${Math.round((b.scene?.progress ?? 0) * 100)} % along), the world stepped on under it, BACK returned to the barn; ${ONE} (not a rider) held under the scene stood still (x ${ex.toFixed(0)} -> ${fx.toFixed(0)} through d, the pad and a tap on the world), Esc back to the barn with them held, walking on with d still down (x ${g0.toFixed(0)} -> ${gx.toFixed(0)}), ${TWO}'s badge over the scene back to the barn and them taken`);
   return out;
 }
 
@@ -895,6 +923,7 @@ const CASES: Case[] = [
   { query: 'view=base&t=600', minColours: 150, allScales: false, init: plant(PLANTED), act: plantedFrozen },
   { query: 'view=base', minColours: 150, allScales: false, act: livePersist, timeout: 45000 },
   { query: 'view=base', minColours: 150, allScales: false, init: plant(OLD_SAVE), act: liveOldSave },
+  { query: 'view=base', minColours: 150, allScales: false, init: plant(V9_SAVE), act: liveV9Save },
   ...BROKEN_SAVES.map((b): Case => ({ query: 'view=base', minColours: 150, allScales: false, init: plant(b.blob), act: liveBrokenSave(b) })),
   { query: 'view=base&hour=22', minColours: 150, allScales: false, init: plant(PLANTED), act: liveHourNoSave },
   // growing up and eggs (BASE_DESIGN 7): EMBER grown an elder, three eggs in the Hatchery's nests, an egg hatched into a baby;
@@ -921,11 +950,13 @@ const CASES: Case[] = [
   // and the capped preset, the barn at its cap (BARN 12/12), its egg due on the first step waiting in the Hatchery's
   // first nest with nobody in front of it (the nest's dots in view)
   { query: 'view=base&preset=capped&t=60&cam=168,280', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...barnIs(12)(b), ...eggWaits(b), ...nestClear(b)] },
-  { query: 'view=base&preset=trip&trip=oldmine:0.95&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', baddie: 'moleking', exit: 'calmed' }) },
-  { query: 'view=base&preset=trip&trip=oldmine:0.95:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ ...succeedingScene('oldmine:0.95', 60), baddie: 'moleking', exit: 'calmed' }) },
-  { query: 'view=base&preset=trip&trip=oldmine:0.91&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', beat: true, baddie: 'moleking', face: 'surprised' }) },
-  { query: 'view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ covered: true, baddie: null })(b), ...(b.scene?.stop && b.scene.stop !== 'baddie' ? [] : [`the last stop is ${b.scene?.stop}, not a challenge`])] },
-  { query: 'view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ ...succeedingScene('bramblewood:0.7', 60), exit: null }) },
+  { query: 'view=base&preset=trip&trip=oldmine:0.1245&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'foes', beat: true, baddie: null, bar: null })(b), ...(b.scene && b.scene.foes > 0 && b.scene.shots > 0 ? [] : [`a fight with ${b.scene?.foes} foes and ${b.scene?.shots} bolts in flight`])] },
+  { query: 'view=base&preset=trip&trip=oldmine:0.9679&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', beat: true, baddie: 'moleking' })(b), ...(b.scene?.bar != null && b.scene.bar > 0 && b.scene.bar < 1 ? [] : [`the boss's bar is ${b.scene?.bar}`])] },
+  { query: 'view=base&preset=trip&trip=oldmine:0.9833&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', baddie: 'moleking', pose: 'down', face: 'dazed', bar: 0 }) },
+  { query: 'view=base&preset=trip&trip=oldmine:0.9833:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ ...succeedingScene('oldmine:0.9833', 60), baddie: 'moleking', pose: 'down' }) },
+  { query: 'view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ covered: true, baddie: null })(b), ...(b.scene?.stop && b.scene.stop !== 'baddie' && b.scene.stop !== 'foes' ? [] : [`the last stop is ${b.scene?.stop}, not a challenge`])] },
+  { query: 'view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs(succeedingScene('bramblewood:0.7', 60)) },
+  { query: 'view=base&preset=trip&trip=bramblewood:0.99:weak&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', covered: false, baddie: 'briarboar', face: 'fierce', pose: 'walk' })(b), ...(b.scene?.bar != null && b.scene.bar > 0 ? [] : [`the unbeaten boss's bar is ${b.scene?.bar}`])] },
   { query: 'view=base&preset=trip&trip=oldmine:1&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result: 'HOME SAFE!' }) },
   { query: 'view=base&preset=trip&trip=bramblewood:1:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result: 'NOT THIS TIME' }) },
   { query: 'view=base&preset=trip&trip=oldmine:0.2&save=0', minColours: 150, allScales: false, act: baseWatch },
@@ -934,8 +965,11 @@ const CASES: Case[] = [
   { query: 'view=missionart&sheet=climates&climate=peaks&phase=night&t=90', minColours: 500, allScales: false, art: { sheet: 'climates', want: ['peaks:night:scene'] } },
   { query: 'view=missionart&sheet=setpieces&t=60', minColours: 1000, allScales: false, art: { sheet: 'setpieces', want: CHALLENGE_IDS } },
   { query: 'view=missionart&sheet=baddies&t=30', minColours: 1000, allScales: false, art: { sheet: 'baddies', want: [...BADDIE_IDS, ...BADDIE_IDS.map((b) => `${b}:portrait`)] } },
+  { query: 'view=missionart&sheet=foes&t=30', minColours: 400, allScales: false, art: { sheet: 'foes', want: FOE_IDS } },
+  { query: 'view=missionart&sheet=fights&t=30', minColours: 100, allScales: false, art: { sheet: 'fights', want: [...DRAGON_ELEMENTS.map((e) => `bolt:${e}`), ...Object.keys(MISSILES).map((k) => `missile:${k}`),
+    ...Array.from({ length: SPARK_LEN / 2 }, (_, i) => `spark:${i * 2}`), ...Array.from({ length: POOF_LEN / 5 }, (_, i) => `poof:${i * 5}`), 'stars', 'pop', 'bar:1', 'bar:0.65', 'bar:0.2', 'bar:0'] } },
   { query: 'view=missionart&sheet=people&t=50', minColours: 1000, allScales: false, keepers: true, art: { sheet: 'people', want: ['miller:grumpy', 'miller:talkedRound', ...KEEPER_IDS] } },
-  { query: 'view=missionart&sheet=icons&t=0', minColours: 300, allScales: false, art: { sheet: 'icons', want: [...CHALLENGE_IDS.map((c) => `challenge:${c}`), ...SKILLS.map((k) => `skill:${k}`), 'saddle', ...DRAGON_ELEMENTS.map((e) => `egg:${e}`), ...BADDIE_IDS.map((b) => `portrait:${b}`)] } },
+  { query: 'view=missionart&sheet=icons&t=0', minColours: 300, allScales: false, art: { sheet: 'icons', want: [...CHALLENGE_IDS.map((c) => `challenge:${c}`), ...SKILLS.map((k) => `skill:${k}`), 'saddle', ...DRAGON_ELEMENTS.map((e) => `egg:${e}`), ...BADDIE_IDS.map((b) => `portrait:${b}`), 'fight'] } },
   // missions (BASE_DESIGN 5): the Map Room's world map and a mission's chooser (frozen, the world stepped first), the muster
   // preset's team all on the Aerie deck, and live, MAP -> a pin -> BEST TEAM -> SEND
   { query: 'view=base&t=60&panel=map', minColours: 100, maxPanelColours: 40, allScales: false, check: tableIs('map') },

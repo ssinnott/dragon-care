@@ -18,7 +18,8 @@
 //   talkedRound  turned to face them: brows up, smiling eyes, a blush and a small smile under the moustache's lifted
 //                ends, a little nod, tipping his cap at its peak with his near hand (the elbow out in front, so the
 //                forearm passes clear of his eyes and his smile; the cap follows the hand).
-// Nobody is angry and nobody is hurt: grumpy is a mood, and it is talked round.
+// The miller is never angry and never hurt: grumpy is a mood, and it is talked round (only the road's enemies look
+// fierce: foes.ts, baddies.ts).
 import { buildKeeper, stepKeeper, drawKeeper } from '../art/keeper/rig.ts';
 import type { KeeperRig } from '../art/keeper/rig.ts';
 import { KeeperPlayer } from '../art/keeper/player.ts';

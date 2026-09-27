@@ -11,16 +11,24 @@ import type { MissionsState } from './missions.ts';
 
 /**
  * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded (the
- * page keeps it aside and starts a new barn: storage.ts). Version 9 (the earlier ones were never shipped) holds the
- * whole world: the rooms and their uses (stats.used by kind, stats.usedRoom by room id); every dragon -- its slot by
- * room id and index, its goal and that goal's job by id, its route, its walk and the speed it last played at (`gaitS`),
- * its turn, its `hold`, its act, its stage and the step it began, its place (barn, garden or away), its plot (`home`)
- * and a resident's rhythm (`garden`); every keeper -- their station and job by id, route, phase (a mission's phases
- * too), what they carry, and the hand-held state, always saved released (control.ts releasedState); the open jobs; the
- * lift (its car, its rider by id, its calls); the eggs in the Hatchery's nests; the garden's plots; the missions (the
- * board and its day, the map, the coin, the trip out and each pair's deck spot); and the stats.
+ * page keeps it aside and starts a new barn: storage.ts) -- but for the one before, which is brought up to this one
+ * as it loads (MIGRATES_FROM). Version 9 (the earlier ones were never shipped) holds the whole world: the rooms and
+ * their uses (stats.used by kind, stats.usedRoom by room id); every dragon -- its slot by room id and index, its goal
+ * and that goal's job by id, its route, its walk and the speed it last played at (`gaitS`), its turn, its `hold`, its
+ * act, its stage and the step it began, its place (barn, garden or away), its plot (`home`) and a resident's rhythm
+ * (`garden`); every keeper -- their station and job by id, route, phase (a mission's phases too), what they carry, and
+ * the hand-held state, always saved released (control.ts releasedState); the open jobs; the lift (its car, its rider
+ * by id, its calls); the eggs in the Hatchery's nests; the garden's plots; the missions (the board and its day, the
+ * map, the coin, the trip out and each pair's deck spot); and the stats. Version 10 is 9 with every road's fights
+ * (BASE_DESIGN 5.3): each mission's boss, its might and the road's foes, fights and packs; a trip's road with its
+ * fights among its stops; no baddie exit.
  */
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
+/**
+ * The version a save may be of and still load, brought up to SAVE_VERSION (CareSim.fromSave: missions.ts
+ * upgradeMissions and upgradeTrip give its board and its trip out their fights, the trip's rolled outcome kept).
+ */
+export const MIGRATES_FROM = 9;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }
@@ -57,11 +65,11 @@ export interface SaveV {
   stats: SimStats;
 }
 
-/** A save this build can't read: another version, or not a save at all. The storage layer (storage.ts) starts a new barn on it. */
+/** A save this build can't read: another version (not MIGRATES_FROM), or not a save at all. The storage layer (storage.ts) starts a new barn on it. */
 export class SaveVersionError extends Error {
   readonly found: unknown;
   constructor(found: unknown) {
-    super(`save version ${JSON.stringify(found) ?? 'none'} is not ${SAVE_VERSION}`);
+    super(`save version ${JSON.stringify(found) ?? 'none'} is not ${SAVE_VERSION} (nor ${MIGRATES_FROM}, which loads brought up to it)`);
     this.name = 'SaveVersionError';
     this.found = found;
   }

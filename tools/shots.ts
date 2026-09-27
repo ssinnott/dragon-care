@@ -105,18 +105,26 @@ const pairs: string[] = [
   // lit, the line over the pad and the pad at the bottom right, the camera following her
   'shots/base_control.png=view=base&t=120&take=bea',
   // the watchable scene (BASE_DESIGN 6; frozen, preset=trip: a team away on the region's hard mission, that far along its road
-  // at t=60): on the road past a challenge met (its banner); each big baddie in its beat -- walked in, grumpy (0.906:
-  // the beat is 0.900-0.928 of a three-day trip) -- and leaving (0.921: the Mole King dozing, the Storm Roc wandering
-  // off the wrong way, up the road; 0.918: the Frost Giant shuffling off up it, before it leaves the screen); the Mole King's two counters' moments (dusk's breath, Bea's
-  // wave); a failure, on its road just as a success is; the result card, and a failure's; the TEAM OUT chip over the barn; and the barn at t=1800
+  // at t=60): on the road past a challenge met (its banner); the first fight with the Mole Miners (0.1245: COBBLE's
+  // rock bolt in flight at the pack) and its first foe beaten (0.1256: a puff of smoke); each region's boss in its fight,
+  // the first hit landed (its bar at 80 %) and its big missile in flight at the team (0.9588; the riders stepped back
+  // behind their dragons); the Mole King knocked down, seeing stars (0.9833) and running off up the road (0.99); the Briar
+  // Boar against a lone pair too weak for it (:weak) -- its big burr in flight (0.9588), and stomping off unbeaten
+  // (0.9865); a failure, on its road just as a success is (0.7); the result card, and a failure's; the TEAM OUT chip over
+  // the barn; and the barn at t=1800
   'shots/base_watch.png=view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60',
-  'shots/base_baddie_moleking.png=view=base&preset=trip&trip=oldmine:0.906&panel=watch&t=60',
-  'shots/base_baddie_stormroc.png=view=base&preset=trip&trip=highfold:0.906&panel=watch&t=60',
-  'shots/base_baddie_frostgiant.png=view=base&preset=trip&trip=frostmere:0.906&panel=watch&t=60',
-  'shots/base_baddie_moleking_moments.png=view=base&preset=trip&trip=oldmine:0.912&panel=watch&t=60',
-  'shots/base_baddie_moleking_exit.png=view=base&preset=trip&trip=oldmine:0.921&panel=watch&t=60',
-  'shots/base_baddie_stormroc_exit.png=view=base&preset=trip&trip=highfold:0.921&panel=watch&t=60',
-  'shots/base_baddie_frostgiant_exit.png=view=base&preset=trip&trip=frostmere:0.918&panel=watch&t=60',
+  'shots/base_fight_foes.png=view=base&preset=trip&trip=oldmine:0.1245&panel=watch&t=60',
+  'shots/base_fight_poof.png=view=base&preset=trip&trip=oldmine:0.1256&panel=watch&t=60',
+  'shots/base_boss_bridgetroll.png=view=base&preset=trip&trip=millbrook:0.9588&panel=watch&t=60',
+  'shots/base_boss_moleking.png=view=base&preset=trip&trip=oldmine:0.9588&panel=watch&t=60',
+  'shots/base_boss_briarboar.png=view=base&preset=trip&trip=bramblewood:0.9588&panel=watch&t=60',
+  'shots/base_boss_stormroc.png=view=base&preset=trip&trip=highfold:0.9588&panel=watch&t=60',
+  'shots/base_boss_frostgiant.png=view=base&preset=trip&trip=frostmere:0.9588&panel=watch&t=60',
+  'shots/base_boss_cindergolem.png=view=base&preset=trip&trip=emberfell:0.9588&panel=watch&t=60',
+  'shots/base_boss_down.png=view=base&preset=trip&trip=oldmine:0.9833&panel=watch&t=60',
+  'shots/base_boss_flee.png=view=base&preset=trip&trip=oldmine:0.99&panel=watch&t=60',
+  'shots/base_boss_weak.png=view=base&preset=trip&trip=bramblewood:0.9588:weak&panel=watch&t=60',
+  'shots/base_boss_stomps.png=view=base&preset=trip&trip=bramblewood:0.9865:weak&panel=watch&t=60',
   'shots/base_fail_road.png=view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60',
   'shots/base_result.png=view=base&preset=trip&trip=oldmine:1&panel=watch&t=60',
   'shots/base_result_fail.png=view=base&preset=trip&trip=bramblewood:1:fail&panel=watch&t=60',
@@ -124,13 +132,16 @@ const pairs: string[] = [
   'shots/base_final.png=view=base&t=1800',
   // the mission art kit (ART_BIBLE 5.10; docs/ART_BIBLE.md "Mission art"): the six climates at the four phases (the chooser's
   // 300 x 112 pictures), two of them filling a road scene, the eleven set pieces ahead and met (a dragon in the fog,
-  // which stands behind it), the three baddies' faces, poses and exits beside an adult dragon, the grumpy miller
-  // grumpy and talked round beside the keepers (and their silhouettes), and the icons
+  // which stands behind it), the six bosses' faces and fight poses beside an adult dragon, the six packs of little
+  // enemies, the fights' marks (the breath bolts, the missiles, the spark, the puff of smoke, the stars, the boss's bar),
+  // the grumpy miller grumpy and talked round beside the keepers (and their silhouettes), and the icons
   'shots/missionart_climates.png=view=missionart&sheet=climates&t=0',
   'shots/missionart_road_caves.png=view=missionart&sheet=climates&climate=caves&phase=day&t=120',
   'shots/missionart_road_ice_night.png=view=missionart&sheet=climates&climate=ice&phase=night&t=120',
   'shots/missionart_setpieces.png=view=missionart&sheet=setpieces&t=60',
   'shots/missionart_baddies.png=view=missionart&sheet=baddies&t=30',
+  'shots/missionart_foes.png=view=missionart&sheet=foes&t=30',
+  'shots/missionart_fights.png=view=missionart&sheet=fights&t=0',
   'shots/missionart_people.png=view=missionart&sheet=people&t=50',
   'shots/missionart_icons.png=view=missionart&sheet=icons&t=0',
   // missions (BASE_DESIGN 5): the Map Room table's world map (the three start regions, the fog hatched over the rest, the

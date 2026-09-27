@@ -44,8 +44,9 @@
 //                              pip) takes that keeper by hand at the first step (frozen too: the pad, the mark and the
 //                              line show); live, a tap on a keeper or their badge takes them, WASD or the arrows walk
 //                              them, E or Space does the chore in reach, Esc lets go; preset=trip&trip=<region>:
-//                              <progress>[:fail] has a team away on the region's hard mission, that far along its road
-//                              at the frozen t (BASE_DESIGN 6); panel=map | mission | watch opens the Map Room table's world
+//                              <progress>[:fail][:weak] has a team away on the region's hard mission, that far along its
+//                              road at the frozen t (BASE_DESIGN 6: :fail the outcome its end tells, :weak a lone pair too
+//                              weak for the boss); panel=map | mission | watch opens the Map Room table's world
 //                              map or a mission's chooser (mission=0..2: which of the board's), or the
 //                              watchable scene of the team out, over the barn at the first frame
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
@@ -145,7 +146,7 @@ export interface GalleryParams {
   /**
    * view=base: panel=map | mission, the Map Room table's overlay open from the first frame (BASE_DESIGN 5), or panel=watch,
    * the watchable scene (BASE_DESIGN 6); mission=<i>, the board's mission the chooser shows (0-2); trip=<region>:<progress>
-   * [:fail], preset=trip's team away.
+   * [:fail][:weak], preset=trip's team away.
    */
   panel: 'map' | 'mission' | 'watch' | null;
   mission: number;

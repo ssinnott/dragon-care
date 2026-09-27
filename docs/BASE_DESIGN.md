@@ -14,17 +14,20 @@ rooms that earn their keep) and World of Warcraft's mission table (pick a team, 
 repeated on the barn's floors, the Dragon Lift, the Aerie and the elder garden; dragons walking to their needs and
 keepers meeting them (4), the clock, day and night, the speed and the barn kept in the browser (7), growing up, eggs and
 hatching and the barn's cap (7, 4.7), taking a keeper by hand (4.10), and missions -- the Map Room's table, the team, the
-trip from the Aerie, the watchable scene (5, 6). Section 8 says what each part is and how it is checked; section 9 what
+trip from the Aerie, the fights on every road (little enemies between its challenges, its region's boss at its end:
+5.3, B8) and the watchable scene (5, 6). Section 8 says what each part is and how it is checked; section 9 what
 is still open.
 
 **Issues #5 to #11: what implements each.**
 - **#5 Missions:** the Map Room's table (5.1: the world map with fogged regions revealed by success, the chooser with
   its climate picture), the team and its riders (5.2), challenges met by elements and rider skills, shown up front and
   met on the road (5.3), the odds and the seeded outcome (5.4, 5.5), coin and eggs brought home to the Hatchery (5.6),
-  big baddies calmed, outwitted or driven off (5.3, 6; a baddie's road is on the board every fourth day from day 3:
-  5.1), sent from the Aerie (the muster, the sky bridge, the landing),
+  every road's fights -- packs of its region's little enemies between its challenges and its region's boss at its end,
+  fought and beaten or not (5.3, 6; B8 as amended: "every mission should have little enemies to fight intermittently
+  and also a final big boss ... a fight and not a social interaction"), sent from the Aerie (the muster, the sky
+  bridge, the landing),
   and the watchable scene (6) -- `missions.ts`, `regions.ts`, `maptable.ts`, `missionview.ts` and the mission art kit;
-  `npm run sim` sections 17 to 24 and 26.
+  `npm run sim` sections 17 to 24 and 26 (and section 6's version-9 barns).
 - **#6 Take a keeper:** a tap, a badge or Tab takes one; WASD or the arrows walk and climb; E or Space picks up,
   serves and puts back; Esc, LET GO or a tap on empty space lets go; a touch pad (4.10) -- `control.ts`; section 25.
 - **#7 Dragons move by needs:** every dragon walks to a room meeting its open need, on its own floor first, riding the
@@ -56,11 +59,11 @@ shows it.*
 | B1 | **The base is a side-view cutaway:** a barn for the dragons with a tower at each end for the people, scrolled at 1x like Fallout Shelter's vault. | The rig is side view, facing right, authored at scale 1 (1.1). A cutaway shows every room at once in that view. |
 | B2 | **Care is managerial by default; you may take any one keeper by hand** (4.10). Dragons have needs that drain over time; keepers (the humans) walk over and meet them. The player's one per-dragon action is **Rush**; a keeper taken by hand is walked by the player and does the chores the player picks (#6). | Tapping every dragon every few minutes is a chore, not a game (the user's words: "that doesn't sound very fun"). The hands-on care of the art bible (spike's chin, dusk's tuck-in) becomes what keepers *do*, animated. |
 | B3 | **Needs show as thought bubbles** over the dragons and as a **prioritised job queue** along the bottom of the screen. | The bubble says *which* dragon wants *what* at a glance; the queue says *what's next*. |
-| B4 | **Missions are set and forget,** a mission table in the style of World of Warcraft: pick a team, the dragons' elements and the riders' skills counter the mission's challenges, a success chance, a reward. The challenges are shown up front, with who at home meets each (the chooser: 5), and met on the road (the scene: 6). | Simple at this stage, by the user's choice; no choices mid-mission. |
+| B4 | **Missions are set and forget,** a mission table in the style of World of Warcraft: pick a team, the dragons' elements and the riders' skills counter the mission's challenges, the dragons' power beats (or not) its boss, a success chance, a reward. The challenges and the boss are shown up front, with who at home meets each (the chooser: 5), and met and fought on the road (the scene: 6). | Simple at this stage, by the user's choice; no choices mid-mission: the fights play out as the team's power says, known at SEND. |
 | B5 | **Missions are watchable:** an animated side-scrolling scene of the team completing it. **The scene is the timer.** (Built and confirmed, 6: the scene is a pure function of the trip and the world's clock and lasts exactly as long as the trip; its result card shows when the trip's time is up.) (Amended: "On a mission you never turn back; the pass fail happens at the end" -- every team walks its whole road, and only the result card, at the road's end, tells a success from a failure: 5.5, 6.) | The user wants to see the team at work; the side-view walk the rig already has makes it cheap. |
 | B6 | **Everything runs only while the game is open.** One clock drives care, missions and hatching; closing the game pauses the world. | No coming back to a barn of red bubbles; no offline catch-up to build. Missions therefore last minutes of play, not hours. |
 | B7 | **Humans are assigned automatically:** keepers to jobs, riders to the dragons you send (each pair's rider is filled in for you, and you may swap it: 5.2) -- unless you take one (4.10): the keeper you hold is left out of every automatic pick, riders included, until you let go. | Fewer clicks; the player's choices are *which dragons* and *what to build*. |
-| B8 | **Cozy:** no combat, and nobody is hurt. Missions have hazards, and some end in a big baddie that is outwitted, calmed or driven off, never fought or killed. Old age is never decline (D21); retiring to the garden is the elder's reward, a place and never a farewell (3, The Garden). | The game's face set has no angry face (D18) and the elder is a reward. (Amended for #5: "Some of the missions might end with a big baddie" -- a baddie, but a cozy one.) |
+| B8 | **Fights, never wounds.** Every mission has little enemies to fight between its challenges and ends in a big boss, fought (5.3, 6): the dragons breathe their elements at the enemies, the enemies throw back, a hit is a spark and a flash, a beaten foe goes up in a puff of smoke, a beaten boss is knocked down, sees stars and runs off, and a boss too strong for the team stomps off unbeaten (the team never turns back: B5). Nobody is wounded or killed -- no blood, no hurt pose on a dragon or a keeper -- and the team comes home tired, never hurt (5.5). Only the enemies may look angry. Old age is never decline (D21); retiring to the garden is the elder's reward, a place and never a farewell (3, The Garden). | The user's words: "Every mission should have little enemies to fight intermittently and also a final big boss. The final should be a fight and not a social interaction." This amends the first B8 ("Cozy: no combat ... a big baddie that is outwitted, calmed or driven off, never fought or killed", and #5's "a baddie, but a cozy one"): the fights are cartoon fights, the dragons' and keepers' faces stay the house's (D18, KEEPERS K3), and the elder's rule stands. How a fight goes is the team's (its power against the boss's might), never the trip's outcome, which the result card alone tells (B5 as amended). |
 
 *Young adult* in the user's request (#9: "start with a young adult dragon of each kind") means a dragon at the very
 start of the adult stage; the stage before adult is called *young* (the art bible's stage names: baby, young, adult,
@@ -749,15 +752,19 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   success in a neighbour reveals them at the next dawn, dotted roads between neighbours and from HOME, and a numbered pin
   for each mission on the board. The board is rolled at 05:00 each day (and at a new game's start): one mission for
   each explored region, up to three, each easy (2 challenges, 1 game day, 40 coin), normal (3, 2 days, 80 coin) or
-  hard (3 and the region's big baddie from day 3, else 4; 3 days; 150 coin) -- 3, 6 or 9 minutes of play at 1x. On
-  day 3 and every fourth day after (7, 11, ...), the first region on the board that has a baddie shows its hard road,
-  so a big baddie is there to meet early (`missions.ts` `baddieDay`). Day 1
-  always has THE LOST NEST (Millbrook, easy: a spring flood and lost things, a sure egg), which two of the seven
-  starters meet (RIPPLE and ECHO). A pin opens the **mission chooser**: the region's **climate picture** (a meadow,
-  caves, a forest, peaks, a frozen lake or ash hills: the mission art's, drawn without dragons), the rewards, each
-  challenge with what meets it and, under GOOD, the dragons at home and the free keepers who could (a tap adds them),
-  a tick once the team does; the big baddie's portrait and its two counters; the team; the odds; BEST TEAM; SEND FROM
-  THE AERIE. The world waits while the table is open.
+  hard (3, 3 days, 150 coin, and titled for its boss's ground: UNDER THE TROLL BRIDGE, THE MOLE KING'S HALL, ...) --
+  3, 6 or 9 minutes of play at 1x. Every road has its **fights** (5.3, B8): packs of the region's little enemies
+  between its challenges -- 2, 3 or 4 fights, 2, 2 or 3 foes in each -- and the region's boss at its end, of might 2,
+  3 or 4. Day 1 always has THE LOST NEST (Millbrook, easy: a spring flood and lost things, two packs of Mud Goblins
+  and the Bridge Troll at the end, a sure egg), which two of the seven starters meet and win (RIPPLE and ECHO). A pin
+  opens the **mission chooser**: the region's **climate picture** (a meadow, caves, a forest, peaks, a frozen lake or
+  ash hills: the mission art's, drawn without dragons), the rewards, each challenge with what meets it and, under
+  GOOD, the dragons at home and the free keepers who could (a tap adds them), a tick once the team does; the boss's
+  row -- its portrait, BOSS: its name, its MIGHT, WEAK TO its element with the dragons at home of that element (a tap
+  adds them), and the team's POWER (red until it reaches the might, then green, with a tick) -- and the road's fights
+  ("2 FIGHTS ON THE ROAD WITH MUD GOBLINS"); the team (while the team can't beat the boss, a dragon of the element it
+  is weak to is starred as a challenge's counter is: TROLL WEAK); the odds; BEST TEAM; SEND FROM THE AERIE. The world
+  waits while the table is open.
 - **5.2 The team.** 1 or 2 **pairs**, each a dragon and its rider -- the riders are the four keepers (KEEPERS.md 2),
   and **two keepers always stay home**; one team is out at a time. You pick the dragons; each takes a rider
   automatically (B7), and a tap on the rider's badge swaps it for the next free keeper:
@@ -788,7 +795,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   needs take over; the rider carrying an egg takes it down the left tower, along the upper floor and up the centre
   ladder to the Hatchery in the hayloft's west corner and lays it in its nest, and every rider hangs the saddle back in the Tack Room
   and rests in the **Bunks** (a job may still call them from there) before going back to their station.
-- **5.3 Challenges and counters.** Terrain is met by a dragon's element, people by a rider's skill:
+- **5.3 Challenges, counters and fights.** Terrain is met by a dragon's element, people by a rider's skill:
 
   | Challenge | Met by | | Challenge | Met by |
   |---|---|---|---|---|
@@ -799,26 +806,50 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   | SPRING FLOOD | water | | NARROW GAP | NIMBLE (Pip) |
   | THORNS | spike | | | |
 
-  A **big baddie** needs both of its counters on the team: THE MOLE KING (Old Mine Road) dusk and CHARM, calmed; THE
-  STORM ROC (Highfold) lightning and NAVIGATOR, outwitted; THE FROST GIANT (Frostmere) fire and NIMBLE, driven off.
-  None is ever fought or hurt (B8).
-- **5.4 The odds.** 20 %, plus 15 % for each challenge met, plus 15 % for the baddie met, plus 5 % for each pair in a
-  good mood (0.5 or more) and 5 % for each pair of partners; kept to 5-95 % (a pair alone never has less than 20 %).
-  Shown live while you pick (a ten-segment bar). THE LOST NEST with RIPPLE and ECHO (its partner Tomas riding), both
-  happy: 65 %; RIPPLE alone: 40 %.
+  **The fights** (B8: "every mission should have little enemies to fight intermittently and also a final big boss"):
+  every road is fought as well as walked. Its region's little enemies wait in packs between its challenges (a fight
+  first, then a challenge, and so on; the rest of either at the end), and its region's boss holds the road's end:
+
+  | Region | Little enemies | Boss | Weak to |
+  |---|---|---|---|
+  | MILLBROOK | MUD GOBLINS | THE BRIDGE TROLL | spike |
+  | OLD MINE ROAD | MOLE MINERS | THE MOLE KING | dusk |
+  | BRAMBLEWOOD | THORN SPRITES | THE BRIAR BOAR | rock |
+  | HIGHFOLD | STORM IMPS | THE STORM ROC | lightning |
+  | FROSTMERE | FROST IMPS | THE FROST GIANT | fire |
+  | EMBERFELL | CINDER IMPS | THE CINDER GOLEM | water |
+
+  The little enemies are always beaten: a pack is a skirmish on the way. The boss is beaten when the team's **power**
+  reaches its **might** (2 on an easy road, 3 on a normal one, 4 on a hard one): each dragon brings its stage's power
+  -- 1 young, 2 adult or elder (an elder is never weaker: D21) -- and one more if the boss is weak to its element
+  (`missions.ts` POWER, WEAK_SPOT). So any adult beats an easy road's boss alone, a lone adult beats a normal road's
+  only on its weak spot, and a hard road's boss takes two pairs. A boss too strong for the team is fought all the
+  same, and stomps off unbeaten: the road's end is never barred (5.5). The dragons fight; the riders' skills meet the
+  people's challenges, and in a fight they step back behind their dragons (6).
+- **5.4 The odds.** 5 %, plus 15 % for each challenge met, plus 15 % for the boss beaten (the team's power at its
+  might), plus 5 % for each pair in a good mood (0.5 or more) and 5 % for each pair of partners; kept to 5-95 %. (The
+  base was 20 % before every road had a boss: a team that beats it has the odds it had then.) Shown live while you
+  pick (a ten-segment bar). THE LOST NEST with RIPPLE and ECHO (its partner Tomas riding), both happy: 65 %; RIPPLE
+  alone (power 2, the troll's might): 40 %. On a normal Millbrook road (might 3), BRAMBLE alone on the troll's weak
+  spot (power 3), BEA riding to talk the miller round, both happy: 40 %; EMBER with BEA instead (partners, but power
+  2: the troll not beaten): 30 %.
 - **5.5 The outcome** is rolled when the team is sent (seeded, `rngAt(seed, MISSION, id)`), and so is the whole road:
-  each challenge sits at (i + 1) / (n + 1) of 85 % of the way, the baddie at 90 %, each met or not and by whom.
-  **On a mission you never turn back; the pass or fail happens at the end.** Whatever the roll, the team walks the
-  whole road -- each stop met, or waited out; the baddie met, or waited out until it leaves by its own exit -- and the
-  road is the same either way (`missions.ts` `roadOf` never sees the roll: every stop's line says how that stop went,
-  never how the trip will end). The outcome is told at the road's end, on the result card (6), and nowhere before it.
+  its K stops before the boss -- the fights and the challenges -- at (i + 1) / (K + 1) of the way to the boss, and the
+  boss at its end, each met or not and by whom (a pack always beaten by the team's dragons; the boss when their power
+  reaches its might). **On a mission you never turn back; the pass or fail happens at the end.** Whatever the roll,
+  the team walks the whole road -- each challenge met, or waited out; each pack fought off; the boss beaten (knocked
+  down, it runs off) or, too strong for the team, fought and not beaten (it stomps off: "TOO STRONG FOR ...") -- and
+  the road is the same either way (`missions.ts` `roadOf` never sees the roll: every stop's line says how that stop
+  went, never how the trip will end). The outcome is told at the road's end, on the result card (6), and nowhere
+  before it.
   - success: the full coin, and the egg;
   - failure: half the coin, no egg.
-  - **Day 1's LOST NEST** is the first mission: a team that meets both of its challenges always succeeds (and brings
-    its sure egg home), whatever the seed's roll -- on seed 1, the default page's, the roll alone would fail it.
+  - **Day 1's LOST NEST** is the first mission: a team that meets both of its challenges and beats the troll always
+    succeeds (and brings its sure egg home), whatever the seed's roll -- on seed 1, the default page's, the roll alone
+    would fail it.
 
-  Nobody is hurt: the team lands tired and hungry (food and sleep at most 45 % on a success, 30 % on a failure), so a
-  mission always ends in a burst of bubbles in the barn.
+  Nobody is ever wounded (B8): the team lands tired and hungry (food and sleep at most 45 % on a success, 30 % on a
+  failure), so a mission always ends in a burst of bubbles in the barn.
 - **5.6 Rewards.** Coin (on the top bar), and **eggs**, which come from the regions, so exploring is how new elements
   arrive: an egg of one of the region's elements, sure on a region's first success and otherwise 35 % (60 % on a hard
   road). The nest is reserved when the team is sent -- the chooser says HATCHERY FULL: NO EGG when all three hold eggs
@@ -834,15 +865,17 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
 
 ![The mission scene: dusk's lamp lights the tunnel, the team waits out the flood, the result](base/mission_scene.png)
 
-*The picture is the first mockup. As built (`src/game/missionview.ts`), the scene reads as follows: the team walks its road, stands for a beat at each stop, meets a big baddie at a hard road's end, and comes home to the result card and the barn.*
+*The picture is the first mockup, drawn before the fights. As built (`src/game/missionview.ts`), the scene reads as follows: the team walks its road, stands for a beat at each challenge, fights each pack of little enemies on the way and the region's boss at the road's end, and comes home to the result card and the barn.*
 
 - **The scene is the timer (B5, confirmed).** The scene lasts exactly as long as the trip, and it is a pure function
   of the trip and the world's clock (`sceneAt(sim, trip)`): E, the time since the team left the Aerie, runs 0..L (L =
   the trip's return less its departure: 1, 2 or 3 game days). Nothing in it is stepped or saved, and the simulation
   never reads it, so a frozen view (`t=`) and a view opened half way along show the same road.
-- **The trip is a road with the challenges as stops** (trip.ts: challenge i of n at (i+1)/(n+1) x 0.85 of the length,
-  the baddie at 0.9). At each stop the team stands for its **beat**: min(600, 0.08 L) steps (10 s at 1x), a baddie's
-  min(900, 0.12 L). The travel time n is E less the beats' time so far, so the walk pauses while a beat plays.
+- **The trip is a road with the challenges and the fights as stops** (trip.ts, missionview.ts: stop i of the K before
+  the boss at (i + 1)/(K + 1) of the way to the boss's fight, which starts at L less its own length and a short tail --
+  min(240, 0.02 L) -- so it ends just before the trip does). At each challenge the team stands for its **beat**:
+  min(600, 0.08 L) steps (10 s at 1x); a pack's fight takes min(720, 0.07 L), the boss's min(1500, 0.13 L) (25 s). The
+  travel time n is E less the stops' time so far, so the walk pauses while a stop plays.
   - **Covered:** its counter has its moment 15 % into the beat, the others stand: dusk, fire, lightning, water and spike
     breathe, rock heaves (`happy`), slinkwing calls; a rider waves (Charm), kneels to pet (Medic), hushes (Navigator)
     or cheers (Nimble). Half way through, the set piece shows the challenge met (the miller, grumpy until then, is
@@ -854,20 +887,37 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   s n (the frames' moves summed, the last one's in part): each step exactly s times the move of the frame it is in.
   Pair 1's dragon walks 170 px behind pair 0's; each rider 56 px ahead of their dragon's root, a step behind it in
   depth, walking at V. The camera keeps the team's middle 260 px from the left edge. The road's feet are at y 300.
-- **The big baddie** (a hard mission in Old Mine Road, Highfold or Frostmere): its beat is split 25 / 35 / 40 %. It
-  walks in from the right to 200 px ahead of the lead, grumpy; turns surprised as its two counters have their moments
-  in turn (the dragon's, then the rider's); then it takes its exit -- the Mole King **calmed** (sits and
-  dozes off, "z"s stepping up), the Storm Roc **outwitted** (turns and wanders off the wrong way) or the Frost Giant
-  **driven off** (shuffles off to colder hills, grumbling, dust at its feet). Each exit is the art kit's own
-  (`exitLook`): the two that leave go up the road ahead of the team, on until they are off the screen's right edge, never
-  back through the team. It takes it on every trip, a failure's too: a baddie nobody met leaves the same way in its
-  own time ("THE MOLE KING - NOBODY COULD HELP, BUT IT CURLS UP AND DOZES"), and the team walks on to the road's end.
-  No knockback, no hurt pose, nothing flung (B8).
-- **What you see.** A banner at the top names the stop as it is reached, then how it went (with a check mark when it
-  was met), and stays up until the next stop. When the trip's time is up, at the road's end, a **result card**: the
-  pass or the fail, told here and nowhere before -- HOME SAFE! or NOT THIS TIME -- the coin (half on a failure) and
-  the egg if one was won, and "NOBODY IS HURT."; a tap puts it away. Until then a team that will fail is drawn exactly
-  as one that will succeed (`sceneAt` never reads the outcome: sim-check 24 reads both at every step of eight trips).
+- **A pack's fight** (B8, 5.3; every road has 2 to 4): the banner names them ("MOLE MINERS!") and the pack -- 2 or 3
+  of the region's little enemies, fierce -- runs in from the right to stand 118 px ahead of the lead dragon, 30 px
+  apart, while the riders step back behind their dragons (22 px behind the root, each at their own walk's pace: never in
+  the line of fire). Then a foe at a time, nearest first: it hops at the lead dragon and throws its region's missile in
+  a lobbed arc (a clod, a pebble, a burr, a zap, a snowball or an ember: `fightfx.ts`), which lands in a spark and a pale
+  flash on the dragon -- a shrug of a hit, no more -- and a dragon breathes back (the dragons in turn, the breath anim:
+  the element's bolt leaves the mouth at the snap frame and flies low and quick), a spark and the foe's own flash and
+  hurt face where it lands, and a moment later the foe goes up in a puff of smoke. With the last one gone the riders step
+  forward again, the dragons cheer (happy), the banner says how it went with its check ("MOLE MINERS - COBBLE AND ECHO
+  FIGHT THEM OFF") and the team walks on. A pack is always beaten.
+- **The boss's fight** (the road's end, on every road): the boss walks in from the right to 200 px ahead of the lead,
+  fierce, its banner up ("THE MOLE KING!") and its **health bar** under the banner (20 segments, which only ever go
+  down); the riders step back. Five times a dragon breathes at it (the dragons in turn), each hit a spark, the boss's
+  flash and hurt face, and a chunk off the bar in proportion to the breather's power -- a dragon on the boss's weak spot
+  hits harder, "WEAK SPOT!" popping up over the hit -- and after each but the last the boss winds up and throws its
+  region's missile back, big, at a dragon (the two in turn). When the team's power reaches the boss's might (5.3), the
+  fifth hit empties the bar and knocks it down: it sits, dazed, stars circling its head, for about 4 s; then it
+  scrambles up and runs off, dust at its feet ("THE MOLE KING - COBBLE AND ECHO WIN THE FIGHT: IT RUNS OFF"), and the
+  team cheers. A boss too strong for the team is fought just the same, but the five hits take only the team's power's
+  share of its might off its bar (half of it, against a lone adult on a hard road), its last throw is its finish, at
+  every dragon, and it stomps off unbeaten, as fierce as it came ("THE BRIAR BOAR - TOO STRONG FOR ECHO: IT STOMPS OFF
+  UNBEATEN"). Either way it leaves up the road ahead of the team, on until it is off the screen's right edge, never
+  back through the team, and the team walks on to the road's end: how the fight goes is the team's, known at SEND, and
+  never the trip's outcome (5.5). A fight never wounds (B8): no blood, no dragon or keeper knocked down or hurt-faced,
+  a hit on the team a spark and a flash; only the enemies look fierce, hurt or dazed.
+- **What you see.** A banner at the top names the stop as it is reached ("THORN SPRITES!" for a fight), then how it
+  went (with a check mark when it was met), and stays up until the next stop; in the boss's fight its health bar sits
+  under it. When the trip's time is up, at the road's end, a **result card**: the pass or the fail, told here and
+  nowhere before -- HOME SAFE! or NOT THIS TIME -- the coin (half on a failure) and the egg if one was won, and "NOBODY
+  IS HURT."; a tap puts it away. Until then a team that will fail is drawn exactly as one that will succeed, its fights
+  too (`sceneAt` never reads the outcome: sim-check 24 reads both at every step of eight trips).
 - **Leaving.** The scene is an overlay over the barn (under the top bar, which stays); the world keeps stepping under
   it at the chosen speed, and its toasts (life's news, a landing, the dawn's tip) show over the scene too, low on the
   verge under the road. "← BACK TO BARN" (or Esc) closes it, and the TEAM OUT chip under the top bar (a trip out:
@@ -877,7 +927,10 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   barn and takes that keeper, as it does there.
 - **Built from data, not animated per mission.** A region is its climate's backdrop in parallax layers, and a set
   piece per challenge (a cave mouth, a boulder cart, a snowdrift, a storm cloud, a ford, a bramble arch, a signpost,
-  the mill, a bandaged bird, a fog bank behind the team, two rocks); the beats are the rig's own anims.
+  the mill, a bandaged bird, a fog bank behind the team, two rocks), its little enemies and its boss (the art kit's
+  poses: walk, stand, attack, hit, and a boss's down and flee) and its missile; the beats and the breaths are the rig's
+  own anims, and every fight is laid out from the road and the team (who breathes, what flies where and when) -- the
+  same trip gives the same fight, frame for frame.
 - **The dark** follows section 1: in the tunnel only the lamp's pool of light is open, stepped in flat rings (no
   gradients).
 - **Back to the barn.** At the trip's return the team lands on the sky bridge and walks back onto the Aerie deck (the
@@ -888,17 +941,21 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
 - **Status (built).** The scene watches the trip that is out: the one the Map Room sent (`sim.missions.trip`: 5), from
   its muster (the team at the road's start) to its landing (the result card). Its dragons are away (place `away`) from
   the Aerie to the landing and are not drawn in the barn; the scene draws them. The trip's log (its stops and the time
-  left) opens over the scene (TRIP LOG). `view=base&preset=trip&trip=<region>:<progress>[:fail]`
-  puts a team of two pairs away on the region's hard mission that far along its road at the frozen step -- the world's
+  left) opens over the scene (TRIP LOG). `view=base&preset=trip&trip=<region>:<progress>[:fail][:weak]`
+  puts a team of two pairs (or, `:weak`, a lone pair too weak for the boss) away on the region's hard mission that far along its road at the frozen step -- the world's
   own trip, as a sent team is once it has left the Aerie, built from the Map Room's own tables and rules
   (`src/game/tripdemo.ts`: `regions.ts`, and `missions.ts` autoRider, oddsOf and roadOf; missions.ts awayNow), the
-  outcome as asked -- and `panel=watch` opens the scene. The climates (in parallax: the far ridge at 0.2 of the camera, the near forms at 0.5,
-  each climate at its own phase of the day), the set pieces, the three baddies and the grumpy miller (at the `miller`
+  outcome as asked -- and `panel=watch` opens the scene (`trip=oldmine:0.1245`: the first fight, COBBLE's bolt in
+  flight at the Mole Miners; `oldmine:0.9588`: the Mole King's fight, its bar at 80 % and its big pebble in flight;
+  `oldmine:0.9833`: knocked down, seeing stars; `bramblewood:0.9865:weak`: the Briar Boar, too strong for a lone pair,
+  stomping off unbeaten). The climates (in parallax: the far ridge at 0.2 of the camera, the near forms at 0.5,
+  each climate at its own phase of the day), the set pieces, the six bosses, the six packs of little enemies, the
+  fights' marks and missiles and the grumpy miller (at the `miller`
   stop, grumpy until the Charm rider's moment has talked him round) are the mission art kit's (ART_BIBLE 5.10: `backdrops.ts`,
-  `setpieces.ts`, `baddies.ts`, `npcs.ts`, `missionicons.ts`); the riders carry
+  `setpieces.ts`, `baddies.ts`, `foes.ts`, `fightfx.ts`, `npcs.ts`, `missionicons.ts`); the riders carry
   the kit's saddle; the dragons and riders are the real rigs. The scene's ground under its road (`ROAD_SCENE`: the slab,
-  the grass strip, the earth) sits between the baddies' dark and mid fills (L 0.19 to 0.27), so palette gate (x) holds
-  every baddie's edge fill 25 % from it as well as from the road and its region's climate bands.
+  the grass strip, the earth) sits between the enemies' dark and mid fills (L 0.19 to 0.27), so palette gate (x) holds
+  every boss's and foe's edge fill 25 % from it as well as from the road and its region's climate bands.
 
 ---
 
@@ -1038,7 +1095,12 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   a nest that isn't one, two in one nest; or a garden it couldn't keep: a dragon in a place this build hasn't got, a
   resident that isn't an elder or has a slot, two on one plot, fewer plots than residents) starts a new barn, with a toast ("NEW BARN: THE OLD SAVE DIDN'T
   FIT"), and the old save is kept aside at `dragon-care/base.bak`; nothing of it is swapped in until the whole trial
-  has passed, so a broken save never freezes the page or is written back. **The tests and `t=` are exempt:** a frozen
+  has passed, so a broken save never freezes the page or is written back. **One older version is read:** a barn saved
+  by the build before the fights (version 9, `MIGRATES_FROM`) is kept aside at `dragon-care/base.bak` all the same, then
+  loaded and brought up to date -- every mission on its board and the trip out get their road's fights (the region's
+  boss and little enemies, the might, fights and packs of its difficulty), a trip out has its road laid again from the
+  outcome it already rolled (its team, success and egg as they were), and its next save is version 10 -- so a player's
+  barn survives the update. **The tests and `t=` are exempt:** a frozen
   page (`t=`), a preset page, a page given `hour=`, `save=0` and every headless check never read or write it, so `t=`
   always shows the new game (or the preset) stepped t times at 1x, whatever the browser holds.
 - **Seeded.** Every random choice (a mission's roll, a starting need, a keeper's tie-break) goes through the engine's
@@ -1064,8 +1126,9 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
 | Night you can see (#8): moonlit walls and shell, never a dragon or a floor | built | 7 |
 | Take a keeper (#6): tap, WASD, E, Esc, the touch pad | built | 4.10 |
 | Missions I (#5, #11): the Map Room's table, the world map, the team, the trip from the Aerie, rewards | built | 5 |
-| Missions II (#5): the watchable scene, challenges on the road, big baddies | built | 6 |
-| The mission art kit: climates, set pieces, baddies, the grumpy miller, icons | built | ART_BIBLE 5.10 |
+| Missions II (#5): the watchable scene, challenges on the road | built | 6 |
+| Missions III: fights on every road -- packs of little enemies between the challenges, the region's boss fought at the end (B8 as amended); a version-9 barn brought up to them | built | B8, 5.3, 6 |
+| The mission art kit: climates, set pieces, bosses and little enemies, the fights' marks, the grumpy miller, icons | built | ART_BIBLE 5.10 |
 
 1. **Needs and jobs.** Built. Run `npm run dev` and open `index.html` (this is the game's default page; `?view=base`
    still names it, for the gallery's other debug views): drag to look around, and tap a bubble, a job chip or a
@@ -1116,11 +1179,13 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    `panel=mission&mission=0..2` (the table open at the first frame; such a page never loads or saves) and
    `preset=muster` (THE LOST NEST sent at once: the team is all on the deck at step 2186).
    **Watching a mission is built too** (6): the TEAM OUT chip opens the scene of the team out on its road --
-   the stops and their beats, the banners, the big baddie's beat and its cozy exit, the result card, the trip's log
-   (TRIP LOG) and BACK TO BARN. `preset=trip&trip=<region>:<progress>[:fail]` puts a team away on a hard mission that far
-   along (`trip=oldmine:0.906&panel=watch&t=60`: the Mole King in its beat; `oldmine:0.921` dozing off; `highfold`,
-   `frostmere` the Storm Roc and the Frost Giant; `bramblewood:0.7:fail` a team that will fail, on its road just where
-   the one that succeeds is; `oldmine:1` the result card, `bramblewood:1:fail` a failure's).
+   the stops and their beats, the fights with the packs of little enemies and with the boss at the road's end, the
+   banners, the result card, the trip's log (TRIP LOG) and BACK TO BARN. `preset=trip&trip=<region>:<progress>[:fail]
+   [:weak]` puts a team away on a hard mission that far along (`trip=oldmine:0.1245&panel=watch&t=60`: the first fight,
+   with the Mole Miners; `oldmine:0.9588` the Mole King's fight, and every region's boss at the same progress;
+   `oldmine:0.9833` knocked down, seeing stars; `oldmine:0.99` running off; `bramblewood:0.9865:weak` a lone pair too
+   weak for the Briar Boar, which stomps off unbeaten; `bramblewood:0.7:fail` a team that will fail, on its road just
+   where the one that succeeds is; `oldmine:1` the result card, `bramblewood:1:fail` a failure's).
 
    ![The built game, 30 s in (11:00), at the start camera: BRAMBLE rests in the ground floor's Grooming Parlour and ECHO in the hayloft's, while Bea walks east past them for the ball RIPPLE wants (RIPPLE's tail in the Bathhouse, on its way to the ground floor's Romp Room); off to the east EMBER sleeps in the ground floor's Lamp Dorm, IRIS goes to tuck ZAP in upstairs and WICK, moved on, heads for a kitchen -- no dragon has needed the lift yet, every need met on its own floor; the top bar with the badges, COIN, BARN 7/12 and MAP](base/base_live.png)
 
@@ -1133,16 +1198,16 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    | `src/game/clock.ts` | the day's length and phases, the speeds, reading the clock (the day, the time, the phase and the sky's stepped turn) |
    | `src/game/sky.ts` | the sky behind the building, in screen space: the bands, the far hills and clouds, the moon and the stars |
    | `src/game/hud.ts` | the top bar (the clock, the jobs, the keepers' badges -- tappable: 4.10 -- the coin, the barn's dragons against its cap, NEW, pause, the speed, MAP), the toasts, the hint, and while a keeper is held the touch pad, the line over it and the portrait line |
-   | `src/game/storage.ts` | the only code that touches the browser's storage: load the barn (or set aside one that doesn't fit), save it, forget it |
+   | `src/game/storage.ts` | the only code that touches the browser's storage: load the barn (or set aside one that doesn't fit; a version-9 barn is set aside too, then loaded and brought up to date), save it, forget it |
    | `src/game/start.ts` | the starting base: the rooms of section 3 (a need's rooms repeated on the floors), seven newly adult dragons (one per element, 0 days into adulthood), each in a slot of its own need's room, and the four named keepers at their fixed stations |
    | `src/game/presets.ts` | code-built starts for views that need what a new game hasn't got (`ages`: every stage; `twelve`: the capacity benchmark, the barn at its cap; `capped`: it with an egg waiting in plain view; `growup`, `eggs`, `hatch`, `full` (forced over the cap); `garden`: three residents; `retire`: seven elders about to retire; `muster`: THE LOST NEST sent; `trip`: a team away on a hard mission, that far along its road: 6) |
-   | `src/game/regions.ts` | the missions' world: the six regions (climate, challenge pool, eggs, baddie, neighbours, titles, their land and pin on the map), the eleven challenges and what meets each, the baddies' two counters and cozy exits, the keepers' rider skills |
-   | `src/game/missions.ts` | the missions, DOM-free: the board rolled at dawn, who may go, auto riders, the odds, BEST TEAM, sending (the outcome, the egg and the road rolled at once), the trip (the muster, the departure over the sky bridge, away, the landing, the egg, the saddles, the rest), and the save's checks |
+   | `src/game/regions.ts` | the missions' world: the six regions (climate, challenge pool, eggs, boss and little enemies, neighbours, titles, their land and pin on the map), the eleven challenges and what meets each, the six bosses (each weak to an element) and the six kinds of little enemy, the keepers' rider skills |
+   | `src/game/missions.ts` | the missions, DOM-free: the board rolled at dawn, each road's fights (`roadFor`: the region's boss and its might, the packs of little enemies), who may go, auto riders, the team's power against the boss, the odds, BEST TEAM, sending (the outcome, the egg and the road rolled at once), the trip (the muster, the departure over the sky bridge, away, the landing, the egg, the saddles, the rest), the save's checks, and a version-9 save's missions brought up to the fights (`upgradeMissions`, `upgradeTrip`) |
    | `src/game/maptable.ts` | the Map Room's table, drawn: the world map (hatched fog, roads, HOME, pins), the mission chooser, the TEAM OUT chip and the trip's log (over the watch overlay); their tap targets |
    | `src/game/sim.ts` | the care simulation: the queue, the keepers' trips and jobs (fetch, go, wait at the stand spot, work), and Rush; no drawing, seeded, deterministic; dragons with stable ids, a clock, and its options (seed, day length, start time) |
    | `src/game/travel.ts` | the dragons on the move: each chooses a room meeting its need (on its own floor first) and takes a slot there (moving a lingerer on to its own lowest need's room, or bumping a holder for a Rush), walks and turns (lively on and off the car and across the bay: the one hurry), waits in a landing's line where it covers no eye, and rides the Dragon Lift; the lift's car and its calls; the bay rule (the shaft guard among it), and one dragon at a time in the shaft; how deep each dragon is drawn |
    | `src/game/gait.ts` | each element's walk at each stage as a table of per-frame root motion, the pace the simulation walks a dragon at |
-   | `src/game/save.ts` | the save format: the whole world as JSON, every reference an id, loaded back exactly (`CareSim.fromSave`); the digest two runs compare |
+   | `src/game/save.ts` | the save format: the whole world as JSON, every reference an id, loaded back exactly (`CareSim.fromSave`); the digest two runs compare; the version it reads besides its own (`MIGRATES_FROM`: 9, the build before the fights) |
    | `src/game/rand.ts` | stateless draws (`rngAt(seed, tag, ...keys)`): no RNG state is ever kept or saved |
    | `src/game/building.ts`, `people.ts`, `icons.ts` | the greybox building (its rooms, the lift's shaft, car and headframe, the ladder bay, the windows, the Aerie's deck and gantry, the Garden Gate's arches), drawn at each step of the night (its colours through `surfaces.ts` `NIGHT`), and its lights by night, the keepers on the named cast's rig (`docs/KEEPERS.md`), their walks played at their pace, the bubbles and chips |
    | `src/game/life.ts` | growing up (a stage-up 30 days into a stage, applied once the dragon is settled, exact; a baby first moving to a module slot) and hatching (an egg 2 days after it was laid, into a free baby sub-slot, never hiding another's egg); the barn's cap (`BARN_CAP` 12, `barnCount`, `barnFull`: no egg hatches in a full barn) |
@@ -1151,11 +1216,12 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    | `src/game/garden.ts` | the elder garden: retiring (30 days into the elder stage), the plots it grows, the residents' nap, sit and stroll (napping only at night: the one simulation module that reads the day's phase), their resting places kept apart (clear of each other's eyes, no two bodies overlapping more than 20 px), their jobs met where they rest |
    | `src/game/gardenArt.ts` | the garden, drawn: a plot's tile (the hedge, the lawn, an apple tree on every other, a nest mound, a lantern, flowers on stalks; the path, the kerb, the ground), drawn only where it is on screen; the fence at the world's end; the lanterns' rings at night, clipped to the hedge's own shape; the GARDEN sign |
    | `src/game/control.ts` | taking a keeper by hand (4.10): the player's commands (take, steer, act, let go; and the Map Room's send), applied at the start of a step; walking and climbing by hand under the bay rule; what E does (pick up, serve, put back) and the line that says so; a keeper held saved as let go; a rider on a mission's trip never taken |
-   | `src/game/missionview.ts` | the watchable scene: the scene as a pure function of the trip and the clock (`sceneAt`: the beats, the pace from each walk's own root motion, the baddie's beat -- never the outcome), the team's characters played to it (the riders with their saddles), and its drawing (the climate, the road, the set pieces, the miller, the baddie, the banner, the result card) |
-   | The mission art kit (`src/game/backdrops.ts`, `setpieces.ts`, `baddies.ts`, `npcs.ts`, `missionicons.ts`, `cel.ts`, `missionart.ts`) | the missions' pictures (ART_BIBLE 5.10): each region's climate at every phase of the day in parallax layers, the eleven set pieces, the three big baddies (their faces, poses and cozy exits) and their portraits, the grumpy miller on the keepers' rig, the challenge and skill icons and the saddle; the gallery's `view=missionart` lays them out; the scene and the Map Room draw them from these modules |
-   | `src/game/tripdemo.ts` | the `trip` preset's mission and team: a region's mission at a difficulty from `regions.ts`, the best two pairs with the missions' own auto riders, odds and road (`missions.ts`), the outcome asked |
+   | `src/game/missionview.ts` | the watchable scene: the scene as a pure function of the trip and the clock (`sceneAt`: the beats, the pace from each walk's own root motion, the fights -- who breathes and throws what at whom and when, the hits, the boss's health, the riders stepping back -- and never the outcome), the team's characters played to it (the riders with their saddles; a dragon a hit lands on flashed flat inside its ink), and its drawing (the climate, the road, the set pieces, the miller, the foes and the boss, the bolts and missiles, the sparks, puffs and pops, the banner and the boss's bar, the result card) |
+   | The mission art kit (`src/game/backdrops.ts`, `setpieces.ts`, `baddies.ts`, `foes.ts`, `fightfx.ts`, `npcs.ts`, `missionicons.ts`, `cel.ts`, `missionart.ts`) | the missions' pictures (ART_BIBLE 5.10): each region's climate at every phase of the day in parallax layers, the eleven set pieces, the six bosses (their faces -- fierce, hurt, dazed -- and fight poses: walk, stand, attack, hit, down, flee) and their portraits, the six kinds of little enemy (the same faces; walk, stand, attack, hit), the fights' marks (each element's breath bolt, each region's missile, the spark, the puff of smoke, the stars, the pop, the boss's bar), the grumpy miller on the keepers' rig, the challenge, skill and fight icons and the saddle; the gallery's `view=missionart` lays them out; the scene and the Map Room draw them from these modules |
+   | `src/game/tripdemo.ts` | the `trip` preset's mission and team: a region's mission at a difficulty from `regions.ts`, the best two pairs (or, `:weak`, a lone pair too weak for the boss) with the missions' own auto riders, odds and road (`missions.ts`), the outcome asked |
    | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks -- at the lively step's speed too -- turns and rides; a resident's nap and wake) and their anims, the lift's car, the eggs, the grow-up's flash, the garden, the sky and the lights, the speed, the camera (out to the garden's end), the HUD (the dragon card too), the input and the overlays over the barn (one screen, one set of input rules: the Map Room's table, 5; the watch overlay, 6: the TEAM OUT chip opens it, BACK TO BARN closes it); a live page loads and saves the barn |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: the care simulation, headless, in 26 numbered sections -- routes, 30 minutes of play on three seeds checked every step (the bay rule, one dragon in the shaft, no eye under a standing body but for a moment), determinism, Rush, the start cast, saves (exact, through JSON, taken at every kind of moment), `rngAt`, the rooms (a purpose each, and every room used over the check, room by room), the gait, barn capacity and the cap, the clock and night, growing up, eggs, retirement and the garden, the missions (the board, the odds, who may go, a full trip, sends mid-act, a failure, the outcome, care with a team away), the watchable scene, and taking a keeper. The file's header lists what each section checks, and each prints what it measured. Five worker threads run the longest sections beside the rest, so the whole check keeps to about 25 s on four CPUs (the budget is 30 s on four CPUs or more, scaled up on fewer; the suite fails over it unless other work beside it kept the machine busy -- half a CPU or more on average, read from /proc/stat) |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: the care simulation, headless, in 26 numbered sections -- routes, 30 minutes of play on three seeds checked every step (the bay rule, one dragon in the shaft, no eye under a standing body but for a moment), determinism, Rush, the start cast, saves (exact, through JSON, taken at every kind of moment; a version-9 barn brought up to date), `rngAt`, the rooms (a purpose each, and every room used over the check, room by room), the gait, barn capacity and the cap, the clock and night, growing up, eggs, retirement and the garden, the missions (the board and its roads' fights, the odds and the power, who may go, a full trip, sends mid-act, a failure, the outcome, care with a team away), the watchable scene (its fights too), and taking a keeper. The file's header lists what each section checks, and each prints what it measured. Five worker threads run the longest sections beside the rest, so the whole check keeps to about 25 s on four CPUs (the budget is 30 s on four CPUs or more, scaled up on fewer; the suite fails over it unless other work beside it kept the machine busy -- half a CPU or more on average, read from /proc/stat) |
+   | `tools/fixtures/save-v9-*.json` | four barns saved by the builds before the fights (a team away half way along the Mole King's road, THE LOST NEST mustering, a day-3 board with an old four-challenge hard road; and, from the build that had every team walk its whole road, a failing team away on Highfold's): sim-check's saves section and the smoke run load them, bring them up to version 10 and step on |
    | `tools/capacity.ts` | `npm run capacity` (not in `npm run check`): the capacity benchmark -- named casts (`start7`, `eight`, `ten`, `twelve`, `thirteen`, `fifteen`) or any `7a3y2b` mix placed on the start barn (fewer than seven adults too: `0a12b`, a late game's barn of babies), 30 minutes on seeds 1 to 8, every run checked as section 2 is (a dragon mid-walk getting no more than 4 px on in 10 s, stood still or turned about on one spot, a stall) -- printed as a table with a SERVED / NOT SERVED verdict each (4.7) |
 
    Measured by `npm run sim` on the starting base (its seven dragons and four keepers, the need rooms repeated on the
@@ -1214,8 +1280,11 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    - no building of rooms (the rooms are section 3's fixed set).
 
    Missions, measured by `npm run sim` (sections 17 to 23, on the whole game: the need rooms repeated, a keeper
-   takeable): 100 boards (seeds 1-5, days 1-10) roll the same twice, day 1's always THE LOST NEST first, no baddie
-   before day 3; the odds match eight hand-computed teams (65 % and 40 % for 5.4's two examples, 95 % the top clamp);
+   takeable): 100 boards (seeds 1-5, days 1-10) roll the same twice, day 1's always THE LOST NEST first (to the Bridge
+   Troll), 127 easy, 124 normal and 49 hard roads, each with its region's little enemies and ending in its region's boss
+   (all six met), its might, fights and packs its difficulty's; the odds match eleven hand-computed teams (65 % and 40 %
+   for 5.4's two examples, 95 % the top clamp, the weak spot beating a normal road's troll at 40 % where a partnered
+   adult without it has 30 %; a young dragon's power 1, an elder's 2);
    with Bea taken by hand (a stub, and the take command: 420 asks each), no auto rider nor BEST TEAM chose her, and a
    send command with her riding was refused ("NOT ENOUGH KEEPERS HOME"). THE LOST NEST with RIPPLE and ECHO (seed 2, a
    600-step day, a success at 55 %): all on the deck 2534 steps after SEND (the muster preset's team, on the real day,
@@ -1223,21 +1292,28 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    nest 2164 steps later (its rider down the left tower and up the centre ladder to the hayloft's Hatchery) and hatched
    two days on; the Map Room used once, the Tack Room 4 times, the Aerie twice, the Bunks twice; 40 coin; FROSTMERE
    revealed at the next dawn. RIPPLE alone fails on seed 1 at 35 %: it waits out the lost things and walks on to the
-   road's end, never a step back, where the result card says NOT THIS TIME, home with 20 coin and no egg; met in full, the LOST NEST succeeds on all 20 seeds tried (BEST TEAM included). Musters sent in the middle of
+   road's end, never a step back, beating the troll there ("THE BRIDGE TROLL - RIPPLE WINS THE FIGHT: IT RUNS OFF"),
+   where the result card says NOT THIS TIME, home with 20 coin and no egg; a team too weak for the boss fights it and
+   hears "TOO STRONG FOR RIPPLE: IT STOMPS OFF UNBEATEN"; met in full, the LOST NEST succeeds on all 20 seeds tried
+   (BEST TEAM included). Musters sent in the middle of
    play (BEST TEAM, seeds 1-6, 600 and 1500 steps in) take median 2456 and at most 2845 steps (the check's bound 9000).
    With the two pairs away 30 minutes of the real day, the five dragons and two keepers home did 111 jobs, a job waited
-   23.2 s on average (89.5 s at most), and no need ever emptied. The watchable scene (section 24): eight trips read at
-   every one of 194 456 steps, each the very scene its trip ending the other way draws, 177 566 of them travel steps
-   without a skating paw, the baddie in view on 7633; the view's
-   walks on the road's frame at 2748 synced steps. Taking a keeper (section 25): BEA feeds EMBER by hand (149 steps at
+   23.2 s on average (89.5 s at most), and no need ever emptied. The watchable scene (section 24): eight trips (all six
+   regions, every difficulty, and two lone pairs too weak for their bosses) read at every one of 216 056 steps, each
+   the very scene its trip ending the other way draws, 170 069 of them travel steps without a skating paw; the boss in
+   view on 12 167, something in flight on 7444 (every rider behind their dragon on each), a hit flashing on a dragon on
+   660, 76 foes beaten, each boss the team's power beats down and then off the screen's right edge, and each too strong
+   for it (the Briar Boar against a lone pair on a hard road, the Cinder Golem on a normal one) stomping off unbeaten,
+   its bar at 50 % and 33 %; the view's walks on the road's frame at 1458 synced travel steps. Taking a keeper
+   (section 25): BEA feeds EMBER by hand (149 steps at
    work), climbs the centre ladder up and down in 141 steps each, is held 10 251 steps while 20 Rushes go on open jobs
    and is never given a job, and walks home in 515 steps once let go. The cap (section 26): the twelve at the cap send
    THE LOST NEST (the chooser's BARN FULL: THE EGG WILL WAIT, the team away and still counted on all 600 of its steps
    away), its egg laid in nest 0 at the hayloft's x 228 falls due at the cap -- one "THE BARN IS FULL" -- and hatches the
    step after EMBER, retiring, reaches the garden (step 11 783). Over the whole check every room is used, room by room
-   (section 8: the three kitchens 465, 403 and 138 times, the Hatchery 61, the Tack Room 39, the Bunks 19, the Map Room
-   11, the Garden Gate 71, and every other copy at least 35), and the suite takes about 25 s on four CPUs (25.3 s in the
-   last run, its slowest worker the `full` preset's 24.5 s, other work beside it 0.07 CPUs; the budget is 30 s on four
+   (section 8: the three kitchens 472, 408 and 143 times, the Hatchery 63, the Tack Room 41, the Bunks 19, the Map Room
+   11, the Garden Gate 70, and every other copy at least 35), and the suite takes about 25 s on four CPUs (22.6 s in the
+   last run, its slowest worker the `full` preset's 21.9 s, other work beside it 0.03 CPUs; the budget is 30 s on four
    CPUs or more, scaled up on fewer -- 60 s on two -- and the suite fails over it unless other work kept the machine
    busy, half a CPU or more).
 2. **Rooms you build:** place, merge and upgrade rooms; move dragons between them; ~~save and load~~ (built: 7). Not
@@ -1286,6 +1362,13 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   bridge (they walk at a keeper's pace, twice a dragon's); a team turning back at a failure faces home at once, with no
   paper turn; the grumpy miller has no walk (he stands at his stop). A faster lift car would shorten the muster (a
   median 2460 steps, 41 s at 1x, over 360 sends: 5.2).
+- **How deep the fights go.** A fight plays out as the team's power says, known at SEND (B4: set and forget): nothing
+  in it is the player's to choose, a road's packs of little enemies are always beaten, and the trip's pass or fail is
+  the result card's alone (B5), so a team can beat the boss and still come home to NOT THIS TIME -- whether a fight
+  should ever be the player's (a tap to breathe, a dragon to send in), and whether the boss's fight should decide or
+  tell the outcome, are asked. The
+  dragons have no hit anim (a hit on one is a pale flash over whatever it is playing; the breath is its one attack) and
+  the keepers none (they step back out of the line of fire); nobody on the team is ever knocked down (B8).
 - **Three Hearth Kitchens.** The barn capacity work read "each need is met in its own room" (the Decisions) as one
   room *kind* per need, and repeated the rooms on the floors so the barn serves twelve (4.7): does a barn of three
   Hearth Kitchens read as filler to the player, though each copy is used (3)? And with the start's seven the Dragon Lift

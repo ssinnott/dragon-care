@@ -23,11 +23,11 @@ import type { Room, RoomPlace, RoomKind, Structure, Leg, Spot, Slot, Nets } from
 import { NEED_ROOM, LEAD_PX, WAIT_MAX, KEEPER_HALF, LIVELY, stepTravel, arrived, remainingCost, ridesLeft, retarget, raiseCall, bayShut, inBay } from './travel.ts';
 import { stepLife } from './life.ts';
 import { stepGarden, standAtResident } from './garden.ts';
-import { newMissions, firstBoard, stepMissions, checkMissions, TRIP_PHASES } from './missions.ts';
+import { newMissions, firstBoard, stepMissions, checkMissions, upgradeMissions, upgradeTrip, TRIP_PHASES } from './missions.ts';
 import type { MissionsState } from './missions.ts';
 import { mix32, TAG } from './rand.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
-import { SAVE_VERSION, SaveVersionError, worldKey } from './save.ts';
+import { SAVE_VERSION, MIGRATES_FROM, SaveVersionError, worldKey } from './save.ts';
 import type { SaveV } from './save.ts';
 import { DRAGON_ELEMENTS } from '../art/dragon/palettes.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
@@ -412,13 +412,17 @@ export class CareSim {
 
   /**
    * A world from its save (save.ts serialize), exactly as it was: the rooms placed again, then every dragon, job and
-   * keeper rebuilt and their references relinked by id. A save of another version throws SaveVersionError. The life
+   * keeper rebuilt and their references relinked by id. A save of another version throws SaveVersionError, but for
+   * one of the version before (save.ts MIGRATES_FROM), whose missions are brought up to this one's as it loads. The life
    * state is checked here (the eggs, each dragon's stage start and hold), and a save whose life state this build can't
    * run throws too: an egg lies unseen and unstepped for days before it hatches or is drawn (off the start's camera), so
    * the view's trial step and draw at load (base.ts load) would never meet a bad one, and the page would freeze days on.
    */
   static fromSave(s: SaveV): CareSim {
-    if (!s || typeof s !== 'object' || s.v !== SAVE_VERSION) throw new SaveVersionError(s && typeof s === 'object' ? s.v : s);
+    if (!s || typeof s !== 'object' || (s.v !== SAVE_VERSION && s.v !== MIGRATES_FROM)) throw new SaveVersionError(s && typeof s === 'object' ? s.v : s);
+    // (a save of the version before, brought up to this one: its missions get their roads' fights, missions.ts
+    // upgradeMissions, and its trip out its road again once its dragons are here, upgradeTrip)
+    const old = s.v === MIGRATES_FROM;
     const sim = new CareSim(s.rooms, [], [], { seed: s.seed, dayLen: s.dayLen, clock0: s.clock0 });
     sim.tick = s.tick; sim.nextDragonId = s.nextDragonId; sim.nextJob = s.nextJob; sim.nextEggId = s.nextEggId;
     const whole = (v: unknown, min = -Infinity): v is number => Number.isInteger(v) && (v as number) >= min;
@@ -449,7 +453,7 @@ export class CareSim {
     const homes = new Set<number>();
     // (the missions: a board, a map and a trip this build can run -- missions.ts checkMissions; a dragon away on one
     // holds no slot, no plot, no rhythm, and is its team's)
-    const ms = checkMissions(s.missions, s.dragons, s.keepers);
+    const ms = checkMissions(old ? upgradeMissions(s.missions) : s.missions, s.dragons, s.keepers);
     for (const d of s.dragons) {
       if (!whole(d.stageSince) || !whole(d.hold, 0)) throw new Error(`save: ${d.name}'s stage began at ${d.stageSince}, its hold ${d.hold}`);
       // (its walk's speed: 1, or the lively step's -- travel.ts pace; the view plays the walk at it)
@@ -480,6 +484,7 @@ export class CareSim {
     Object.assign(sim.stats, s.stats, { used: { ...s.stats.used }, usedRoom: [...ur], doneBy: { ...s.stats.doneBy } });
     sim.lift = { ...s.lift, calls: s.lift.calls.map((c) => ({ ...c })) };
     sim.missions = ms;
+    if (old) upgradeTrip(sim);
     return sim;
   }
 

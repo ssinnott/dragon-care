@@ -100,13 +100,14 @@ export const GARDEN_RESIDENTS: readonly string[] = Object.freeze(['BRAMBLE', 'CO
 export const RETIRE_AT = RETIRE_DAYS - 0.1;
 
 /** The `trip` preset's trip when no `trip=` is given (or one that doesn't parse): half way along the Old Mine Road. */
-export const TRIP_DEFAULT: TripParam = Object.freeze({ region: 'oldmine', progress: 0.5, fail: false });
+export const TRIP_DEFAULT: TripParam = Object.freeze({ region: 'oldmine', progress: 0.5, fail: false, weak: false });
 
 /**
- * The new game with a team away on a hard mission (BASE_DESIGN 6: view=base&preset=trip&trip=<region>:<progress>[:fail]):
- * the region's hard mission (its baddie at the end of the road, if it has one), the best two pairs of the seven with
- * their auto riders and its road (tripdemo.ts demoTrip: the missions' own rider pick, odds and road, missions.ts), the
- * outcome as asked -- a success unless `:fail` -- and the team away as a sent team is once it has left the Aerie
+ * The new game with a team away on a hard mission (BASE_DESIGN 6: view=base&preset=trip&trip=<region>:<progress>[:fail]
+ * [:weak]): the region's hard mission (its fights, and its boss at the end of the road), the best two pairs of the seven
+ * with their auto riders -- or, `:weak`, a lone pair too weak for the boss -- and its road (tripdemo.ts demoTrip: the
+ * missions' own rider pick, odds and road, missions.ts), the outcome as asked -- a success unless `:fail`, told by the
+ * result card at the road's end -- and the team away as a sent team is once it has left the Aerie
  * (missions.ts awayNow: its dragons off the map, its riders away), left so long ago that at step `at` (the frozen t=;
  * 0 live) exactly `progress` of the trip's length has gone by. The world's own trip (sim.missions.trip): it lands, and
  * its riders come home, as any.
@@ -114,7 +115,7 @@ export const TRIP_DEFAULT: TripParam = Object.freeze({ region: 'oldmine', progre
 export function tripStart(param: TripParam | string | null | undefined, at = 0): StartSpec {
   const p = typeof param === 'string' || param == null ? parseTripParam(param) ?? TRIP_DEFAULT : param;
   return { ...newGame(), after: (sim) => {
-    const trip = demoTrip(sim, p.region, 'hard', !p.fail);
+    const trip = demoTrip(sim, p.region, 'hard', !p.fail, p.weak);
     const L = trip.mission.days * sim.dayLen;
     awayNow(sim, trip, sim.clock + at - Math.round(p.progress * L));
   } };

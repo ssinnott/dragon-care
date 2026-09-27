@@ -1,12 +1,12 @@
-// The world the missions go out into (docs/BASE_DESIGN.md 5): six regions, each with its climate, the
-// challenges its roads hold, the eggs it can give and (three of them) a big baddie at the end of a hard road; the
-// eleven challenges and what meets each (a dragon's element for the land's, a rider's skill for the people's); the
-// baddies' two counters each and their cozy exits (BASE_DESIGN B8: calmed, outwitted or driven off -- never fought, and nobody
-// is hurt); the four keepers' rider skills; and the Map Room table's map (each region's land and its pin). Plain data:
-// the words are missiondata.ts's (shared with the mission art and the scene), the rules are missions.ts's.
+// The world the missions go out into (docs/BASE_DESIGN.md 5): six regions, each with its climate, the challenges its
+// roads hold, the little enemies that fight the team on them, the boss at the end of every one of them, and the eggs it
+// can give; the eleven challenges and what meets each (a dragon's element for the land's, a rider's skill for the
+// people's); the bosses' might and weak spots (BASE_DESIGN 5.3: fought, B8); the four keepers' rider skills; and the
+// Map Room table's map (each region's land and its pin). Plain data: the words are missiondata.ts's (shared with the
+// mission art and the scene), the rules are missions.ts's.
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
-import type { RegionId, Climate, ChallengeId, Skill, BaddieId, BaddieExit } from './missiondata.ts';
+import type { RegionId, Climate, ChallengeId, Skill, BaddieId, FoeId } from './missiondata.ts';
 
 /** What meets a challenge: a team dragon of this element, or a rider with this skill. */
 export interface Counter { element?: DragonElement; skill?: Skill }
@@ -31,13 +31,27 @@ export const CHALLENGES: Readonly<Record<ChallengeId, { name: string; word: stri
 });
 
 /**
- * The big baddies (BASE_DESIGN 5.3, 6): each needs both of its counters on the team (a dragon's element and a rider's skill),
- * and leaves the road its own cozy way on a success (BASE_DESIGN B8). There is no hurt state anywhere in this data.
+ * The bosses (BASE_DESIGN 5.3, 6): one at the end of every road of its region, fought (B8). The team beats one when its
+ * power reaches the boss's might (missions.ts powerOf: a dragon's stage, and more from one of the element the boss is
+ * weak to: `weak`, its weak spot); `word` is the chooser's short name ("THE MOLE KING" -> "MOLE KING").
  */
-export const BADDIES: Readonly<Record<BaddieId, { name: string; counters: readonly [Counter, Counter]; exit: BaddieExit; how: string }>> = Object.freeze({
-  moleking: { name: 'THE MOLE KING', counters: [{ element: 'dusk' }, { skill: 'charm' }], exit: 'calmed', how: 'CURLS UP AND DOZES' },
-  stormroc: { name: 'THE STORM ROC', counters: [{ element: 'lightning' }, { skill: 'navigator' }], exit: 'outwitted', how: 'WANDERS OFF THE WRONG WAY' },
-  frostgiant: { name: 'THE FROST GIANT', counters: [{ element: 'fire' }, { skill: 'nimble' }], exit: 'drivenOff', how: 'GRUMBLES OFF TO COLDER HILLS' },
+export const BADDIES: Readonly<Record<BaddieId, { name: string; word: string; weak: DragonElement }>> = Object.freeze({
+  bridgetroll: { name: 'THE BRIDGE TROLL', word: 'TROLL', weak: 'spike' },
+  moleking: { name: 'THE MOLE KING', word: 'MOLE KING', weak: 'dusk' },
+  briarboar: { name: 'THE BRIAR BOAR', word: 'BOAR', weak: 'rock' },
+  stormroc: { name: 'THE STORM ROC', word: 'ROC', weak: 'lightning' },
+  frostgiant: { name: 'THE FROST GIANT', word: 'GIANT', weak: 'fire' },
+  cindergolem: { name: 'THE CINDER GOLEM', word: 'GOLEM', weak: 'water' },
+});
+
+/** The little enemies (BASE_DESIGN 5.3, 6): a pack of them fights the team between the challenges of every road of their region, and is always beaten. */
+export const FOES: Readonly<Record<FoeId, { name: string }>> = Object.freeze({
+  mudgoblin: { name: 'MUD GOBLINS' },
+  moleminer: { name: 'MOLE MINERS' },
+  thornsprite: { name: 'THORN SPRITES' },
+  stormimp: { name: 'STORM IMPS' },
+  frostimp: { name: 'FROST IMPS' },
+  cinderimp: { name: 'CINDER IMPS' },
 });
 
 /** The four keepers ride with these skills (docs/KEEPERS.md 2): Bea charms, Tomas mends, Iris finds the way, Pip slips through. */
@@ -55,13 +69,15 @@ export interface Region {
   pool: readonly ChallengeId[];
   /** The elements of the eggs it gives. */
   eggs: readonly DragonElement[];
-  baddie: BaddieId | null;
+  /** The boss at the end of its roads, and the little enemies on them. */
+  baddie: BaddieId;
+  foe: FoeId;
   neighbours: readonly RegionId[];
   /** Explored from the start (else revealed at the dawn after a success in a neighbour). */
   start: boolean;
-  /** Mission titles (a board draws one), and a hard road's title when it ends in the baddie. */
+  /** Mission titles (a board draws one), and a hard road's: the boss's own ground. */
   titles: readonly string[];
-  baddieTitle?: string;
+  baddieTitle: string;
   /** Its land on the Map Room's map (screen px, the map panel's own: an outline's x, y pairs) and its pin's point. */
   map: { poly: readonly number[]; pin: readonly [number, number] };
 }
@@ -78,23 +94,23 @@ function land(cx: number, cy: number, rx: number, ry: number, k: readonly number
 
 /** The six regions (BASE_DESIGN 5.1), in the order they are indexed (a board's difficulty draw keys on the index). */
 export const REGIONS: readonly Region[] = Object.freeze([
-  { id: 'millbrook', name: 'MILLBROOK', climate: 'meadow', word: 'MILD MEADOWS', pool: ['flood', 'miller', 'hurt', 'lost'], eggs: ['water', 'spike'], baddie: null,
-    neighbours: ['frostmere', 'bramblewood'], start: true, titles: ['THE MILL RACE', 'MEADOW ERRANDS', 'THE BROOK BRIDGE'],
+  { id: 'millbrook', name: 'MILLBROOK', climate: 'meadow', word: 'MILD MEADOWS', pool: ['flood', 'miller', 'hurt', 'lost'], eggs: ['water', 'spike'], baddie: 'bridgetroll', foe: 'mudgoblin',
+    neighbours: ['frostmere', 'bramblewood'], start: true, titles: ['THE MILL RACE', 'MEADOW ERRANDS', 'THE BROOK BRIDGE'], baddieTitle: 'UNDER THE TROLL BRIDGE',
     map: land(262, 266, 70, 44, [1.0, 0.92, 1.05, 0.96, 1.08, 0.94, 1.0, 1.06, 0.9, 1.02]) },
-  { id: 'oldmine', name: 'OLD MINE ROAD', climate: 'caves', word: 'DRY HILLS AND CAVES', pool: ['dark', 'heavy', 'lost', 'gap'], eggs: ['rock', 'dusk'], baddie: 'moleking',
+  { id: 'oldmine', name: 'OLD MINE ROAD', climate: 'caves', word: 'DRY HILLS AND CAVES', pool: ['dark', 'heavy', 'lost', 'gap'], eggs: ['rock', 'dusk'], baddie: 'moleking', foe: 'moleminer',
     neighbours: ['highfold', 'emberfell'], start: true, titles: ['THE DEEP SEAM', 'LANTERN RUN', 'THE OLD CART TRACK'], baddieTitle: 'THE MOLE KING\'S HALL',
     map: land(410, 186, 64, 42, [0.95, 1.05, 0.9, 1.04, 0.98, 1.08, 0.92, 1.0, 1.06, 0.94]) },
-  { id: 'bramblewood', name: 'BRAMBLEWOOD', climate: 'forest', word: 'DEEP FOREST', pool: ['thorns', 'lost', 'fog', 'hurt'], eggs: ['spike', 'slinkwing'], baddie: null,
-    neighbours: ['highfold', 'millbrook'], start: true, titles: ['THE THICKET', 'MOSSY HOLLOW', 'THE OWL WOOD'],
+  { id: 'bramblewood', name: 'BRAMBLEWOOD', climate: 'forest', word: 'DEEP FOREST', pool: ['thorns', 'lost', 'fog', 'hurt'], eggs: ['spike', 'slinkwing'], baddie: 'briarboar', foe: 'thornsprite',
+    neighbours: ['highfold', 'millbrook'], start: true, titles: ['THE THICKET', 'MOSSY HOLLOW', 'THE OWL WOOD'], baddieTitle: 'THE BRIAR BOAR\'S DEN',
     map: land(168, 150, 68, 46, [1.04, 0.94, 1.0, 1.08, 0.92, 1.0, 1.06, 0.95, 1.02, 0.9]) },
-  { id: 'highfold', name: 'HIGHFOLD', climate: 'peaks', word: 'STORMY PEAKS', pool: ['storm', 'cold', 'fog', 'gap'], eggs: ['lightning', 'slinkwing'], baddie: 'stormroc',
+  { id: 'highfold', name: 'HIGHFOLD', climate: 'peaks', word: 'STORMY PEAKS', pool: ['storm', 'cold', 'fog', 'gap'], eggs: ['lightning', 'slinkwing'], baddie: 'stormroc', foe: 'stormimp',
     neighbours: ['oldmine', 'bramblewood', 'emberfell'], start: false, titles: ['THE HIGH PASS', 'THUNDER RIDGE', 'THE GOAT PATH'], baddieTitle: 'THE STORM ROC\'S CRAG',
     map: land(322, 94, 66, 42, [0.92, 1.06, 1.0, 0.94, 1.08, 0.96, 1.02, 0.9, 1.05, 1.0]) },
-  { id: 'frostmere', name: 'FROSTMERE', climate: 'ice', word: 'FROZEN LAKE', pool: ['cold', 'flood', 'gap', 'hurt'], eggs: ['fire', 'water'], baddie: 'frostgiant',
+  { id: 'frostmere', name: 'FROSTMERE', climate: 'ice', word: 'FROZEN LAKE', pool: ['cold', 'flood', 'gap', 'hurt'], eggs: ['fire', 'water'], baddie: 'frostgiant', foe: 'frostimp',
     neighbours: ['millbrook', 'emberfell'], start: false, titles: ['THE ICE ROAD', 'THE THAW', 'SNOWBOUND'], baddieTitle: 'THE FROST GIANT\'S PASS',
     map: land(488, 266, 66, 42, [1.02, 0.96, 1.06, 0.92, 1.0, 1.04, 0.94, 1.08, 0.96, 1.0]) },
-  { id: 'emberfell', name: 'EMBERFELL', climate: 'ash', word: 'WARM ASH HILLS', pool: ['heavy', 'dark', 'storm', 'miller'], eggs: ['fire', 'lightning', 'dusk'], baddie: null,
-    neighbours: ['highfold', 'frostmere', 'oldmine'], start: false, titles: ['THE CINDER FIELDS', 'THE HOT SPRINGS', 'ASHFALL'],
+  { id: 'emberfell', name: 'EMBERFELL', climate: 'ash', word: 'WARM ASH HILLS', pool: ['heavy', 'dark', 'storm', 'miller'], eggs: ['fire', 'lightning', 'dusk'], baddie: 'cindergolem', foe: 'cinderimp',
+    neighbours: ['highfold', 'frostmere', 'oldmine'], start: false, titles: ['THE CINDER FIELDS', 'THE HOT SPRINGS', 'ASHFALL'], baddieTitle: 'THE GOLEM\'S FORGE',
     map: land(548, 116, 58, 44, [0.96, 1.04, 0.92, 1.06, 1.0, 0.94, 1.08, 1.0, 0.9, 1.04]) },
 ] as Region[]);
 

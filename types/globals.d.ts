@@ -84,10 +84,11 @@ interface Window {
      * whether the trip's log is open over the watch overlay (`log`); and the chooser's line about the egg (`notice`:
      * `HATCHERY FULL: NO EGG`, `BARN FULL: THE EGG WILL WAIT` at the barn's cap, or null -- null too on any other screen).
      * The watchable scene (BASE_DESIGN 6): `scene`, while a trip is out (null
-     * otherwise): the last stop the team reached (`baddie` or its challenge; null before the first), whether it was met,
-     * whether its beat is playing, the banner, the baddie on the road (its id, face and pose; null when none is in view),
-     * its exit (once it is the last stop reached), how far along the trip is (0..1), and once its time is up, the result
-     * card's title (the trip's pass or fail: nothing before it tells which).
+     * otherwise): the last stop the team reached (`foes`, `baddie` or its challenge; null before the first), whether it
+     * was met, whether its beat is playing, the banner, the boss on the road (its id, face and pose; null when none is in
+     * view) and its health bar (0..1 while its fight is on, else null), how many foes are in view and how many bolts and
+     * missiles are in flight, how far along the trip is (0..1), and once its time is up, the result card's title (the
+     * trip's pass or fail: nothing before it tells which).
      * Barn capacity (BASE_DESIGN 4.7): the barn's dragons against its cap (`count`: every dragon not living in the garden,
      * those away on a mission too -- life.ts barnCount -- and `cap`, life.ts BARN_CAP; a preset may hold more than the
      * cap). The toast showing, if any (`toast`, its text).
@@ -125,9 +126,10 @@ interface Window {
         pins: { x: number; y: number; w: number; h: number }[]; buttons: Record<string, { x: number; y: number; w: number; h: number }>;
         chip: { x: number; y: number; w: number; h: number } | null; back: { x: number; y: number; w: number; h: number } | null; log: boolean;
         notice: 'HATCHERY FULL: NO EGG' | 'BARN FULL: THE EGG WILL WAIT' | null };
-      scene: { stop: string | null; covered: boolean | null; beat: boolean; banner: string | null; baddie: 'moleking' | 'stormroc' | 'frostgiant' | null;
-        face: 'neutral' | 'grumpy' | 'surprised' | 'sleepy' | null; pose: 'walk' | 'stand' | 'sit' | 'turn' | 'leave' | null;
-        exit: 'calmed' | 'outwitted' | 'drivenOff' | null; progress: number; done: boolean; result: string | null } | null;
+      scene: { stop: string | null; covered: boolean | null; beat: boolean; banner: string | null;
+        baddie: 'bridgetroll' | 'moleking' | 'briarboar' | 'stormroc' | 'frostgiant' | 'cindergolem' | null;
+        face: 'fierce' | 'hurt' | 'dazed' | null; pose: 'walk' | 'stand' | 'attack' | 'hit' | 'down' | 'flee' | null; bar: number | null;
+        foes: number; shots: number; progress: number; done: boolean; result: string | null } | null;
       barn: { count: number; cap: number };
       /** The toast showing now, if any (its text). */
       toast: string | null };

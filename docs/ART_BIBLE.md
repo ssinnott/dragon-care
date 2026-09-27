@@ -28,9 +28,9 @@
 
 **Where this came from.** Three art directors proposed designs independently, from three lenses: readability (R), charm (C) and growth (G). This bible takes the strongest idea for each decision rather than averaging, and says where each one came from. Readability constraints are **hard rules**. No decision below trades one away. v2 was proposed the same way: an elder-stage proposal (**EL**), two independent seventh-element proposals (**NA**, "Vesper", and **NB**, "Wisp"), and a spike-and-water proposal (**SW**), each prototyped in a scratch copy of the rig; the lead art director took one seventh element, grafted the best of the other onto it, and re-ran every colour through the extended palette check (Decisions (v2)).
 
-**Status.** v1 is built: the quadruped rig, the shared features and all six v1 elements, each finished by its own element artist, reviewed and integrated (the **Element pass** in the Review log), live in `src/art/dragon/` (file list in 1.1). Built: the core animation set of 4.2 per stage (idle with its variants, walk, happy, eat, sleep and wake, breath, pet, beg), authored as tracks from the 4.1 stage timing rules and tuned per element by the generic knobs of 4.3; every element's signature breath, baby fizzle, idle fidget (section 3) and 4.3 column (walk, happy flourish, hungry tell, sleep pose); the element anims fire's `bath`, rock's `upset` tuck and slinkwing's lonely `call`; rock's roll-over happy and the E8 fan flop; a turn in place (a paper turn: 4.1) and a head that looks back over its shoulder (a head pitched past vertical: 4.1). **Not built yet:** the anims grow-up, hopGlide, fly and rock's boulder hop, play, refuse and zap, and the other elements' baths; water floating belly-up (the habitat has no water) and spike's shed quills (a collectible). The game's side of the care loop does not exist yet: nothing consumes `event: 'shriek'`, `'call'` or `'hush'` (nor plays dusk's `tuckin` on a tuck-in: `ELEMENT_ANIM_FALLBACK` names every other element's sleep for it), the pebble pile of rock's hungry tell is drawn by rock rather than placed as a habitat prop, and `bond` (DrawDragonOpts) is fed only by the gallery (its `bond` query). **The game's pet renderer** (the base, `src/game/base.ts` and `pet.ts`) now feeds `charge` from lightning's play need and runs the wary latch and the crowd rule (5.4) every step, which matters now that its dragons walk past each other: it walks each dragon by its walk anim's own root motion (the simulation moves the body by each frame's `move` at speed 1 and the view plays that walk from the start of every bout, `src/game/gait.ts`, so a planted paw holds still on the floor -- with one exception, the base's **lively step** (BASE_DESIGN 2): stepping on and off the Dragon Lift's car and crossing its bay, a dragon's walk plays at 2x and the simulation moves its body by exactly twice each frame's `move`, so the paws stay planted there too; a dragon never hurries anywhere else, and keepers never walk lively), turns it with the paper turn (4.1) and carries it on the Dragon Lift's car. Each element file's header lists what it draws. **The mission art kit is built** (5.10): the six climates at every phase, the eleven set pieces, the three big baddies (faces, poses, cozy exits, gate x), the grumpy miller on the keepers' rig and the mission icons, laid out by the gallery's `view=missionart`; the watchable scene (5.11) and the Map Room's chooser (the climate picture, the icons, the baddies' portraits) draw them, and the riders carry its saddle. **Stand-ins the game draws** (each a follow-up for the anim it stands in for): **the grow-up** is the new stage's body swapped in, flat in `glow.hi` inside its own ink for 12 f, then `happy` (4.2's 240 f grow-up with its "look at me" is not built); **`fly`** -- a mission's team leaves the Aerie and lands on it by walking over a sky bridge off its west end, its walk as ever (rock and the young could not fly anyway: docs/BASE_DESIGN.md 5.2), and hopGlide and rock's boulder hop have no stand-in and are not played; **the keepers' climb** is their `idle` held on the ladder, by hand or not (the keeper cast has no climb anim: docs/KEEPERS.md); and the grumpy miller has no walk (he stands at his stop). Follow-ups: those anims, then the per-element baths, play, refuse and zap above.
+**Status.** v1 is built: the quadruped rig, the shared features and all six v1 elements, each finished by its own element artist, reviewed and integrated (the **Element pass** in the Review log), live in `src/art/dragon/` (file list in 1.1). Built: the core animation set of 4.2 per stage (idle with its variants, walk, happy, eat, sleep and wake, breath, pet, beg), authored as tracks from the 4.1 stage timing rules and tuned per element by the generic knobs of 4.3; every element's signature breath, baby fizzle, idle fidget (section 3) and 4.3 column (walk, happy flourish, hungry tell, sleep pose); the element anims fire's `bath`, rock's `upset` tuck and slinkwing's lonely `call`; rock's roll-over happy and the E8 fan flop; a turn in place (a paper turn: 4.1) and a head that looks back over its shoulder (a head pitched past vertical: 4.1). **Not built yet:** the anims grow-up, hopGlide, fly and rock's boulder hop, play, refuse and zap, and the other elements' baths; water floating belly-up (the habitat has no water) and spike's shed quills (a collectible). The game's side of the care loop does not exist yet: nothing consumes `event: 'shriek'`, `'call'` or `'hush'` (nor plays dusk's `tuckin` on a tuck-in: `ELEMENT_ANIM_FALLBACK` names every other element's sleep for it), the pebble pile of rock's hungry tell is drawn by rock rather than placed as a habitat prop, and `bond` (DrawDragonOpts) is fed only by the gallery (its `bond` query). **The game's pet renderer** (the base, `src/game/base.ts` and `pet.ts`) now feeds `charge` from lightning's play need and runs the wary latch and the crowd rule (5.4) every step, which matters now that its dragons walk past each other: it walks each dragon by its walk anim's own root motion (the simulation moves the body by each frame's `move` at speed 1 and the view plays that walk from the start of every bout, `src/game/gait.ts`, so a planted paw holds still on the floor -- with one exception, the base's **lively step** (BASE_DESIGN 2): stepping on and off the Dragon Lift's car and crossing its bay, a dragon's walk plays at 2x and the simulation moves its body by exactly twice each frame's `move`, so the paws stay planted there too; a dragon never hurries anywhere else, and keepers never walk lively), turns it with the paper turn (4.1) and carries it on the Dragon Lift's car. Each element file's header lists what it draws. **The mission art kit is built** (5.10): the six climates at every phase, the eleven set pieces, the six bosses and the six kinds of little enemy (their fierce, hurt and dazed faces and fight poses, gate x), the fights' marks (the breath bolts, the missiles, the spark, the puff of smoke, the stars, the boss's bar), the grumpy miller on the keepers' rig and the mission icons, laid out by the gallery's `view=missionart`; the watchable scene (5.11) and the Map Room's chooser (the climate picture, the icons, the bosses' portraits) draw them, and the riders carry its saddle. **Stand-ins the game draws** (each a follow-up for the anim it stands in for): **the grow-up** is the new stage's body swapped in, flat in `glow.hi` inside its own ink for 12 f, then `happy` (4.2's 240 f grow-up with its "look at me" is not built); **`fly`** -- a mission's team leaves the Aerie and lands on it by walking over a sky bridge off its west end, its walk as ever (rock and the young could not fly anyway: docs/BASE_DESIGN.md 5.2), and hopGlide and rock's boulder hop have no stand-in and are not played; **the keepers' climb** is their `idle` held on the ladder, by hand or not (the keeper cast has no climb anim: docs/KEEPERS.md); and the grumpy miller has no walk (he stands at his stop). Follow-ups: those anims, then the per-element baths, play, refuse and zap above.
 
-**v2 status: designed, reviewed and built: the colour half, the elder core and the element pass v2.** The palette is code: `src/art/dragon/palettes.ts` holds the seven base palettes and the greying transform (`agePalette`, `agedPalette`, the silvered highlight in `dragonTones`, the elder face greys `muzzleOf` / `beardOf`, with every strength as data), and `tools/palette-check.ts` runs every gate on all seven elements at all four stages (report in 5.8: **2492 of 2492 gates pass**, the water and rock beards' exempt pairs reported, not counted; gate (i) runs on every floor the base's dragons and keepers stand on, `src/game/surfaces.ts` `FLOORS` (the straw, the elder garden's pale path, and the mission road the team walks in the watchable scene), each also held under HSV S 0.20; the egg gate, counted apart, **8 of 8** (every element's egg, its baby's colour, ≥ 25 % from the Hatchery's nest straw, and the egg seen against that straw alone: 5.9); gate (w), counted apart, **4215 of 4215**, holds everything the base's dragons are seen against -- the sky at every hour of the day and night, every wall (by day, by night and at the two stepped mixes between: the base's moonlit night colours, `src/game/surfaces.ts` `NIGHT`), the elder garden's hedge, lawn, wood and fence, every layer of the six mission climates at every phase (each climate its own night, never the night table), the fog bank behind the team, the mission scene's ground under its road, and the lamps' and lanterns' light ≥ 25 % *lighter* than every dark body (L ≥ 0.159, so night stays mid-value, never black), the big props behind a slot ≥ 25 % from them either way, and all 6 Oklab L from the ink -- and no dragon is ever tinted for night: **the walls may shift with the hour, the dragons and the floors never**; gate (x), counted apart, **764 of 764**, holds each big baddie's silhouette edge apart from the road it walks, the ground under it and every band of its home climate at every phase, every fill apart from the ink, and the colours that touch inside it by the ladder: 5.10, 5.11). Water is sea green and the sandstone a touch warmer in the rig today. **The elder core is built** in the shared rig (the Review log's **Elder core** entries): the elder in `Stage` and every per-stage table (`STAGE_DIMS.elder`, `STAGE_TIMING`, `TAIL_CHAIN`, the fidget's `FIDGET_TIMING`), every stage drawn through `agedPalette` with the tone cache seeded from `dragonTones` for every slot (no element renderer reads a base palette at runtime), the elder's posture (the settled chest, the paunch, the level head, the wider stance), face (the grey muzzle and brow tuft, the inked beard fitted to each head, the worn fangs, the slower blink), wing wear (the tears, and the notched hole at full spread, cut through the far wing and the back row), the elder column of the shared anims with its variants (the back stretch, reminisce, airing the wings), and the gallery's elder row (every view, and `view=wings`). **The element pass v2 is built and integrated** (the Review log's **Element pass v2**): every elder cue and elder-only extra of section 3 (the hearth and its coal bed, the sap-buds, the 36 × 12 dome and the fourth crystal, the third bolt tooth and the far bolt's tear, the 18 × 9 fluke with its rays and pearls, the 19 px fans and their frost, the resident moth), every elder breath's finale ring (4.2), spike's spikier comb (3.3), slinkwing's arm-panel tear and its own elder preen (2.9, 1.3), rock's sunning and lightning's storm-watch in the airing's place (4.2), and **dusk, built whole** (3.8: the lamp and its lexicon, the nose frost and the smoke tip, Nightfall and the fizzle, the moths and motes, the lantern carry, the search by lamplight, the lamp-bat and the tuck-in). An elder now gains its face, its greys, its airing and its element's extra: the last grow-up's reward (D15) is drawn, waiting for the grow-up anim to show it off. **Not built yet:** the grow-up and its "look at me" beat, the gliding flight (the holes' other showing), the fly and the hop-glide, and the game side of the care loop (the Review log's known gaps). `npm run shots` renders the standard sheets of 5.5 and `npm run smoke` checks every gallery view, the floor, leg-root, tail-ceiling, pour-column and neutral-area audits included (all seven elements; the gallery's lineup, cast, mood and silhouette views lay out seven columns, the habitat holds all seven). Every hex below comes from that module and passed that check. The bible has been through one design review round (a readability critique and a care-game critique), four review rounds of the built rig, the element pass, two cast reviews (the whole cast judged together), the v2 design round, the v2 review (a readability critique and a care-game critique of the v2 design), two review rounds of the built elder core, the element pass v2 (a critique and a fix round per element, then the integration) and two cast reviews of the v2 cast (appeal and distinctness, each round fixed and re-checked on renders: Nightfall is now breathed out in puffs that settle as one sheet, the habitat keeps spread wings apart by a crowd rule, and a pour-column audit joins the smoke run); what changed, and what was turned down, is in the **Review log** at the end, with what building the core animations found.
+**v2 status: designed, reviewed and built: the colour half, the elder core and the element pass v2.** The palette is code: `src/art/dragon/palettes.ts` holds the seven base palettes and the greying transform (`agePalette`, `agedPalette`, the silvered highlight in `dragonTones`, the elder face greys `muzzleOf` / `beardOf`, with every strength as data), and `tools/palette-check.ts` runs every gate on all seven elements at all four stages (report in 5.8: **2492 of 2492 gates pass**, the water and rock beards' exempt pairs reported, not counted; gate (i) runs on every floor the base's dragons and keepers stand on, `src/game/surfaces.ts` `FLOORS` (the straw, the elder garden's pale path, and the mission road the team walks in the watchable scene), each also held under HSV S 0.20; the egg gate, counted apart, **8 of 8** (every element's egg, its baby's colour, ≥ 25 % from the Hatchery's nest straw, and the egg seen against that straw alone: 5.9); gate (w), counted apart, **4215 of 4215**, holds everything the base's dragons are seen against -- the sky at every hour of the day and night, every wall (by day, by night and at the two stepped mixes between: the base's moonlit night colours, `src/game/surfaces.ts` `NIGHT`), the elder garden's hedge, lawn, wood and fence, every layer of the six mission climates at every phase (each climate its own night, never the night table), the fog bank behind the team, the mission scene's ground under its road, and the lamps' and lanterns' light ≥ 25 % *lighter* than every dark body (L ≥ 0.159, so night stays mid-value, never black), the big props behind a slot ≥ 25 % from them either way, and all 6 Oklab L from the ink -- and no dragon is ever tinted for night: **the walls may shift with the hour, the dragons and the floors never**; gate (x), counted apart, **1623 of 1623**, holds each boss's and each little enemy's silhouette edge apart from the road it walks, the ground under it and every band of its home climate at every phase, every fill apart from the ink, and the colours that touch inside it by the ladder: 5.10, 5.11). Water is sea green and the sandstone a touch warmer in the rig today. **The elder core is built** in the shared rig (the Review log's **Elder core** entries): the elder in `Stage` and every per-stage table (`STAGE_DIMS.elder`, `STAGE_TIMING`, `TAIL_CHAIN`, the fidget's `FIDGET_TIMING`), every stage drawn through `agedPalette` with the tone cache seeded from `dragonTones` for every slot (no element renderer reads a base palette at runtime), the elder's posture (the settled chest, the paunch, the level head, the wider stance), face (the grey muzzle and brow tuft, the inked beard fitted to each head, the worn fangs, the slower blink), wing wear (the tears, and the notched hole at full spread, cut through the far wing and the back row), the elder column of the shared anims with its variants (the back stretch, reminisce, airing the wings), and the gallery's elder row (every view, and `view=wings`). **The element pass v2 is built and integrated** (the Review log's **Element pass v2**): every elder cue and elder-only extra of section 3 (the hearth and its coal bed, the sap-buds, the 36 × 12 dome and the fourth crystal, the third bolt tooth and the far bolt's tear, the 18 × 9 fluke with its rays and pearls, the 19 px fans and their frost, the resident moth), every elder breath's finale ring (4.2), spike's spikier comb (3.3), slinkwing's arm-panel tear and its own elder preen (2.9, 1.3), rock's sunning and lightning's storm-watch in the airing's place (4.2), and **dusk, built whole** (3.8: the lamp and its lexicon, the nose frost and the smoke tip, Nightfall and the fizzle, the moths and motes, the lantern carry, the search by lamplight, the lamp-bat and the tuck-in). An elder now gains its face, its greys, its airing and its element's extra: the last grow-up's reward (D15) is drawn, waiting for the grow-up anim to show it off. **Not built yet:** the grow-up and its "look at me" beat, the gliding flight (the holes' other showing), the fly and the hop-glide, and the game side of the care loop (the Review log's known gaps). `npm run shots` renders the standard sheets of 5.5 and `npm run smoke` checks every gallery view, the floor, leg-root, tail-ceiling, pour-column and neutral-area audits included (all seven elements; the gallery's lineup, cast, mood and silhouette views lay out seven columns, the habitat holds all seven). Every hex below comes from that module and passed that check. The bible has been through one design review round (a readability critique and a care-game critique), four review rounds of the built rig, the element pass, two cast reviews (the whole cast judged together), the v2 design round, the v2 review (a readability critique and a care-game critique of the v2 design), two review rounds of the built elder core, the element pass v2 (a critique and a fix round per element, then the integration) and two cast reviews of the v2 cast (appeal and distinctness, each round fixed and re-checked on renders: Nightfall is now breathed out in puffs that settle as one sheet, the habitat keeps spread wings apart by a crowd rule, and a pour-column audit joins the smoke run); what changed, and what was turned down, is in the **Review log** at the end, with what building the core animations found.
 
 
 **The keepers.** People who look after the dragons now share their screen: four keepers (a cook, a groomer, a night
@@ -76,7 +76,7 @@ The contested choices:
 | D15 | **Growth follows Seed → Sprout → Signature → Elder signature** (v2). Each stage-up adds one sub-part to the cue, and each element has one adult-only extra; the elder keeps its adult signature or grows it within its zone budget, and gains one **permanent** elder-only extra, drawn at every mood (section 3). Babies carry the adult's *first* marking. | G, v2 review | This gives "same species" continuity (R and G) and makes each stage-up visibly a reward. C gave babies no markings at all. v2's first draft "weathered" every elder cue (chipped quills, a chipped dome, nicked fans and flukes) and made most extras conditional, so the last grow-up revealed only losses (the care review): wear is now the wings' alone, as the user asked. |
 | D16 | **Two claws per near paw, with 2 px gaps, drawn un-inked.** | G + review | Three claws on an 8 px paw (R, C) need 1 px gaps, and a 1 px gap closes, turning the claws into one pale band. For the same reason the claws carry no outline of their own (D13): each claw's ink would eat 1 px of the 2 px gap. |
 | D17 | **Animation uses R's frame tables as the base:** a 48 f lateral-sequence walk (R + G), the adult preens instead of hopping (R), plus C's beg loop and G's grow-up. Every baby breath fails, adorably (C + G). | R + C + G | A slow pet ambles in a four-beat lateral sequence, with a different leg moving on each of the 8 keys. C's 36 f diagonal gait is a two-beat trot that reads as hurrying. |
-| D18 | **The dragons get their own face set, DFACE:** neutral, happy, closed, hungry, sleepy, sad, surprised, grumpy, sheepish, scared, dazed. Never angry. | C + review | The engine's `FACE` is a combat set (angry, shout, grit), and this is a cozy game. Sheepish and scared were added because the care loop calls for them (lightning's zap, slinkwing's fright); dazed was redrawn because the engine's X-eyes are 1 px marks. |
+| D18 | **The dragons get their own face set, DFACE:** neutral, happy, closed, hungry, sleepy, sad, surprised, grumpy, sheepish, scared, dazed. Never angry. | C + review | The engine's `FACE` is a combat set (angry, shout, grit), and this is a cozy game. Sheepish and scared were added because the care loop calls for them (lightning's zap, slinkwing's fright); dazed was redrawn because the engine's X-eyes are 1 px marks. Kept when the missions gained their fights (BASE_DESIGN B8, amended): a dragon fights with this set -- its breath is its attack, never an angry face -- and only the road's enemies look fierce (5.10). |
 | D19 | **A folded far wing is not drawn.** A far part either shows at least 3 px or is hidden (the "sliver rule"). | C + G | R's knuckle-only far wing is a 1 to 2 px sliver, which reads as a defect. |
 | D20 | **Emitters are flat, never cel-banded.** This covers flame, crystals, bolts, sparks, bubbles, glow dots and sound arcs. | G | A flame with a shadow band reads as an orange stone. |
 
@@ -1410,7 +1410,7 @@ Babies come in at about 18 to 22 and the young at about 26 to 32. An elder adds 
   - *water:* a bluer membrane (`#16566e`: dusk's new body) and a greener one (spike's leaf).
 
 ### 5.8 Palette check report
-Output of `node tools/palette-check.ts` for the base palettes of 3.1 at all four stages (the greying of 3.9), and (since the base's day and night) gate (w) on everything the base's dragons are seen against (`src/game/surfaces.ts`: the sky at every phase and every stepped mix between two, the walls, the big props behind a slot, the lamps' light; since the elder garden, its hedge, lawn, trunks and bench, fence, nest mounds and the lanterns' rings; since night you can see (docs/BASE_DESIGN.md 7), each wall, garden backdrop and prop by moonlight and at the two stepped mixes toward it, and the night table's own checks: every wall, backdrop and prop colour has a night entry, no floor has one that changes it; since the mission art kit (5.10), the six climates, one line per climate and phase, the cave mouth and the fog bank; since the watchable scene, the mission scene's ground under its road), counted on its own line, and (since the Hatchery's eggs) the egg gate (5.9), on its own line too, and (since the mission art kit and the watchable scene) gate (x) on the big baddies (5.10, 5.11), on its own line; the mission road is in (i); the keepers' gates (the grumpy miller's among them) are in `docs/KEEPERS.md`. Re-paste it whenever a hex or a greying strength changes.
+Output of `node tools/palette-check.ts` for the base palettes of 3.1 at all four stages (the greying of 3.9), and (since the base's day and night) gate (w) on everything the base's dragons are seen against (`src/game/surfaces.ts`: the sky at every phase and every stepped mix between two, the walls, the big props behind a slot, the lamps' light; since the elder garden, its hedge, lawn, trunks and bench, fence, nest mounds and the lanterns' rings; since night you can see (docs/BASE_DESIGN.md 7), each wall, garden backdrop and prop by moonlight and at the two stepped mixes toward it, and the night table's own checks: every wall, backdrop and prop colour has a night entry, no floor has one that changes it; since the mission art kit (5.10), the six climates, one line per climate and phase, the cave mouth and the fog bank; since the watchable scene, the mission scene's ground under its road), counted on its own line, and (since the Hatchery's eggs) the egg gate (5.9), on its own line too, and (since the mission art kit and the watchable scene) gate (x) on the bosses and, since the fights, the little enemies (5.10, 5.11), on its own line; the mission road is in (i); the keepers' gates (the grumpy miller's among them) are in `docs/KEEPERS.md`. Re-paste it whenever a hex or a greying strength changes.
 
 ```
 DRAGON PALETTE CHECK  (tools/palette-check.ts)
@@ -2012,7 +2012,18 @@ stages: baby / young / adult / elder (b/y/a/e), each the base palette greyed by 
   ok   dusk       egg #1f5580  L 0.083   88% from the nest (darker)
   ok   egg-lie    every egg lies against the nest's straw alone: the 162 pixels round its ink ring over its 3 wobbles, all in the heap (20 x 21 px), over the band, off the strands
 
-(x) BADDIES  (each fill on a baddie's silhouette edge >= 25% luminance from the road #dcd6c4 and from every band of its home climate at every phase; every fill >= 6 Oklab L from the ink; touching colours by the ladder)
+(x) BADDIES  (the bosses, then the little enemies: each fill on a silhouette edge >= 25% luminance from the road #dcd6c4 and from every band of its home climate at every phase; every fill >= 6 Oklab L from the ink; touching colours by the ladder)
+ THE BRIDGE TROLL (124 x 124; home meadow)
+  ok   edge skin     #3f4e38  L 0.068  least  65% (night sky top #6a78a8), 25 bands
+  ok   edge moss     #2e4226  L 0.046  least  76% (night sky top #6a78a8), 25 bands
+  ok   edge cloth    #4e3a2c  L 0.048  least  75% (night sky top #6a78a8), 25 bands
+  ok   edge club     #4a3424  L 0.040  least  79% (night sky top #6a78a8), 25 bands
+  ok   skin/belly       lum  71%  hue 20deg  lum      #3f4e38 #7a8a5c  (the belly on the body)
+  ok   skin/tusk        lum  91%  hue   n/a  lum      #3f4e38 #e8e0c8  (the tusks on the jaw)
+  ok   skin/cloth       lum  29%  hue 76deg  lum+hue  #3f4e38 #4e3a2c  (the loincloth on the hips)
+  ok   skin/club        lum  41%  hue 76deg  lum+hue  #3f4e38 #4a3424  (the club in the hand)
+  ok   skin/white       lum  93%  hue   n/a  lum      #3f4e38 #f8f4ec  (the eye on the face)
+  ok   moss/white       lum  95%  hue   n/a  lum      #2e4226 #f8f4ec  (the brow over the eye)
  THE MOLE KING (112 x 88; home caves)
   ok   edge velvet   #5e4238  L 0.066  least  64% (night sky top #6a74a4), 25 bands
   ok   edge paw      #e8969c  L 0.414  least  33% (dusk ridge #e6c8b4), 25 bands
@@ -2024,6 +2035,15 @@ stages: baby / young / adult / elder (b/y/a/e), each the base palette greyed by 
   ok   crown/jewel      lum  72%  hue 54deg  lum+hue  #d8a838 #b0304a  (the jewel on the crown)
   ok   velvet/rim       lum  85%  hue 26deg  lum      #5e4238 #d8a838  (the spectacles on the face)
   ok   velvet/white     lum  93%  hue   n/a  lum      #5e4238 #f8f4ec  (the eye on the face)
+ THE BRIAR BOAR (140 x 92; home forest)
+  ok   edge hide     #3e3036  L 0.034  least  81% (night sky top #66749e), 25 bands
+  ok   edge bristle  #2a2226  L 0.018  least  90% (night sky top #66749e), 25 bands
+  ok   hide/snout       lum  88%  hue   n/a  lum      #3e3036 #c87880  (the snout on the head)
+  ok   hide/tusk        lum  96%  hue   n/a  lum      #3e3036 #efe4c8  (the tusk on the jaw)
+  ok   snout/tusk       lum  65%  hue   n/a  lum      #c87880 #efe4c8  (the tusk by the snout)
+  ok   hide/vine        lum  84%  hue   n/a  lum      #3e3036 #5a8a3e  (the vines round the body)
+  ok   vine/berry       lum   8%  hue 105deg  HUE ONLY #5a8a3e #d04a5a  (the berries on the vines)
+  ok   hide/white       lum  96%  hue   n/a  lum      #3e3036 #f8f4ec  (the eye on the face)
  THE STORM ROC (140 x 100; home peaks)
   ok   edge body     #4a5a7a  L 0.102  least  44% (night sky top #6874a6), 25 bands
   ok   edge wing     #34405c  L 0.052  least  72% (night sky top #6874a6), 25 bands
@@ -2050,11 +2070,25 @@ stages: baby / young / adult / elder (b/y/a/e), each the base palette greyed by 
   ok   wool/boot        lum  87%  hue 155deg  lum+hue  #98a8c4 #503a34  (the boots under the wool)
   ok   face/white       lum  52%  hue   n/a  lum      #d8a4a0 #f8f4ec  (the eye on the face)
   ok   wool/scarf       lum  72%  hue 138deg  lum+hue  #98a8c4 #a8323a  (the mittens on the arms)
+ THE CINDER GOLEM (104 x 132; home ash)
+  ok   edge rock     #3a3236  L 0.034  least  80% (night sky top #6c70a0), 25 bands
+  ok   rock/facet       lum  71%  hue   n/a  lum      #3a3236 #6a5e62  (the lit facets of the rock)
+  ok   rock/seam        lum  89%  hue   n/a  lum      #3a3236 #f07a2a  (the glowing seams)
+  ok   seam/core        lum  52%  hue 21deg  lum      #f07a2a #ffd24a  (the core at the chest's heart)
+  ok   rock/core        lum  95%  hue   n/a  lum      #3a3236 #ffd24a  (the glowing eye)
  in the watchable scene (BASE_DESIGN 6: every fill of baddies.ts BADDIE_FILLS >= 25% in luminance from the road #dcd6c4, the scene's ground and its region's backdrop bands at every phase (backdrops.ts climateBands); >= 6 Oklab L from the ink #1a1018)
+  ok   THE BRIDGE TROLL #3f4e38  L 0.068  least  65% (meadow night band 0)  okL 21.4 from ink
+  ok   THE BRIDGE TROLL #2e4226  L 0.046  least  76% (meadow night band 0)  okL 16.4 from ink
+  ok   THE BRIDGE TROLL #4e3a2c  L 0.048  least  75% (meadow night band 0)  okL 17.7 from ink
+  ok   THE BRIDGE TROLL #4a3424  L 0.040  least  79% (meadow night band 0)  okL 15.6 from ink
+       THE BRIDGE TROLL: 24 meadow backdrop bands gated
   ok   THE MOLE KING    #5e4238  L 0.066  least  64% (caves night band 0)  okL 21.7 from ink
   ok   THE MOLE KING    #e8969c  L 0.414  least  33% (caves dusk band 3)  okL 56.7 from ink
   ok   THE MOLE KING    #d8a838  L 0.429  least  30% (caves dusk band 3)  okL 56.7 from ink
        THE MOLE KING: 24 caves backdrop bands gated
+  ok   THE BRIAR BOAR   #3e3036  L 0.034  least  81% (forest night band 0)  okL 13.7 from ink
+  ok   THE BRIAR BOAR   #2a2226  L 0.018  least  90% (forest night band 0)   okL 7.3 from ink
+       THE BRIAR BOAR: 24 forest backdrop bands gated
   ok   THE STORM ROC    #4a5a7a  L 0.102  least  44% (peaks night band 0)  okL 27.8 from ink
   ok   THE STORM ROC    #34405c  L 0.052  least  72% (peaks night band 0)  okL 18.4 from ink
   ok   THE STORM ROC    #9aa6c4  L 0.381  least  30% (road slab)  okL 53.6 from ink
@@ -2067,11 +2101,55 @@ stages: baby / young / adult / elder (b/y/a/e), each the base palette greyed by 
   ok   THE FROST GIANT  #b83040  L 0.127  least  32% (ice night band 0)  okL 33.4 from ink
   ok   THE FROST GIANT  #503a34  L 0.050  least  73% (ice night band 0)  okL 18.1 from ink
        THE FROST GIANT: 24 ice backdrop bands gated
+  ok   THE CINDER GOLEM #3a3236  L 0.034  least  80% (ash night band 0)  okL 13.7 from ink
+       THE CINDER GOLEM: 24 ash backdrop bands gated
+ the little enemies (foes.ts: each edge fill >= 25% in luminance from the road, the scene's ground and every band of its home climate at every phase; every fill >= 6 Oklab L from the ink; touching colours by the ladder)
+ MUD GOBLINS (28 x 24; home meadow: 28 backgrounds)
+  ok   edge #46562e  L 0.082  least  58% (meadow night band 0 #6a78a8)  okL 23.9 from ink
+  ok   edge #4a3a28  L 0.046  least  76% (meadow night band 0 #6a78a8)  okL 17.1 from ink
+  ok   skin/tunic       lum  43%  hue 52deg  lum+hue  #46562e #4a3a28  (the tunic under the head)
+  ok   tunic/belt       lum  79%  hue  2deg  lum      #4a3a28 #a07a4a  (the belt on the tunic)
+  ok   skin/white       lum  91%  hue   n/a  lum      #46562e #f8f4ec  (the eyes on the face)
+ MOLE MINERS (30 x 24; home caves: 28 backgrounds)
+  ok   edge #5e4238  L 0.066  least  64% (caves night band 0 #6a74a4)  okL 21.7 from ink
+  ok   edge #d8a838  L 0.429  least  30% (caves dusk band 3 #e6c8b4)  okL 56.7 from ink
+  ok   edge #e8969c  L 0.414  least  33% (caves dusk band 3 #e6c8b4)  okL 56.7 from ink
+  ok   edge #4a3426  L 0.041  least  78% (caves night band 0 #6a74a4)  okL 15.6 from ink
+  ok   edge #a8a8b4  L 0.396  least  33% (road slab #978c76)  okL 54.5 from ink
+  ok   velvet/helmet    lum  85%  hue 26deg  lum      #5e4238 #d8a838  (the helmet on the head)
+  ok   velvet/paw       lum  84%  hue 20deg  lum      #5e4238 #e8969c  (the paws and nose on the body)
+  ok   helmet/lamp      lum  51%  hue  9deg  lum      #d8a838 #fff2a8  (the lamp on the helmet)
+  ok   velvet/white     lum  93%  hue   n/a  lum      #5e4238 #f8f4ec  (the eyes on the face)
+  ok   paw/handle       lum  90%  hue 28deg  lum      #e8969c #4a3426  (the pick in the paw)
+ THORN SPRITES (24 x 24; home forest: 28 backgrounds)
+  ok   edge #2e3a24  L 0.037  least  79% (forest night band 0 #66749e)  okL 14.1 from ink
+  ok   edge #72403a  L 0.075  least  58% (forest night band 0 #66749e)  okL 24.1 from ink
+  ok   bramble/thorn    lum  51%  hue   n/a  lum      #2e3a24 #72403a  (the thorns on the ball)
+  ok   bramble/vine     lum  83%  hue   n/a  lum      #2e3a24 #6a8a4a  (the vines round the ball)
+  ok   bramble/glow     lum  94%  hue   n/a  lum      #2e3a24 #ffd24a  (the glowing eyes)
+ STORM IMPS (26 x 29; home peaks: 28 backgrounds)
+  ok   edge #3e4660  L 0.062  least  66% (peaks night band 0 #6874a6)  okL 20.8 from ink
+  ok   cloud/bolt       lum  92%  hue 176deg  lum+hue  #3e4660 #ffe45a  (the bolt on its belly)
+  ok   cloud/puff       lum  74%  hue  2deg  lum      #3e4660 #7a86a8  (the pale tops of its puffs)
+  ok   cloud/white      lum  93%  hue   n/a  lum      #3e4660 #f8f4ec  (the eyes on the face)
+ FROST IMPS (22 x 26; home ice: 28 backgrounds)
+  ok   edge #8eaecb  L 0.403  least  34% (road slab #978c76)  okL 54.7 from ink
+  ok   edge #9ab8d4  L 0.459  least  28% (ice dusk band 0 #dccce6)  okL 58.0 from ink
+  ok   edge #2e3a5a  L 0.043  least  77% (ice night band 0 #6676aa)  okL 16.3 from ink
+  ok   ice/boot         lum  89%  hue 15deg  lum      #8eaecb #2e3a5a  (the boots under the body)
+  ok   ice/frost        lum  55%  hue   n/a  lum      #8eaecb #e8f4fc  (the frost on the cheeks)
+  ok   icicle/boot      lum  91%  hue 15deg  lum      #9ab8d4 #2e3a5a  (the crown over the dark brim)
+  ok   ice/white        lum  56%  hue   n/a  lum      #8eaecb #f8f4ec  (the eyes on the face)
+ CINDER IMPS (22 x 26; home ash: 28 backgrounds)
+  ok   edge #2e2a2c  L 0.024  least  86% (ash night band 0 #6c70a0)  okL 10.0 from ink
+  ok   char/glow        lum  93%  hue   n/a  lum      #2e2a2c #f08a2e  (the glowing cracks)
+  ok   glow/core        lum  46%  hue 17deg  lum      #f08a2e #ffd24a  (the glow at the crest's heart)
+  ok   char/core        lum  96%  hue   n/a  lum      #2e2a2c #ffd24a  (the glowing eyes)
 
 RESULT: PASS  2492 of 2492 gates passed
 BACKDROPS: PASS  4215 of 4215 gates passed
 EGGS: PASS  8 of 8 gates passed
-BADDIES: PASS  764 of 764 gates passed
+BADDIES: PASS  1623 of 1623 gates passed
 ```
 
 ### 5.9 Eggs
@@ -2115,8 +2193,9 @@ The missions' drawings (built ahead of the missions; the Map Room's chooser and 
 state, every quantity a pure function of its inputs and a step count, so a frozen view draws the same frame every time.
 All in the house style: a 1 px `#1a1018` ink, flat cel bands lit from the top left (the engine's cel helpers through
 `src/game/cel.ts`, the dragons' and keepers' exact shading), no gradients, no alpha, no mark under 2 px. The gallery's
-`view=missionart` lays each part out on the mission road (`sheet=climates|setpieces|baddies|people|icons`; shots
-`missionart_*`). The shared names (climates, challenges, skills, baddies, faces, poses, exits) are `src/game/missiondata.ts`.
+`view=missionart` lays each part out on the mission road (`sheet=climates|setpieces|baddies|foes|fights|people|icons`;
+shots `missionart_*`). The shared names (climates, challenges, skills, bosses, little enemies, faces, poses) are
+`src/game/missiondata.ts`.
 
 - **The climates** (`src/game/backdrops.ts` `drawClimate(ctx, climate, phase, rect, scroll)`): MILD MEADOWS (rolling downs,
   hedgerows, rain), DRY HILLS AND CAVES (mesas, sandy hills, one cave mouth with its lantern and one stepped pool of its
@@ -2126,9 +2205,10 @@ All in the house style: a 1 px `#1a1018` ink, flat cel bands lit from the top le
   weather marks (rain 2 x 4 streaks, snow 2 x 2, 3 px bolts, 2 px heat bands) -- at day, dusk, night and dawn, with no
   dragon in it. It draws the chooser's 300 x 112 picture and fills a 640 x 300 road scene as `scroll` advances (the
   landforms scale with the rect's height; the marks keep their px). Night is the blue hour, never black. Every colour is
-  `surfaces.ts` `CLIMATE_BACKDROPS` (`BACKDROPS.climate`) and passes gate (w); the three climates a big baddie lives in
-  (caves, peaks, ice) keep their bands pale by day, dusk and dawn (L >= 0.6) and at L 0.17-0.26 at night, so a baddie's
-  fills can sit dark (L <= 0.13) or in the middle (L 0.35-0.45) against its home at every hour (gate x).
+  `surfaces.ts` `CLIMATE_BACKDROPS` (`BACKDROPS.climate`) and passes gate (w); the caves, the peaks and the ice keep
+  their bands pale by day, dusk and dawn (L >= 0.6) and at L 0.17-0.26 at night, so an enemy's edge there can sit dark
+  (L <= 0.13) or in the middle (L 0.35-0.46) against its home at every hour; in the meadow, the forest and the ash hills
+  only a dark edge passes (gate x).
 - **The set pieces** (`src/game/setpieces.ts` `drawSetPiece(ctx, id, x, feetY, state, t)`): one per challenge, standing on
   the road behind the team, `ahead`/`unmet` showing the problem and `met` visibly solving it: a cave mouth (a lantern and
   one stepped lamp pool when met), a boulder across the road beside an empty cart (loaded when met), a snowdrift (a low
@@ -2138,25 +2218,53 @@ All in the house style: a 1 px `#1a1018` ink, flat cel bands lit from the top le
   open, a flour sack out), a small bird on a tussock that can't fly (its wing in a neat bandage, hopping, a heart: never
   a wound), a fog bank in stepped flat bands drawn behind the team (thinned to a low band and a waymark), two tall rocks
   with a narrow way between (a knotted rope and a flag).
-- **The big baddies** (`src/game/baddies.ts`: `BADDIE_ART`, `drawBaddie(ctx, id, x, feetY, facing, face, pose, t)`,
-  `drawBaddiePortrait(ctx, id, x, y)` 24 x 24): THE MOLE KING (about 112 x 88: a round velvet-brown body, a tiny gold crown
-  with a jewel, big pink digging paws with fat toes, gold spectacles ringing his eye, a pale muzzle; exit calmed), THE
-  STORM ROC (about 140 x 100: a fluffy slate-blue bird, folded wings with stepped feather ends, a tufted crest, a hooked
-  beak, a pale breast; exit outwitted), THE FROST GIANT (about 96 x 140: a tall woolly blue-grey mass with wool lumps and
-  curls, a peach face, a big deep-red nose, a knitted scarf with stripes, mittens and boots; exit driven off). Faces only
-  from `BaddieFace`: neutral, grumpy (a heavy FLAT brow pulled low, the eye lidded under it, a pout -- never a V brow),
-  surprised (brows up, the eye wide, an "o"), sleepy (the eye shut in a soft curve). Poses: walk, stand, sit, turn (it
-  looks back the other way, a "!"), leave (a shuffle with 2 px dust at its heels and a flat grumble cloud). The exits
-  (`BADDIE_EXIT_LOOK`, `exitLook(exit, u)`): calmed sits and dozes with three 5 x 6 "z"s in 2 px strokes stepping up (not the first spec's 3 x 3: at 3 x 3 a z reads as an "I" or "=", C16; the scene's own 2 px "z" is the kit's, drawn the right way round whichever way the baddie faces, so the scene draws one set); outwitted turns,
-  surprised, then wanders off the wrong way at a plain walk (neutral: no dust, no grumble cloud); driven off shuffles off grumbling. No knockback, no hurt pose, nothing flung;
-  the type has no hurt, health or defeat field (`_NoHurt`) and exactly the three exits (`_Exits`). Nothing covers an
-  eye (the spectacles ring it).
-- **Gate (x)** (`tools/palette-check.ts`, counted apart with the scene's half, 5.11: `BADDIES: PASS 764 of 764`, 387 of them the kit's): each fill on a baddie's silhouette
-  edge (`BADDIE_EDGE`) keeps >= 25 % luminance from the road (`FLOORS.road` `#dcd6c4`, L 0.673, S 0.11, itself gated by
-  (i) and (Ki)) and from every band of its home climate at every phase (25 bands each); every fill keeps 6 Oklab L from
-  the ink; the colours that touch inside it pass the ladder. Its report is the `(x)` block in 5.8. The thinnest: the
-  Storm Roc's beak and legs against Highfold's dusk sky (27 %), the Mole King's crown against Old Mine Road's dusk ridge
-  (30 %).
+- **The bosses** (`src/game/baddies.ts`: `BADDIE_ART`, `drawBaddie(ctx, id, x, feetY, facing, face, pose, t, flash)`,
+  `drawBaddiePortrait(ctx, id, x, y)` 24 x 24), one at the end of every road of its region, 88-140 px: THE BRIDGE TROLL
+  (about 124 x 124: a hulking mossy troll, hunched, a big head with a pale muzzle, a warty nose ball over two tusks,
+  long arms, a log club dragged behind it in the far hand), THE MOLE KING (about 112 x 88: a round velvet-brown body, a
+  tiny gold crown with a jewel, big pink digging paws with fat toes, gold spectacles ringing his eye, a pale muzzle),
+  THE BRIAR BOAR (about 140 x 92: a huge dark boar, a bristling ridge down its back, bramble wound round it with red
+  berries, tusks by a pink snout), THE STORM ROC (about 140 x 100: a fluffy slate-blue bird, folded wings with stepped
+  feather ends, a tufted crest, a hooked beak, a pale breast), THE FROST GIANT (about 96 x 140: a tall woolly blue-grey
+  mass with wool lumps and curls, a peach face, a big deep-red nose, a knitted scarf with stripes, mittens and boots),
+  THE CINDER GOLEM (about 104 x 132: a hulk of dark basalt boulders, glowing seams across it, a glowing core in its
+  chest, glowing eyes). Faces (`BaddieFace`): fierce (a heavy brow slanted down toward the snout, the eye narrowed under
+  it, teeth gritted -- the one angry face in the game, and only the enemies wear it: D18), hurt (the eye screwed shut
+  to a ">", a wince) as a hit lands, dazed (the eye a spiral) knocked down. Poses (`BaddiePose`): walk, stand, attack
+  (it rears forward into its lunge), hit (rocked back), down (sat down hard, three stars circling its head), flee
+  (scrambling off, 2 px dust at its heels); one too strong for the team leaves in its walk, turned up the road, as
+  fierce as it came. A hit flashes its fills pale inside its own ink (`flash`: `cel.ts`
+  `HIT_FLASH` `#fff6e4`, as the dragons' grow-up flash is drawn), never a wound: no blood, no bruise, nothing broken.
+  Nothing covers an eye (the spectacles ring it).
+- **The little enemies** (`src/game/foes.ts`: `FOE_ART`, `drawFoe(ctx, id, x, feetY, facing, face, pose, t, flash)`),
+  a pack of 2 or 3 at a time, each about 22-30 px (a third of a keeper's height), seen in three quarters with both eyes
+  showing, and each told by its region's tell at a glance: MUD GOBLINS (long ears, an olive skin, a tunic and belt),
+  MOLE MINERS (a gold helmet with its lamp, a pick in a pink paw), THORN SPRITES (a dark bramble ball bristling with
+  thorns, vines round it, glowing eyes), STORM IMPS (a storm cloud of three inked puffs on a flat underside, floating a
+  little over the road, a bolt on its belly), FROST IMPS (an icicle crown over a dark brim, frosted cheeks, dark
+  boots), CINDER IMPS (a charcoal crest glowing inside, glowing eyes). Faces: fierce (V brows slanted down onto the
+  eyes, a scowl and a fang) and hurt (the eyes screwed shut, an "o" mouth), the bosses' set; poses (`FoePose`): walk
+  (scurrying in), stand, attack (a hop at the team, leaning in), hit (knocked back, leaning away). A hit flashes it as
+  it does a boss; a beaten one goes up in a puff of smoke.
+- **The fights' marks** (`src/game/fightfx.ts`), small sprites in the icons format (every pixel ringed in ink): each
+  element's breath bolt -- the breath its anim shows at the mouth, thrown: fire's fireball, lightning's zig-zag, water's
+  bubble ball, rock's pebble, spike's quill, slinkwing's sound rings, dusk's nightfall orb with its star (5-7 px); the
+  enemies' missiles, one kind per region, a foe's small (5 px) and a boss's big (7 px): a clod, a pebble, a thorn burr, a
+  zap, a snowball, an ember; the spark where a hit lands (12 steps); the puff of smoke a beaten foe goes up in (30
+  steps: three puffs swelling and thinning away, two stars popping up); the three stars circling a knocked-down boss's
+  head (a 5 x 5 star, stepping round every 5 steps); the "WEAK SPOT!" pop over a hit on a boss's weak spot (48 steps,
+  rising, in outlined text); and the boss's health bar (162 x 9 px, 20 segments, under the banner). Each is a pure
+  function of its age or the scene's step.
+- **Gate (x)** (`tools/palette-check.ts`, counted apart with the scene's half, 5.11: `BADDIES: PASS 1623 of 1623`): each
+  fill on a boss's or a little enemy's silhouette edge (`BADDIE_EDGE`, `FOE_EDGE`) keeps >= 25 % luminance from the road
+  (`FLOORS.road` `#dcd6c4`, L 0.673, S 0.11, itself gated by (i) and (Ki)) and from every band of its home climate at
+  every phase (25 bands each; a foe's 28 backgrounds count the scene's ground too); every fill keeps 6 Oklab L from the
+  ink; the colours that touch inside it pass the ladder (`BADDIE_PAIRS`, `FOE_PAIRS`). Its report is the `(x)` block in
+  5.8. In the meadow, the forest and the ash hills only a dark edge passes (L <= 0.125), so the troll, the boar, the
+  golem and their regions' little enemies are dark shapes whose bright parts -- tusks, a snout, berries, glowing seams
+  and eyes -- lie inside their outlines. The thinnest: the Storm Roc's beak and legs against Highfold's dusk sky (27 %),
+  the frost imps' icicle crown against Frostmere's dusk (28 %), the Mole King's crown and the miners' helmet against
+  Old Mine Road's dusk ridge (30 %).
 - **The grumpy miller** ("Hob"; `src/game/npcs.ts` `drawMiller(ctx, mood, x, feetY, facing, t)`; built from the
   mockup on the notes branch, `miller_mock.png`): a mission NPC drawn through the real
   keeper rig -- `src/art/keeper/cast.ts` `NPCS.miller` (in `NPC_IDS`, never in `KEEPER_IDS`: no job, no agent, not in the
@@ -2179,13 +2287,13 @@ All in the house style: a 1 px `#1a1018` ink, flat cel bands lit from the top le
 - **The icons** (`src/game/missionicons.ts`): 9 x 9 icons in the `icons.ts` sprite format (every pixel ringed in ink):
   the eleven challenges (a crescent moon, a boulder, a snowflake, a storm cloud, water, a bramble, a "?", a windmill,
   a sticking plaster, fog bands, two rocks), the four skills (a speech bubble with a heart, a first-aid cross, a compass,
-  a feather), a saddle (11 x 7), and the egg a rider carries home (the Hatchery's egg, whole: `carriedEgg`, `drawCarriedEgg`).
+  a feather), a fight (two crossed claws over a spark: the trip log's fights), a saddle (11 x 7), and the egg a rider carries home (the Hatchery's egg, whole: `carriedEgg`, `drawCarriedEgg`).
 
 **Status:** built as above. The watchable scene (5.11) draws them from the kit's own modules: the climate in parallax
-behind the road, the set pieces, the baddies' beats and exits,
+behind the road, the set pieces, the packs of little enemies and the bosses in their fights with the fights' marks,
 the miller at the `miller` stop (grumpy until the Charm rider's moment has talked him round) and the riders' saddles.
 The Map Room's chooser (BASE_DESIGN 5) draws the climate picture (each region's, by day), the challenge and skill
-icons and the baddies' portraits from the same modules, and the riders carry the saddle in the barn's muster and landing too.
+icons and the boss's portrait from the same modules (the trip log its fight icon), and the riders carry the saddle in the barn's muster and landing too.
 Follow-ups:
 the rain and snow are placed, not falling (a frozen scene's weather moves only with `scroll`); the miller has no walk.
 
@@ -2207,32 +2315,42 @@ ask of it, and how each is kept:
   checks the frame they play on every travel step). The riders walk 56 px ahead of their dragon's root (the team
   walks up the road the whole way: it never turns back), sorted a step behind it (drawn under the dragon: its eye
   stays clear).
-- **Set pieces stand behind the team** (the fog bank too), and the big baddie behind them (its feet 4 px deeper).
-  Nothing is drawn over a dragon's eye but the banner at the top and the result card (both clear of the team's heads
-  at every stop; the card's bottom edge sits over the riders' heads once home).
-- **Nobody is hurt (BASE_DESIGN B8, cozy).** A baddie's face is only ever `neutral`, `grumpy` (a flat brow and a pout, never a V),
-  `surprised` or `sleepy` (the type holds it: missiondata.ts `BaddieFace`, missionview.ts `_Faces`); it walks in
-  grumpy, turns surprised as its two counters have their moments, and leaves calmed (sits and dozes, three 5 x 6 "z"s
-  in 2 px strokes, ringed in ink, stepping up over its head), outwitted (turns, and wanders off the wrong way: up the road ahead of the team and off the screen, the kit's `exitLook`) or driven off
-  (shuffles off grumbling under a flat grumble cloud, 2 px dust puffs stepping back from its heels) -- met or waited
-  out, on a trip that will fail as on one that will succeed, so the team walks on past it. The scene's baddie has no
-  hurt, health or defeat state (`_NoHurt`), and
-  its exits are those three alone (`_Exits`): both compile-time checks.
-- **Gate (x)** (`tools/palette-check.ts`, counted apart with the kit's half, 5.10: `BADDIES: PASS 764 of 764`): every
-  fill the scene sees a baddie by (`baddies.ts BADDIE_FILLS`: the silhouette edge fills, `BADDIE_EDGE`) keeps
+- **Set pieces stand behind the team** (the fog bank too), and the enemies behind them (their feet 4 px deeper; a
+  pack drawn back to front). Nothing stands over a dragon's eye but the banner at the top and the result card (both
+  clear of the team's heads at every stop; the card's bottom edge sits over the riders' heads once home); an enemy's
+  missile lands on a dragon's back, over its shoulders, never on its face.
+- **Fights, never wounds (BASE_DESIGN B8).** Only the enemies look fierce, hurt or dazed (the kit's faces: 5.10); the
+  dragons keep their own face set (D18: never angry) and the keepers theirs (KEEPERS K3). A hit on a dragon is a spark
+  on its back and its fills flashed pale inside its ink for 6 steps (the grow-up flash's `flat`), over whatever it is
+  playing: no knockback, no hurt pose, no fall. A hit on an enemy is a spark on its body, its flash and its hurt face (a
+  boss rocked back in its `hit` pose); a beaten foe goes up in a puff of smoke; a beaten boss sits down hard, dazed,
+  stars circling its head, then runs off; one too strong for the team stomps off unbeaten, as fierce as it came --
+  either way up the road ahead of the team and off the screen's right edge, never back through the team, on a trip
+  that will fail as on one that will succeed, so the team walks on past where it stood. No blood, no wound, no death,
+  nothing broken.
+- **The riders keep out of the line of fire.** In a fight each rider steps back from 56 px ahead of its dragon's root to
+  22 px behind it (`RIDER_FIGHT`), at their own walk's pace (the slowest sets the time: at most 0.15 of a pack's beat,
+  0.12 of the boss's), before anything is thrown, and comes forward again once it is over; sim-check 24 checks every
+  rider behind its dragon on every step something is in flight.
+- **What flies where.** A dragon's bolt leaves its mouth on the breath's snap frame (frame 22 of every stage's
+  breath; the mouth is the rig's own joint, `mouthOf`) and flies low and quick to where it lands on the enemy
+  (`hitAt`); an enemy's missile leaves its hand (`throwAt`) in a higher lob. The enemies stand ahead of the lead
+  dragon's snout (a pack from 118 px ahead, 30 px apart; a boss 200 px ahead), so no breath passes through anyone.
+- **Gate (x)** (`tools/palette-check.ts`, counted apart with the kit's half, 5.10: `BADDIES: PASS 1623 of 1623`): every
+  fill the scene sees an enemy by (the silhouette edge fills: `baddies.ts` `BADDIE_FILLS`, `foes.ts` `FOE_FILLS`) keeps
   >= 25 % luminance from the road, its slab, the grass strip and the earth, and from its region's backdrop bands at
   every phase (`backdrops.ts climateBands`: the climate's sky bands, ridge, near forms and detail), and
   >= 6 Oklab L from the ink (the colours inside the silhouette meet neither the road nor the sky: the kit's half holds
-  them to the ladder). The kit's baddies sit dark (L <= 0.127) or mid (L 0.38-0.46), so the scene's ground was
+  them to the ladder). The kit's enemies sit dark (L <= 0.127) or mid (L 0.38-0.46), so the scene's ground was
   darkened to sit between them (L 0.19-0.27: slab `#978c76`, grass `#728b5e`, earth `#8d775c`, each its
   old hue; a lighter ground, L 0.29-0.41, left the mid fills 0-9 % from the slab and grass). The thinnest: the Storm
   Roc's breast fluff and the Frost Giant's stripe against the slab (30 %).
-  **Status:** the climates, set pieces, baddies and the miller are the mission art kit's (5.10), drawn by its own
-  modules; the kit's `drawBaddie` draws each exit's marks (the dozing "z"s, the shuffle's
-  dust and grumble cloud, the turn's "!"), so the scene adds none of its own; the riders carry the kit's saddle in the
-  near hand. The dragons and riders in the scene are the real rigs. The trip watched is the one the Map Room sent (BASE_DESIGN 5),
+  **Status:** the climates, set pieces, bosses, little enemies, the fights' marks and the miller are the mission art
+  kit's (5.10), drawn by its own modules; the kit's `drawBaddie` draws a boss's own marks (the stars while it is down,
+  the dust as it runs off), and the scene places the rest -- what is in flight, the sparks, the puffs, the pops and the
+  bar -- from `fightfx.ts`; the riders carry the kit's saddle in the near hand. The dragons and riders in the scene are the real rigs. The trip watched is the one the Map Room sent (BASE_DESIGN 5),
   or the `trip` preset's -- the world's own trip too, its team away (off the barn's screen) -- and the trip's log
-  (TRIP LOG) opens over the scene under the banner's line, clear of the team's heads and the baddie's.
+  (TRIP LOG) opens over the scene under the banner's line, clear of the team's heads and the boss's.
 
 ## Review log
 Two critiques reviewed the first draft: **R**, readability (2 blockers, 9 major, 10 minor), and **C**, the care game (11 major, 11 minor). Every item was checked against the files before it was acted on. The geometry claims were re-run from the bible's own numbers; the colour claims were re-measured with the engine's colour maths. Every measured claim reproduced. **Applied** means the change is in this bible, and in `palettes.ts` or `palette-check.ts` where it touches colour. **In part** says which part was turned down.

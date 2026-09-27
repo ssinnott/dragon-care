@@ -175,7 +175,7 @@ export interface BaseViewOpts {
    */
   panel?: 'map' | 'mission' | 'watch' | null;
   mission?: number | null;
-  /** preset=trip's trip (trip=<region>:<progress>[:fail]) and the step it is to be at that progress (the frozen t=, else 0). */
+  /** preset=trip's trip (trip=<region>:<progress>[:fail][:weak]) and the step it is to be at that progress (the frozen t=, else 0). */
   trip?: string | null;
   at?: number;
 }
@@ -793,12 +793,12 @@ export class BaseView {
       departAt: t.departAt, returnAt: t.returnAt, progress: tripProgress(this.sim, t) };
   }
 
-  /** The scene as the hook reports it (BASE_DESIGN 6): the last stop reached, its banner, the baddie on the road, its exit, how far along it is, and the result card's title once it is done. */
+  /** The scene as the hook reports it (BASE_DESIGN 6): the last stop reached, its banner, the boss on the road and its health, the foes in view and what is in flight, how far along it is, and the result card's title once it is done. */
   private sceneHook(): NonNullable<NonNullable<Window['__dragonCare']>['base']>['scene'] {
     if (!this.scene) return null;
     const { trip, f } = this.scene, s = f.last == null ? null : trip.stops[f.last];
-    return { stop: s ? (s.kind === 'baddie' ? 'baddie' : s.challenge) : null, covered: s ? s.covered : null, beat: f.stop != null, banner: f.banner,
-      baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, exit: s?.kind === 'baddie' ? trip.exit : null,
+    return { stop: s ? (s.kind === 'challenge' ? s.challenge : s.kind) : null, covered: s ? s.covered : null, beat: f.stop != null, banner: f.banner,
+      baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, bar: f.bar, foes: f.foes.length, shots: f.shots.length,
       progress: f.L ? f.E / f.L : 0, done: f.done, result: f.done ? resultTitle(trip) : null };
   }
 

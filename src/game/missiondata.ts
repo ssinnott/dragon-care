@@ -1,11 +1,16 @@
 // The words missions are made of (docs/BASE_DESIGN.md 5 and 6): the six regions and their climates, the eleven
-// challenges and the four rider skills that meet some of them, the difficulties, and the three big baddies with their
-// faces, poses and exits. Data only, no drawing and no simulation: shared by the mission model (missions.ts,
-// regions.ts), the mission art kit (backdrops.ts, setpieces.ts, baddies.ts, npcs.ts, missionicons.ts) and the mission
-// scene (missionview.ts), none of which needs the others to name these. Safe to import from Node.
+// challenges and the four rider skills that meet some of them, the difficulties, the little enemies each region's roads
+// hold and the six bosses at the ends of them, with the enemies' faces and poses. Data only, no drawing and no
+// simulation: shared by the mission model (missions.ts, regions.ts), the mission art kit (backdrops.ts, setpieces.ts,
+// baddies.ts, foes.ts, fightfx.ts, npcs.ts, missionicons.ts) and the mission scene (missionview.ts), none of which
+// needs the others to name these. Safe to import from Node.
 //
-// Cozy (BASE_DESIGN B8): a baddie is calmed, outwitted or driven off, never hurt -- no hurt, defeat or health exists
-// here, and no face is angry (a grumpy face is a flat brow and a pout, never a V).
+// Fights (BASE_DESIGN B8): every road has its region's little enemies to fight between its challenges and ends in its
+// boss (the code's `baddie`), fought: the dragons' breath against the enemies' clods and claws, a flash where a hit
+// lands, never a wound. A beaten foe poofs into smoke; a beaten boss is knocked down, sees stars and runs off; a boss
+// too strong for the team stomps off unbeaten, and the team walks on to the road's end (it never turns back), tired
+// but whole. The enemies may look fierce --
+// the only angry faces in the game; the dragons and the keepers never do (ART_BIBLE D18, KEEPERS K3).
 
 /** The six regions on the Map Room's board (regions.ts names and places them). */
 export type RegionId = 'millbrook' | 'oldmine' | 'bramblewood' | 'highfold' | 'frostmere' | 'emberfell';
@@ -22,22 +27,43 @@ export const CHALLENGE_IDS: readonly ChallengeId[] = Object.freeze(['dark', 'hea
 export type Skill = 'charm' | 'medic' | 'navigator' | 'nimble';
 export const SKILLS: readonly Skill[] = Object.freeze(['charm', 'medic', 'navigator', 'nimble'] as Skill[]);
 
-/** A mission's difficulty: 2 challenges easy, 3 normal, 3 or 4 hard (hard ends in a big baddie). */
+/** A mission's difficulty: 2 challenges easy, 3 normal and hard; the fights on the road and the boss's might grow with it. */
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
-/** The three big baddies (BASE_DESIGN 6): THE MOLE KING (Old Mine Road), THE STORM ROC (Highfold), THE FROST GIANT (Frostmere). */
-export type BaddieId = 'moleking' | 'stormroc' | 'frostgiant';
-export const BADDIE_IDS: readonly BaddieId[] = Object.freeze(['moleking', 'stormroc', 'frostgiant'] as BaddieId[]);
+/**
+ * The six bosses (BASE_DESIGN 5.3, 6), one at the end of every road of its region, in the regions' order: THE BRIDGE
+ * TROLL (Millbrook), THE MOLE KING (Old Mine Road), THE BRIAR BOAR (Bramblewood), THE STORM ROC (Highfold), THE FROST
+ * GIANT (Frostmere), THE CINDER GOLEM (Emberfell).
+ */
+export type BaddieId = 'bridgetroll' | 'moleking' | 'briarboar' | 'stormroc' | 'frostgiant' | 'cindergolem';
+export const BADDIE_IDS: readonly BaddieId[] = Object.freeze(['bridgetroll', 'moleking', 'briarboar', 'stormroc', 'frostgiant', 'cindergolem'] as BaddieId[]);
 
-/** How a baddie leaves the road, and the only ways it can: calmed (it dozes off), outwitted (it wanders the wrong way), driven off (it shuffles off grumbling). */
-export type BaddieExit = 'calmed' | 'outwitted' | 'drivenOff';
+/**
+ * The little enemies (BASE_DESIGN 5.3, 6), a pack of them between the challenges on every road of their region, in the
+ * regions' order: MUD GOBLINS, MOLE MINERS, THORN SPRITES, STORM IMPS, FROST IMPS, CINDER IMPS.
+ */
+export type FoeId = 'mudgoblin' | 'moleminer' | 'thornsprite' | 'stormimp' | 'frostimp' | 'cinderimp';
+export const FOE_IDS: readonly FoeId[] = Object.freeze(['mudgoblin', 'moleminer', 'thornsprite', 'stormimp', 'frostimp', 'cinderimp'] as FoeId[]);
 
-/** A baddie's face: no angry one exists (grumpy is a flat, low brow and a pout). */
-export type BaddieFace = 'neutral' | 'grumpy' | 'surprised' | 'sleepy';
-export const BADDIE_FACES: readonly BaddieFace[] = Object.freeze(['neutral', 'grumpy', 'surprised', 'sleepy'] as BaddieFace[]);
+/**
+ * An enemy's face (a boss's or a foe's): fierce (a V brow over a narrowed eye and a toothy scowl -- the one angry face
+ * in the game, and only the enemies wear it), hurt (the eye screwed shut as a hit lands), dazed (knocked down: the eye a
+ * spiral, stars round the head).
+ */
+export type BaddieFace = 'fierce' | 'hurt' | 'dazed';
+export const BADDIE_FACES: readonly BaddieFace[] = Object.freeze(['fierce', 'hurt', 'dazed'] as BaddieFace[]);
 
-/** A baddie's pose: no knockback, no hurt pose, nothing flung. */
-export type BaddiePose = 'walk' | 'stand' | 'sit' | 'turn' | 'leave';
+/**
+ * A boss's pose: walk (onto the road, at the team), stand (squared up), attack (its big move: rearing up and lunging
+ * at the team as it throws), hit (rocked back as a hit lands), down (knocked down, seeing stars), flee (beaten,
+ * scrambling off up the road, dust at its heels).
+ */
+export type BaddiePose = 'walk' | 'stand' | 'attack' | 'hit' | 'down' | 'flee';
+export const BADDIE_POSES: readonly BaddiePose[] = Object.freeze(['walk', 'stand', 'attack', 'hit', 'down', 'flee'] as BaddiePose[]);
+
+/** A little enemy's pose: walk (scurrying in), stand, attack (a hop at the team as it throws), hit (knocked back as a hit lands). A beaten one is its poof (fightfx.ts). */
+export type FoePose = 'walk' | 'stand' | 'attack' | 'hit';
+export const FOE_POSES: readonly FoePose[] = Object.freeze(['walk', 'stand', 'attack', 'hit'] as FoePose[]);
 
 /** The grumpy miller's two looks (npcs.ts): grumpy at the mill until a CHARM rider talks him round, then talked round. */
 export type MillerMood = 'grumpy' | 'talkedRound';

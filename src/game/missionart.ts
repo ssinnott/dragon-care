@@ -7,22 +7,30 @@
 //                                      the road band (FLOORS.road) at y 292-306
 //   view=missionart&sheet=setpieces    the eleven set pieces on the road, ahead and met side by side (an adult dragon
 //                                      standing in the fog, which is drawn behind it)
-//   view=missionart&sheet=baddies      the three big baddies: every face, every pose and each exit, an adult dragon for
+//   view=missionart&sheet=baddies      the six bosses: every face, every pose (a hit with its flash), an adult dragon for
 //                                      scale, and their 24 x 24 portraits (&id=<baddie>: that one's row alone)
+//   view=missionart&sheet=foes         the six little enemies: every face and pose (a hit with its flash) and the puff of
+//                                      smoke a beaten one goes up in, beside an adult dragon and a keeper for scale
+//   view=missionart&sheet=fights       the fights' marks: every element's breath bolt, every missile small and big, a
+//                                      hit's spark, a puff of smoke and the knocked-down stars through their steps, a
+//                                      WEAK SPOT! pop and the boss's health bar
 //   view=missionart&sheet=people       the grumpy miller, grumpy and talked round, at 1x and 3x, beside the four keepers,
 //                                      and all five as flat silhouettes at a third of their size
-//   view=missionart&sheet=icons        the challenge and skill icons, the saddle and the carried eggs, at 1x and 3x
+//   view=missionart&sheet=icons        the challenge, skill and fight icons, the saddle and the carried eggs, at 1x and 3x
 //
 // The page's hook (window.__dragonCare.missionart) names the sheet and what it drew, for the smoke run.
 import { drawText } from '../lib/engine/text.ts';
 import { drawClimate, CLIMATE_PIC } from './backdrops.ts';
 import { drawSetPiece } from './setpieces.ts';
-import { drawBaddie, drawBaddiePortrait, BADDIE_ART, BADDIE_EXIT_LOOK } from './baddies.ts';
+import { drawBaddie, drawBaddiePortrait, BADDIE_ART } from './baddies.ts';
+import { drawFoe, FOE_ART } from './foes.ts';
+import { BOLTS, MISSILES, SPARK_LEN, POOF_LEN, drawBolt, drawMissile, drawSpark, drawPoof, drawStars, drawPop, drawBossBar } from './fightfx.ts';
+import type { MissileKind } from './fightfx.ts';
 import { drawMiller } from './npcs.ts';
-import { CHALLENGE_ICONS, SKILL_ICONS, SADDLE, drawCarriedEgg } from './missionicons.ts';
+import { CHALLENGE_ICONS, SKILL_ICONS, SADDLE, FIGHT_ICON, drawCarriedEgg } from './missionicons.ts';
 import { drawSprite } from './icons.ts';
-import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS, BADDIE_FACES } from './missiondata.ts';
-import type { Climate, BaddieId } from './missiondata.ts';
+import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS, BADDIE_FACES, FOE_IDS } from './missiondata.ts';
+import type { Climate, BaddieId, BaddiePose } from './missiondata.ts';
 import { PHASE_ORDER } from './clock.ts';
 import type { DayPhase } from './clock.ts';
 import { FLOORS, INK, STRAW_SEAM } from './surfaces.ts';
@@ -34,7 +42,7 @@ import type { KeeperAgent } from '../care/keeper.ts';
 import { KEEPER_IDS, KEEPERS } from '../art/keeper/cast.ts';
 import { DRAGON_ELEMENTS } from '../art/dragon/palettes.ts';
 
-export const SHEETS = ['climates', 'setpieces', 'baddies', 'people', 'icons'] as const;
+export const SHEETS = ['climates', 'setpieces', 'baddies', 'foes', 'fights', 'people', 'icons'] as const;
 export type Sheet = typeof SHEETS[number];
 
 /** The gallery's scene shape (gallery.ts Scene), structurally. */
@@ -87,6 +95,8 @@ export function missionArtScene(search: string): ArtScene {
   switch (sheet) {
     case 'setpieces': return setPiecesSheet();
     case 'baddies': return baddiesSheet((BADDIE_IDS as readonly string[]).includes(q.get('id') || '') ? [q.get('id') as BaddieId] : BADDIE_IDS);
+    case 'foes': return foesSheet();
+    case 'fights': return fightsSheet();
     case 'people': return peopleSheet();
     case 'icons': return iconsSheet();
     default: return climate ? roadScene(climate, phase) : climatesSheet();
@@ -161,7 +171,7 @@ function setPiecesSheet(): ArtScene {
   };
 }
 
-/** The baddies: a row each -- the four faces standing, then walk, the three exits' looks -- and the portraits. */
+/** The bosses: a row each -- the three faces standing, then walk, attack, hit (its flash), down (its stars) and flee -- and the portraits. */
 function baddiesSheet(ids: readonly BaddieId[]): ArtScene {
   let t = 0;
   const cols = 8, cw = 150, rh = 205, w = 60 + cols * cw, h = 20 + ids.length * rh + 44;
@@ -175,14 +185,10 @@ function baddiesSheet(ids: readonly BaddieId[]): ArtScene {
       ids.forEach((id, i) => {
         const y0 = 20 + i * rh, feet = y0 + rh - 30, B = BADDIE_ART[id];
         roadBand(ctx, 0, w, feet);
-        label(ctx, `${B.name}  ${B.w} X ${B.h}  EXIT: ${B.exit.toUpperCase()}`, 60, y0 + 2, LABEL, 'left');
+        label(ctx, `${B.name}  ${B.w} X ${B.h}`, 60, y0 + 2, LABEL, 'left');
         const cells: [string, () => void][] = [
           ...BADDIE_FACES.map((f): [string, () => void] => [f.toUpperCase(), () => drawBaddie(ctx, id, 0, 0, -1, f, 'stand', t)]),
-          ['WALK', () => drawBaddie(ctx, id, 0, 0, -1, 'grumpy', 'walk', t)],
-          ...(['calmed', 'outwitted', 'drivenOff'] as const).map((e): [string, () => void] => {
-            const L = BADDIE_EXIT_LOOK[e];
-            return [e.toUpperCase(), () => drawBaddie(ctx, id, 0, 0, L.facing, L.face, L.pose, t)];
-          }),
+          ...(['walk', 'attack', 'hit', 'down', 'flee'] as BaddiePose[]).map((p): [string, () => void] => [p.toUpperCase(), () => drawBaddie(ctx, id, 0, 0, p === 'flee' ? 1 : -1, 'fierce', p, t, p === 'hit')]),
         ];
         let all = true;
         cells.forEach(([name, draw], j) => {
@@ -197,6 +203,80 @@ function baddiesSheet(ids: readonly BaddieId[]): ArtScene {
       label(ctx, 'PORTRAITS', 8, py + 8, LABEL, 'left');
       BADDIE_IDS.forEach((id, i) => { if (drew(ctx, 80 + i * 40, py, 24, 24, () => drawBaddiePortrait(ctx, id, 80 + i * 40, py))) drawn.push(`${id}:portrait`); });
       publish('baddies', drawn);
+    },
+  };
+}
+
+/** The foes: a row each -- fierce, hurt, walk, attack, hit (its flash), and its puff of smoke at three ages -- an adult dragon and a keeper for scale. */
+function foesSheet(): ArtScene {
+  let t = 0;
+  const cw = 64, rh = 56, left = 110, cells = ['FIERCE', 'HURT', 'WALK', 'ATTACK', 'HIT', 'POOF 4', 'POOF 12', 'POOF 24'];
+  const w = left + cells.length * cw + 150, h = 24 + FOE_IDS.length * rh + 8;
+  const pets = [makePet('water', 'adult', 3, 'idle', w - 80, 24 + 3 * rh - 16, { desync: false })];
+  const keeper = makeKeeper('pip', 'idle', w - 40, 24 + 5 * rh - 16, { seed: 5 });
+  const top = new TopPass(40), budget = new AmbientBudget();
+  return {
+    w, h, pets, step() { t++; for (const p of pets) stepPet(p); stepKeeperAgent(keeper); },
+    draw(ctx) {
+      ctx.fillStyle = PAGE; ctx.fillRect(0, 0, w, h);
+      cells.forEach((c, j) => label(ctx, c, left + j * cw + cw / 2, 6, SUB));
+      const drawn: string[] = [];
+      FOE_IDS.forEach((id, i) => {
+        const feet = 24 + (i + 1) * rh - 16, F = FOE_ART[id];
+        roadBand(ctx, 0, w, feet);
+        label(ctx, id.toUpperCase(), 4, feet - 14, LABEL, 'left');
+        label(ctx, `${F.w} X ${F.h}`, 4, feet - 4, SUB, 'left');
+        const draws: (() => void)[] = [
+          () => drawFoe(ctx, id, 0, 0, -1, 'fierce', 'stand', t), () => drawFoe(ctx, id, 0, 0, -1, 'hurt', 'stand', t),
+          () => drawFoe(ctx, id, 0, 0, -1, 'fierce', 'walk', t), () => drawFoe(ctx, id, 0, 0, -1, 'fierce', 'attack', t),
+          () => drawFoe(ctx, id, 0, 0, -1, 'fierce', 'hit', t, true),
+          ...[4, 12, 24].map((a) => () => drawPoof(ctx, 0, F.hitAt[1], a)),
+        ];
+        let all = true;
+        draws.forEach((d, j) => { const cx = left + j * cw + cw / 2; all = drew(ctx, cx - cw / 2, feet - rh + 16, cw, rh - 10, () => { ctx.save(); ctx.translate(cx, feet); d(); ctx.restore(); }) && all; });
+        if (all) drawn.push(id);
+      });
+      drawPets(ctx, pets, { top, budget, frame: t });
+      drawKeeperAgent(ctx, keeper);
+      publish('foes', drawn);
+    },
+  };
+}
+
+/** The fights' marks: the bolts, the missiles small and big, a spark's steps, a puff's, the stars, a pop and the boss's bar. */
+function fightsSheet(): ArtScene {
+  let t = 0;
+  const w = 640, h = 300;
+  return {
+    w, h, pets: [], step() { t++; },
+    draw(ctx) {
+      ctx.fillStyle = PAGE; ctx.fillRect(0, 0, w, h);
+      const drawn: string[] = [];
+      label(ctx, 'BREATH BOLTS', 8, 6, LABEL, 'left');
+      DRAGON_ELEMENTS.forEach((el, i) => {
+        const x = 30 + i * 60;
+        if (drew(ctx, x - 20, 20, 40, 24, () => drawBolt(ctx, el, x, 32, 3, 0))) drawn.push(`bolt:${el}`);
+        label(ctx, el.toUpperCase(), x, 46, SUB);
+      });
+      label(ctx, 'MISSILES SMALL AND BIG', 8, 62, LABEL, 'left');
+      (Object.keys(MISSILES) as MissileKind[]).forEach((k, i) => {
+        const x = 40 + i * 90;
+        const a = drew(ctx, x - 22, 74, 20, 20, () => drawMissile(ctx, k, false, x - 12, 84, -3, 1));
+        const b = drew(ctx, x - 2, 74, 26, 20, () => drawMissile(ctx, k, true, x + 10, 84, -3, 1));
+        if (a && b) drawn.push(`missile:${k}`);
+        label(ctx, k.toUpperCase(), x, 98, SUB);
+      });
+      label(ctx, 'SPARK', 8, 116, LABEL, 'left');
+      for (let a = 0; a < SPARK_LEN; a += 2) if (drew(ctx, 60 + a * 20 - 12, 120, 24, 24, () => drawSpark(ctx, 60 + a * 20, 132, a))) drawn.push(`spark:${a}`);
+      label(ctx, 'POOF', 8, 158, LABEL, 'left');
+      for (let a = 0; a < POOF_LEN; a += 5) if (drew(ctx, 60 + a * 12 - 16, 150, 32, 34, () => drawPoof(ctx, 60 + a * 12, 170, a))) drawn.push(`poof:${a}`);
+      label(ctx, 'STARS', 8, 202, LABEL, 'left');
+      if (drew(ctx, 40, 190, 60, 24, () => drawStars(ctx, 70, 202, t))) drawn.push('stars');
+      if (drew(ctx, 120, 190, 80, 24, () => drawPop(ctx, 'WEAK SPOT!', 160, 204, 6))) drawn.push('pop');
+      label(ctx, 'BOSS BAR', 8, 232, LABEL, 'left');
+      [1, 0.65, 0.2, 0].forEach((hp, i) => { if (drew(ctx, 20 + i * 150, 244, 150, 12, () => drawBossBar(ctx, 95 + i * 150, 246, hp))) drawn.push(`bar:${hp}`); label(ctx, `${Math.round(hp * 100)} %`, 95 + i * 150, 262, SUB); });
+      void BOLTS;
+      publish('fights', drawn);
     },
   };
 }
@@ -248,7 +328,7 @@ function peopleSheet(): ArtScene {
   };
 }
 
-/** The icons: challenges and skills at 1x and 3x, the saddle, the carried eggs, the baddies' portraits. */
+/** The icons: challenges, skills and a fight at 1x and 3x, the saddle, the carried eggs, the bosses' portraits. */
 function iconsSheet(): ArtScene {
   const w = 640, h = 370;
   const off = document.createElement('canvas');
@@ -276,6 +356,9 @@ function iconsSheet(): ArtScene {
         drawSprite(g, SKILL_ICONS[sk], 8 + i * 18, 30);
         if (ok) drawn.push(`skill:${sk}`);
       });
+      label(ctx, 'FIGHT', 220, 52, LABEL, 'left');
+      if (drew(ctx, 226, 66, 12, 12, () => drawSprite(ctx, FIGHT_ICON, 232, 72))) drawn.push('fight');
+      drawSprite(g, FIGHT_ICON, 76, 30);
       label(ctx, 'SADDLE', 260, 52, LABEL, 'left');
       if (drew(ctx, 268, 66, 16, 12, () => drawSprite(ctx, SADDLE, 276, 72))) drawn.push('saddle');
       drawSprite(g, SADDLE, 90, 30);
