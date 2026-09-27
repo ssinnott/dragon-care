@@ -10,7 +10,8 @@ import { STAGE_DAYS, HATCH_DAYS, RETIRE_DAYS } from './clock.ts';
 import { NEEDS, hasNeed, moodOf } from './needs.ts';
 import { NAMES } from './names.ts';
 import { settleInGarden } from './garden.ts';
-import { send, autoRider, awayNow, LOST_NEST } from './missions.ts';
+import { send, autoRider, awayNow, rollBoard, LOST_NEST } from './missions.ts';
+import { REGIONS } from './regions.ts';
 import type { Pair } from './trip.ts';
 import { demoTrip, parseTripParam } from './tripdemo.ts';
 import { boutNow } from './arena.ts';
@@ -198,6 +199,11 @@ export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze(
    * somewhere new (travel.ts redirectable), and walks out to the garden.
    */
   retire: () => ({ ...newGame(), dragons: START_DRAGONS.map((p): DragonPlace => ({ ...p, stage: 'elder', days: RETIRE_AT })) }),
+  /**
+   * The new game with every region explored (BASE_DESIGN 5.1: the whole map out from under the cloud) and the day's board
+   * rolled again over all six -- THE LOST NEST first, as on any day 1.
+   */
+  explored: () => ({ ...newGame(), after: (sim) => { sim.missions.explored = REGIONS.map((r) => r.id); rollBoard(sim, sim.missions.day); } }),
   /** A team away (tripStart): half way along the Old Mine Road, here; the view passes its own `trip=` and frozen t. */
   trip: () => tripStart(TRIP_DEFAULT),
   /**

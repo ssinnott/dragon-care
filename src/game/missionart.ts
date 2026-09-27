@@ -12,6 +12,8 @@
 //   view=missionart&sheet=people       the grumpy miller, grumpy and talked round, at 1x and 3x, beside the four keepers,
 //                                      and all five as flat silhouettes at a third of their size
 //   view=missionart&sheet=icons        the challenge and skill icons, the saddle and the carried eggs, at 1x and 3x
+//   view=missionart&sheet=places       the world map's landmarks (worldmap.ts PLACE_ART, one for each place) and HOME at 2x,
+//                                      each over its region's ground, and every growth the map's land has, at 1x and 2x
 //
 // The page's hook (window.__dragonCare.missionart) names the sheet and what it drew, for the smoke run.
 import { drawText } from '../lib/engine/text.ts';
@@ -21,6 +23,7 @@ import { drawBaddie, drawBaddiePortrait, BADDIE_ART, BADDIE_EXIT_LOOK } from './
 import { drawMiller } from './npcs.ts';
 import { CHALLENGE_ICONS, SKILL_ICONS, SADDLE, drawCarriedEgg } from './missionicons.ts';
 import { drawSprite } from './icons.ts';
+import { drawLandmark, drawScaled, growthSamples, PLACES, HOME_ART, GROUND_OF } from './worldmap.ts';
 import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS, BADDIE_FACES } from './missiondata.ts';
 import type { Climate, BaddieId } from './missiondata.ts';
 import { PHASE_ORDER } from './clock.ts';
@@ -34,7 +37,7 @@ import type { KeeperAgent } from '../care/keeper.ts';
 import { KEEPER_IDS, KEEPERS } from '../art/keeper/cast.ts';
 import { DRAGON_ELEMENTS } from '../art/dragon/palettes.ts';
 
-export const SHEETS = ['climates', 'setpieces', 'baddies', 'people', 'icons'] as const;
+export const SHEETS = ['climates', 'setpieces', 'baddies', 'people', 'icons', 'places'] as const;
 export type Sheet = typeof SHEETS[number];
 
 /** The gallery's scene shape (gallery.ts Scene), structurally. */
@@ -78,6 +81,41 @@ function publish(sheet: string, drawn: string[]): void {
   if (dc) dc.missionart = { sheet, drawn };
 }
 
+/**
+ * The world map's landmarks (BASE_DESIGN 5.1; worldmap.ts): every place's, named by its art, and HOME, each twice its
+ * size over its region's ground (the mill with its sails), then every growth of the map's land at 1x and 2x.
+ */
+function placesSheet(): ArtScene {
+  const w = 640, h = 370;
+  return {
+    w, h, pets: [], step() { /* still */ },
+    draw(ctx) {
+      ctx.fillStyle = PAGE; ctx.fillRect(0, 0, w, h);
+      const drawn: string[] = [];
+      label(ctx, 'PLACES (2X)', 8, 6, LABEL, 'left');
+      const cells: { name: string; ground: string; draw: (cx: number, foot: number) => void }[] = [
+        ...PLACES.map((p) => ({ name: p.art, ground: GROUND_OF(p.region), draw: (cx: number, foot: number) => drawLandmark(ctx, p.art, cx, foot, 2) })),
+        { name: 'home', ground: GROUND_OF('millbrook'), draw: (cx: number, foot: number) => drawScaled(ctx, HOME_ART, cx - HOME_ART.rows[0].length, foot - HOME_ART.rows.length * 2, 2) },
+      ];
+      cells.forEach((c, i) => {
+        const cx = 40 + (i % 8) * 78, top = 18 + Math.floor(i / 8) * 64, foot = top + 44;
+        ctx.fillStyle = c.ground; ctx.fillRect(cx - 36, top, 72, 50);
+        if (drew(ctx, cx - 36, top, 72, 50, () => c.draw(cx, foot))) drawn.push(c.name === 'home' ? 'home' : `place:${c.name}`);
+        label(ctx, c.name.toUpperCase(), cx, top + 52, SUB);
+      });
+      label(ctx, 'GROWTHS (1X AND 2X)', 8, 214, LABEL, 'left');
+      let x = 12;
+      for (const g of growthSamples()) {
+        const gw = g.s.rows[0].length, gh = g.s.rows.length;
+        if (drew(ctx, x - 1, 226, gw + 2, gh + 2, () => drawScaled(ctx, g.s, x, 227, 1))) drawn.push(`growth:${g.name}`);
+        drawScaled(ctx, g.s, x, 270, 2);
+        x += gw * 2 + 8;
+      }
+      publish('places', drawn);
+    },
+  };
+}
+
 /** Build the sheet the query asks for (an unknown sheet: climates). */
 export function missionArtScene(search: string): ArtScene {
   const q = new URLSearchParams(search);
@@ -89,6 +127,7 @@ export function missionArtScene(search: string): ArtScene {
     case 'baddies': return baddiesSheet((BADDIE_IDS as readonly string[]).includes(q.get('id') || '') ? [q.get('id') as BaddieId] : BADDIE_IDS);
     case 'people': return peopleSheet();
     case 'icons': return iconsSheet();
+    case 'places': return placesSheet();
     default: return climate ? roadScene(climate, phase) : climatesSheet();
   }
 }

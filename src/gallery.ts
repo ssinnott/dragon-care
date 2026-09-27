@@ -30,12 +30,14 @@
 //   view=pour                  the pour-column audit (no breath effect joins the mouth to the floor: 3.8), narrowed the same
 //   view=neutral               the neutral-area recorder (each look's share of HSV S < 0.25 pixels, <= 40 %: 3.1)
 //   view=missionart            the mission art kit (src/game/missionart.ts): sheet=climates (&climate=<c>&phase=<p>:
-//                              one climate as a scrolling road scene) | setpieces | baddies | people | icons
+//                              one climate as a scrolling road scene) | setpieces | baddies | people | icons | places (the
+//                              world map's landmarks and its land's growths)
 //   view=base                  the base (src/game/base.ts; docs/BASE_DESIGN.md): the barn and towers at 640 x 360 with the
 //                              care simulation running -- need bubbles, keepers, the job strip; live, drag to look around
 //                              and tap a bubble, a job or a dragon to Rush it; seed= seeds the world, cam=x,y starts the
 //                              camera there (world px), preset=<name> starts from a code-built world instead of the new
-//                              game (src/game/presets.ts: ages = every stage), save=0 keeps a live page from saving
+//                              game (src/game/presets.ts: ages = every stage, explored = the whole world map out from
+//                              under its cloud), save=0 keeps a live page from saving
 //                              (a preset page, like a frozen one, never loads or saves: it isn't the player's barn),
 //                              hour=0..23 starts day 1 at that hour (22: night; nor does a page given an hour load or
 //                              save, so it always starts there), layers=world draws the world alone (the

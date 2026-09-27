@@ -84,7 +84,10 @@ interface Window {
      * The overlays (`ui`, BASE_DESIGN 5 and 6): the screen open -- `none` (the barn), `map` or `mission` (the Map Room table's
      * world map or a mission's chooser: the world waits while one is open) or `watch` (the team out watched on its
      * road, the world stepping on underneath) -- the mission chosen (id) and the team being put together, the map's
-     * pins (canvas px, board order) and the named buttons on screen (canvas px: `back`, `best`, `send`, and `chip`, the
+     * pins (canvas px, board order: each mission's plate), its places with no mission today (`places`, by name: each
+     * landmark's tap box) and its regions under cloud (`clouds`, by region id: each cloud's "?" -- a tap anywhere on
+     * the cloud says how it clears), and the named buttons on screen (canvas px: `back`, `best`, `send`, on the map
+     * `home` and each mission's landmark `mark0`-`mark2`, and `chip`, the
      * TEAM OUT chip while a team is out and the barn is on screen; over the watch overlay `log`, which opens the trip's
      * log), and `chip` (the TEAM OUT chip's rect while it shows) and `back` (BACK TO BARN's while watching), and
      * whether the trip's log is open over the watch overlay (`log`); and the chooser's line about the egg (`notice`:
@@ -141,6 +144,7 @@ interface Window {
       ui: { screen: 'none' | 'map' | 'mission' | 'watch' | 'arena' | 'bout'; mission: number | null; pairs: { dragon: number; keeper: number }[]; corners: (number | null)[];
         boutChip: { x: number; y: number; w: number; h: number } | null;
         pins: { x: number; y: number; w: number; h: number }[]; buttons: Record<string, { x: number; y: number; w: number; h: number }>;
+        places: Record<string, { x: number; y: number; w: number; h: number }>; clouds: Record<string, { x: number; y: number; w: number; h: number }>;
         chip: { x: number; y: number; w: number; h: number } | null; back: { x: number; y: number; w: number; h: number } | null; log: boolean;
         notice: 'HATCHERY FULL: NO EGG' | 'BARN FULL: THE EGG WILL WAIT' | null };
       scene: { stop: string | null; covered: boolean | null; beat: boolean; banner: string | null; baddie: 'moleking' | 'stormroc' | 'frostgiant' | null;

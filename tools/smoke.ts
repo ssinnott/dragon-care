@@ -54,7 +54,9 @@
 // line.
 // The Map Room (BASE_DESIGN 5; panel=map and panel=mission frames too): MAP opens the world map, a pin its chooser
 // (the climate picture, the challenges and who meets them, the odds, the egg's notice), BEST TEAM fills the team and
-// SEND starts the muster and eases the camera to the Aerie. The mission loop, live at 8x: the muster to the deck, the
+// SEND starts the muster and eases the camera to the Aerie. The world map's places, live: a place with no mission today
+// says what it is, a cloud how it clears, and a mission's landmark opens its chooser; the map's panel stays flat
+// pixel art (a colour budget) and the places sheet draws every landmark. The mission loop, live at 8x: the muster to the deck, the
 // TEAM OUT chip to the watch scene, TRIP LOG open and shut, BACK TO BARN.
 // The mission art kit (ART_BIBLE 5.10, view=missionart): every sheet -- the climates (and one as a scrolling road scene), the
 // set pieces, the baddies, the people (the miller beside the keepers) and the icons -- draws every item on it, with
@@ -87,6 +89,7 @@ import { SAVE_KEY, BACKUP_KEY } from '../src/game/storage.ts';
 import { FLOORS, STRAW_SEAM, PATH_EDGE } from '../src/game/surfaces.ts';
 import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS } from '../src/game/missiondata.ts';
 import { PHASE_ORDER } from '../src/game/clock.ts';
+import { PLACES, growthSamples } from '../src/game/worldmap.ts';
 import { PLATES, LOG_LINE, MENU, AUTO, BOUT_BACK } from '../src/game/arenaui.ts';
 
 const require = createRequire(import.meta.url);
@@ -126,7 +129,12 @@ interface Case {
   init?: (page: any) => Promise<void>;
   /** view=missionart (ART_BIBLE 5.10): the sheet the page's hook must name, and every item it must have drawn. */
   art?: { sheet: string; want: readonly string[] };
-  /** The Map Room's panel (inside its border, screen px 12-628 x 22-332): at most this many colours (flat pixel-art fills, no anti-aliased edges: the house style). */
+  /**
+   * The Map Room's panel (inside its border, screen px 12-628 x 22-332): at most this many colours -- flat pixel-art
+   * fills, no anti-aliased edge anywhere (the house style: a single smoothed edge brings in a spread of in-between shades).
+   * The world map is a painted little world now (worldmap.ts: its land, growths, landmarks and cloud), 96 colours in the
+   * new game's frame at t=60, all of them flat.
+   */
   maxPanelColours?: number;
   /** Hash the frame (an in-page FNV-1a over the canvas's pixels) for TINT: the whole frame, and the world between the HUD's bars (rows 16-338). */
   hash?: boolean;
@@ -679,6 +687,45 @@ async function baseLoop(page: any): Promise<string[]> {
 }
 
 /**
+ * view=base, live (save=0): the world map's places (BASE_DESIGN 5.1). MAP opens the map; a tap on a place with no
+ * mission today says what it is (the toast opens with its name) and the map stays open; a tap on a region under cloud
+ * (its "?") says how the cloud clears -- a success next door, named; a tap on the first mission's landmark (not its
+ * plate) opens its chooser.
+ */
+async function baseMapPlaces(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  const until = (fn: string, ms: number) => page.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (r: { x: number; y: number; w: number; h: number }) => page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  await click((await st()).buttons.map);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "map"', 2000))) return [`MAP did not open the map (screen ${(await st()).ui.screen})`];
+  const m = await st(), places = Object.entries(m.ui.places), clouds = Object.entries(m.ui.clouds);
+  if (places.length !== 7 || clouds.length !== 3) out.push(`the new game's map has ${places.length} quiet places (want 7: the start's ten less the board's three) and ${clouds.length} clouds (want 3)`);
+  const [name, pr] = places[0] ?? [], said: string[] = [];
+  if (pr) {
+    await click(pr);
+    if (!(await until(`(window.__dragonCare?.base?.toast ?? '').startsWith(${JSON.stringify(name)})`, 2000))) out.push(`tapping ${name} said ${JSON.stringify((await st()).toast)}`);
+    if ((await st()).ui.screen !== 'map') out.push(`tapping ${name} left the map for ${(await st()).ui.screen}`);
+    said.push(`${(await st()).toast}`);
+  }
+  const [region, cr] = clouds[0] ?? [];
+  if (cr) {
+    await click(cr);
+    if (!(await until(`(window.__dragonCare?.base?.toast ?? '').startsWith('UNDER CLOUD: A SUCCESS IN ')`, 2000))) out.push(`tapping ${region}'s cloud said ${JSON.stringify((await st()).toast)}`);
+    said.push(`${(await st()).toast}`);
+  }
+  const mark = (await st()).ui.buttons.mark0;
+  if (!mark) return [...out, 'the map has no landmark for its first mission'];
+  await click(mark);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "mission"', 2000))) return [...out, `the first mission's landmark opened ${(await st()).ui.screen}, not its chooser`];
+  if ((await st()).ui.mission !== m.board[0].id) out.push(`the first mission's landmark opened mission ${(await st()).ui.mission}, not ${m.board[0].id}`);
+  if (!out.length) console.log(`        map places: ${name} told of ("${said[0]}"), ${region}'s cloud how it clears ("${said[1]}"), ${m.board[0].title}'s landmark opened its chooser`);
+  return out;
+}
+
+/**
  * view=base&panel=arena (BASE_DESIGN 10): the Arena's chooser, open over a world that waits, with a button for every
  * dragon free to spar (every one, a minute into the new game), no corner filled and no bout on.
  */
@@ -1083,14 +1130,18 @@ const CASES: Case[] = [
   { query: 'view=missionart&sheet=baddies&t=30', minColours: 1000, allScales: false, art: { sheet: 'baddies', want: [...BADDIE_IDS, ...BADDIE_IDS.map((b) => `${b}:portrait`)] } },
   { query: 'view=missionart&sheet=people&t=50', minColours: 1000, allScales: false, keepers: true, art: { sheet: 'people', want: ['miller:grumpy', 'miller:talkedRound', ...KEEPER_IDS] } },
   { query: 'view=missionart&sheet=icons&t=0', minColours: 300, allScales: false, art: { sheet: 'icons', want: [...CHALLENGE_IDS.map((c) => `challenge:${c}`), ...SKILLS.map((k) => `skill:${k}`), 'saddle', ...DRAGON_ELEMENTS.map((e) => `egg:${e}`), ...BADDIE_IDS.map((b) => `portrait:${b}`)] } },
+  // (the world map's landmarks, HOME and the land's growths: BASE_DESIGN 5.1)
+  { query: 'view=missionart&sheet=places&t=0', minColours: 90, allScales: false, art: { sheet: 'places', want: [...new Set(PLACES.map((p) => `place:${p.art}`)), 'home', ...growthSamples().map((g) => `growth:${g.name}`)] } },
   // missions (BASE_DESIGN 5): the Map Room's world map and a mission's chooser (frozen, the world stepped first), the muster
   // preset's team all on the Aerie deck, and live, MAP -> a pin -> BEST TEAM -> SEND
-  { query: 'view=base&t=60&panel=map', minColours: 100, maxPanelColours: 40, allScales: false, check: tableIs('map') },
+  { query: 'view=base&t=60&panel=map', minColours: 100, maxPanelColours: 110, allScales: false, check: tableIs('map') },
   { query: 'view=base&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: (b) => [...tableIs('mission')(b), ...noticeIs(null)(b)] },
   // (and over a full barn: the twelve preset at the cap, the chooser open on THE LOST NEST, its egg to wait)
   { query: 'view=base&preset=twelve&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: (b) => [...tableIs('mission')(b), ...barnIs(12)(b), ...noticeIs('BARN FULL: THE EGG WILL WAIT')(b)] },
   { query: 'view=base&preset=muster&t=2186&cam=0,20', minColours: 150, allScales: false, check: (b) => [...mustered(b), ...travels(b)] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseMission },
+  // (the world map's places, live: a quiet place told of, a cloud's way to clear, a mission's landmark to its chooser)
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseMapPlaces },
   // the whole loop live (BASE_DESIGN 5, 6): MAP -> a pin -> BEST TEAM -> SEND -> the muster on the Aerie -> the TEAM
   // OUT chip -> the watch scene (its trip log) -> BACK
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseLoop },
