@@ -406,16 +406,15 @@ export function tripProgress(sim: CareSim, t: Trip): number {
   return Math.max(0, Math.min(1, (sim.clock - t.departAt) / (t.returnAt - t.departAt)));
 }
 /**
- * Where each stop is at the world's clock (or `clock`): reached and met, reached and unmet, not reached yet, or never
- * (past the turn-back) -- each told
- * only once the scene has shown how it went (missionview.ts stopShownAt: the banner's moment, the scene being the
- * timer), and the stops past the turn-back only once the turn-back stop's has, so the card never tells a stop, or a
- * failure, before the scene does.
+ * Where each stop is at the world's clock (or `clock`): reached and met, reached and unmet (waited out), or not reached
+ * yet -- the team reaches every one, a trip that fails too -- each told only once the scene has shown how it went
+ * (missionview.ts stopShownAt: the banner's moment, the scene being the timer), so the card never tells a stop before
+ * the scene does; and never the trip's outcome, which is the result card's, at the road's end.
  */
-export function stopStates(sim: CareSim, t: Trip, clock = sim.clock): ('met' | 'unmet' | 'ahead' | 'never')[] {
+export function stopStates(sim: CareSim, t: Trip, clock = sim.clock): ('met' | 'unmet' | 'ahead')[] {
   const E = t.state === 'muster' || t.state === 'depart' || t.departAt == null ? -1 : t.state === 'away' ? clock - t.departAt : Infinity;
-  const at = stopShownAt(sim, t), shown = (i: number) => E >= at[i], turned = t.turnBack != null && shown(t.turnBack);
-  return t.stops.map((s, i) => (turned && i > t.turnBack! ? 'never' : shown(i) ? (s.covered ? 'met' : 'unmet') : 'ahead'));
+  const at = stopShownAt(sim, t);
+  return t.stops.map((s, i) => (E < at[i] ? 'ahead' : s.covered ? 'met' : 'unmet'));
 }
 
 /** The words fitted to a width (cut on a space), as lines. */
@@ -435,7 +434,7 @@ export function drawLogButton(ctx: CanvasRenderingContext2D, open: boolean): voi
 
 /**
  * The trip's log (over the watch overlay, opened by its TRIP LOG button: BASE_DESIGN 6): the mission and its region, each stop (its icon and name, a tick
- * met, a cross unmet, a mark still ahead, a dash past the turn-back), the trip log's latest lines, and the time left.
+ * met, a cross unmet, a mark still ahead), the trip log's latest lines, and the time left.
  */
 export function drawTripCard(ctx: CanvasRenderingContext2D, sim: CareSim, t: Trip): void {
   const { x, y, w, h } = TRIP_CARD;
@@ -447,12 +446,11 @@ export function drawTripCard(ctx: CanvasRenderingContext2D, sim: CareSim, t: Tri
     const ly = y + 18 + i * 11;
     const icon = s.kind === 'baddie' ? null : CHALLENGE_ICONS[s.challenge!];
     if (icon) drawSprite(ctx, icon, x + 11, ly + 3.5); else drawBaddiePortraitSmall(ctx, x + 7, ly - 1);
-    text(ctx, s.kind === 'baddie' ? BADDIES[s.baddie!].name : CHALLENGES[s.challenge!].name, x + 20, ly, st[i] === 'never' ? OFF : TEXT);
-    const mark = st[i] === 'met' ? ICONS.check : st[i] === 'unmet' ? CROSS : st[i] === 'ahead' ? PENDING : null;
-    if (mark) drawSprite(ctx, mark, x + 150, ly + 3.5); else text(ctx, '-', x + 148, ly, OFF);
+    text(ctx, s.kind === 'baddie' ? BADDIES[s.baddie!].name : CHALLENGES[s.challenge!].name, x + 20, ly, TEXT);
+    drawSprite(ctx, st[i] === 'met' ? ICONS.check : st[i] === 'unmet' ? CROSS : PENDING, x + 150, ly + 3.5);
   });
   // the log's latest lines (the stops reached), wrapped to the card
-  const seen = t.stops.filter((_, i) => st[i] === 'met' || st[i] === 'unmet').map((s) => s.log);
+  const seen = t.stops.filter((_, i) => st[i] !== 'ahead').map((s) => s.log);
   const lines = seen.slice(-2).flatMap((l) => wrap(l, w - 12)).slice(-3);
   lines.forEach((l, i) => text(ctx, l, x + 6, y + 76 + i * 10, '#e8d8a8'));
   const left = t.state === 'muster' ? 'MUSTERING ON THE AERIE' : t.state === 'depart' ? 'LEAVING OVER THE SKY BRIDGE'

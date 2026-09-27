@@ -31,7 +31,7 @@ import { CareSim } from './sim.ts';
 import type { Dragon, Job, Keeper } from './sim.ts';
 import { startSpec, buildSim, tripStart } from './presets.ts';
 import type { Trip } from './trip.ts';
-import { sceneAt, drawMissionScene, drawBackButton, drawResultCard, ScenePets, BACK_BUTTON, RESULT_CARD, ROAD_BOTTOM } from './missionview.ts';
+import { sceneAt, drawMissionScene, drawBackButton, drawResultCard, resultTitle, ScenePets, BACK_BUTTON, RESULT_CARD, ROAD_BOTTOM } from './missionview.ts';
 import type { SceneFrame } from './missionview.ts';
 import { worldKey, barnKey, fnv1a, serialize } from './save.ts';
 import type { SaveV } from './save.ts';
@@ -793,13 +793,13 @@ export class BaseView {
       departAt: t.departAt, returnAt: t.returnAt, progress: tripProgress(this.sim, t) };
   }
 
-  /** The scene as the hook reports it (BASE_DESIGN 6): the last stop reached, its banner, the baddie on the road, its exit, which way the team faces, how far along it is. */
+  /** The scene as the hook reports it (BASE_DESIGN 6): the last stop reached, its banner, the baddie on the road, its exit, how far along it is, and the result card's title once it is done. */
   private sceneHook(): NonNullable<NonNullable<Window['__dragonCare']>['base']>['scene'] {
     if (!this.scene) return null;
     const { trip, f } = this.scene, s = f.last == null ? null : trip.stops[f.last];
     return { stop: s ? (s.kind === 'baddie' ? 'baddie' : s.challenge) : null, covered: s ? s.covered : null, beat: f.stop != null, banner: f.banner,
-      baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, exit: s?.kind === 'baddie' ? trip.exit : null, facing: f.facing,
-      progress: f.L ? f.E / f.L : 0, done: f.done, result: f.done ? (trip.success ? 'HOME SAFE!' : 'HOME EARLY') : null };
+      baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, exit: s?.kind === 'baddie' ? trip.exit : null,
+      progress: f.L ? f.E / f.L : 0, done: f.done, result: f.done ? resultTitle(trip) : null };
   }
 
   /** How far on an egg is: 0 laid, 1 due (its HATCH_DAYS in the nest; one past it waits for a sub-slot at 1). */

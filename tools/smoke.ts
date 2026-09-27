@@ -41,8 +41,10 @@
 // opens its card and Rushes the job -- a head drawn over a keeper included. The elder garden (BASE_DESIGN 3): the new game's garden has its two empty plots; the garden preset's
 // three residents live on three plots, by day and by night (each dragon says where it lives: the barn or the garden).
 // The watchable scene (BASE_DESIGN 6): frozen with a team away (preset=trip&trip=...&panel=watch), the scene is on screen at
-// the baddie (the Mole King in view, dozing off calmed; in its beat, surprised), at a challenge the team met (with its
-// banner), turned back on a failure, and home with the result card; live, the TEAM OUT chip opens the scene over the
+// the baddie (the Mole King in view, dozing off calmed; in its beat, surprised; and dozing off just the same for a team
+// that will fail), at a challenge the team met (with its banner), on a failure just where the team that succeeds is
+// (it never turns back, and nothing tells the outcome early), and home with the result card (HOME SAFE!, or NOT THIS
+// TIME at a failure's end); live, the TEAM OUT chip opens the scene over the
 // barn, the world steps on under it, and BACK TO BARN closes it; beside a keeper held by hand (who stands still under
 // it), a badge or Esc goes back to the barn.
 // Taking a keeper (BASE_DESIGN 4.10, #6; take= frames too): a tap on a keeper or their badge takes them, d and the pad's
@@ -68,6 +70,8 @@ import { KEEPER_PALETTES } from '../src/art/keeper/palettes.ts';
 import { KEEPER_IDS } from '../src/art/keeper/cast.ts';
 import { REACH_MISS } from '../src/care/limits.ts';
 import { CareSim } from '../src/game/sim.ts';
+import { buildSim, tripStart } from '../src/game/presets.ts';
+import { sceneAt } from '../src/game/missionview.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts';
 import { serialize } from '../src/game/save.ts';
 import { SAVE_KEY, BACKUP_KEY } from '../src/game/storage.ts';
@@ -444,6 +448,19 @@ function sceneIs(want: Partial<NonNullable<BaseHook['scene']>>) {
     if (!(s.progress >= 0 && s.progress <= 1)) out.push(`the progress is ${s.progress}`);
     return out;
   };
+}
+
+/**
+ * The scene a trip preset's page shows at its frozen step `t` for the team that SUCCEEDS on it (trip=<region>:<progress>),
+ * read in Node from the scene's own pure function as the page's hook reports it (base.ts sceneHook): the last stop
+ * reached, whether it was met, whether its beat is playing, the banner, and not done. The same page for a team that
+ * fails must show just this: it never turns back, and nothing on the road tells the outcome.
+ */
+function succeedingScene(trip: string, t: number): Partial<NonNullable<BaseHook['scene']>> {
+  const w = buildSim(tripStart(trip, t), 1);
+  for (let i = 0; i < t; i++) w.step();
+  const tr = w.missions.trip!, f = sceneAt(w, tr), s = f.last == null ? null : tr.stops[f.last];
+  return { stop: s ? (s.kind === 'baddie' ? 'baddie' : s.challenge) : null, covered: s ? s.covered : null, beat: f.stop != null, banner: f.banner, done: false, result: null };
 }
 
 /**
@@ -904,11 +921,13 @@ const CASES: Case[] = [
   // and the capped preset, the barn at its cap (BARN 12/12), its egg due on the first step waiting in the Hatchery's
   // first nest with nobody in front of it (the nest's dots in view)
   { query: 'view=base&preset=capped&t=60&cam=168,280', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...barnIs(12)(b), ...eggWaits(b), ...nestClear(b)] },
-  { query: 'view=base&preset=trip&trip=oldmine:0.95&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', baddie: 'moleking', exit: 'calmed', facing: 1 }) },
+  { query: 'view=base&preset=trip&trip=oldmine:0.95&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', baddie: 'moleking', exit: 'calmed' }) },
+  { query: 'view=base&preset=trip&trip=oldmine:0.95:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ ...succeedingScene('oldmine:0.95', 60), baddie: 'moleking', exit: 'calmed' }) },
   { query: 'view=base&preset=trip&trip=oldmine:0.91&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', beat: true, baddie: 'moleking', face: 'surprised' }) },
-  { query: 'view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ covered: true, baddie: null, facing: 1 })(b), ...(b.scene?.stop && b.scene.stop !== 'baddie' ? [] : [`the last stop is ${b.scene?.stop}, not a challenge`])] },
-  { query: 'view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ facing: -1, exit: null }) },
+  { query: 'view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ covered: true, baddie: null })(b), ...(b.scene?.stop && b.scene.stop !== 'baddie' ? [] : [`the last stop is ${b.scene?.stop}, not a challenge`])] },
+  { query: 'view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ ...succeedingScene('bramblewood:0.7', 60), exit: null }) },
   { query: 'view=base&preset=trip&trip=oldmine:1&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result: 'HOME SAFE!' }) },
+  { query: 'view=base&preset=trip&trip=bramblewood:1:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result: 'NOT THIS TIME' }) },
   { query: 'view=base&preset=trip&trip=oldmine:0.2&save=0', minColours: 150, allScales: false, act: baseWatch },
   // the mission art kit (ART_BIBLE 5.10): every sheet draws everything on it (the page's hook lists it), in its colours
   { query: 'view=missionart&sheet=climates&t=0', minColours: 1000, allScales: false, art: { sheet: 'climates', want: CLIMATES.flatMap((c) => PHASE_ORDER.map((p) => `${c}:${p}`)) } },

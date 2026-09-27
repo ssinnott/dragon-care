@@ -1,7 +1,9 @@
 // The watchable scene (docs/BASE_DESIGN.md 6): a team out on a mission, walking the road of its region, meeting
-// each challenge where it comes (the counter's moment, a banner), a hard mission's big baddie at the end of the road
-// (walks in grumpy, is met by its two counters, and leaves calmed, outwitted or driven off -- nobody hurt, ever: BASE_DESIGN B8),
-// and the result card once the trip's time is up. "The scene is the timer" (B5): nothing here is stepped or saved;
+// each challenge where it comes (the counter's moment, a banner) or waiting it out, a hard mission's big baddie at the
+// end of the road (walks in grumpy, is met by its two counters, and leaves calmed, outwitted or driven off -- nobody
+// hurt, ever: BASE_DESIGN B8), and the result card once the trip's time is up. The team never turns back: every trip
+// walks its whole road, and the scene is the same whatever the outcome until the result card tells it, at the end.
+// "The scene is the timer" (B5): nothing here is stepped or saved;
 // every quantity is a pure function of the Trip and the world's clock (`sceneAt`), so a frozen view (t=) and a view
 // opened half way along show the same road. The simulation never reads any of it.
 //
@@ -136,13 +138,13 @@ export interface BaddieAt { id: BaddieId; x: number; face: BaddieFace; pose: Bad
 /**
  * The scene at one clock value (`SceneFrame`: BASE_DESIGN 6's scene, plus what the view needs to draw it). E is the time since the
  * team left (0..L), n the travel time in it; `stop` the stop whose beat is playing (else null), `beatT` how far into it;
- * `last` the last stop reached (its banner stays up until the next); xs each pair's dragon's road x, `speeds` each
- * one's walk speed; `camX` the road x at the screen's left edge.
+ * `last` the last stop reached (its banner stays up until the next); xs each pair's dragon's road x (the team walks
+ * up the road, east, all the way: it never turns back), `speeds` each one's walk speed; `camX` the road x at the
+ * screen's left edge. Nothing in it tells the trip's outcome: that is the result card's, once `done`.
  */
 export interface SceneFrame {
   E: number; L: number; n: number;
   stop: number | null; beatT: number; last: number | null;
-  facing: 1 | -1;
   xs: number[]; speeds: number[];
   camX: number;
   banner: string | null; bannerOk: boolean;
@@ -186,10 +188,10 @@ export function tripLen(sim: CareSim, trip: Trip): number {
 }
 
 /**
- * The trip time (E) from which each stop's outcome shows in the scene -- its banner turning from the stop's name to how
+ * The trip time (E) from which how each stop went shows in the scene -- its banner turning from the stop's name to how
  * it went: a challenge's at its counter's moment (MOMENT_AT of its beat), the baddie's once its counters' moments are
- * over (its exit, or its keeping the road, begins). The TRIP LOG reads the stops by it (maptable.ts stopStates), so the
- * log never tells what the scene has not shown yet: the scene is the timer.
+ * over (its exit begins). The TRIP LOG reads the stops by it (maptable.ts stopStates), so the log never tells what the
+ * scene has not shown yet: the scene is the timer.
  */
 export function stopShownAt(sim: CareSim, trip: Trip): number[] {
   const L = tripLen(sim, trip), P = baddieParts(L);
@@ -197,51 +199,49 @@ export function stopShownAt(sim: CareSim, trip: Trip): number[] {
 }
 
 /**
- * The scene at the world's clock (or at `clock`): pure -- the same trip and clock give the same frame, always.
+ * The scene at the world's clock (or at `clock`): pure -- the same trip and clock give the same frame, always. It never
+ * reads the trip's outcome (success, egg): a team that will fail walks the same road, meets the same stops and watches
+ * the same baddie leave as one that will succeed, frame for frame, until the result card (drawResultCard) tells which.
  */
 export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): SceneFrame {
   const team = teamOf(sim, trip), L = tripLen(sim, trip);
   const E = trip.departAt == null ? 0 : Math.max(0, Math.min(L, clock - trip.departAt));
-  const stops = trip.stops, lastStop = trip.success ? stops.length - 1 : Math.min(stops.length - 1, trip.turnBack ?? stops.length - 1);
+  const stops = trip.stops;
   const starts = stops.map((s) => Math.round(s.at * L)), lens = stops.map((s) => (s.kind === 'baddie' ? baddieBeatLen(L) : beatLen(L)));
-  const nAt = (e: number) => { let n = e; for (let j = 0; j <= lastStop; j++) if (starts[j] <= e) n -= Math.min(e - starts[j], lens[j]); return n; };
+  const nAt = (e: number) => { let n = e; for (let j = 0; j < stops.length; j++) if (starts[j] <= e) n -= Math.min(e - starts[j], lens[j]); return n; };
   const n = nAt(E);
   let stop: number | null = null, last: number | null = null;
-  for (let j = 0; j <= lastStop; j++) if (starts[j] <= E) { last = j; if (E < starts[j] + lens[j]) stop = j; }
+  for (let j = 0; j < stops.length; j++) if (starts[j] <= E) { last = j; if (E < starts[j] + lens[j]) stop = j; }
   const beatT = stop == null ? 0 : E - starts[stop];
-  const b = trip.success ? null : lastStop, nb = b == null ? 0 : nAt(starts[b]);
-  const turned = b != null && E >= starts[b] + lens[b];
-  const facing: 1 | -1 = turned ? -1 : 1;
   const X0 = (i: number) => -PAIR_BACK * i;
   const xAt = (i: number, nn: number) => X0(i) + walkDist(team.gaits[i], team.speeds[i] * nn);
-  const xs = team.ds.map((_, i) => (turned ? xAt(i, nb) - walkDist(team.gaits[i], team.speeds[i] * (n - nb)) : xAt(i, n)));
+  const xs = team.ds.map((_, i) => xAt(i, n));
   const mean = xs.length ? xs.reduce((a, v) => a + v, 0) / xs.length : 0;
   const camX = mean - CAM_BACK;
   const leadAt = (j: number) => (team.ds.length ? xAt(0, nAt(starts[j])) : 0);
 
-  // the set pieces: every stop the road reaches (on a failure, none past the turn-back), where it stands and how it looks
+  // the set pieces: every stop's (the team reaches them all), where it stands and how it looks
   const pieces: Piece[] = [];
-  for (let j = 0; j <= lastStop; j++) {
+  for (let j = 0; j < stops.length; j++) {
     if (stops[j].kind !== 'challenge') continue;
     const resolved = E >= starts[j] + RESOLVED_AT * lens[j];
     pieces.push({ stop: j, x: leadAt(j) + PIECE_AHEAD, state: !resolved ? 'ahead' : stops[j].covered ? 'met' : 'unmet' });
   }
 
-  // the banner: the last stop's (its name alone until its counter's moment -- a baddie's until its exit begins, so the
-  // ending is never told before it plays -- then how it went), up until the next stop
+  // the banner: the last stop's (its name alone until its counter's moment -- a baddie's until its exit begins, so its
+  // exit is never told before it plays -- then how it went), up until the next stop
   let banner: string | null = null, bannerOk = false;
   if (last != null) {
     const s = stops[last], head = s.log.split(' - ')[0], bt = E - starts[last];
     const P = baddieParts(L), shown = s.kind === 'baddie' ? bt >= P.enter + P.moments : bt >= MOMENT_AT * lens[last];
     if (!shown) banner = s.kind === 'baddie' ? `${head}!` : head;
-    else if (b === last) banner = s.kind === 'baddie' ? `${head} KEEPS THE ROAD. HOME FOR TEA. NOBODY IS HURT.` : `${head} - ${s.covered ? '' : 'NOBODY COULD HELP: '}THEY TURN BACK FOR HOME`;
     else { banner = s.log; bannerOk = s.covered; }
   }
 
-  // the baddie: in from the right, the two moments, its exit (or it keeps the road)
+  // the baddie: in from the right, the two moments, its exit (met or waited out, it always leaves: the team walks on)
   let baddie: BaddieAt | null = null;
   const kb = stops.findIndex((s) => s.kind === 'baddie');
-  if (kb >= 0 && kb <= lastStop && E >= starts[kb]) {
+  if (kb >= 0 && E >= starts[kb]) {
     const P = baddieParts(L), bt = E - starts[kb], x0 = leadAt(kb) + BADDIE_AHEAD, id = stops[kb].baddie!;
     const walkIn = Math.round(0.7 * P.enter), from = x0 + 190;
     if (bt < P.enter) baddie = { id, x: bt < walkIn ? from + (x0 - from) * (bt / walkIn) : x0, face: 'grumpy', pose: bt < walkIn ? 'walk' : 'stand', facing: -1, fx: null, t: bt };
@@ -251,14 +251,11 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
       // how far it has gone; calmed sits and dozes where it stood, outwitted turns and then walks off up the road, ahead
       // of the team, driven off shuffles off up it -- and one that leaves goes on at its exit's last pace once the beat
       // is over, until it is off the screen: never back through the team)
-      const et = bt - P.enter - P.moments;
-      if (!trip.success || !trip.exit) baddie = { id, x: x0, face: 'grumpy', pose: 'stand', facing: -1, fx: null, t: bt };
-      else {
-        const look = exitLook(trip.exit, et / P.exit), end = exitLook(trip.exit, 1), half = exitLook(trip.exit, 0.5);
-        const pace = (end.dx - half.dx) / (0.5 * P.exit), on = Math.max(0, et - P.exit) * pace;
-        const fx = look.pose === 'leave' ? 'dust' : look.pose === 'sit' && look.face === 'sleepy' ? 'z' : null;
-        baddie = { id, x: x0 + look.dx + on, face: look.face, pose: look.pose, facing: look.facing, fx, t: bt };
-      }
+      const et = bt - P.enter - P.moments, exit = trip.exit!;
+      const look = exitLook(exit, et / P.exit), end = exitLook(exit, 1), half = exitLook(exit, 0.5);
+      const pace = (end.dx - half.dx) / (0.5 * P.exit), on = Math.max(0, et - P.exit) * pace;
+      const fx = look.pose === 'leave' ? 'dust' : look.pose === 'sit' && look.face === 'sleepy' ? 'z' : null;
+      baddie = { id, x: x0 + look.dx + on, face: look.face, pose: look.pose, facing: look.facing, fx, t: bt };
     }
     // (gone once it is well off the screen: walked off, or left behind)
     if (baddie && Math.abs(baddie.x - (camX + 320)) > 520) baddie = null;
@@ -268,12 +265,12 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
   const acts = team.ds.map((d, i) => {
     const k = team.ks[i];
     const walkAct = (who: 'd' | 'k'): Act => {
-      const seg = last == null ? -1 : last, tau = team.speeds[i] * (turned ? n - nb : n);
+      const seg = last == null ? -1 : last, tau = team.speeds[i] * n;
       const g = team.gaits[i];
-      const segStart = turned ? starts[b!] + lens[b!] : seg < 0 ? 0 : starts[seg] + lens[seg];
+      const segStart = seg < 0 ? 0 : starts[seg] + lens[seg];
       return who === 'd'
-        ? { key: `w${seg}${turned ? 't' : ''}`, anim: 'walk', start: segStart, speed: team.speeds[i], phase: loopPhase(g, tau) }
-        : { key: `w${seg}${turned ? 't' : ''}`, anim: 'walk', start: segStart, speed: team.V / KEEPERS[k!.look].speed, phase: 0 };
+        ? { key: `w${seg}`, anim: 'walk', start: segStart, speed: team.speeds[i], phase: loopPhase(g, tau) }
+        : { key: `w${seg}`, anim: 'walk', start: segStart, speed: team.V / KEEPERS[k!.look].speed, phase: 0 };
     };
     const beatAct = (who: 'd' | 'k', name: string, moment: string): Act => {
       const j = stop!, s = stops[j], by = s.by;
@@ -289,7 +286,7 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
     return { dragon: walkAct('d'), rider: k ? walkAct('k') : null };
   });
 
-  return { E, L, n, stop, beatT, last, facing, xs, speeds: team.speeds, camX, banner, bannerOk, baddie, pieces, acts, done: E >= L };
+  return { E, L, n, stop, beatT, last, xs, speeds: team.speeds, camX, banner, bannerOk, baddie, pieces, acts, done: E >= L };
 }
 
 // ---------- the view: the team's pets and riders, and drawing ----------
@@ -353,24 +350,24 @@ export class ScenePets {
       ticks = a.pet && act.anim === 'walk' ? 0 : Math.max(0, Math.min(act.anim === 'walk' ? 120 : 960, Math.round(f.E - act.start)));
     } else ticks = Math.max(0, Math.min(gap > SYNC_GAP ? 120 : SYNC_GAP, gap));
     a.clock = clock;
-    for (let t = 0; t < ticks; t++) this.tick(a, act, x, y, f.facing);
-    // (placed where the frame says even when nothing ticked)
-    if (a.pet) { a.pet.x = x; a.pet.y = y; a.pet.facing = f.facing; }
-    else if (a.agent) { a.agent.x = x; a.agent.y = y; a.agent.facing = f.facing; }
+    for (let t = 0; t < ticks; t++) this.tick(a, act, x, y);
+    // (placed where the frame says even when nothing ticked; facing up the road, as the team always does)
+    if (a.pet) { a.pet.x = x; a.pet.y = y; a.pet.facing = 1; }
+    else if (a.agent) { a.agent.x = x; a.agent.y = y; a.agent.facing = 1; }
   }
 
-  private tick(a: Actor, act: Act, x: number, y: number, facing: 1 | -1): void {
+  private tick(a: Actor, act: Act, x: number, y: number): void {
     a.age++;
     const moment = act.anim !== 'walk' && act.anim !== 'idle';
     if (a.pet) {
       const p = a.pet;
       if (moment && !a.momentDone && (p.player.done || a.age >= MOMENT_MAX)) { p.player.play('idle', { blend: 8 }); p.anim = 'idle'; a.momentDone = true; }
-      p.x = x; p.y = y; p.facing = facing;
+      p.x = x; p.y = y; p.facing = 1;
       stepPet(p);
     } else {
       const k = a.agent!;
       if (moment && !a.momentDone && (k.player.done || a.age >= MOMENT_MAX)) { k.player.play('idle', { blend: 8 }); a.momentDone = true; }
-      k.x = x; k.y = y; k.facing = facing; k.pinX = true;
+      k.x = x; k.y = y; k.facing = 1; k.pinX = true;
       stepKeeperAgent(k);
     }
   }
@@ -467,14 +464,17 @@ export function rewardsOf(trip: Trip): { coin: number; egg: DragonElement | null
   return { coin: trip.success ? trip.mission.coin : Math.floor(trip.mission.coin / 2), egg: trip.success ? trip.egg : null };
 }
 
-/** The result card (once the trip's time is up, until the team lands): HOME SAFE! or HOME EARLY, the rewards, and that nobody is hurt. */
+/** The result card's title: the trip's pass or fail, told here at the road's end and nowhere on the road before it. */
+export function resultTitle(trip: Trip): string { return trip.success ? 'HOME SAFE!' : 'NOT THIS TIME'; }
+
+/** The result card (once the trip's time is up, until the team lands): HOME SAFE! or NOT THIS TIME, the rewards, and that nobody is hurt. */
 export function drawResultCard(ctx: CanvasRenderingContext2D, trip: Trip, tick: number): void {
   const r = RESULT_CARD, { coin, egg } = rewardsOf(trip);
   ctx.fillStyle = INK; ctx.fillRect(r.x, r.y, r.w, r.h);
   ctx.fillStyle = '#8a6a4a'; ctx.fillRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
   ctx.fillStyle = '#e8d8a8'; ctx.fillRect(r.x + 3, r.y + 3, r.w - 6, r.h - 6);
   const cx = r.x + r.w / 2;
-  drawTextOutlined(ctx, trip.success ? 'HOME SAFE!' : 'HOME EARLY', cx, r.y + 14, { size: 2, color: '#f3e6c8', outline: INK, thickness: 1, align: 'center', shadow: false });
+  drawTextOutlined(ctx, resultTitle(trip), cx, r.y + 14, { size: 2, color: '#f3e6c8', outline: INK, thickness: 1, align: 'center', shadow: false });
   const line = egg ? `+${coin} COIN   AND AN EGG` : `+${coin} COIN`;
   drawText(ctx, line, cx - (egg ? 8 : 0), r.y + 50, { color: INK, shadow: false, align: 'center' });
   if (egg) drawEgg(ctx, egg, cx + measureText(line) / 2 + 4, r.y + 58, 0, tick);
