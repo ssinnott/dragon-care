@@ -1,7 +1,8 @@
 // The base's building, drawn once (docs/BASE_DESIGN.md 2): the ground, the two stone towers with their window slits,
 // every room with its props, the gambrel roof over the hayloft, the Dragon Lift's shaft from the ground floor up
 // through the roof to its headframe over the Aerie, the keepers' centre ladder bay, and the Aerie deck on its gantry
-// over the roof (its west end running on as the sky bridge a mission's team leaves by: BASE_DESIGN 5), and the Garden Gate in the right tower's ground floor (BASE_DESIGN 3, The Garden: an 84 px arch in both its walls, the one
+// over the roof (its west end running on as the sky bridge a mission's team leaves by: BASE_DESIGN 5), the Arena deck
+// on the east roof, where two dragons spar (BASE_DESIGN 10), and the Garden Gate in the right tower's ground floor (BASE_DESIGN 3, The Garden: an 84 px arch in both its walls, the one
 // tower door a dragon fits, a straw floor straight through it, its gate leaf open against the back wall) -- transparent
 // above the ground and around its walls, where the view draws the sky (sky.ts: in screen space, behind it, so the day
 // turns without redrawing this); the garden beyond the gate is gardenArt.ts's. Greybox:
@@ -23,6 +24,7 @@ import {
   WORLD_W, WORLD_H, GROUND, PITCH, MOD, TOWER_W, WALL, WALL_H, BAND, SLAB, TOWER_L, TOWER_R, BARN_X, RIDGE_X, RIDGE_Y,
   KNEE_DX, KNEE_Y, BARN_FLOORS, TOWER_FLOORS, BARN_MODS, LIFT_MOD, LIFT_X0, LIFT_X1, LIFT_STOPS, CAR_X0, CAR_X1, LADDER_BAY_X0,
   LADDER_BAY_X1, AERIE_F, DECK_X0, DECK_X1, HEAD_Y, PULLEY_Y, LADDERS, NESTS, GATE_X0, underSlope, roomMods, GATE_X1, GATE_ARCH, NEST_RX, NEST_RY, NEST_STRANDS, floorTop, feetY, modX, nestX, nestBase, platesOf,
+  ARENA_X0, ARENA_X1,
 } from './layout.ts';
 import type { Room, Link } from './layout.ts';
 import { FLOORS, INK, EMPTY_WALL, LIFT_WALL, STONE, STRAW_SEAM, WALLS, PROPS, NEST, LIGHTS, LAMP_RINGS, HEARTH_RING, BACKDROPS, skyBands, nightColour } from './surfaces.ts';
@@ -34,6 +36,19 @@ const STRAW = FLOORS.straw;
 const TIMBER = '#8a6242', TIMBER_DK = '#6b4a34';
 /** The lift car's side rails (px tall), its cables' colour and x (one over each rail), and the headframe's pulleys. */
 const RAIL_H = 40, CABLE = '#5a4a40', CABLE_X = [CAR_X0 + 1, CAR_X1 - 2] as const, PULLEY_R = 4, PULLEY_X = [CAR_X0 + 5, CAR_X1 - 6] as const;
+/** The Romp Room's bunting, and the Arena's (BASE_DESIGN 10): flags keep their colours at night (not in the night table). */
+const BUNTING = ['#e0664a', '#f2c14e', '#5aa0c8', '#7bbf6a'] as const;
+/**
+ * The Arena's corner colours (BASE_DESIGN 10): the west corner's pennant blue, the east's red -- the bout's name plates
+ * wear them too (arenaui.ts), so a player reads which plate is which dragon.
+ */
+export const ARENA_FLAGS = Object.freeze({ west: '#5aa0c8', east: '#e0664a' });
+/**
+ * The Arena's flag poles' height over its deck's straw (px): their tops -- and the bunting strung 4 px under them, its
+ * pennants 8 px long -- stand 19 px or more over the tallest head in the ring (an adult lightning's bolts, 62 px over
+ * its feet), so nothing of it is ever near a fighter's eye.
+ */
+const ARENA_POLE = 86;
 
 // ---------- the pen ----------
 
@@ -285,8 +300,7 @@ function props(g: CanvasRenderingContext2D, r: Room): void {
       // bunting, and the play wheel that turns the mill (the romp room's post: the balls are kept in the box by it)
       const by = t + 8;
       rect(g, x + 110, by, r.x1 - 10 - (x + 110), 1, '#6e4a30');
-      const cs = ['#e0664a', '#f2c14e', '#5aa0c8', '#7bbf6a'];
-      for (let bx = x + 116, i = 0; bx < r.x1 - 18; bx += 16, i++) poly(g, [bx, by, bx + 10, by, bx + 5, by + 8], cs[i % 4]);
+      for (let bx = x + 116, i = 0; bx < r.x1 - 18; bx += 16, i++) poly(g, [bx, by, bx + 10, by, bx + 5, by + 8], BUNTING[i % 4]);
       const cx = x + 50, cy = t + 46, R = 36;
       disc(g, cx, cy, R, '#a47a52'); disc(g, cx, cy, R - 5, WALLS.romp!, false);
       for (let a = 0; a < 8; a++) { const th = a * Math.PI / 4; line(g, cx, cy, cx + Math.cos(th) * (R - 4), cy + Math.sin(th) * (R - 4), '#6e4a30', 2); }
@@ -330,6 +344,43 @@ function props(g: CanvasRenderingContext2D, r: Room): void {
       for (const [px, py, c] of [[x + 16, t + 32, '#d04a3a'], [x + 36, t + 42, '#3a7ad0'], [x + 52, t + 30, '#d0a03a']] as const) disc(g, px, py, 2, c);
       break;
   }
+}
+
+/**
+ * The Arena (BASE_DESIGN 10: layout.ts ARENA_X0-ARENA_X1): the roof floor running on east from the lift's head, the
+ * Aerie's twin -- its straw deck (a floor: FLOORS.straw), on two trestles over the roof's east slope (the Aerie gantry's,
+ * mirrored about the ridge) and a knee brace to the right tower's west wall; a railing along its back edge (thin
+ * timber marks, as the gantry's: a fighter is seen against the sky between them); a flag pole at each end of the ring,
+ * each with its corner's pennant (the west corner's blue, the east's red), and a string of bunting between the poles'
+ * tops, 16 px over the tallest head in the ring (the bunting and the pennants keep their colours at night, as the Romp
+ * Room's do: not in the night table; the timber is moonlit with the rest). `deck` is the straw band's top, `under` the
+ * slab's bottom.
+ */
+function arena(g: CanvasRenderingContext2D, deck: number, under: number): void {
+  for (const fx of [RIDGE_X * 2 - 416, RIDGE_X * 2 - 288]) {
+    const fy = roofAt(fx) + 2;
+    member(g, fx - 34, under - 1, fx, fy, 3); member(g, fx + 34, under - 1, fx, fy, 3);
+    const ty = under + (fy - under) * 0.4, tw = 34 * 0.6 - 2;
+    member(g, fx - tw, ty, fx + tw, ty, 2);
+    box(g, fx - 6, fy - 3, 12, 5, TIMBER_DK, false);
+  }
+  member(g, TOWER_R - 34, under - 1, TOWER_R, under + 40, 3);
+  // (the railing: posts every 67 px along the back edge, and its top rail)
+  const r0 = ARENA_X0 + 12, r1 = ARENA_X1 - 4;
+  for (let i = 0; i <= 8; i++) { const x = r0 + i * (r1 - r0) / 8; rect(g, x - 2, deck - 18, 4, 18, INK); rect(g, x - 1, deck - 17, 2, 17, TIMBER); }
+  rect(g, r0, deck - 20, r1 - r0, 4, INK); rect(g, r0 + 1, deck - 19, r1 - r0 - 2, 2, TIMBER);
+  // (its straw runs on from the Aerie deck's at the lift's head with no seam: one roof floor)
+  rect(g, ARENA_X0, deck - 1, ARENA_X1 - ARENA_X0 + 1, BAND + SLAB + 1, INK);
+  floor(g, ARENA_X0, ARENA_X1, deck);
+  // (the flag poles at the ring's ends, their pennants flying outward, and the bunting between their tops)
+  const top = deck - ARENA_POLE;
+  for (const [px, dir, c] of [[ARENA_X0 + 14, -1, ARENA_FLAGS.west], [ARENA_X1 - 14, 1, ARENA_FLAGS.east]] as const) {
+    box(g, px - 1, top, 3, deck - top, TIMBER_DK, false);
+    poly(g, [px + (dir > 0 ? 1 : 0), top + 2, px + dir * 20, top + 7, px + (dir > 0 ? 1 : 0), top + 12], c);
+  }
+  const bx0 = ARENA_X0 + 16, bx1 = ARENA_X1 - 16, by = top + 4;
+  rect(g, bx0, by, bx1 - bx0, 1, '#6e4a30');
+  for (let bx = bx0 + 6, i = 0; bx < bx1 - 12; bx += 16, i++) poly(g, [bx, by, bx + 10, by, bx + 5, by + 8], BUNTING[i % BUNTING.length]);
 }
 
 /**
@@ -486,6 +537,7 @@ function buildingAt(rooms: readonly Room[]): HTMLCanvasElement {
   rect(g, 0, deck - 15, 3, 3, INK); rect(g, 0, deck - 14, 3, 1, '#b89868');
   // (the flag, at the deck's west end)
   box(g, DECK_X0 + 1, deck - 40, 3, 40, TIMBER_DK, false); poly(g, [DECK_X0 + 3, deck - 40, DECK_X0 + 25, deck - 34, DECK_X0 + 3, deck - 28], '#f2c14e');
+  arena(g, deck, deckBottom);
   // the lift's headframe over its head: two legs on the housing's posts, the beam a room's height over the deck, and
   // a pulley over each of the car's rails
   for (const x of [LIFT_X0, LIFT_X1]) { rect(g, x - 3, HEAD_Y, 6, deck - HEAD_Y, INK); rect(g, x - 2, HEAD_Y, 4, deck - HEAD_Y, TIMBER); rect(g, x - 2, HEAD_Y, 1, deck - HEAD_Y, '#a47a52'); }

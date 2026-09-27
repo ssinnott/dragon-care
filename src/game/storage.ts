@@ -3,7 +3,7 @@
 // check never do: BASE_DESIGN 7, Saves). A save is save.ts's JSON under one key; one this build can't read -- another
 // version, or not a save at all -- is copied to a backup key and a new barn starts, without throwing. Storage that
 // isn't there (a private window, a quota, a blocked origin) reads as no save and writes as a failed write.
-import { SAVE_VERSION } from './save.ts';
+import { SAVE_VERSION, migrateSave } from './save.ts';
 import type { SaveV } from './save.ts';
 
 /** Where the barn is kept, and where a save that didn't fit is kept aside. */
@@ -24,9 +24,10 @@ export function backupSave(): void {
 
 /**
  * The barn as saved: `ok` with the save, or no save and why -- `none` (never saved), `old` (another version) or `bad`
- * (not JSON, or not a save). An old or bad save is copied to BACKUP_KEY. Never throws. (A save of this version whose
- * insides are broken is found only when the view loads it -- BaseView's load(): CareSim.fromSave, then a trial step
- * and draw -- and the caller backs it up the same way: backupSave.)
+ * (not JSON, or not a save). A save of the version before this one is brought up to this one first (save.ts
+ * migrateSave: version 9, before the Arena, loads with every dragon at level 1). An old or bad save is copied to
+ * BACKUP_KEY. Never throws. (A save of this version whose insides are broken is found only when the view loads it --
+ * BaseView's load(): CareSim.fromSave, then a trial step and draw -- and the caller backs it up the same way: backupSave.)
  */
 export function loadSave(): { save: SaveV | null; note: LoadNote } {
   const s = store();
@@ -36,6 +37,7 @@ export function loadSave(): { save: SaveV | null; note: LoadNote } {
   let v: unknown;
   try { v = JSON.parse(raw); } catch { backupSave(); return { save: null, note: 'bad' }; }
   if (!v || typeof v !== 'object' || Array.isArray(v)) { backupSave(); return { save: null, note: 'bad' }; }
+  v = migrateSave(v);
   if ((v as { v?: unknown }).v !== SAVE_VERSION) { backupSave(); return { save: null, note: 'old' }; }
   return { save: v as SaveV, note: 'ok' };
 }

@@ -90,6 +90,16 @@ export function makePet(el: DragonElement, stage: Stage, seed: number, anim: str
 /** Where the eat bowl stands (src/art/props.ts bowlFor: under the snout at the chomp). */
 export { bowlFor };
 
+/**
+ * A pet's idle variants on (the look-arounds, yawns and fidgets it cuts to every 6-10 s, as makePet schedules them) or
+ * off (the base's fighters in a bout: a yawn cut in between two moves would read as the YAWN skill, docs/BASE_DESIGN.md 10).
+ */
+export function idleSchedule(p: Pet, on: boolean): void {
+  if (!on) { p.player.setVariants('idle', []); return; }
+  const [a, b] = variantEvery(p.rig.stage);
+  p.player.setVariants('idle', idleVariants(p.rig.stage, p.rig.sp.wing), a, b, SPREAD_VARIANTS);
+}
+
 /** A pet's draw options: where it stands, its mood, wariness, bond and charge, then `extra` (a scene's own). */
 export function petOpts(p: Pet, extra: Partial<DrawDragonOpts> = {}): DrawDragonOpts {
   return { x: p.x, y: p.y, facing: p.facing, scale: p.scale, mood: p.mood, wary: p.wary, bond: p.bond, charge: p.charge, ...extra };

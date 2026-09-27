@@ -32,6 +32,12 @@ interface Window {
     pour?: { id: string; frame: number; top: number; lip: number; column: boolean }[];
     /** view=neutral (src/gallery.ts): per look, the share of its pixels that are neutral (HSV S < 0.25); `over` > 40 % (3.1). */
     neutral?: { id: string; share: number; over: boolean }[];
+    /**
+     * view=arenaaudit (src/gallery.ts; docs/BASE_DESIGN.md 10): per look and sparring skill, the most pixels of it over
+     * the other fighter's eye box, and of the other over its own (never any), against which look and when, how far it
+     * reaches past the ring's middle, and the least gap between the two snouts as drawn.
+     */
+    arena?: { id: string; covered: number; against: string; frame: number; reach: number; own: number; gap: number }[];
     /** view=missionart (src/game/missionart.ts): the sheet shown and every item it drew (ART_BIBLE 5.10's mission art kit). */
     missionart?: { sheet: string; drawn: string[] };
     /**
@@ -91,13 +97,20 @@ interface Window {
      * Barn capacity (BASE_DESIGN 4.7): the barn's dragons against its cap (`count`: every dragon not living in the garden,
      * those away on a mission too -- life.ts barnCount -- and `cap`, life.ts BARN_CAP; a preset may hold more than the
      * cap). The toast showing, if any (`toast`, its text).
+     * The Arena (BASE_DESIGN 10): each dragon's `goal` (sim.ts DragonGoal: `bout` while its bout is on), `level` and
+     * `xp`; `arena` (the bouts begun, and the bout on or null: its state, turn, AUTO, the player's pick waiting, its
+     * fighters -- dragon id and name, corner, level, puff and whole, stages -- this turn's moves, the winner and the XP
+     * each got, its latest line); the overlays' `arena` (the chooser) and `bout` (the bout watched) screens, the
+     * chooser's corners being picked (`corners`, dragon ids or null), their named buttons among `buttons` (`start`,
+     * `swap`, `back`, `corner0`/`corner1`, `fighter<id>` for each dragon that may spar; over the bout `skill0`-`skill3`,
+     * `auto`, `boutBack`, `result`), and the bout's chip (`boutChip`: its rect while a bout is on and the barn is on screen).
      * Gone once the base is detached (the page left it).
      */
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
       chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[];
       digest: string;
-      dragons: { id: number; name: string; element: string; stage: string; place: 'barn' | 'garden' | 'away'; f: number; x: number; move: string; room: string | null; slot: string | null;
-        waiting: boolean; head: { x: number; y: number } | null }[];
+      dragons: { id: number; name: string; element: string; stage: string; place: 'barn' | 'garden' | 'away'; f: number; x: number; move: string; goal: string | null; level: number; xp: number;
+        room: string | null; slot: string | null; waiting: boolean; head: { x: number; y: number } | null }[];
       lift: { y: number; rider: number | null };
       walked: number;
       barnDigest: string;
@@ -121,7 +134,12 @@ interface Window {
       board: { id: number; region: string; title: string; difficulty: string; challenges: string[]; baddie: string | null; days: number; coin: number }[];
       trip: { state: string; mission: string; region: string; success: boolean; egg: string | null; pairs: { dragon: number; keeper: number }[];
         departAt: number | null; returnAt: number | null; progress: number } | null;
-      ui: { screen: 'none' | 'map' | 'mission' | 'watch'; mission: number | null; pairs: { dragon: number; keeper: number }[];
+      arena: { bouts: number; bout: { id: number; state: 'muster' | 'face' | 'pick' | 'play' | 'over' | 'home'; t: number; turn: number; auto: boolean; pick: string | null;
+        fighters: { dragon: number; name: string; corner: 0 | 1 | null; level: number; puff: number; max: number; power: number; guard: number }[];
+        moves: { by: 0 | 1; skill: string; t: number; len: number; landed: boolean; hit: boolean; loss: number }[];
+        winner: 0 | 1 | null; xp: number[]; line: string | null } | null };
+      ui: { screen: 'none' | 'map' | 'mission' | 'watch' | 'arena' | 'bout'; mission: number | null; pairs: { dragon: number; keeper: number }[]; corners: (number | null)[];
+        boutChip: { x: number; y: number; w: number; h: number } | null;
         pins: { x: number; y: number; w: number; h: number }[]; buttons: Record<string, { x: number; y: number; w: number; h: number }>;
         chip: { x: number; y: number; w: number; h: number } | null; back: { x: number; y: number; w: number; h: number } | null; log: boolean;
         notice: 'HATCHERY FULL: NO EGG' | 'BARN FULL: THE EGG WILL WAIT' | null };

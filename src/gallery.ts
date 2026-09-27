@@ -21,6 +21,8 @@
 //   view=yard                  640 x 360: six dragons with needs and the four keepers answering them (docs/KEEPERS.md)
 //   view=keepers | view=care   the keepers (anim=, k= for a strip) | the care acts (act=, el=, stage=, k=; n= a strip)
 //   view=careaudit             every care act on every look: the eye never covered, the hand on its mark, the act ends
+//   view=arenaaudit            every sparring skill of every look that spars, at its Arena corner (docs/BASE_DESIGN.md 10):
+//                              neither fighter's eye ever covered by the other; els= / stages= narrow it
 //   view=yardaudit             the same checks on every act the yard plays in two and a half minutes
 //   view=floor | view=roots    the floor audit (nothing sinks through y = 0) and the leg-root audit (no far leg floats
 //                              free of the body); els= / stages= / anims= narrow them
@@ -47,7 +49,8 @@
 //                              <progress>[:fail] has a team away on the region's hard mission, that far along its road
 //                              at the frozen t (BASE_DESIGN 6); panel=map | mission | watch opens the Map Room table's world
 //                              map or a mission's chooser (mission=0..2: which of the board's), or the
-//                              watchable scene of the team out, over the barn at the first frame
+//                              watchable scene of the team out, over the barn at the first frame; panel=arena | bout the
+//                              Arena's chooser or the bout on (BASE_DESIGN 10: preset=bout has one), b opens the Arena live
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
 //   params: anim, mood (-1..1), t, scale, bg, seed, facing (-1: zoom and strip mirrored), bond (0..1, default 1),
@@ -77,6 +80,8 @@ import { TOOL_BOWL } from './art/keeper/parts.ts';
 import { keeperJoint } from './art/keeper/rig.ts';
 import type { KeeperAgent } from './care/keeper.ts';
 import { makeDragon, drawDragonAgent, stepDragonAgent, eyeBox } from './care/dragon.ts';
+import { arenaSpot, ARENA_MID } from './game/layout.ts';
+import type { SkillAnim } from './game/training.ts';
 import type { DragonAgent } from './care/dragon.ts';
 import { beginFeed, beginPet, beginTuck, stepAct, approachSide } from './care/acts.ts';
 import type { ActKind, CareAct } from './care/acts.ts';
@@ -89,7 +94,7 @@ import { missionArtScene } from './game/missionart.ts';
 export const STRAW = FLOORS.straw;
 const LABEL = '#3a2a30';
 
-export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings', 'keepers', 'care', 'careaudit', 'yard', 'yardaudit', 'missionart', 'base'] as const;
+export const VIEWS = ['lineup', 'silhouette', 'stages', 'grey', 'cvd', 'strip', 'habitat', 'zoom', 'cast', 'mood', 'faces', 'floor', 'roots', 'tails', 'pour', 'neutral', 'wings', 'keepers', 'care', 'careaudit', 'yard', 'yardaudit', 'missionart', 'arenaaudit', 'base'] as const;
 export type View = typeof VIEWS[number];
 /** The views the arrows and Space cycle through: every one but the game's (view=base keeps its keys, so it could never be left). */
 const RING: readonly View[] = VIEWS.filter((v) => v !== 'base');
@@ -143,11 +148,11 @@ export interface GalleryParams {
   /** view=base: take=<keeper name>, a keeper taken by hand at the first step (null: none). */
   take: string | null;
   /**
-   * view=base: panel=map | mission, the Map Room table's overlay open from the first frame (BASE_DESIGN 5), or panel=watch,
-   * the watchable scene (BASE_DESIGN 6); mission=<i>, the board's mission the chooser shows (0-2); trip=<region>:<progress>
-   * [:fail], preset=trip's team away.
+   * view=base: panel=map | mission, the Map Room table's overlay open from the first frame (BASE_DESIGN 5), panel=watch,
+   * the watchable scene (BASE_DESIGN 6), or panel=arena | bout, the Arena's chooser or the bout on watched (BASE_DESIGN
+   * 10); mission=<i>, the board's mission the chooser shows (0-2); trip=<region>:<progress>[:fail], preset=trip's team away.
    */
-  panel: 'map' | 'mission' | 'watch' | null;
+  panel: 'map' | 'mission' | 'watch' | 'arena' | 'bout' | null;
   mission: number;
   trip: string | null;
 }
@@ -189,7 +194,7 @@ export function parseParams(search: string): GalleryParams {
     hour: hourParam(q.get('hour')),
     layers: q.get('layers') === 'world' ? 'world' : q.get('layers') === 'cast' ? 'cast' : 'all',
     take: q.get('take') || null,
-    panel: q.get('panel') === 'map' || q.get('panel') === 'mission' || q.get('panel') === 'watch' ? q.get('panel') as 'map' | 'mission' | 'watch' : null,
+    panel: (['map', 'mission', 'watch', 'arena', 'bout'] as const).find((v) => v === q.get('panel')) ?? null,
     mission: Math.max(0, Math.min(2, Math.round(num('mission', 0)))),
     trip: q.get('trip') || null,
   };
@@ -767,6 +772,125 @@ function careAuditScene(P: GalleryParams): Scene {
     draw(ctx) {
       ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
       label(ctx, `CARE AUDIT: ${rows.length} ACT RUNS, ${bad.length} FAILING (EYE COVERED, HAND OFF ITS MARK BY MORE THAN ${REACH_MISS} PX, OR NEVER ENDS)`, this.w / 2, 4, LABEL, 1);
+      lines.forEach((t, i) => label(ctx, t.toUpperCase(), this.w / 2, 16 + i * 9, t.endsWith('FAIL') ? '#8a1c1c' : LABEL, 1));
+    },
+  };
+}
+
+// ---------- the arena audit (docs/BASE_DESIGN.md 10: a spar never covers an eye) ----------
+
+/** The looks that spar (a baby doesn't: arena.ts fighterReason), and the anims their skills play (training.ts SkillAnim). */
+const SPAR_STAGES: readonly Stage[] = ['young', 'adult', 'elder'];
+const SPAR_ANIMS: readonly SkillAnim[] = ['breath', 'happy', 'yawn', 'fidget'];
+
+/**
+ * view=arenaaudit (docs/BASE_DESIGN.md 10; bible 1.4, "nothing covers the eye"): every skill of every look that spars
+ * (young, adult, elder: its breath, its preen, its yawn and its show-off -- the element's fidget) played through from its
+ * start at the Arena's west corner (layout.ts arenaSpot), facing east, drawn alone on a clear canvas frame by frame with
+ * its effects -- and the frames after it while they last -- against the eye box of every look that spars standing in the
+ * east corner facing it (its idle, sampled a whole breath and more: the union of its eye's boxes): a pixel of the mover
+ * inside that box fails. And the other way round: the mover's own eye box, frame by frame, against the pixels of every
+ * look standing there idle. The preen is also the winner's at a bout's end, beside the one out of puff lying down asleep:
+ * it is checked against that one's eye too (its lie-down and nap, frame by frame with the preen). It measures how far
+ * each skill reaches past the ring's middle, and the gap between the two snouts as drawn (the least over every pair).
+ * The rows go on window.__dragonCare.arena for tools/smoke.ts, which fails any eye covered.
+ */
+function arenaAuditScene(P: GalleryParams): Scene {
+  const W = 560, H = 200, MID = 280, GY = 150, MIN_A = 128, IDLE_N = 160, AFTER = 30;
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const g = off.getContext('2d', { willReadFrequently: true })!;
+  const els = P.els || ELEMENT_IDS, stages = (P.stages || SPAR_STAGES).filter((st) => st !== 'baby');
+  const at = (st: Stage, corner: 0 | 1) => MID + (arenaSpot(st, corner) - ARENA_MID);
+  const opaque = (x0: number, y0: number, x1: number, y1: number) => {
+    const X0 = Math.max(0, x0), Y0 = Math.max(0, y0), w = Math.min(W, x1) - X0, h = Math.min(H, y1) - Y0;
+    if (w <= 0 || h <= 0) return 0;
+    const px = g.getImageData(X0, Y0, w, h).data;
+    let n = 0;
+    for (let i = 3; i < px.length; i += 4) if (px[i] >= MIN_A) n++;
+    return n;
+  };
+  type Box = { x0: number; y0: number; x1: number; y1: number };
+  const grow = (b: Box | null, e: Box): Box => (b ? { x0: Math.min(b.x0, e.x0), y0: Math.min(b.y0, e.y0), x1: Math.max(b.x1, e.x1), y1: Math.max(b.y1, e.y1) } : { ...e });
+  // (each look in the east corner: its eye's boxes over its idle, and over a nap -- the lie-down and the loop -- for the
+  // winner's preen; its idle's pixels, as a mask, for the mover's own eye; and its snout's x, the least over its idle)
+  const east = new Map<string, { idle: Box; nap: Box[]; mask: Uint8Array; snout: number }>();
+  for (const el of els) for (const st of stages) {
+    const idle = makeGamePet(el, st, P.seed, 'idle', at(st, 1), GY, { facing: -1, desync: false, blink: false });
+    let box: Box | null = null, snout = W;
+    const mask = new Uint8Array(W * H);
+    for (let f = 0; f < IDLE_N; f++) {
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+      drawDragon(g, idle.rig, idle.player.pose, gamePetOpts(idle, { still: true, shadow: false, top: null }));
+      box = grow(box, eyeBox(idle));
+      const px = g.getImageData(0, 0, W, H).data;
+      for (let i = 0; i < W * H; i++) if (px[i * 4 + 3] >= MIN_A) { mask[i] = 1; snout = Math.min(snout, i % W); }
+      stepPet(idle);
+    }
+    const nap = makeGamePet(el, st, P.seed, 'sleep', at(st, 1), GY, { facing: -1, desync: false, blink: false }), naps: Box[] = [];
+    for (let f = 0; f < 200; f++) {
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+      drawDragon(g, nap.rig, nap.player.pose, gamePetOpts(nap, { still: true, shadow: false, top: null }));
+      naps.push(eyeBox(nap));
+      stepPet(nap);
+    }
+    east.set(`${el}-${st}`, { idle: box!, nap: naps, mask, snout });
+  }
+  const rows: { id: string; covered: number; against: string; frame: number; reach: number; own: number; gap: number }[] = [];
+  // (the half of the canvas past the ring's middle, where the east corner stands: read once a frame)
+  const HW = W - MID, half = (b: Box, px: Uint8ClampedArray) => {
+    let n = 0;
+    for (let y = Math.max(0, b.y0); y < Math.min(H, b.y1); y++) for (let x = Math.max(MID, b.x0); x < Math.min(W, b.x1); x++) if (px[(y * HW + x - MID) * 4 + 3] >= MIN_A) n++;
+    return n;
+  };
+  for (const el of els) for (const st of stages) {
+    // (the look's idle snout in the west corner, before any skill: the gap to each look in the east corner)
+    const rest = makeGamePet(el, st, P.seed, 'idle', at(st, 0), GY, { facing: 1, desync: false, blink: false });
+    let tip = 0;
+    for (let f = 0; f < IDLE_N; f++) {
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+      drawDragon(g, rest.rig, rest.player.pose, gamePetOpts(rest, { still: true, shadow: false, top: null }));
+      const px = g.getImageData(0, 0, W, H).data;
+      for (let i = 0; i < W * H; i++) if (px[i * 4 + 3] >= MIN_A) tip = Math.max(tip, i % W);
+      stepPet(rest);
+    }
+    for (const anim of SPAR_ANIMS) {
+    const p = makeGamePet(el, st, P.seed, anim, at(st, 0), GY, { facing: 1, desync: false, blink: false });
+    const len = Math.max(1, p.player.length) + AFTER;
+    const r = { id: `${el}-${st}:${anim}`, covered: 0, against: '', frame: 0, reach: 0, own: 0, gap: Infinity };
+    for (const e of east.values()) r.gap = Math.min(r.gap, e.snout - tip - 1);
+    for (let f = 0; f < len; f++) {
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+      drawDragon(g, p.rig, p.player.pose, gamePetOpts(p, { still: true, shadow: false, top: null }));
+      // (how far it reaches past the ring's middle: its rightmost pixel there)
+      const px = g.getImageData(MID, 0, HW, H).data;
+      for (let x = HW - 1; x > r.reach; x--) { let hit = false; for (let y = 0; y < H && !hit; y++) hit = px[(y * HW + x) * 4 + 3] >= MIN_A; if (hit) { r.reach = x; break; } }
+      const mine = eyeBox(p);
+      for (const [k, e] of east) {
+        // (the mover over the other's eye: its idle -- and, for the preen, its nap beside it)
+        const boxes = anim === 'happy' ? [e.idle, e.nap[Math.min(f, e.nap.length - 1)]] : [e.idle];
+        for (const b of boxes) {
+          const n = b.x1 > MID ? half(b, px) : opaque(b.x0, b.y0, b.x1, b.y1);
+          if (n > r.covered) { r.covered = n; r.against = k; r.frame = f; }
+        }
+        // (the other's idle over the mover's own eye)
+        let m = 0;
+        for (let y = Math.max(0, mine.y0); y < Math.min(H, mine.y1); y++) for (let x = Math.max(0, mine.x0); x < Math.min(W, mine.x1); x++) m += e.mask[y * W + x];
+        if (m > r.own) { r.own = m; if (!r.covered) { r.against = k; r.frame = f; } }
+      }
+      stepPet(p);
+    }
+    rows.push(r);
+    }
+  }
+  if (window.__dragonCare) window.__dragonCare.arena = rows;
+  const bad = rows.filter((r) => r.covered > 0 || r.own > 0);
+  const lines = rows.map((r) => `${r.id}: ${r.covered || r.own ? `EYE COVERED ${r.covered} PX, OWN EYE ${r.own} PX (${r.against} AT F${r.frame})` : 'EYES CLEAR'}  REACH ${r.reach} PX  GAP ${r.gap} PX${r.covered || r.own ? '  FAIL' : ''}`);
+  return {
+    w: 560, h: Math.max(120, 24 + lines.length * 9), pets: [],
+    draw(ctx) {
+      ctx.fillStyle = P.bg || STRAW; ctx.fillRect(0, 0, this.w, this.h);
+      label(ctx, `ARENA AUDIT: ${rows.length} SKILLS, ${bad.length} FAILING (AN EYE COVERED BY THE OTHER FIGHTER, EITHER WAY)`, this.w / 2, 4, LABEL, 1);
       lines.forEach((t, i) => label(ctx, t.toUpperCase(), this.w / 2, 16 + i * 9, t.endsWith('FAIL') ? '#8a1c1c' : LABEL, 1));
     },
   };
@@ -1369,6 +1493,7 @@ function makeScene(P: GalleryParams): Scene {
     case 'keepers': return keepersScene(P);
     case 'care': return careScene(P);
     case 'careaudit': return careAuditScene(P);
+    case 'arenaaudit': return arenaAuditScene(P);
     case 'yard': return yardScene(P);
     case 'yardaudit': return yardAuditScene(P);
     case 'missionart': return missionArtScene(location.search);

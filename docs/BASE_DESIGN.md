@@ -13,9 +13,10 @@ rooms that earn their keep) and World of Warcraft's mission table (pick a team, 
 **Status.** Built, as the game's default page (`view=base`), in the building of sections 2 and 3: the need rooms,
 repeated on the barn's floors, the Dragon Lift, the Aerie and the elder garden; dragons walking to their needs and
 keepers meeting them (4), the clock, day and night, the speed and the barn kept in the browser (7), growing up, eggs and
-hatching and the barn's cap (7, 4.7), taking a keeper by hand (4.10), and missions -- the Map Room's table, the team, the
-trip from the Aerie, the watchable scene (5, 6). Section 8 says what each part is and how it is checked; section 9 what
-is still open.
+hatching and the barn's cap (7, 4.7), taking a keeper by hand (4.10), missions -- the Map Room's table, the team, the
+trip from the Aerie, the watchable scene (5, 6) -- and training bouts in the Arena on the roof, where two dragons spar,
+gain XP, level up and learn skills (10). Section 8 says what each part is and how it is checked; section 9 what is
+still open.
 
 **Issues #5 to #11: what implements each.**
 - **#5 Missions:** the Map Room's table (5.1: the world map with fogged regions revealed by success, the chooser with
@@ -39,6 +40,13 @@ is still open.
   dragon can fly a mission (3, The Garden) -- `garden.ts`, `gardenArt.ts`, `life.ts`; sections 15 and 16.
 - **#11 Rooms with a purpose:** every named, furnished room has one, each copy of a need's room included, and every one
   is proven used; the rest of the building is bare (3) -- `layout.ts` `ROOM_INFO`; section 8.
+- **Training in the Arena** (asked after the issues: "Similar to Pokémon we should be able to train dragons with one
+  another a they will gain skills and level up. These fights should happen in an arena"): the Arena, a deck on the roof
+  east of the Dragon Lift's head, where two of the barn's dragons spar turn by turn -- the player picks its dragon's
+  moves, the partner's coach picks its own -- by a ring of the seven elements, each strong against one and weak against
+  one; both come home with XP, levels (LV 1 to 10) and, at some levels, a new skill, every skill one of the dragon's own
+  anims; a spar, never a fight: a move costs the other puff, and whoever is out of puff naps (10, B8, B9) --
+  `training.ts`, `arena.ts`, `arenaui.ts`; section 27.
 
 ![The whole base, one screen of it outlined: the first greybox mockup, from before the room set was settled](base/barn_cutaway.png)
 
@@ -60,7 +68,8 @@ shows it.*
 | B5 | **Missions are watchable:** an animated side-scrolling scene of the team completing it. **The scene is the timer.** (Built and confirmed, 6: the scene is a pure function of the trip and the world's clock and lasts exactly as long as the trip; its result card shows when the trip's time is up.) | The user wants to see the team at work; the side-view walk the rig already has makes it cheap. |
 | B6 | **Everything runs only while the game is open.** One clock drives care, missions and hatching; closing the game pauses the world. | No coming back to a barn of red bubbles; no offline catch-up to build. Missions therefore last minutes of play, not hours. |
 | B7 | **Humans are assigned automatically:** keepers to jobs, riders to the dragons you send (each pair's rider is filled in for you, and you may swap it: 5.2) -- unless you take one (4.10): the keeper you hold is left out of every automatic pick, riders included, until you let go. | Fewer clicks; the player's choices are *which dragons* and *what to build*. |
-| B8 | **Cozy:** no combat, and nobody is hurt. Missions have hazards, and some end in a big baddie that is outwitted, calmed or driven off, never fought or killed. Old age is never decline (D21); retiring to the garden is the elder's reward, a place and never a farewell (3, The Garden). | The game's face set has no angry face (D18) and the elder is a reward. (Amended for #5: "Some of the missions might end with a big baddie" -- a baddie, but a cozy one.) |
+| B8 | **Cozy:** no combat, and nobody is hurt. Missions have hazards, and some end in a big baddie that is outwitted, calmed or driven off, never fought or killed. Old age is never decline (D21); retiring to the garden is the elder's reward, a place and never a farewell (3, The Garden). The Arena's bouts are sparring, never fighting (B9). | The game's face set has no angry face (D18) and the elder is a reward. (Amended for #5: "Some of the missions might end with a big baddie" -- a baddie, but a cozy one. Amended for the Arena: "These fights should happen in an arena" -- a bout is a spar: a move costs the other puff, its breath, never its health, and whoever is out of puff lies down for a nap; no hurt pose, no knockback, nothing flung, the one a move lands on only looks surprised, and both come home with XP: 10.) |
+| B9 | **Training is sparring in the Arena** (10): two of the barn's dragons spar turn by turn on the roof, each move one of the dragon's own anims, the seven elements round a ring (each strong against one, weak against one); both gain XP, a level brings stats and some levels a new skill (LV 1 to 10). One bout at a time. The player picks its own dragon's moves (the world waits for the pick) or lets its coach pick (AUTO); the partner's coach always picks. | The user's request ("Similar to Pokémon ... train dragons with one another ... gain skills and level up"): a Pokémon battle's turns, types and levels, kept cozy (B8). The skills are anims the rig already has (ART_BIBLE 4.2, section 3), so nothing new is drawn but the Arena itself. What lost: a level weighs only in the Arena for now (9). |
 
 *Young adult* in the user's request (#9: "start with a young adult dragon of each kind") means a dragon at the very
 start of the adult stage; the stage before adult is called *young* (the art bible's stage names: baby, young, adult,
@@ -128,6 +137,10 @@ picture.*
 - **The Aerie** is walkable **floor 5** (feet at y 136): one straw deck from x 8 to 648, over the left tower's top,
   then a gantry over the barn roof (x 168 to 488: a railing along its back, two trestles down to the roof and a knee
   brace to the tower), then the lift's head. The left tower's ladder climbs on to it. Teams will leave and land here (5).
+  **The Arena** goes on east from the lift's head on the same floor, x 648 to 1184 over the roof's east slope: a straw
+  deck on two trestles and a knee brace to the right tower, railing posts, a flag pole at each end with its corner's
+  pennant (blue the west, red the east) and bunting between them; two dragons spar here (10). Dragons alone go there,
+  by the lift.
 - **Every floor is pale.** Every surface a dragon or a keeper stands on (a room's band, the landings, the ladder bay,
   the towers' boards, the lift car's deck, the Aerie deck, the Garden Gate's floor, the garden's path) is a `FLOORS`
   colour in `src/game/surfaces.ts`, and `tools/palette-check.ts` gates every entry before anything stands on it: gate
@@ -143,6 +156,7 @@ picture.*
 | Ladder bay | 64 wide | a keeper's ladder, and straw across it |
 | Tower | 112 wide, 96 inside | a human is 72 to 76 tall and about 30 wide |
 | Aerie | floor 5: x 8 to 648, feet at y 136 | one deck over the left tower, the roof and the lift's head |
+| Arena | floor 5: x 648 to 1184; the corners' snouts 40 px apart about x 916 | two dragons facing each other with room for every move they make (10.1) |
 | World | the building 1360 x 760, ground at y 712; the walkable ground runs on east through the garden, 1688 wide with its first two plots and 176 more a plot (2568 with seven) | about 2 x 2 screens, then the garden; the player pans |
 
 **Moving around.** Keepers walk a floor and climb the three ladders: up each tower (the left one on to the Aerie) and
@@ -295,6 +309,7 @@ food, love and sleep (under its low slopes there is room only for babies, and th
 | Bunks | riders rest here after a mission | left tower, floor 2 | each rider rests here after landing (a rest counted; a job may call them from it) |
 | Map Room | the mission table: the world map and the mission chooser | left tower, floor 4 | missions are chosen and sent from its table (a send counted) |
 | Aerie | teams gather here, leave and land | the roof (floor 5) | the team musters on the deck, walks off west over the sky bridge, and lands on it (each counted) |
+| Arena | two dragons spar here in a training bout, and both gain XP and level up (10) | the roof (floor 5), east of the lift's head | a bout's two stand facing each other in their corners (counted) |
 | Garden Gate | the dragons' way out to the garden: an arch in both walls, the one tower door a dragon fits | right tower, ground floor | elders walk out through it, keepers out to the residents and back (a pass counted each way) |
 | Garden | the retired elders' home: they move here 30 days into the elder stage, and it grows a plot for each | outside, east | residents arrive, and their needs are met there |
 
@@ -561,10 +576,10 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
   - `BARN 9/12` (x 392, or a space after `COIN n` from 1 000 coin): the barn's dragons -- every one not living in the
     garden, those away on a mission and an elder still walking out to the garden among them -- against its cap (4.7),
     amber when full; a preset forced over the cap shows its true count (`preset=full`: `BARN 21/12`);
-  - four buttons: **NEW** (x 528: tap it twice within 2 s for a new barn), **II** (x 558: pause), **>1X** (x 578:
-    the speed, cycling 1x, 2x, 4x and 8x) and **MAP** (x 610: the Map Room's table, 5.1). A button is lit (`#6b4a34`)
-    while it is in force: NEW asked, paused, faster than 1x, the table open. A tap on the bar goes to its buttons,
-    never to the world under it.
+  - five buttons: **ARENA** (x 486: the Arena's chooser, or the bout on: 10.5), **NEW** (x 528: tap it twice within 2 s
+    for a new barn), **II** (x 558: pause), **>1X** (x 578: the speed, cycling 1x, 2x, 4x and 8x) and **MAP** (x 610:
+    the Map Room's table, 5.1). A button is lit (`#6b4a34`) while it is in force: NEW asked, paused, faster than 1x,
+    the table or the Arena open. A tap on the bar goes to its buttons, never to the world under it.
 - **The Map Room's table** (5.1): the world map and a mission's chooser, over the world (8, 18, 624 x 318) and under
   the top bar; the world waits while it is open. **The TEAM OUT chip** (394, 19, 114 x 15; first drawn at x 520, where it
   covered a plate at the start camera: at 394 it sits over the lift shaft's and the ladder bay's tops), while a team is out: MUSTER, TEAM OUT - 14H (game hours to go), then LANDING while a team dragon is still coming onto the deck, EGG TO THE NEST while its rider carries the egg down, and HOME until the saddles are hung up; a tap opens the watch overlay (6),
@@ -573,6 +588,11 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
   moment (missionview.ts `stopShownAt`: the scene is the timer), and one never reached only once the turn-back stop's
   has, so the log never tells a stop, or a failure, early -- the log's latest lines, the time left), drawn over the result card, and a tap on it (or TRIP LOG again) closes it.
   A toast shown while the table is open goes low in its panel, and one too long to clear the chip goes under it.
+- **The Arena** (10.5): its chooser over the world and under the top bar (the world waits while it is open, as under
+  the table), and a bout watched over the world with the camera on the Arena (the world steps on, but waits while the
+  player's pick does). **The bout's chip** (274, 19, 114 x 15, left of the TEAM OUT chip), while a bout is on and the
+  barn is on screen: BOUT: ON THE WAY, BOUT: YOUR PICK! (lit), BOUT: TURN n, then EMBER WINS or BOUT: A DRAW until the
+  pair is home; a tap opens the bout.
 - **Bubbles** over the dragons.
 - **The job strip** along the bottom: the top five jobs in order, numbered, each chip in its tier's colour with a
   check or an hourglass. Tapping a chip pans to that dragon and rushes the job.
@@ -582,32 +602,36 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
   head is under that place and none under the other, where it opens instead: `hud.ts` `cardAt`): tap a dragon and its
   card opens (one with a job waiting is Rushed too, as
   ever: a dragon has a job waiting most of the time, 60 to 79 % of it in the start barn, so the card comes with the Rush
-  rather than only without one): its name and element, its stage and `DAY d OF 30` (d is the day of its stage, 7), the
+  rather than only without one): its name and element with its level (`FIRE LV 2`: 10), its stage and `DAY d OF 30` (d is the day of its stage, 7), the
   stage's 30 days as a bar, and its needs, each an icon over a bar. A tap on a bubble or a chip Rushes only. A tap on
   the card, or anywhere else in the world, closes it (the top bar's buttons leave it open, so the game can be paused
   to read it).
-- **The hint** on an ink strip at the bottom right, beside the job strip, four in turn, 4 s each: `TAP A BUBBLE: RUSH
+- **The hint** on an ink strip at the bottom right, beside the job strip, five in turn, 4 s each: `TAP A BUBBLE: RUSH
   TAP A KEEPER: TAKE`; `TAP MAP: SEND A TEAM TO THE LOST NEST` (until the first mission is sent; then `... ON A
-  MISSION`, and none while a team is out); `DRAG TO LOOK AROUND THE BARN`; `TAKE A KEEPER: WASD TO WALK, E TO ACT`. It
+  MISSION`, and none while a team is out); `TAP ARENA: TWO DRAGONS SPAR AND LEVEL UP` (none while a bout is on); `DRAG
+  TO LOOK AROUND THE BARN`; `TAKE A KEEPER: WASD TO WALK, E TO ACT`. It
   gives way when the strip reaches it, and while a keeper is held (the pad is there then: 4.10).
 - **Toasts**, centred under the top bar for 3 s: "SURE? TAP AGAIN", "A NEW BARN", "NEW BARN: THE OLD SAVE DIDN'T FIT",
   "THE BARN IS FULL" (an egg fell due with the barn at its cap: 7), a grow-up ("EMBER IS AN ELDER NOW!"), a mission
   sent ("THE LOST NEST: THE TEAM MUSTERS ON THE AERIE") or landed ("THE LOST NEST: HOME SAFE WITH 40 COIN AND AN EGG",
   or "... BACK HOME WITH 20 COIN. NOBODY IS HURT.") and the dawn's tip at 05:00 ("3 DRAGONS GROW UP TOMORROW": the
   soonest of the dragons whose stage-up falls due within two game days, by the day it falls on: TODAY, TOMORROW or IN 2
-  DAYS), and an elder staying on as the barn's last flier (3, The Garden). Life's news (the grow-ups, the tip, the full barn) waits its turn behind the toast
+  DAYS), an elder staying on as the barn's last flier (3, The Garden), and the Arena's (10.5: a bout's pair heading up
+  or why not, who won and the XP, a level and its new skill). Life's news (the grow-ups, the tip, the full barn, a
+  bout's end and its levels) waits its turn behind the toast
   showing, never cutting it short, and grow-ups into one stage still waiting to be shown share one toast ("EMBER AND
   ZAP ARE ELDERS NOW!", "EMBER, BRAMBLE AND 2 MORE ARE ELDERS NOW!": the new game's seven all fall due at once).
 - **Panning:** drag the barn (while a keeper is held, the camera follows them again 3 s after a drag). **Keys:** 1 to
-  4 pick 1x, 2x, 4x and 8x; p pauses and plays; m opens (and closes) the Map Room's table; with a keeper held (4.10),
+  4 pick 1x, 2x, 4x and 8x; p pauses and plays; m opens (and closes) the Map Room's table; b the Arena (10.5); with a keeper held (4.10),
   WASD or the arrows walk them (W and S climb at a ladder), E or Space does the chore in reach, Esc lets go, and Tab
-  takes the next keeper (passing over any on a mission's trip). Over an overlay -- the watch overlay (6) or the Map
-  Room's table (5.1) alike -- the speed keys and m work as ever, Esc goes back to the barn, Tab goes back to the barn
+  takes the next keeper (passing over any on a mission's trip). Over an overlay -- the watch overlay (6), the Map
+  Room's table (5.1) or the Arena's (10.5) alike -- the speed keys, m and b work as ever, Esc goes back to the barn, Tab goes back to the barn
   and takes the next keeper, and the rest do nothing (a keeper held stays held but stands still under it).
 - **Taps, in order:** a top-bar button or badge; the pad (a keeper held); the TEAM OUT chip (a team out: opens the watch
-  overlay, 6); the card (closes it); a job chip; a bubble; a keeper (takes them; a rider on a trip, a toast); a dragon
-  (its card, and Rush if a job waits); the Map Room's table (opens the map); empty space (lets go of the keeper held,
-  closes the card). An open overlay -- the watch overlay, or the Map Room's table -- takes every tap under the top bar
+  overlay, 6) and the bout's chip (a bout on: opens the bout, 10.5); the card (closes it); a job chip; a bubble; a
+  keeper (takes them; a rider on a trip, a toast); a dragon (its card, and Rush if a job waits); the Map Room's table
+  (opens the map); the Arena's deck (opens the Arena); empty space (lets go of the keeper held, closes the card). An
+  open overlay -- the watch overlay, the Map Room's table or the Arena's -- takes every tap under the top bar
   before the pad or the world (the watch overlay's BACK TO BARN, TRIP LOG, its result card; the table's own; anything
   else swallowed), and no drag moves the camera under it; the top bar's buttons still work, and a badge goes back to the
   barn and takes (or lets go of) that keeper.
@@ -1028,11 +1052,13 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
 - **Saves.** The browser keeps the barn (`localStorage`, key `dragon-care/base`; `src/game/storage.ts` is the only code
   that touches it). It is loaded when the game's page opens, and saved every 10 s of play (600 frames) and when the
   page is hidden or left; closing pauses the world (B6). A save is the whole world as JSON, loaded back exactly
-  (`src/game/save.ts`). **NEW** (tap twice) starts a new barn on a fresh seed, and it replaces the old one. A save this
+  (`src/game/save.ts`): version 10, which added each dragon's XP and the Arena (the bout on, its fighters by id, and the
+  bouts begun: 10). A version 9 save (the first shipped, before the Arena) is brought up to date as it loads
+  (`save.ts` `migrateSave`): every dragon at 0 XP (LV 1), no bout begun, the rest as it was. **NEW** (tap twice) starts a new barn on a fresh seed, and it replaces the old one. A save this
   build can't read (another version, not a save at all, or one whose insides it can't build, step once and draw: an
   element, a stage or a keeper it doesn't know; or whose eggs it couldn't hatch or draw days later: an unknown element,
   a nest that isn't one, two in one nest; or a garden it couldn't keep: a dragon in a place this build hasn't got, a
-  resident that isn't an elder or has a slot, two on one plot, fewer plots than residents) starts a new barn, with a toast ("NEW BARN: THE OLD SAVE DIDN'T
+  resident that isn't an elder or has a slot, two on one plot, fewer plots than residents; or a bout it couldn't run: `arena.ts` `checkArena`) starts a new barn, with a toast ("NEW BARN: THE OLD SAVE DIDN'T
   FIT"), and the old save is kept aside at `dragon-care/base.bak`; nothing of it is swapped in until the whole trial
   has passed, so a broken save never freezes the page or is written back. **The tests and `t=` are exempt:** a frozen
   page (`t=`), a preset page, a page given `hour=`, `save=0` and every headless check never read or write it, so `t=`
@@ -1062,6 +1088,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
 | Missions I (#5, #11): the Map Room's table, the world map, the team, the trip from the Aerie, rewards | built | 5 |
 | Missions II (#5): the watchable scene, challenges on the road, big baddies | built | 6 |
 | The mission art kit: climates, set pieces, baddies, the grumpy miller, icons | built | ART_BIBLE 5.10 |
+| Training in the Arena: sparring bouts on the roof, XP, levels and skills | built | 10 |
 
 1. **Needs and jobs.** Built. Run `npm run dev` and open `index.html` (this is the game's default page; `?view=base`
    still names it, for the gallery's other debug views): drag to look around, and tap a bubble, a job chip or a
@@ -1116,6 +1143,13 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    (TRIP LOG) and BACK TO BARN. `preset=trip&trip=<region>:<progress>[:fail]` puts a team away on a hard mission that far
    along (`trip=oldmine:0.906&panel=watch&t=60`: the Mole King in its beat; `oldmine:0.921` dozing off; `highfold`,
    `frostmere` the Storm Roc and the Frost Giant; `bramblewood:0.7:fail` turned back; `oldmine:1` the result card).
+   **The Arena is built too** (10): ARENA (or B, or a tap on the Arena's deck) opens its chooser; tap your dragon, then
+   its sparring partner, and START BOUT -- the two ride up to the roof and face each other, you pick your dragon's
+   moves (or AUTO), and both come home with XP, levels and new skills. The page also takes `panel=arena` or `panel=bout`
+   (the chooser, or the bout on, open at the first frame with the camera on the Arena) and `preset=bout` (EMBER at LV 3,
+   the player's, and BRAMBLE at LV 2 in their corners from the first step: `view=base&preset=bout&panel=bout&t=90` is
+   the move menu frozen); the gallery's `view=arenaaudit` plays every sparring move against every look in the other
+   corner and measures each eye (10.6).
 
    ![The built game, 30 s in (11:00), at the start camera: BRAMBLE rests in the ground floor's Grooming Parlour and ECHO in the hayloft's, while Bea walks east past them for the ball RIPPLE wants (RIPPLE's tail in the Bathhouse, on its way to the ground floor's Romp Room); off to the east EMBER sleeps in the ground floor's Lamp Dorm, IRIS goes to tuck ZAP in upstairs and WICK, moved on, heads for a kitchen -- no dragon has needed the lift yet, every need met on its own floor; the top bar with the badges, COIN, BARN 7/12 and MAP](base/base_live.png)
 
@@ -1127,10 +1161,10 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    | `src/game/surfaces.ts` | every floor anyone stands on (`FLOORS`: straw, the garden's path, the mission road), and everything a dragon is seen against (the walls, the sky's colours at every phase, the big props behind a slot, the lamps' and lanterns' light, the garden's hedge, lawn, wood and fence, the mission scene's ground under its road: `ROAD_SCENE`), each gated by `tools/palette-check.ts` (i, Ki, w); the one night table (`NIGHT`: a day colour to its moonlit night colour, gated by w too, never a floor's; never the mission scene's ground, drawn as it is at every hour: it is not the barn) |
    | `src/game/clock.ts` | the day's length and phases, the speeds, reading the clock (the day, the time, the phase and the sky's stepped turn) |
    | `src/game/sky.ts` | the sky behind the building, in screen space: the bands, the far hills and clouds, the moon and the stars |
-   | `src/game/hud.ts` | the top bar (the clock, the jobs, the keepers' badges -- tappable: 4.10 -- the coin, the barn's dragons against its cap, NEW, pause, the speed, MAP), the toasts, the hint, and while a keeper is held the touch pad, the line over it and the portrait line |
+   | `src/game/hud.ts` | the top bar (the clock, the jobs, the keepers' badges -- tappable: 4.10 -- the coin, the barn's dragons against its cap, ARENA, NEW, pause, the speed, MAP), the toasts, the hint, the dragon card (its level too), and while a keeper is held the touch pad, the line over it and the portrait line |
    | `src/game/storage.ts` | the only code that touches the browser's storage: load the barn (or set aside one that doesn't fit), save it, forget it |
    | `src/game/start.ts` | the starting base: the rooms of section 3 (a need's rooms repeated on the floors), seven newly adult dragons (one per element, 0 days into adulthood), each in a slot of its own need's room, and the four named keepers at their fixed stations |
-   | `src/game/presets.ts` | code-built starts for views that need what a new game hasn't got (`ages`: every stage; `twelve`: the capacity benchmark, the barn at its cap; `capped`: it with an egg waiting in plain view; `growup`, `eggs`, `hatch`, `full` (forced over the cap); `garden`: three residents; `retire`: seven elders about to retire; `muster`: THE LOST NEST sent; `trip`: a team away on a hard mission, that far along its road: 6) |
+   | `src/game/presets.ts` | code-built starts for views that need what a new game hasn't got (`ages`: every stage; `twelve`: the capacity benchmark, the barn at its cap; `capped`: it with an egg waiting in plain view; `growup`, `eggs`, `hatch`, `full` (forced over the cap); `garden`: three residents; `retire`: seven elders about to retire; `muster`: THE LOST NEST sent; `trip`: a team away on a hard mission, that far along its road: 6; `bout`: a bout in the Arena from the first step: 10) |
    | `src/game/regions.ts` | the missions' world: the six regions (climate, challenge pool, eggs, baddie, neighbours, titles, their land and pin on the map), the eleven challenges and what meets each, the baddies' two counters and cozy exits, the keepers' rider skills |
    | `src/game/missions.ts` | the missions, DOM-free: the board rolled at dawn, who may go, auto riders, the odds, BEST TEAM, sending (the outcome, the egg and the road rolled at once), the trip (the muster, the departure over the sky bridge, away, the landing, the egg, the saddles, the rest), and the save's checks |
    | `src/game/maptable.ts` | the Map Room's table, drawn: the world map (hatched fog, roads, HOME, pins), the mission chooser, the TEAM OUT chip and the trip's log (over the watch overlay); their tap targets |
@@ -1145,12 +1179,15 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    | `src/game/eggs.ts` | the eggs, drawn: the shell, its cracks and wobble, the hatch's shell bits, and the dots over a due egg still waiting |
    | `src/game/garden.ts` | the elder garden: retiring (30 days into the elder stage), the plots it grows, the residents' nap, sit and stroll (napping only at night: the one simulation module that reads the day's phase), their resting places kept apart (clear of each other's eyes, no two bodies overlapping more than 20 px), their jobs met where they rest |
    | `src/game/gardenArt.ts` | the garden, drawn: a plot's tile (the hedge, the lawn, an apple tree on every other, a nest mound, a lantern, flowers on stalks; the path, the kerb, the ground), drawn only where it is on screen; the fence at the world's end; the lanterns' rings at night, clipped to the hedge's own shape; the GARDEN sign |
-   | `src/game/control.ts` | taking a keeper by hand (4.10): the player's commands (take, steer, act, let go; and the Map Room's send), applied at the start of a step; walking and climbing by hand under the bay rule; what E does (pick up, serve, put back) and the line that says so; a keeper held saved as let go; a rider on a mission's trip never taken |
+   | `src/game/control.ts` | taking a keeper by hand (4.10): the player's commands (take, steer, act, let go; the Map Room's send; and the Arena's bout, skill and coach: 10), applied at the start of a step; walking and climbing by hand under the bay rule; what E does (pick up, serve, put back) and the line that says so; a keeper held saved as let go; a rider on a mission's trip never taken |
    | `src/game/missionview.ts` | the watchable scene: the scene as a pure function of the trip and the clock (`sceneAt`: the beats, the pace from each walk's own root motion, the turn back, the baddie's beat), the team's characters played to it (the riders with their saddles), and its drawing (the climate, the road, the set pieces, the miller, the baddie, the banner, the result card) |
    | The mission art kit (`src/game/backdrops.ts`, `setpieces.ts`, `baddies.ts`, `npcs.ts`, `missionicons.ts`, `cel.ts`, `missionart.ts`) | the missions' pictures (ART_BIBLE 5.10): each region's climate at every phase of the day in parallax layers, the eleven set pieces, the three big baddies (their faces, poses and cozy exits) and their portraits, the grumpy miller on the keepers' rig, the challenge and skill icons and the saddle; the gallery's `view=missionart` lays them out; the scene and the Map Room draw them from these modules |
    | `src/game/tripdemo.ts` | the `trip` preset's mission and team: a region's mission at a difficulty from `regions.ts`, the best two pairs with the missions' own auto riders, odds and road (`missions.ts`), the outcome asked |
-   | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks -- at the lively step's speed too -- turns and rides; a resident's nap and wake) and their anims, the lift's car, the eggs, the grow-up's flash, the garden, the sky and the lights, the speed, the camera (out to the garden's end), the HUD (the dragon card too), the input and the overlays over the barn (one screen, one set of input rules: the Map Room's table, 5; the watch overlay, 6: the TEAM OUT chip opens it, BACK TO BARN closes it); a live page loads and saves the barn |
-   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: the care simulation, headless, in 26 numbered sections -- routes, 30 minutes of play on three seeds checked every step (the bay rule, one dragon in the shaft, no eye under a standing body but for a moment), determinism, Rush, the start cast, saves (exact, through JSON, taken at every kind of moment), `rngAt`, the rooms (a purpose each, and every room used over the check, room by room), the gait, barn capacity and the cap, the clock and night, growing up, eggs, retirement and the garden, the missions (the board, the odds, who may go, a full trip, sends mid-act, a failure, the outcome, care with a team away), the watchable scene, and taking a keeper. The file's header lists what each section checks, and each prints what it measured. Five worker threads run the longest sections beside the rest, so the whole check keeps to about 25 s on four CPUs (the budget is 30 s on four CPUs or more, scaled up on fewer; the suite fails over it unless other work beside it kept the machine busy -- half a CPU or more on average, read from /proc/stat) |
+   | `src/game/training.ts` | the Arena's rules (10.4), pure: levels and XP, each element's stats by stage and level, the spirits, the ring of the seven elements, the skills and the levels they are learned at, a move's outcome from its rolls, who moves first, the coach's pick, the XP a bout brings |
+   | `src/game/arena.ts` | a bout in the simulation (10.3), DOM-free and seeded: who may spar, the muster up to the corners, the turns and their moves (each its anim's length, landing at its impact), the end (the XP, levels and skills; tired and hungry; the nap and the preen), the walk home, what each fighter shows (its move's anim, a face), and the save's checks |
+   | `src/game/arenaui.ts` | the Arena's screens, drawn (10.5): the chooser (the corners' cards, the matchup, the dragons, SWAP, START BOUT), the bout's plates, line, move menu, result card and popups, and the bout's chip; their tap targets |
+   | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks -- at the lively step's speed too -- turns and rides; a resident's nap and wake) and their anims, the lift's car, the eggs, the grow-up's flash, the garden, the sky and the lights, the speed, the camera (out to the garden's end), the HUD (the dragon card too), the input and the overlays over the barn (one screen, one set of input rules: the Map Room's table, 5; the watch overlay, 6: the TEAM OUT chip opens it, BACK TO BARN closes it; the Arena's chooser and its bout, 10: the world waiting for the player's pick, the fighters' moves, faces and popups); a live page loads and saves the barn |
+   | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: the care simulation, headless, in 27 numbered sections -- routes, 30 minutes of play on three seeds checked every step (the bay rule, one dragon in the shaft, no eye under a standing body but for a moment), determinism, Rush, the start cast, saves (exact, through JSON, taken at every kind of moment), `rngAt`, the rooms (a purpose each, and every room used over the check, room by room), the gait, barn capacity and the cap, the clock and night, growing up, eggs, retirement and the garden, the missions (the board, the odds, who may go, a full trip, sends mid-act, a failure, the outcome, care with a team away), the watchable scene, taking a keeper, and the Arena (its rules and balance, a whole bout in the world, who may spar, its saves). The file's header lists what each section checks, and each prints what it measured. Five worker threads run the longest sections beside the rest, so the whole check keeps to about 25 s on four CPUs (the budget is 30 s on four CPUs or more, scaled up on fewer; the suite fails over it unless other work beside it kept the machine busy -- half a CPU or more on average, read from /proc/stat) |
    | `tools/capacity.ts` | `npm run capacity` (not in `npm run check`): the capacity benchmark -- named casts (`start7`, `eight`, `ten`, `twelve`, `thirteen`, `fifteen`) or any `7a3y2b` mix placed on the start barn (fewer than seven adults too: `0a12b`, a late game's barn of babies), 30 minutes on seeds 1 to 8, every run checked as section 2 is (a dragon mid-walk getting no more than 4 px on in 10 s, stood still or turned about on one spot, a stall) -- printed as a table with a SERVED / NOT SERVED verdict each (4.7) |
 
    Measured by `npm run sim` on the starting base (its seven dragons and four keepers, the need rooms repeated on the
@@ -1234,6 +1271,19 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    last run, its slowest worker the `full` preset's 24.5 s, other work beside it 0.07 CPUs; the budget is 30 s on four
    CPUs or more, scaled up on fewer -- 60 s on two -- and the suite fails over it unless other work kept the machine
    busy, half a CPU or more).
+
+   The Arena, measured by `npm run sim` (section 27, about 1.3 s in the `saves` worker): every pairing of the start's
+   seven each way round on four seeds (168 bouts at LV 1, AUTO) -- each element won 21 to 28 of its 48, a bout lasted
+   6.2 turns on average (3 to 12; 2 ran out of turns), no draw; a level up beat its own element in 28 of 28 bouts, and
+   three levels up beat the element strong on it in 56 of 56. A whole bout in the world (seed 1): begun at step 1997
+   with ZAP being tucked in by IRIS and EMBER asleep -- EMBER woke 664 steps into the muster and ZAP 967, and both
+   stood in their corners 3453 steps after START (EMBER, up first, in the east one); the first pick waited its 300 steps
+   for the coach, a PREEN and a breath were picked by hand, then AUTO; EMBER won in 6 turns (+30 XP: LV 2 and YAWN;
+   ZAP +15), the pair stayed 245 steps in the ring for the nap and the preen, and were home 1013 steps later, ZAP (the
+   west corner) first. The same bout twice is the same world, and saves taken at every state of it step on the same.
+   The smoke's sparring audit (`view=arenaaudit`): all 84 sparring skills of the 21 looks that spar, against every look
+   in the other corner -- no eye covered either way; the longest reach past the ring's middle 46 px (the elder rock's
+   GRAVEL ROAR), and the two drawn at 18 px apart at the least (the elder dusk's lamp ahead of its snout).
 2. **Rooms you build:** place, merge and upgrade rooms; move dragons between them; ~~save and load~~ (built: 7). Not
    built: the one way the barn could grow past its cap (4.7).
 3. **Missions:** ~~the table~~ (built: 5), then ~~the scene~~ (built: 6). Built both.
@@ -1280,8 +1330,156 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   bridge (they walk at a keeper's pace, twice a dragon's); a team turning back at a failure faces home at once, with no
   paper turn; the grumpy miller has no walk (he stands at his stop). A faster lift car would shorten the muster (a
   median 2460 steps, 41 s at 1x, over 360 sends: 5.2).
+- **Levels outside the Arena.** A dragon's level weighs only in its bouts: the missions' odds (5.4) don't read it, and
+  XP comes only from sparring -- whether a trip should bring XP, and a level count on the road, is open. The skills are
+  anims the rig had already: a move's cost shows as a face and a popup, never a reaction of the body (B8 wants no hurt
+  pose; a dodge or a flinch that reads as neither would need new anims). One bout at a time, two of the barn's own; no
+  garden resident or baby spars.
 - **Three Hearth Kitchens.** The barn capacity work read "each need is met in its own room" (the Decisions) as one
   room *kind* per need, and repeated the rooms on the floors so the barn serves twelve (4.7): does a barn of three
   Hearth Kitchens read as filler to the player, though each copy is used (3)? And with the start's seven the Dragon Lift
   is nearly idle (1 to 4 rides in 30 minutes) and the hayloft's rooms nearly empty until the herd passes about ten:
   its regular riders are the hayloft's overflow, Rushes, elders leaving and the mission teams.
+
+## 10. The Arena
+
+Asked after the issues: "Similar to Pokémon we should be able to train dragons with one another a they will gain
+skills and level up. These fights should happen in an arena." Two of the barn's dragons spar on the roof, turn by turn,
+a Pokémon battle kept cozy (B8, B9): every move is one of the dragon's own anims, the seven elements beat one another
+round a ring, and both come home with XP -- levels, and at some levels a new skill. Built: `src/game/training.ts` (the
+rules), `arena.ts` (a bout in the simulation), `arenaui.ts` (its screens), the Arena drawn by `building.ts`; checked by
+`npm run sim` section 27 and the smoke's Arena cases (10.6).
+
+![The Arena on the roof, the bout preset at its move menu (view=base&preset=bout&panel=bout&t=90): EMBER, the player's, at LV 3 in the blue west corner and BRAMBLE at LV 2 in the red east one, the bunting between the flag poles, each fighter's plate, the bout's line, and EMBER's three skills -- FIRE BREATH strong on BRAMBLE, PREEN and YAWN -- with AUTO and BACK TO BARN](base/arena_bout.png)
+
+**10.1 The place.** The Arena is the roof deck east of the Dragon Lift's head: floor 5 (feet at y 136), x 648 to 1184,
+the Aerie deck's other side -- the Aerie's teams walk off the car west, a bout's two east. A straw deck on two trestles
+down to the roof's east slope and a knee brace to the right tower, railing posts, a flag pole at each end with a
+pennant in its corner's colour (blue `#5aa0c8` the west, red `#e0664a` the east) and bunting between their tops; its
+plate, ARENA, at the east end. It is a structure (3's table): named for a real purpose and proven used (#11: a bout's
+two facing each other in their corners count a use). The dragons' net on floor 5 runs from the sky bridge to the
+Arena's east end; no keeper goes up there. **The corners:** each fighter stands with its snout 20 px short of the
+ring's middle (x 916), the two snouts 40 px apart (`ARENA_GAP`), the west corner facing east and the east facing west
+(`layout.ts` `arenaSpot`: an adult's root at x 845 and 987). 40 px keeps every drawn move clear of the other's eye (the
+sparring audit: 10.6).
+
+**10.2 Who may spar.** Any two of the barn's dragons but a baby, a garden resident (or an elder walking out to the
+garden) and one with a mission's team (mustering, away or landing); and not one with a need at its yellow bubble or
+lower (under 0.25: it goes to its keeper first) -- the chooser greys it with the need's word: HUNGRY, SLEEPY, BORED,
+GRUBBY or LONELY. One bout at a time: START is refused while one is on (A BOUT IS ON) and while its two walk home (THE
+LAST PAIR IS WALKING HOME). A dragon being met, asleep or holding still for its grow-up's cheer may be picked: the bout
+waits for it, as a muster does (5.2), and a mission can't take a dragon in a bout (the chooser says SPARRING).
+
+**10.3 A bout** (`arena.ts`; its state is in the save and the hook):
+- **Muster.** START BOUT (a `bout` command: `control.ts`) drops the two dragons' jobs -- a keeper at work finishes, a
+  sleeper sleeps on, and each keeps its slot until it sets off -- and their goal is the bout: they ask for nothing, and
+  their needs wait, as a team's do away (a job or a nap under way runs on to its end). Each rides the Dragon Lift up at
+  the car's first priority, as a mission's team does, and walks off it east; the first up takes the east corner, so the
+  second never walks through it, and each turns to face the other.
+- **Face** (1 s). Both in their corners: the Arena is used, and the bout's line says `EMBER (LV 1) AND BRAMBLE (LV 1)
+  FACE EACH OTHER`.
+- **Pick.** The player picks its dragon's move from the move menu -- or its coach does: with AUTO on, or once the pick
+  has waited 5 s (`PICK_WAIT`; the view makes the world wait while the menu is up, so it runs out only with the bout
+  left on from the barn). The partner's coach picks its own every turn.
+- **Play.** The quicker moves first (the higher SPEED, with its stage; the player's dragon on a tie). Each move is its
+  dragon's own anim played through while the simulation holds both still, and lands at its impact, a share of the
+  anim (the breath's stream at its full reach, 0.45; the preen's flourish, 0.3; the yawn's peak and the show-off's
+  middle, 0.5): the other's puff goes down, or a stat's stage moves, and the line says so -- `EMBER'S FIRE BREATH:
+  BRAMBLE -12 PUFF, A STRONG ONE!`, `... BRAMBLE DODGES!`, `EMBER PREENS: GUARD UP`, `EMBER YAWNS AND BRAMBLE CATCHES
+  IT: POWER DOWN`. The one a move lands on shows a face for 0.6 s -- surprised at a cost, happy at a dodge, sleepy
+  catching a yawn -- and never a hurt pose (B8). A breath of 0.4 s between moves (`MOVE_GAP`).
+- **Over.** A dragon out of puff has had its bout; after 12 turns (`MAX_TURNS`) it goes to the one with more of its puff
+  left, as a share of its whole, or is a draw. Both get XP (10.4) and a level's new skills; both are tired and hungry
+  (food and sleep at most 0.6: a burst of bubbles back in the barn); the one out of puff lies down, naps 2.5 s and
+  wakes, and the winner preens (a draw: both).
+- **Home.** The west corner sets off first for the nearest free slot of its size, the east one 2.5 s later (so the two
+  never walk nose into head), their lift calls still at the car's first priority; the bout is over once both are off
+  the Arena's deck, and their needs take over again.
+
+**10.4 The rules** (`training.ts`, plain data and pure functions: a bout's rolls are the Arena's own stateless draws,
+`rngAt(seed, BOUT, bout, turn, move)`, so a bout is the same every time from the same world).
+- **Stats:** PUFF (how long it keeps going), POWER, GUARD and SPEED (who moves first), each element's at LV 1 as an
+  adult from its character (ART_BIBLE section 3). Each is worth about the same in a bout (10.6's balance).
+
+  | Element | PUFF | POWER | GUARD | SPEED | |
+  |---|---|---|---|---|---|
+  | fire | 40 | 14 | 10 | 11 | the show-off hits hardest |
+  | spike | 42 | 11 | 12 | 9 | prickly to wear down |
+  | rock | 46 | 10 | 13 | 5 | a slow boulder |
+  | lightning | 40 | 13 | 10 | 15 | the quickest |
+  | water | 42 | 12 | 11 | 10 | steady |
+  | slinkwing | 42 | 13 | 10 | 13 | quick |
+  | dusk | 44 | 11 | 12 | 8 | calm |
+
+  Each level adds 5 PUFF, 1.5 POWER, 1.5 GUARD and 1 SPEED (rounded: a LV 10 adult fire has 85, 28, 24 and 20). The
+  young spar at 0.85 (a teen's SPEED at 1.05); the elder is never weaker (D21) but steadier: GUARD x 1.15, SPEED x 0.9.
+  A dragon in good spirits (mood 0.5 or more: no need asking yet) hits 10 % harder, a low one (a need at its yellow
+  bubble) 10 % softer: care is how a dragon trains well.
+- **The ring:** each element's element moves are strong (x 1.5) on the next and weak (x 2/3) on the one before it --
+  water douses fire, fire singes brambles, roots crack rock, rock grounds lightning, a flash dazzles night eyes
+  (slinkwing), echoes find their way in the dusk, and the moon-lamp pulls the tide -- one strong, one weak and five
+  even for every element.
+- **Skills**, each one of the dragon's own anims (ART_BIBLE 4.2 and section 3), learned by level, four at most, in the
+  move menu's order:
+
+  | Skill | Its anim | What it does | Learned |
+  |---|---|---|---|
+  | its breath: FIRE BREATH, QUILL VOLLEY, GRAVEL ROAR, SPARK BOLT, BUBBLE JET, SHRIEK, NIGHTFALL | `breath` | an element move: power 10, 95 % sure | LV 1 |
+  | PREEN | `happy` | its own GUARD up a stage | LV 1 |
+  | YAWN | `yawn` | the other's POWER down a stage (a yawn is catching) | LV 2 |
+  | its show-off: TAIL CHASE, QUILL GROOM, SUNBATHE, ZOOMIES, BIG SHAKE, ECHO PING, LAMP BAT | its idle trick, `fidget` | a plain move, never weak: power 8, always lands | LV 4 |
+  | its big breath: BLAZE, QUILL STORM, BOULDER ROAR, THUNDERBOLT, TIDAL JET, ECHO SHRIEK, DEEP NIGHTFALL | `breath` | in the breath's place: power 15, 85 % sure | LV 7 |
+
+  A stat's stage runs -2 to +2: +1 x 5/4, +2 x 3/2, -1 x 4/5, -2 x 2/3.
+- **A move's cost:** an attack costs the other its power x (my POWER / its GUARD, each with its stage) x the ring's
+  weight (an element move only) x 0.75 x 85 to 100 % (a roll), at least 1 when it lands; a roll over its sureness is a
+  dodge. A status skill always lands, moving its stage unless the stage is already at its limit.
+- **The coach** (the partner's picks, and the player's with AUTO): a yawn early on while the other's POWER can still go
+  down (about one turn in seven, the first three turns), a preen while it is fresh and its GUARD can still go up (about
+  one in seven), and otherwise the attack that costs the other most on average.
+- **XP and levels:** LV 1 to 10, LV L at 10 L (L - 1) XP in all (20 for LV 2, 60 for LV 3 ... 900 for LV 10). A bout
+  brings the winner 10 x the other's level + 20 and the other 5 x the winner's level + 10; a draw brings each 5 x the
+  other's level + 15. Sparring a higher level is how the young catch up: a LV 1 sparring a LV 10 is LV 3 after one
+  bout, however it goes. A dragon's XP (`Dragon.xp`) is all the save keeps: its level, stats and skills follow from it.
+
+**10.5 On screen** (`arenaui.ts`, `base.ts`).
+- **ARENA** in the top bar (x 486), **B**, or a tap on the Arena's deck eases the camera to the Arena (the ring's middle
+  at the screen's, the roof at the top) and opens **the chooser** -- or, a bout on, the bout. The world waits while the
+  chooser is open, as under the Map Room's table. On it: the two corners' cards (YOUR DRAGON - YOU PICK ITS MOVES;
+  SPARRING PARTNER - ITS COACH PICKS: the dragon's name, element, stage and level, its XP to the next level, its stats
+  with its spirits on its power, the skills it knows and the next it learns, what it is strong and weak against; a
+  tap empties it), the matchup (how each one's breath lands on the other, and why) and the XP a win or a loss would
+  bring each; the dragons (a tap puts one in the first empty corner, or takes it out; one that can't spar greyed with
+  why), SWAP, START BOUT (greyed with why not) and BACK.
+- **The bout**, watched over the world: a plate under each fighter in its corner's colour (its name and level -- once
+  decided its new one, lit if it went up -- YOU on the player's, its puff as a bar, its stages), the bout's latest
+  line, and by its state the move menu (`WHAT WILL EMBER DO?  (TURN 2)` and a button for each skill it knows: its
+  name, what it is, and how it lands on this partner -- STRONG ON BRAMBLE!, WEAK ON BRAMBLE, EVEN ON BRAMBLE; a status
+  skill says what it does), THE COACH PICKS YOUR MOVES with AUTO on, or the result card (who won, each one's XP and
+  what it brought, `NOBODY IS HURT: BRAMBLE NAPS IT OFF.`; a tap closes it); AUTO and BACK TO BARN. As a move lands a
+  popup rises over the head it landed on (-12 with STRONG! or WEAK under it, DODGED!, POWER DOWN; GUARD UP over the
+  one preening), never over an eye. **The world waits for the player's pick** while its menu is up (the one choice a
+  bout asks for) and steps on otherwise, the moves at the game's speed. BACK TO BARN leaves the bout on: the coach
+  picks once a pick has waited 5 s. A fighter plays no idle variant while its bout is on (a yawn between two moves
+  would read as the YAWN skill).
+- **The bout's chip** (274, 19, 114 x 15, left of the TEAM OUT chip) while a bout is on and the barn is on screen:
+  BOUT: ON THE WAY, BOUT: YOUR PICK! (lit), BOUT: TURN n, then EMBER WINS or BOUT: A DRAW; a tap opens the bout.
+- **Toasts:** the two heading up (`EMBER AND BRAMBLE HEAD UP TO THE ARENA`) or why not (`BRAMBLE IS SLEEPY`); then, as
+  life's news, `EMBER WINS THE BOUT! +30 XP` (or `A DRAW: ...`) and `EMBER IS LEVEL 2! NEW SKILL: YAWN`. The dragon card
+  shows its level beside its element, and the hint says TAP ARENA: TWO DRAGONS SPAR AND LEVEL UP while no bout is on.
+- `panel=arena` and `panel=bout` open them at the first frame (the camera already on the Arena); `preset=bout` begins a
+  bout at once, EMBER (LV 3, the player's) and BRAMBLE (LV 2) in their corners (`view=base&preset=bout&panel=bout&t=90`
+  is the move menu frozen).
+
+**10.6 Saves and checks.** The save keeps each dragon's XP and the Arena (the bout on, its fighters by dragon id, and
+the bouts begun): version 10, a version 9 save brought up to it as it loads (7). `npm run sim` section 27 checks the
+rules (the ring, the levels, the XP, the skills and their anims, the stats, the corners), the balance (10.4's numbers
+over every pairing of the start's seven: each element wins 35 to 65 % of its bouts, 4.5 to 8 turns on average; a
+level up beats its own element, three up the element strong on it), a whole bout in the world under section 2's
+invariants (begun while a keeper is at work with one of the two and the other sleeps), who may spar, the bout preset,
+saves taken at every state, the version 9 migration and 15 bouts a build can't run, and that no bout's line nor the
+Arena's text has a word of harm but NOBODY IS HURT (8 has the numbers). The smoke's sparring audit (`view=arenaaudit`)
+plays every sparring skill of the 21 looks that spar (seven elements, young to elder) in the west corner against every
+look in the east, frame by frame with its effects, and fails any frame where one covers the other's eye, or the other
+its own (ART_BIBLE 1.4); the preen, a winner's, against the loser's nap too. And the smoke drives the chooser, the
+move menu and a whole bout live (10.5), and loads a version 9 save in the browser.

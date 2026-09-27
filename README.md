@@ -9,7 +9,10 @@ tap a need bubble, a job chip or a dragon to Rush it. A day and a night pass in 
 (or the keys 1-4) runs it at 2x, 4x or 8x, II (or p) pauses, and MAP (or m) opens the Map Room's table, where you pick
 a mission, BEST TEAM and SEND a team off from the Aerie, then tap the TEAM OUT chip to watch it on the road. Tap a
 keeper (or their badge, or Tab) to take them by hand: WASD or the arrows walk and climb, E or Space fetches and does
-the chore in reach, Esc lets go -- and on a touch screen a pad of arrows, E and LET GO does the same. A dragon grows a
+the chore in reach, Esc lets go -- and on a touch screen a pad of arrows, E and LET GO does the same. ARENA (or b)
+opens the Arena on the roof: tap your dragon, then its sparring partner, and START BOUT -- the two ride up and spar
+turn by turn, you picking your dragon's moves (or AUTO), each element strong against one other and weak against
+another; nobody is hurt (whoever runs out of puff takes a nap), and both come home with XP, levels and new skills. A dragon grows a
 stage every 30 game days (90 minutes at 1x): you start with a young adult of each kind, missions bring eggs home to
 the Hatchery, and elders retire to the garden past the right tower (the last one able to fly a mission stays until
 another can). The barn is kept in the browser and resumes on a reload; NEW, tapped twice, starts another.

@@ -90,12 +90,12 @@ export function stageDue(sim: CareSim, d: Dragon): number { return d.stageSince 
 
 /**
  * Whether a dragon is settled (BASE_DESIGN 7): in the barn (not a garden resident, nor an elder on its way there, nor with a
- * mission's team: missions.ts), no act
+ * mission's team: missions.ts, nor in a bout: arena.ts), no act
  * (a sleeper has one), no keeper on any of its jobs (on the way, waiting at the stand spot or at work), no route left,
  * standing still (not turning, not waiting at a landing or held at the bay's edge), and not the lift's rider.
  */
 export function settled(sim: CareSim, d: Dragon): boolean {
-  return d.place === 'barn' && d.goal !== 'retire' && d.goal !== 'muster' && !d.act && d.asleep === 0 && !d.legs.length && d.move === 'still' && d.turn < 0 && sim.lift.rider !== d.id
+  return d.place === 'barn' && d.goal !== 'retire' && d.goal !== 'muster' && d.goal !== 'bout' && !d.act && d.asleep === 0 && !d.legs.length && d.move === 'still' && d.turn < 0 && sim.lift.rider !== d.id
     && !sim.jobs.some((j) => j.dragon === d && j.keeper);
 }
 
@@ -161,7 +161,7 @@ function hatch(sim: CareSim, e: Egg): boolean {
   needs.food = HATCH_FOOD;
   const baby: Dragon = { id: sim.nextDragonId, name: hatchName(sim, e.element), element: e.element, stage: 'baby', seed: e.seed, slot: null, goal: null, goalJob: null,
     f: room.floor, x: nestX(room, e.nest), facing: -1, legs: [], move: 'still', gaitT: 0, gaitS: 1, walkSeq: 0, turn: -1, waited: 0,
-    needs, mood: moodOf(e.element, needs), act: null, asleep: 0, stageSince: sim.clock, hold: 0, place: 'barn', home: null, garden: null };
+    needs, mood: moodOf(e.element, needs), act: null, asleep: 0, stageSince: sim.clock, hold: 0, place: 'barn', home: null, garden: null, xp: 0 };
   // (each of the Hatchery's sub-slots stands in front of a nest: a baby there hides that nest's egg, so one in front of
   // no other egg comes first -- the nest-1 egg's hatchling does not stand before a newer egg in nest 0 -- then the one
   // nearest its own nest)
