@@ -14,10 +14,11 @@ rooms that earn their keep) and World of Warcraft's mission table (pick a team, 
 repeated on the barn's floors, the Dragon Lift, the Aerie and the elder garden; dragons walking to their needs and
 keepers meeting them (4), the clock, day and night, the speed and the barn kept in the browser (7), growing up, eggs and
 hatching and the barn's cap (7, 4.7), taking a keeper by hand (4.10), missions -- the Map Room's table, the team, the
-trip from the Aerie, the watchable scene (5, 6), the encounters on the road -- each stop an obstacle the dragons'
-abilities overcome or a big baddie worn out of puff in a bout like the Arena's, the player picking or the trail coach
-(11) -- and training bouts in the Arena on the roof, where two dragons spar, gain XP, level up and learn skills (10).
-Section 8 says what each part is and how it is checked; section 9 what is still open.
+trip from the Aerie, the watchable scene the game follows the team through (5, 6), the encounters on the road -- each
+stop an obstacle the dragons' abilities overcome or a big baddie worn out of puff in a bout like the Arena's, the
+player picking or the trail coach (11) -- and training bouts in the Arena on the roof, where two dragons spar, gain
+XP, level up and learn skills (10). Section 8 says what each part is and how it is checked; section 9 what is still
+open.
 
 **Issues #5 to #11: what implements each.**
 - **#5 Missions:** the Map Room's table (5.1: the world map -- a little island of places to visit, each mission met at
@@ -50,6 +51,13 @@ Section 8 says what each part is and how it is checked; section 9 what is still 
   one; both come home with XP, levels (LV 1 to 10) and, at some levels, a new skill, every skill one of the dragon's own
   anims; a spar, never a fight: a move costs the other puff, and whoever is out of puff naps (10, B8, B9) --
   `training.ts`, `arena.ts`, `arenaui.ts`; section 27.
+- **Following the team** (asked after the Arena: "When we go on adventures I want to shift the game to require you to
+  follow the group. This is currently optional but I want the game mode to switch to a follow mode"): watching a
+  mission is no longer optional. From SEND until the team is home the game follows it -- the barn with the camera held
+  on the Aerie as the team gathers and sets out over the sky bridge, then its road, with no way back to the barn until
+  its result card (the world waiting on it) is tapped away -- and the barn runs itself meanwhile: nobody held by hand,
+  no Rush, no Arena; the map still opens (6, B5) -- `base.ts` (`followStage`, `keepFollowing`), `maptable.ts` (the
+  follow line); `npm run smoke`'s follow cases.
 
 ![The whole base, one screen of it outlined: the first greybox mockup, from before the room set was settled](base/barn_cutaway.png)
 
@@ -65,10 +73,10 @@ shows it.*
 | # | Decision | Why (and what lost) |
 |---|---|---|
 | B1 | **The base is a side-view cutaway:** a barn for the dragons with a tower at each end for the people, scrolled at 1x like Fallout Shelter's vault. | The rig is side view, facing right, authored at scale 1 (1.1). A cutaway shows every room at once in that view. |
-| B2 | **Care is managerial by default; you may take any one keeper by hand** (4.10). Dragons have needs that drain over time; keepers (the humans) walk over and meet them. The player's one per-dragon action is **Rush**; a keeper taken by hand is walked by the player and does the chores the player picks (#6). | Tapping every dragon every few minutes is a chore, not a game (the user's words: "that doesn't sound very fun"). The hands-on care of the art bible (spike's chin, dusk's tuck-in) becomes what keepers *do*, animated. |
+| B2 | **Care is managerial by default; you may take any one keeper by hand** (4.10). Dragons have needs that drain over time; keepers (the humans) walk over and meet them. The player's one per-dragon action is **Rush**; a keeper taken by hand is walked by the player and does the chores the player picks (#6). (Not while the game follows a team on a mission: the barn runs itself then, 6.) | Tapping every dragon every few minutes is a chore, not a game (the user's words: "that doesn't sound very fun"). The hands-on care of the art bible (spike's chin, dusk's tuck-in) becomes what keepers *do*, animated. |
 | B3 | **Needs show as thought bubbles** over the dragons and as a **prioritised job queue** along the bottom of the screen. | The bubble says *which* dragon wants *what* at a glance; the queue says *what's next*. |
 | B4 | **Missions are picked at a table and played on the road.** A mission table in the style of World of Warcraft: pick a team, the dragons' elements and the riders' skills counter the mission's challenges, a forecast, a reward. The challenges are shown up front, with who at home meets each (the chooser: 5). (Amended: "when you encounter a challenge you need to use special abilities from your dragons to overcome them ... when we encounter enemies we need to fight them" -- the road is played, stop by stop (11): at each obstacle you pick each dragon's ability, and a hard road's big baddie is worn out of puff in a bout like the Arena's; the trail coach picks for a team you leave to it (AUTO, or a pick that waits too long), so a team is still set and forget if you want it so. The forecast is the coach's own dry run of the road (5.4), not a roll.) | Set and forget was simple at the first stage, by the user's choice; a road with nothing to do on it was "lackluster ... not interactive" (the user's words), so the stops became the play. What lost: a mission's success chance as a number you buy with counters -- the counters now win the stops. |
-| B5 | **Missions are watchable:** an animated side-scrolling scene of the team completing it. **The scene is the trip.** (Built and confirmed, 6: the scene is a pure function of the trip's state and the world's clock; the trip walks its road in the world's own steps and halts at each stop for its encounter, so the scene shows the road exactly as far as it is walked and the stop exactly as it is played, and its result card shows when the team lands.) (Amended: "On a mission you never turn back; the pass fail happens at the end" -- every team walks its whole road, and only the result card, at the road's end, tells a success from a failure: 5.5, 6.) (Amended for 11: the scene is also where the road is played -- the team's plates, the stop's plate and the ability menu sit in the sky over the road, and the world waits for your pick while the scene is open, as the Arena's bout does.) | The user wants to see the team at work; the side-view walk the rig already has makes it cheap. A timer the scene merely ran to would have had nothing to do at a stop; the trip's own steps let a stop take as long as its turns take. |
+| B5 | **Missions are watchable:** an animated side-scrolling scene of the team completing it. **The scene is the trip.** (Built and confirmed, 6: the scene is a pure function of the trip's state and the world's clock; the trip walks its road in the world's own steps and halts at each stop for its encounter, so the scene shows the road exactly as far as it is walked and the stop exactly as it is played, and its result card shows when the team lands.) (Amended: "On a mission you never turn back; the pass fail happens at the end" -- every team walks its whole road, and only the result card, at the road's end, tells a success from a failure: 5.5, 6.) (Amended for 11: the scene is also where the road is played -- the team's plates, the stop's plate and the ability menu sit in the sky over the road, and the world waits for your pick while the scene is open, as the Arena's bout does.) (Amended: "When we go on adventures I want to shift the game to require you to follow the group. This is currently optional but I want the game mode to switch to a follow mode" -- from SEND until the team is home the game follows it, and the barn runs itself: 6, Following the team.) | The user wants to see the team at work; the side-view walk the rig already has makes it cheap. A timer the scene merely ran to would have had nothing to do at a stop; the trip's own steps let a stop take as long as its turns take. |
 | B6 | **Everything runs only while the game is open.** One clock drives care, missions and hatching; closing the game pauses the world. | No coming back to a barn of red bubbles; no offline catch-up to build. Missions therefore last minutes of play, not hours. |
 | B7 | **Humans are assigned automatically:** keepers to jobs, riders to the dragons you send (each pair's rider is filled in for you, and you may swap it: 5.2) -- unless you take one (4.10): the keeper you hold is left out of every automatic pick, riders included, until you let go. | Fewer clicks; the player's choices are *which dragons* and *what to build*. |
 | B8 | **Cozy:** no combat, and nobody is hurt. Missions have hazards, and some end in a big baddie that is outwitted, calmed or driven off, never hurt or killed. Old age is never decline (D21); retiring to the garden is the elder's reward, a place and never a farewell (3, The Garden). The Arena's bouts are sparring, never fighting (B9), and a big baddie is met the same way (11.4). | The game's face set has no angry face (D18) and the elder is a reward. (Amended for #5: "Some of the missions might end with a big baddie" -- a baddie, but a cozy one. Amended for the Arena: "These fights should happen in an arena" -- a bout is a spar: a move costs the other puff, its breath, never its health, and whoever is out of puff lies down for a nap; no hurt pose, no knockback, nothing flung, the one a move lands on only looks surprised, and both come home with XP: 10. Amended for the road: "we need to fight them" -- the baddie is worn out of puff by the Arena's own rules, turn by turn, and out of puff it takes its cozy exit: the Mole King dozes off, the Storm Roc wanders off outwitted, the Frost Giant shuffles off; a team out of puff sits down for a breather and the baddie leaves anyway; an obstacle's bite costs puff too, never health; the harm-word check of sim-check 27 reads every line of the road as well: 11.) |
@@ -585,8 +593,12 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
     the table or the Arena open. A tap on the bar goes to its buttons, never to the world under it.
 - **The Map Room's table** (5.1): the world map and a mission's chooser, over the world (8, 18, 624 x 318) and under
   the top bar; the world waits while it is open. **The TEAM OUT chip** (394, 19, 114 x 15; first drawn at x 520, where it
-  covered a plate at the start camera: at 394 it sits over the lift shaft's and the ladder bay's tops), while a team is out: MUSTER, TEAM OUT - 14H (game hours to go), then LANDING while a team dragon is still coming onto the deck, EGG TO THE NEST while its rider carries the egg down, and HOME until the saddles are hung up; a tap opens the watch overlay (6),
-  where a TRIP LOG button (124, 338, 64 x 16, beside BACK TO BARN) opens the trip's log (8, 34, 300 x 120: each stop met,
+  covered a plate at the start camera: at 394 it sits over the lift shaft's and the ladder bay's tops), while a team is out: MUSTER, TEAM OUT - 14H (game hours to go), then LANDING while a team dragon is still coming onto the deck, EGG TO THE NEST while its rider carries the egg down, and HOME until the saddles are hung up -- lit while the game follows the team (6), and the team's status only: a tap on it goes nowhere.
+  **The follow line** (on an ink strip with the team's flag, right-aligned at x 632 on the bottom row, y 338, 16 tall),
+  while the game follows a team (6): `FOLLOWING THE TEAM: THEY GATHER ON THE AERIE`, `...: THEY SET OUT OVER THE SKY
+  BRIDGE`, then on its road `FOLLOWING THE TEAM - HOME IN 14H`, and landed `- HOME!`; over the barn it takes the job
+  strip's and the hint's place. Over the watch overlay (6)
+  a TRIP LOG button (8, 338, 64 x 16) opens the trip's log (8, 34, 300 x 120: each stop met,
   unmet or still ahead -- each stop told only once the scene has shown how it went, at its banner's
   moment (missionview.ts `stopShownAt`: the scene is the timer), so the log never tells a stop early, and never the
   outcome at all -- the log's latest lines, the time left), drawn over the result card, and a tap on it (or TRIP LOG again) closes it.
@@ -598,7 +610,8 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
   pair is home; a tap opens the bout.
 - **Bubbles** over the dragons.
 - **The job strip** along the bottom: the top five jobs in order, numbered, each chip in its tier's colour with a
-  check or an hourglass. Tapping a chip pans to that dragon and rushes the job.
+  check or an hourglass. Tapping a chip pans to that dragon and rushes the job. (Not while the game follows a team out:
+  the follow line takes its place, 6.)
 - **A dragon's card** (160 x 76, on the far side of the screen from the dragon tapped: at 8, 20 for one in the right
   half; at 472, 38 for one in the left half, under the TEAM OUT chip -- so the card never opens over its own dragon,
   nor, for a dragon tapped in the Hatchery at the start camera, over the nests and their eggs -- unless another dragon's
@@ -613,31 +626,39 @@ the barn built alone, to the tenth (the ms per step aside); the wall time 19.2 s
   TAP A KEEPER: TAKE`; `TAP MAP: SEND A TEAM TO THE LOST NEST` (until the first mission is sent; then `... ON A
   MISSION`, and none while a team is out); `TAP ARENA: TWO DRAGONS SPAR AND LEVEL UP` (none while a bout is on); `DRAG
   TO LOOK AROUND THE BARN`; `TAKE A KEEPER: WASD TO WALK, E TO ACT`. It
-  gives way when the strip reaches it, and while a keeper is held (the pad is there then: 4.10).
+  gives way when the strip reaches it, while a keeper is held (the pad is there then: 4.10), and while the game follows
+  a team out (the follow line is there then: 6).
 - **Toasts**, centred under the top bar for 3 s: "SURE? TAP AGAIN", "A NEW BARN", "NEW BARN: THE OLD SAVE DIDN'T FIT",
   "THE BARN IS FULL" (an egg fell due with the barn at its cap: 7), a grow-up ("EMBER IS AN ELDER NOW!"), a mission
   sent ("THE LOST NEST: THE TEAM MUSTERS ON THE AERIE") or landed ("THE LOST NEST: HOME SAFE WITH 40 COIN AND AN EGG",
   or "... BACK HOME WITH 20 COIN. NOBODY IS HURT.") and the dawn's tip at 05:00 ("3 DRAGONS GROW UP TOMORROW": the
   soonest of the dragons whose stage-up falls due within two game days, by the day it falls on: TODAY, TOMORROW or IN 2
-  DAYS), an elder staying on as the barn's last flier (3, The Garden), and the Arena's (10.5: a bout's pair heading up
-  or why not, who won and the XP, a level and its new skill). Life's news (the grow-ups, the tip, the full barn, a
+  DAYS), an elder staying on as the barn's last flier (3, The Garden), the Arena's (10.5: a bout's pair heading up
+  or why not, who won and the XP, a level and its new skill), and while the game follows a team out, its answer to a tap
+  in the barn, a badge, Tab, b or ARENA, or Esc on the road: "FOLLOWING THE TEAM: THE KEEPERS MIND THE BARN TILL THEY
+  LAND" (6). Life's news (the grow-ups, the tip, the full barn, a
   bout's end and its levels) waits its turn behind the toast
   showing, never cutting it short, and grow-ups into one stage still waiting to be shown share one toast ("EMBER AND
   ZAP ARE ELDERS NOW!", "EMBER, BRAMBLE AND 2 MORE ARE ELDERS NOW!": the new game's seven all fall due at once).
-- **Panning:** drag the barn (while a keeper is held, the camera follows them again 3 s after a drag). **Keys:** 1 to
+- **Panning:** drag the barn (while a keeper is held, the camera follows them again 3 s after a drag; while the game
+  follows a team out, no drag moves it: 6). **Keys:** 1 to
   4 pick 1x, 2x, 4x and 8x; p pauses and plays; m opens (and closes) the Map Room's table; b the Arena (10.5); with a keeper held (4.10),
   WASD or the arrows walk them (W and S climb at a ladder), E or Space does the chore in reach, Esc lets go, and Tab
-  takes the next keeper (passing over any on a mission's trip). Over an overlay -- the watch overlay (6), the Map
+  takes the next keeper (passing over any on a mission's trip). Over an overlay -- the Map
   Room's table (5.1) or the Arena's (10.5) alike -- the speed keys, m and b work as ever, Esc goes back to the barn, Tab goes back to the barn
-  and takes the next keeper, and the rest do nothing (a keeper held stays held but stands still under it).
-- **Taps, in order:** a top-bar button or badge; the pad (a keeper held); the TEAM OUT chip (a team out: opens the watch
-  overlay, 6) and the bout's chip (a bout on: opens the bout, 10.5); the card (closes it); a job chip; a bubble; a
+  and takes the next keeper, and the rest do nothing (a keeper held stays held but stands still under it). While the
+  game follows a team out (6) nobody is held: the speed keys and p work as ever, m opens the map at once over the team's
+  view and shuts it again, Esc shuts the map, else the trip's log, else the result card (back to the barn), and b, Tab
+  and Esc on the team's own view say the game is following the team.
+- **Taps, in order:** a top-bar button or badge; the pad (a keeper held); the TEAM OUT chip (a team out: its status,
+  which takes the tap and goes nowhere) and the bout's chip (a bout on: opens the bout, 10.5); the card (closes it); a job chip; a bubble; a
   keeper (takes them; a rider on a trip, a toast); a dragon (its card, and Rush if a job waits); the Map Room's table
   (opens the map); the Arena's deck (opens the Arena); empty space (lets go of the keeper held, closes the card). An
   open overlay -- the watch overlay, the Map Room's table or the Arena's -- takes every tap under the top bar
-  before the pad or the world (the watch overlay's BACK TO BARN, TRIP LOG, its result card; the table's own; anything
+  before the pad or the world (the watch overlay's TRIP LOG and its result card; the table's own; anything
   else swallowed), and no drag moves the camera under it; the top bar's buttons still work, and a badge goes back to the
-  barn and takes (or lets go of) that keeper.
+  barn and takes (or lets go of) that keeper. While the game follows a team out (6) a badge takes nobody, and a tap in
+  the barn as the team gathers only says so -- but for the Map Room's table, which opens the map.
 - **The canvas** is as big as the window allows: whole pixels from 1x up, and under 1x in a smaller window (a phone
   held upright). In an upright window, while a keeper is held, a line left of the pad says TURN SIDEWAYS FOR BIGGER
   BUTTONS.
@@ -725,7 +746,8 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   another lets go of the one held first. A keeper taken while at work (mid-meal, mid-tuck-in) finishes that job first,
   then is yours where they stand (and at once if the job goes from under them: its dragon sent on a mission, or moved
   to the garden); otherwise any job they had goes back to the queue, a climb under way is finished,
-  and whatever they carry stays in their hand. A mark in their own colour hangs over their head, their badge is lit,
+  and whatever they carry stays in their hand. (Not while the game follows a team out, 6: then nobody is taken, and a
+  keeper held when a team is sent is let go.) A mark in their own colour hangs over their head, their badge is lit,
   and the camera follows them (it keeps them inside the middle of the screen across, and frames their floor: their
   feet 196 px down the screen, or as near as the world's edge lets it -- so their mark shows under the top bar and the
   floors below them stand clear of the pad; a drag stops it for 3 s).
@@ -827,9 +849,10 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   bridge** and is away: the bridge stands in for `fly`, which is not built (and rock and the young can't fly anyway).
   Away, the team is not drawn, its dragons' needs wait (and their stage-ups and retirement with them), and its riders
   are nobody's to call (nor the player's to take by hand: a toast says so); the TEAM OUT chip under the top bar says
-  MUSTER, TEAM OUT and the game hours of walking to go, at a stop the stop's word and PICK! (lit: a pick is yours to
-  make, 11.6) or its turn (`MOLE KING TURN 3`), or LANDING, and a tap opens the watchable scene (6), where TRIP LOG opens the
-  trip's log (each stop met, unmet or still ahead, each dragon's puff, the encounter's lines, the time left). SEND is a command the world takes at
+  MUSTER, TEAM OUT and the game hours of walking to go, or LANDING. From SEND the game follows the team (6): the barn
+  with the camera held on the Aerie as it gathers and sets out, then the watchable scene of its road -- where the road
+  is played, stop by stop (11), and TRIP LOG opens the trip's log (each stop cleared, waited out or still ahead, each
+  dragon's puff, the encounter's lines, the walk left) -- until its result card is tapped away. SEND is a command the world takes at
   its next step (control.ts, like the keys and taps a keeper held by hand obeys), so a team that can no longer go by
   then -- a rider just taken by hand -- is refused with the reason, as the chooser would have said it. It lands
   on the bridge and walks back onto the deck; each dragon then walks down to the nearest free slot of its size and its
@@ -894,7 +917,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
 
 ## 6. Watching a mission
 
-![The mission scene as built, at the Mole King's fight (view=base&preset=trip&trip=oldmine:0.9&panel=watch&t=200): RIPPLE's and WICK's plates with their puff, the Mole King's with its 96, the banner, and RIPPLE's menu -- BUBBLE JET even on the Mole King, PREEN, YAWN, REST and BEA's CHARM, the rider's special -- with BACK TO BARN, TRIP LOG and AUTO under the road](base/mission_scene.png)
+![The mission scene as built, at the Mole King's fight (view=base&preset=trip&trip=oldmine:0.9&t=200): EMBER's and WICK's plates with their puff, the Mole King's with its 96, the banner, and EMBER's menu -- FIRE BREATH even on the Mole King, PREEN, YAWN, REST and BEA's CHARM, the rider's special -- with TRIP LOG and AUTO at the bottom left and the follow line at the right: the game follows the team](base/mission_scene.png)
 
 *As built (`src/game/missionview.ts`, `encounterui.ts`) the scene reads as follows: the team walks its road, halts at each stop to play its encounter (11) -- the ability menu in the sky over the road -- meets a big baddie at a hard road's end, and comes home to the result card and the barn.*
 
@@ -932,30 +955,49 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   every trip, a failure's too ("THE MOLE KING - THE TEAM SITS DOWN FOR A BREATHER, BUT IT CURLS UP AND DOZES"), and
   the team walks on to the road's end. No knockback, no hurt pose, nothing flung (B8).
 - **What you see** (`encounterui.ts`). A banner at the top names the stop as it is reached, then the encounter's
-  latest line through it (`RIPPLE'S WATER JET: 8 WORK, STRONG!`, `THE MOLE KING FLINGS DIRT: ECHO -9 PUFF`), then how
+  latest line through it (`RIPPLE'S BUBBLE JET: 8 WORK, STRONG!`, `THE MOLE KING FLINGS DIRT: ECHO -9 PUFF`), then how
   the stop went (with a check mark when it was cleared), and stays up until the next stop. Through an encounter, each
   pair's **plate** at the left (the dragon's name and level, its puff bar, its rider) and the **stop's plate** at the
   right (an obstacle's WORK left of its toughness and the turn; a baddie's name, its puff bar and its stages) sit in the sky over the road, and
   between them, while a pick is yours, the **ability menu**: `WHAT WILL RIPPLE DO?  (TURN 2)` and a row per ability
   it has here -- its Arena skills (each with how it works this stop: STRONG, HELPS, A LITTLE, CHARMS; a fight's
   STRONG ON THE MOLE KING or EVEN), REST (+8 PUFF), and its rider's SPECIAL where the rider has the stop's counter --
-  with an AUTO button under the road: on, the menu's place says THE TRAIL COACH PICKS: TAP AUTO TO PICK YOURSELF. When the team lands, at the
-  road's end, a **result card**: the pass or the fail, told here and nowhere before -- HOME SAFE! or NOT THIS TIME --
-  `3 OF 4 STOPS CLEARED`, the coin (half on a failure), the egg if one came home, the XP the road brought each dragon,
-  and "NOBODY IS HURT."; a tap puts it away. Until then a team that will fail is drawn exactly as one that will
-  succeed (`sceneAt` never reads the outcome; the trip's `success` is null till the landing: sim-check 24 reads six
-  trips at every step).
-- **The world waits for your pick** while the scene is open and a pair's pick is yours to make (the trail coach off),
-  as it does for the Arena's move menu (10.5): the road's one choice. It steps on otherwise, the moves at the game's
-  speed. BACK TO BARN leaves the encounter on: the coach picks once a pick has waited 450 steps (7.5 s at 1x), and the
-  TEAM OUT chip says `FLOOD: PICK!`, lit, while a pick is yours (a toast at the meet says so too).
-- **Leaving.** The scene is an overlay over the barn (under the top bar, which stays); the world keeps stepping under
-  it at the chosen speed (but for the pick above), and its toasts (life's news, a landing, the dawn's tip) show over the scene too, low on the
-  verge under the road. "← BACK TO BARN" (or Esc) closes it, and the TEAM OUT chip under the top bar (a trip out:
-  "TEAM OUT - 14H", game hours of walking to go) opens it again. Every tap under the top bar is the overlay's while it is open.
-  A keeper held by hand (4.10) stays held under it but stands still -- no key or pad reaches them, and the pad and its
-  line are not drawn -- and walks on as the keys say once the barn is back; a tap on a badge (or Tab) goes back to the
-  barn and takes that keeper, as it does there.
+  with an AUTO button beside TRIP LOG under the road: on, the menu's place says THE TRAIL COACH PICKS: TAP AUTO TO PICK
+  YOURSELF. When the team lands, at the road's end, a **result card**: the pass or the fail, told here and nowhere
+  before -- HOME SAFE! or NOT THIS TIME -- `3 OF 4 STOPS CLEARED`, the coin (half on a failure), the egg if one came
+  home, the XP the road brought each dragon, "NOBODY IS HURT." and "TAP TO GO BACK TO THE BARN": the world waits on
+  it, and a tap (or Esc) puts it away, and with it the game's following the team (below). Until then a team that will
+  fail is drawn exactly as one that will succeed (`sceneAt` never reads the outcome; the trip's `success` is null till
+  the landing: sim-check 24 reads six trips at every step).
+- **The world waits for your pick** while a pair's pick is yours to make (the trail coach off) -- the road is on screen
+  whenever the team is out (following the team, below), so a pick waits for you as the Arena's move menu does (10.5):
+  the road's one choice. It steps on otherwise, the moves at the game's speed; AUTO hands the picks to the trail coach,
+  and the Map Room's table opened over the road makes the world wait too. Only a world nobody watches (the checks'
+  headless runs) has the coach take a pick that has waited 450 steps (7.5 s at 1x), so a road always plays out (11.6).
+- **Following the team** (B5, amended: "When we go on adventures I want to shift the game to require you to follow the
+  group. This is currently optional but I want the game mode to switch to a follow mode"). Watching is not optional:
+  from SEND until the team is home the game follows it, and the barn runs itself -- the keepers at their jobs, the
+  dragons at their needs. It is read off the world's trip (`base.ts` `followStage`), so a page loaded with a team out
+  follows it too.
+  - **Gathering** (the muster, and the walk off the Aerie): the barn on screen, the camera eased to the Aerie deck and
+    held there (no drag moves it), the TEAM OUT chip lit, and the follow line in the job strip's and the hint's place:
+    `FOLLOWING THE TEAM: THEY GATHER ON THE AERIE`, then `...: THEY SET OUT OVER THE SKY BRIDGE`.
+  - **The road:** as the last of the team walks off the bridge, the scene comes on by itself -- an overlay over the barn
+    (under the top bar, which stays), TRIP LOG at its bottom left (and AUTO beside it while the team stands at a stop)
+    and the follow line at its right (`FOLLOWING THE TEAM - HOME IN 14H`: the game hours of walking to go) -- with no
+    way back to the barn. The world keeps stepping under it at the chosen speed (the speed and pause buttons work; at a
+    stop it waits for your pick, above), and its toasts (life's news, a landing, a stop's end, the dawn's tip) show over
+    the scene too, low on the verge under the road. Every tap under the top bar is the overlay's.
+  - **Home:** at the road's end the result card, the world waiting on it; tapped away (or put away by Esc), the game
+    stops following: the barn again, the camera easing to the Aerie as the team lands on the bridge and walks back onto
+    the deck, and the barn is the player's (the TEAM OUT chip, unlit, says LANDING, EGG TO THE NEST and HOME until the
+    riders are done).
+  - **Meanwhile** nobody is held by hand: a keeper held when the team is sent is let go, and a badge, Tab or `take=`
+    takes nobody. The job strip and a dragon's card are put away, and a tap in the barn, a badge, Tab, b or ARENA, or
+    Esc on the road says "FOLLOWING THE TEAM: THE KEEPERS MIND THE BARN TILL THEY LAND". MAP (or m) still opens the map,
+    at once and over the team's view (the world waits under it; the team's flag stands on its road there), and BACK shuts
+    it onto the team again; Esc shuts the map, else the trip's log, else the result card. The Arena waits: its chooser
+    won't open and the bout's chip is hidden, and a bout already on goes on, its coach picking for the player (10).
 - **Built from data, not animated per mission.** A region is its climate's backdrop in parallax layers, and a set
   piece per challenge (a cave mouth, a boulder cart, a snowdrift, a storm cloud, a ford, a bramble arch, a signpost,
   the mill, a bandaged bird, a fog bank behind the team, two rocks); the moves are the rig's own anims (the Arena's
@@ -963,22 +1005,24 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
 - **The dark** follows section 1: in the tunnel only the lamp's pool of light is open, stepped in flat rings (no
   gradients).
 - **Back to the barn.** At the road's end the team lands on the sky bridge and walks back onto the Aerie deck (the
-  scene, if open, shows its result card; its dragons are drawn in the barn again from the landing): the dragons ride the
+  scene shows its result card, the world waiting on it; its dragons are drawn in the barn again from the landing, and
+  with the card tapped away the camera is on the Aerie as they walk back onto the deck): the dragons ride the
   lift down to the nearest free slots and their needs take over, the egg's rider carries it up to the Hatchery, and the
   riders hang their saddles in the Tack Room and rest in the Bunks (5.2); the toast says how it went ("THE LOST NEST: HOME
   SAFE WITH 40 COIN AND AN EGG").
-- **Status (built).** The scene watches the trip that is out: the one the Map Room sent (`sim.missions.trip`: 5), from
-  its muster (the team at the road's start) to its landing (the result card). Its dragons are away (place `away`) from
+- **Status (built).** The scene shows the trip that is out: the one the Map Room sent (`sim.missions.trip`: 5), from
+  its leaving the Aerie (the team at the road's start) to its landing (the result card) -- the game following it there,
+  and as it gathers in the barn (`base.ts` `followStage`, `keepFollowing`). Its dragons are away (place `away`) from
   the Aerie to the landing and are not drawn in the barn; the scene draws them. The trip's log (its stops, each dragon's
-  puff, the encounter's lines and the time left) opens over the scene (TRIP LOG). `view=base&preset=trip&trip=<region>:<progress>[:fail]`
+  puff, the encounter's lines and the walk left) opens over the scene (TRIP LOG). `view=base&preset=trip&trip=<region>:<progress>[:fail][:auto]`
   puts a team of two pairs away on the region's hard mission that far along its walk at the frozen step, the stops
   before that point resolved as their counters would have (`missions.ts` `placeAlong`; `:fail` waits the last of them
   out) -- the world's own trip, as a sent team is once it has left the Aerie, built from the Map Room's own tables and
   rules (`src/game/tripdemo.ts`: `regions.ts`, and `missions.ts` autoRider, forecastOf and roadOf; missions.ts awayNow) --
-  and `panel=watch` opens the scene; a stop at that very point begins its encounter on the first step
-  (`trip=oldmine:0.9&panel=watch&t=200`: the Mole King walked in and the menu up; with `:auto` the trail coach plays
-  it, so a frozen step shows a move or the exit), and `:1` lands the team (the result
-  card). The climates (in parallax: the far ridge at 0.2 of the camera, the near forms at 0.5,
+  the game following it, its road on screen from the first frame (`panel=watch` asks for it too); a stop at that very
+  point begins its encounter on the first step (`trip=oldmine:0.9&t=200`: the Mole King walked in and the menu up; with
+  `:auto` the trail coach plays it, so a frozen step shows a move or the exit), and `:1` lands the team (the result
+  card, the world waiting on it). The climates (in parallax: the far ridge at 0.2 of the camera, the near forms at 0.5,
   each climate at its own phase of the day), the set pieces, the three baddies and the grumpy miller (at the `miller`
   stop, grumpy until he is talked round) are the mission art kit's (ART_BIBLE 5.10: `backdrops.ts`,
   `setpieces.ts`, `baddies.ts`, `npcs.ts`, `missionicons.ts`); the riders carry
@@ -1206,16 +1250,16 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    perhaps an egg for the Hatchery, and the riders rest in the Bunks. The page also takes `panel=map` or
    `panel=mission&mission=0..2` (the table open at the first frame; such a page never loads or saves) and
    `preset=muster` (THE LOST NEST sent at once: the team is all on the deck at step 2186).
-   **Watching a mission is built too** (6), and the road is played there (11): the TEAM OUT chip opens the scene of
-   the team out on its road -- the stops and their encounters (the plates, the ability menu, the moves and their
-   popups, AUTO), the banners, the big baddie's fight and its cozy exit, the result card, the trip's log (TRIP LOG) and
-   BACK TO BARN; the world waits for your pick while the menu is up. `preset=trip&trip=<region>:<progress>[:fail]`
-   puts a team away on a hard mission that far along its walk, the stops before that point resolved
-   (`trip=oldmine:0.9&panel=watch&t=200`: the Mole King walked in and the fight's menu up; `:auto` after the progress
-   puts the trail coach on, so a frozen step shows the fight played; `oldmine:0.905` the team
-   walking on past it, calmed; `highfold:0.9`, `frostmere:0.9` the Storm Roc and the Frost Giant; `bramblewood:0.7:fail` a
-   team that will fail, on its road just where the one that succeeds is; `oldmine:1` the result card,
-   `bramblewood:1:fail` a failure's).
+   **Following a mission is built too** (6), and the road is played there (11): from SEND the game follows the team --
+   the camera on the Aerie as it gathers and sets out, then the scene of its road: the stops and their encounters (the
+   plates, the ability menu, the moves and their popups, AUTO; the world waits for your pick while the menu is up), the
+   banners, the big baddie's fight and its cozy exit, the trip's log (TRIP LOG), and the result card, tapped away the
+   way back to the barn. `preset=trip&trip=<region>:<progress>[:fail][:auto]` puts a team away on a hard mission that
+   far along its walk, the stops before that point resolved (`trip=oldmine:0.9&t=200`: the Mole King walked in and the
+   fight's menu up; `:auto` after the progress puts the trail coach on, so a frozen step shows the fight played;
+   `oldmine:0.905` the team walking on past it, calmed; `highfold:0.9`, `frostmere:0.9` the Storm Roc and the Frost
+   Giant; `bramblewood:0.7:fail` a team that will fail, on its road just where the one that succeeds is; `oldmine:1` the
+   result card, `bramblewood:1:fail` a failure's).
    **The Arena is built too** (10): ARENA (or B, or a tap on the Arena's deck) opens its chooser; tap your dragon, then
    its sparring partner, and START BOUT -- the two ride up to the roof and face each other, you pick your dragon's
    moves (or AUTO), and both come home with XP, levels and new skills. The page also takes `panel=arena` or `panel=bout`
@@ -1243,7 +1287,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    | `src/game/trip.ts` | a mission and a trip as plain data (5, 11): the road's stops (each with its result, its turns and the clock it was resolved at), the walk (`travel`, `walked`), the team's stats, puff and XP, the trail coach's switch (AUTO), the encounter at the stop the team stands at, the baddie's exit |
    | `src/game/encounter.ts` | the encounters on the road (11), DOM-free and seeded: an obstacle's work and bite, a fight's baddie and its coach, the abilities offered each pair at a stop (with their weights) and the trail coach's pick, a turn's moves (the quicker first, each its anim's length, landing at its impact), the stop's outcome, line and XP; the forecast's dry run (`forecastRoad`); what the scene shows for each move (`pairLook`, `foeShow`, `popupOf`); the save's checks |
    | `src/game/worldmap.ts` | the world map's picture (5.1): the island generated from seeded noise (the coast, the regions' land, the lake, the brook, the roads), what grows on it, every place's landmark and HOME, cloud over the regions not explored yet, and its living parts (glints, the mill's sails, smoke); the team's route; the layout's self-check (`mapProblems`) |
-   | `src/game/maptable.ts` | the Map Room's table, drawn: the world map (worldmap.ts's picture, the regions' names, each mission's pin and plate at its place, the team's road and flag), the mission chooser, the TEAM OUT chip and the trip's log (over the watch overlay); their tap targets |
+   | `src/game/maptable.ts` | the Map Room's table, drawn: the world map (worldmap.ts's picture, the regions' names, each mission's pin and plate at its place, the team's road and flag), the mission chooser, the TEAM OUT chip, the follow line and the trip's log (over the watch overlay); their tap targets |
    | `src/game/sim.ts` | the care simulation: the queue, the keepers' trips and jobs (fetch, go, wait at the stand spot, work), and Rush; no drawing, seeded, deterministic; dragons with stable ids, a clock, and its options (seed, day length, start time) |
    | `src/game/travel.ts` | the dragons on the move: each chooses a room meeting its need (on its own floor first) and takes a slot there (moving a lingerer on to its own lowest need's room, or bumping a holder for a Rush), walks and turns (lively on and off the car and across the bay: the one hurry), waits in a landing's line where it covers no eye, and rides the Dragon Lift; the lift's car and its calls; the bay rule (the shaft guard among it), and one dragon at a time in the shaft; how deep each dragon is drawn |
    | `src/game/gait.ts` | each element's walk at each stage as a table of per-frame root motion, the pace the simulation walks a dragon at |
@@ -1263,7 +1307,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    | `src/game/training.ts` | the Arena's rules (10.4), pure: levels and XP, each element's stats by stage and level, the spirits, the ring of the seven elements, the skills and the levels they are learned at, a move's outcome from its rolls, who moves first, the coach's pick, the XP a bout brings |
    | `src/game/arena.ts` | a bout in the simulation (10.3), DOM-free and seeded: who may spar, the muster up to the corners, the turns and their moves (each its anim's length, landing at its impact), the end (the XP, levels and skills; tired and hungry; the nap and the preen), the walk home, what each fighter shows (its move's anim, a face), and the save's checks |
    | `src/game/arenaui.ts` | the Arena's screens, drawn (10.5): the chooser (the corners' cards, the matchup, the dragons, SWAP, START BOUT), the bout's plates, line, move menu, result card and popups, and the bout's chip; their tap targets |
-   | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks -- at the lively step's speed too -- turns and rides; a resident's nap and wake) and their anims, the lift's car, the eggs, the grow-up's flash, the garden, the sky and the lights, the speed, the camera (out to the garden's end), the HUD (the dragon card too), the input and the overlays over the barn (one screen, one set of input rules: the Map Room's table, 5; the watch overlay, 6: the TEAM OUT chip opens it, BACK TO BARN closes it; the Arena's chooser and its bout, 10: the world waiting for the player's pick, the fighters' moves, faces and popups); a live page loads and saves the barn |
+   | `src/game/base.ts` | the live view: the simulation driving the dragons (where they stand, their walks -- at the lively step's speed too -- turns and rides; a resident's nap and wake) and their anims, the lift's car, the eggs, the grow-up's flash, the garden, the sky and the lights, the speed, the camera (out to the garden's end), the HUD (the dragon card too), the input and the overlays over the barn (one screen, one set of input rules: the Map Room's table, 5; following a team out, 6: the camera held on the Aerie as it gathers, then the watch overlay of its road, with no way back to the barn until its result card is tapped away; the Arena's chooser and its bout, 10: the world waiting for the player's pick, the fighters' moves, faces and popups); a live page loads and saves the barn; and the road played from the scene -- the encounter's rows and AUTO, the world waiting for the pick (11) |
    | `tools/sim-check.ts` | `npm run sim`, in `npm run check`: the care simulation, headless, in 28 numbered sections -- routes, 30 minutes of play on three seeds checked every step (the bay rule, one dragon in the shaft, no eye under a standing body but for a moment), determinism, Rush, the start cast, saves (exact, through JSON, taken at every kind of moment), `rngAt`, the rooms (a purpose each, and every room used over the check, room by room), the gait, barn capacity and the cap, the clock and night, growing up, eggs, retirement and the garden, the missions (the board, the forecast, who may go, a full trip with its stops played, sends mid-act, a failure, the outcome, care with a team away), the watchable scene, taking a keeper, the Arena (its rules and balance, a whole bout in the world, who may spar, its saves) and the encounters on the road (the offers, the rules, the balance, a road by commands, its saves, a version 10 trip brought up, no word of harm). The file's header lists what each section checks, and each prints what it measured. Five worker threads run the longest sections beside the rest, so the whole check keeps to about 25 s on four CPUs (the budget is 30 s on four CPUs or more, scaled up on fewer; the suite fails over it unless other work beside it kept the machine busy -- half a CPU or more on average, read from /proc/stat) |
    | `tools/capacity.ts` | `npm run capacity` (not in `npm run check`): the capacity benchmark -- named casts (`start7`, `eight`, `ten`, `twelve`, `thirteen`, `fifteen`) or any `7a3y2b` mix placed on the start barn (fewer than seven adults too: `0a12b`, a late game's barn of babies), 30 minutes on seeds 1 to 8, every run checked as section 2 is (a dragon mid-walk getting no more than 4 px on in 10 s, stood still or turned about on one spot, a stall) -- printed as a table with a SERVED / NOT SERVED verdict each (4.7) |
 
@@ -1672,20 +1716,19 @@ cleared and 5 for one waited out, 40 for a baddie worn out and 15 for one sat ou
 come on the road as in the Arena (the toast `RIPPLE IS LEVEL 2! NEW SKILL: YAWN`, the `level` and `learn` events),
 and the result card totals the road's XP.
 
-**11.6 Playing it.** At a stop the TEAM OUT chip says `FLOOD AHEAD!`, then `FLOOD: PICK!`, lit, while a pair's pick
-is yours to make, `FLOOD TURN 2` as the moves play, then `FLOOD CLEARED` or `FLOOD: WAITED OUT` (a fight: `MOLE KING:
-PICK!`), and a toast at the meet says `SPRING FLOOD AHEAD! TAP TEAM OUT TO HELP (THE TRAIL COACH WILL IF YOU DON'T)`
-(`THE MOLE KING! TAP TEAM OUT TO FIGHT ...`); at the end, `SPRING FLOOD CLEARED! +15 XP EACH`. The chip opens the
-scene (6): the pairs' plates and the stop's, the menu for the pair whose pick waits (`WHAT WILL RIPPLE DO?  (TURN
-2)`, a row an ability, a tap picks it; then the next pair's), the moves played where the team stands, the popups over
-the heads, and the AUTO button. **The world waits for your pick** while the scene is open with a pick pending (the
-road's one choice; `base.ts` worldWaits), and steps on otherwise: with the scene closed, a pick waits 450 steps (7.5 s
-at 1x) for you and then the **trail coach** takes every pick still missing; AUTO (the `trail` command) hands it every
-pick at once, and the menu's place says THE TRAIL COACH PICKS: TAP AUTO TO PICK YOURSELF. The coach picks
-(`encounter.ts` coachPick) the rider's special whenever it is to be had; a REST when low (under a fifth of its puff at
-an obstacle, under three tenths in a fight, two rolls in five); in a fight a YAWN in the first three turns while the
-baddie's POWER can still go down and a PREEN while over 60 % puff (about one roll in seven each); else the move that
-does most on average (its power × its chance × its weight). BACK TO BARN leaves the encounter on.
+**11.6 Playing it.** The game follows the team (6), so at a stop its road is already on screen: the pairs' plates and
+the stop's, the menu for the pair whose pick waits (`WHAT WILL RIPPLE DO?  (TURN 2)`, a row an ability, a tap picks
+it; then the next pair's), the moves played where the team stands, the popups over the heads, and the AUTO button
+beside TRIP LOG; at the stop's end a toast says `SPRING FLOOD CLEARED! +15 XP EACH` (`THE MOLE KING IS WORN OUT!`).
+**The world waits for your pick** while a pick is yours to make (the road's one choice, as the Arena's bout waits for
+its pick; `base.ts` worldWaits), and steps on otherwise; the Map Room's table opened over the road makes it wait too.
+AUTO (the `trail` command) hands every pick to the **trail coach** at once, and the menu's place says THE TRAIL COACH
+PICKS: TAP AUTO TO PICK YOURSELF. The simulation never knows whether it is watched, so in a world nobody watches (the
+checks' headless runs) a pick waits PICK_WAIT_TRAIL (450 steps, 7.5 s at 1x) and then the coach takes every pick still
+missing: a road always plays out. The coach picks (`encounter.ts` coachPick) the rider's special whenever it is to be
+had; a REST when low (under a fifth of its puff at an obstacle, under three tenths in a fight, two rolls in five); in a
+fight a YAWN in the first three turns while the baddie's POWER can still go down and a PREEN while over 60 % puff
+(about one roll in seven each); else the move that does most on average (its power × its chance × its weight).
 
 **11.7 The forecast** is the coach's dry run of the road (5.4: every roll even, `evenRoll`, the coach picking every
 move, the baddie's coach at the dragon with the most puff): the chooser's FORECAST line and bar, and BEST TEAM's
@@ -1702,6 +1745,6 @@ whole puff, a move by a pair there isn't, a stage past +2...). `npm run sim` che
 its stops played (20), a failure that walks on (21), the road the seed's (22), care with a team away (23), the scene
 at every step of six roads (24), the cap beside a played road (26) and the encounters themselves (28: the offers, the
 rules alone, the balance, a road by commands, its saves, no word of harm); the smoke reads the fight's menu frozen,
-the failing road beside the succeeding one, both result cards, and plays a fight live from the chip (the pick waited
-for, the row tapped, AUTO, the exit, BACK TO BARN), and loads a version 9 save in the browser. 8's paragraph has the
-numbers.
+the failing road beside the succeeding one, both result cards, and plays a fight live on the road the game follows
+(the pick waited for, the row tapped, AUTO, the exit, the road still on screen), and loads a version 9 save in the
+browser. 8's paragraph has the numbers.

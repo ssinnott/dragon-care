@@ -86,16 +86,21 @@ interface Window {
      * (its stop, kind, state, steps and turn, the pair whose pick waits, this turn's picks, an obstacle's work left of
      * its toughness, a fight's baddie and its puff, the outcome once resolved, the latest line, and the move playing).
      * The overlays (`ui`, BASE_DESIGN 5 and 6): the screen open -- `none` (the barn), `map` or `mission` (the Map Room table's
-     * world map or a mission's chooser: the world waits while one is open) or `watch` (the team out watched on its
+     * world map or a mission's chooser: the world waits while one is open) or `watch` (the team out followed on its
      * road, the world stepping on underneath) -- the mission chosen (id) and the team being put together, the map's
      * pins (canvas px, board order: each mission's plate), its places with no mission today (`places`, by name: each
      * landmark's tap box) and its regions under cloud (`clouds`, by region id: each cloud's "?" -- a tap anywhere on
      * the cloud says how it clears), and the named buttons on screen (canvas px: `back`, `best`, `send`, on the map
      * `home` and each mission's landmark `mark0`-`mark2`, and `chip`, the
      * TEAM OUT chip while a team is out and the barn is on screen; over the watch overlay `log`, which opens the trip's
-     * log), and `chip` (the TEAM OUT chip's rect while it shows) and `back` (BACK TO BARN's while watching), and
-     * whether the trip's log is open over the watch overlay (`log`); and the chooser's line about the egg (`notice`:
-     * `HATCHERY FULL: NO EGG`, `BARN FULL: THE EGG WILL WAIT` at the barn's cap, or null -- null too on any other screen).
+     * log, and `result`, the result card once the road is walked whole -- tapped away, the barn again), and `chip` (the
+     * TEAM OUT chip's rect while it shows), and whether the trip's log is open over the watch overlay (`log`); and the
+     * chooser's line about the egg (`notice`: `HATCHERY FULL: NO EGG`, `BARN FULL: THE EGG WILL WAIT` at the barn's cap,
+     * or null -- null too on any other screen).
+     * Following the team (`ui.follow`, BASE_DESIGN 6): `gather` from a team's send until it has walked off the Aerie (the
+     * barn on screen, the camera held on the deck), `road` while it is away on its road and landed with its result card
+     * up (the watch overlay, with no way back to the barn but that card), or null (no team out, or its result card
+     * tapped away): while it is set, nobody is held by hand and the barn takes no tap.
      * The watchable scene (BASE_DESIGN 6, 11): `scene`, while a trip is out (null
      * otherwise): the last stop the team reached (`baddie` or its challenge; null before the first), how it went
      * (`result`: ahead while the team stands at it, then met or unmet), whether the team has its counter, the state of
@@ -155,7 +160,7 @@ interface Window {
         boutChip: { x: number; y: number; w: number; h: number } | null;
         pins: { x: number; y: number; w: number; h: number }[]; buttons: Record<string, { x: number; y: number; w: number; h: number }>;
         places: Record<string, { x: number; y: number; w: number; h: number }>; clouds: Record<string, { x: number; y: number; w: number; h: number }>;
-        chip: { x: number; y: number; w: number; h: number } | null; back: { x: number; y: number; w: number; h: number } | null; log: boolean;
+        chip: { x: number; y: number; w: number; h: number } | null; follow: 'gather' | 'road' | null; log: boolean;
         notice: 'HATCHERY FULL: NO EGG' | 'BARN FULL: THE EGG WILL WAIT' | null };
       scene: { stop: string | null; result: 'ahead' | 'met' | 'unmet' | null; covered: boolean | null; at: 'meet' | 'pick' | 'play' | 'done' | null; banner: string | null;
         baddie: 'moleking' | 'stormroc' | 'frostgiant' | null;

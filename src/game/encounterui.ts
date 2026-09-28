@@ -17,7 +17,7 @@ import type { Trip } from './trip.ts';
 import type { Hit } from './maptable.ts';
 import type { SceneFrame, ScenePets } from './missionview.ts';
 import { baddieHead, pieceAt } from './missionview.ts';
-import { partyOf, offersFor, pendingPair, popupOf, stopName, stopWord, FOE, FACE_FRAMES, ABILITY_NAME } from './encounter.ts';
+import { partyOf, offersFor, pendingPair, popupOf, stopName, FOE, FACE_FRAMES, ABILITY_NAME } from './encounter.ts';
 import type { Encounter, Offer } from './encounter.ts';
 
 // ---------- where things are (screen px) ----------
@@ -28,8 +28,8 @@ export const STOP_PLATE: Readonly<Rect> = Object.freeze({ x: 524, y: 38, w: 108,
 export const MENU: Readonly<Rect> = Object.freeze({ x: 120, y: 38, w: 400, h: 124 });
 /** The menu's rows: one an ability, seven at most (a fight at LV 4 and up: the breath, the big breath, the show-off, PREEN, YAWN, REST and the rider's special). */
 export const ROW_H = 15, ROW_Y0 = 16, MAX_ROWS = 7;
-/** AUTO (the trail coach), beside TRIP LOG (maptable.ts LOG_BUTTON, x 124-188) and BACK TO BARN (missionview.ts BACK_BUTTON, x 8-118). */
-export const TRAIL_AUTO: Readonly<Rect> = Object.freeze({ x: 194, y: 338, w: 64, h: 16 });
+/** AUTO (the trail coach), beside TRIP LOG (maptable.ts LOG_BUTTON, x 8-72) at the bottom left, clear of the follow line at the right (maptable.ts FOLLOW_LINE_X1). */
+export const TRAIL_AUTO: Readonly<Rect> = Object.freeze({ x: 78, y: 338, w: 64, h: 16 });
 /** Where a row's middle column starts (the longest name, IRIS: NAVIGATOR, ends short of it). */
 const WHAT_X = 120;
 /** What the menu's place says with AUTO on. */
@@ -188,19 +188,6 @@ export function drawEncounterHud(ctx: CanvasRenderingContext2D, sim: CareSim, tr
   return hits;
 }
 
-/**
- * The TEAM OUT chip's words while the team stands at a stop (maptable.ts chipText): the stop ahead as it is met, YOUR
- * PICK! (lit) while a pair's pick waits for the player, its turn as the moves play, then how it went. Null: walking.
- */
-export function encounterChip(trip: Trip): { text: string; lit: boolean } | null {
-  const enc = trip.encounter;
-  if (!enc) return null;
-  const stop = trip.stops[enc.stop], word = stopWord(stop);
-  if (enc.state === 'meet') return { text: `${word} AHEAD!`, lit: true };
-  if (enc.state === 'pick' && !trip.auto && pendingPair(trip) >= 0) return { text: `${word}: PICK!`, lit: true };
-  if (enc.state === 'done') return { text: enc.outcome === 'cleared' ? `${word} CLEARED` : `${word}: WAITED OUT`, lit: false };
-  return { text: `${word} TURN ${Math.max(1, enc.turn)}`, lit: false };
-}
 
 /** The words for a pick, as the lines and the hook write it (an ability's name on the menu is the offer's: offersFor). */
 export function pickWord(p: string): string { return p === 'rest' || p === 'rider' || p === 'sit' ? ABILITY_NAME[p as 'rest' | 'rider' | 'sit'] : p.toUpperCase(); }

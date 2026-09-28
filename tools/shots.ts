@@ -105,14 +105,16 @@ const pairs: string[] = [
   // lit, the line over the pad and the pad at the bottom right, the camera following her
   'shots/base_control.png=view=base&t=120&take=bea',
   // the watchable scene (BASE_DESIGN 6, 11; frozen, preset=trip: a team away on the region's hard mission, that far along
-  // its walk, the stops before resolved): on the road past a challenge cleared (its banner); each big baddie's fight --
-  // 0.9 is its stop, the baddie walked in and the fight's menu up at t=200 (the pairs' plates, the baddie's, the rows, AUTO)
-  // -- played by the trail coach with `:auto` (oldmine at t=209: BEA's CHARM, the first move, landing on the Mole King --
-  // its popup, surprised; the exits, each a few seconds into its beat: t=1865 the Mole King dozing off, calmed; t=2180
-  // the Storm Roc wandering off the wrong way, up the road; t=1522 the Frost Giant shuffling off up it, before it leaves
-  // the screen); an obstacle's menu (millbrook:0.17 at t=100: LOST THINGS, the first stop, met on the first step); a
-  // failure, on its road just where a success is (its last stop waited out); the result card, and a failure's; the TEAM
-  // OUT chip over the barn, lit (MOLE KING: PICK!); and the barn at t=1800
+  // its walk, the stops before resolved -- the game following it, its road on screen): on the road past a challenge
+  // cleared (its banner); each big baddie's fight -- 0.9 is its stop, the baddie walked in and the fight's menu up at
+  // t=200 (the pairs' plates, the baddie's, the rows, AUTO) -- played by the trail coach with `:auto` (oldmine at t=209:
+  // BEA's CHARM, the first move, landing on the Mole King -- its popup, surprised; the exits, each a few seconds into its
+  // beat: t=1865 the Mole King dozing off, calmed; t=2180 the Storm Roc wandering off the wrong way, up the road; t=1522
+  // the Frost Giant shuffling off up it, before it leaves the screen); an obstacle's menu (millbrook:0.17 at t=100: LOST
+  // THINGS, the first stop, met on the first step); a failure, on its road just where a success is (its last stop waited
+  // out); the result card, and a failure's; the game following a team as it gathers on the Aerie and as it sets out over
+  // the sky bridge (the muster preset: the camera held on the deck, the TEAM OUT chip lit, the follow line in the job
+  // strip's place); and the barn at t=1800
   'shots/base_watch.png=view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60',
   'shots/base_baddie_moleking.png=view=base&preset=trip&trip=oldmine:0.9&panel=watch&t=200',
   'shots/base_baddie_stormroc.png=view=base&preset=trip&trip=highfold:0.9&panel=watch&t=200',
@@ -125,7 +127,8 @@ const pairs: string[] = [
   'shots/base_fail_road.png=view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60',
   'shots/base_result.png=view=base&preset=trip&trip=oldmine:1&panel=watch&t=60',
   'shots/base_result_fail.png=view=base&preset=trip&trip=bramblewood:1:fail&panel=watch&t=60',
-  'shots/base_team_chip.png=view=base&preset=trip&trip=oldmine:0.9&t=200',
+  'shots/base_follow_gather.png=view=base&preset=muster&t=900',
+  'shots/base_follow_depart.png=view=base&preset=muster&t=2200',
   'shots/base_final.png=view=base&t=1800',
   // the mission art kit (ART_BIBLE 5.10; docs/ART_BIBLE.md "Mission art"): the six climates at the four phases (the chooser's
   // 300 x 112 pictures), two of them filling a road scene, the eleven set pieces ahead and met (a dragon in the fog,

@@ -153,7 +153,7 @@ const FOE_VERBS: Readonly<Record<BaddieId, Readonly<Record<FoeMoveKind, string>>
   stormroc: { attack: 'FLAPS UP A GALE', grumble: 'SCREECHES', rest: 'PREENS' },
   frostgiant: { attack: 'STAMPS UP A FLURRY', grumble: 'SIGHS A COLD SIGH', rest: 'SHAKES THE SNOW OFF' },
 });
-/** A short name for a baddie (the chip: `MOLE KING: PICK!`). */
+/** A short name for a baddie (stopWord: a stop's word, as the challenges have theirs). */
 export const FOE_WORD: Readonly<Record<BaddieId, string>> = Object.freeze({ moleking: 'MOLE KING', stormroc: 'STORM ROC', frostgiant: 'GIANT' });
 /** How a pick is written on the menu and in the lines. */
 export const ABILITY_NAME: Readonly<Record<'rest' | 'rider' | 'sit', string>> = Object.freeze({ rest: 'REST', rider: 'SPECIAL', sit: 'SITS IT OUT' });

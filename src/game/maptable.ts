@@ -4,10 +4,11 @@
 // board at its place -- the road's challenges and its days on the plate -- and, while a team is out, its road from HOME
 // and its flag walking it) and the mission chooser (the region's climate picture, the mission's rewards, its challenges with
 // what meets them and who at home could, the big baddie, the team's pairs and riders, the eligible dragons, the trail coach's forecast,
-// BEST TEAM and SEND FROM THE AERIE) -- and, while a team is out, its TEAM OUT chip under the top bar (a tap opens the
-// watchable scene: BASE_DESIGN 6, missionview.ts) and the trip's log, opened over the scene by its TRIP LOG button (each stop
-// met, unmet or still ahead, the log so far, the time left). Drawing and hit rects only, at the view's 640 x 360:
-// base.ts owns what a tap does (tableTap, watchTap), and
+// BEST TEAM and SEND FROM THE AERIE) -- and, while a team is out, its TEAM OUT chip under the top bar (lit while the game
+// follows the team: BASE_DESIGN 6), the follow line (where the team is, while the game follows it: over the barn as it
+// gathers on the Aerie, over the watchable scene of its road, missionview.ts) and the trip's log, opened over the scene
+// by its TRIP LOG button (each stop met, unmet or still ahead, the log so far, the time left). Drawing and hit rects
+// only, at the view's 640 x 360: base.ts owns what a tap does (tableTap, watchTap), and
 // missions.ts every rule. House style: 1 px ink outlines, flat fills, the engine's 5 x 7 font (it has no tick, cross or
 // arrow glyphs: those are small inked sprites), no alpha anywhere -- the regions not explored yet lie under cloud, never
 // faded. The mission art (the climate picture, the challenge and skill icons, the baddie's portrait) is the mission art
@@ -29,7 +30,7 @@ import {
 } from './missions.ts';
 import { stopName } from './encounter.ts';
 import type { Ability } from './encounter.ts';
-import { encounterChip } from './encounterui.ts';
+
 import type { Mission, Pair, Trip } from './trip.ts';
 import type { CareSim, Dragon, Keeper } from './sim.ts';
 import { newArenaPick } from './arenaui.ts';
@@ -39,7 +40,7 @@ import { KEEPER_PALETTES } from '../art/keeper/palettes.ts';
 import { DRAGON_PALETTES } from '../art/dragon/palettes.ts';
 
 /**
- * Which overlay is open: none, the map, a mission's chooser, the team out watched on its road (BASE_DESIGN 6), or the
+ * Which overlay is open: none, the map, a mission's chooser, the team out followed on its road (BASE_DESIGN 6), or the
  * Arena's chooser (`arena`) or its bout watched over the world (`bout`: BASE_DESIGN 10, arenaui.ts).
  */
 export type Screen = 'none' | 'map' | 'mission' | 'watch' | 'arena' | 'bout';
@@ -83,16 +84,22 @@ export const FORECAST_BAR: Readonly<Rect> = Object.freeze({ x: 324, y: 270, w: 1
 const PAIR_SLOTS: readonly Rect[] = [{ x: 324, y: 40, w: 300, h: 44 }, { x: 324, y: 88, w: 300, h: 44 }];
 const GRID = { x: 324, y: 142, w: 96, h: 18, dx: 102, dy: 21, cols: 3, rows: 5 } as const;
 /**
- * The TEAM OUT chip under the top bar (a tap opens the watch overlay): at x 520 it covered the Lamp Dorm's plate at the
- * start camera (the upper floor's plates sit just under the bar there, and the dorm's starts at screen x 513); at x 394
- * it sits over the lift shaft's and the ladder bay's tops, where no plate or window is, still clear of the buttons over
- * it and of the canvas point (350, 200) where the smoke test's drag starts. And over the watch overlay, the trip's log
- * (its stops and the time left: under the scene's banner line, clear of the team's heads and the baddie's)
- * and its TRIP LOG button, beside BACK TO BARN (missionview.ts BACK_BUTTON, x 8-118).
+ * The TEAM OUT chip under the top bar (the team's status: a tap on it goes nowhere): at x 520 it covered the Lamp Dorm's
+ * plate at the start camera (the upper floor's plates sit just under the bar there, and the dorm's starts at screen x
+ * 513); at x 394 it sits over the lift shaft's and the ladder bay's tops, where no plate or window is, still clear of the
+ * buttons over it and of the canvas point (350, 200) where the smoke test's drag starts. And over the watch overlay, the
+ * trip's log (its stops and the time left: under the scene's banner line, clear of the team's heads and the baddie's)
+ * and its TRIP LOG button at the bottom left, where the scene has no way back to the barn (BASE_DESIGN 6: the game
+ * follows the team).
  */
 export const CHIP: Readonly<Rect> = Object.freeze({ x: 394, y: 19, w: 114, h: 15 });
 export const TRIP_CARD: Readonly<Rect> = Object.freeze({ x: 8, y: 34, w: 300, h: 120 });
-export const LOG_BUTTON: Readonly<Rect> = Object.freeze({ x: 124, y: 338, w: 64, h: 16 });
+export const LOG_BUTTON: Readonly<Rect> = Object.freeze({ x: 8, y: 338, w: 64, h: 16 });
+/**
+ * The follow line's row (drawFollowLine): the bottom row, its strip's right end at x 632 -- over the scene level with
+ * TRIP LOG, over the barn in the hint's place.
+ */
+export const FOLLOW_LINE_Y = 338, FOLLOW_LINE_X1 = 632;
 
 // ---------- colours ----------
 
@@ -468,28 +475,47 @@ export function editTeam(sim: CareSim, ui: MapUi, act: UiAct): string | null {
 // ---------- the team out ----------
 
 /**
- * The chip's words: MUSTER, TEAM OUT - 14H (game hours of walking to go); at a stop, the encounter's (encounterui.ts
- * encounterChip: FLOOD AHEAD!, FLOOD: PICK! while a pair's pick waits for the player, FLOOD TURN 2, FLOOD CLEARED);
- * landed, LANDING while a dragon of the team is still coming onto the deck, EGG TO THE NEST while its rider carries the
+ * The chip's words: MUSTER, TEAM OUT - 14H (game hours of walking to go; the chip shows only while the barn is on screen,
+ * so never at a stop: the game follows the team on its road, BASE_DESIGN 6); landed, LANDING while a dragon of the team
+ * is still coming onto the deck, EGG TO THE NEST while its rider carries the
  * egg down to the Hatchery, then HOME (the riders hanging their saddles up, until the trip is over).
  */
 export function chipText(sim: CareSim, t: Trip): string {
   if (t.state === 'muster') return 'MUSTER';
-  const at = encounterChip(t);
-  if (at) return at.text;
   if (t.state === 'return' || t.state === 'home') {
     if (t.pairs.some((p) => sim.dragons.find((d) => d.id === p.dragon)?.goal === 'muster')) return 'LANDING';
     return t.pairs.some((p) => sim.keepers.find((k) => k.id === p.keeper)?.carrying === 'egg') ? 'EGG TO THE NEST' : 'HOME';
   }
   return `TEAM OUT - ${t.state === 'away' ? hoursLeft(sim, t) : t.mission.days * 24}H`;
 }
-/** The TEAM OUT chip (a trip is out): its box (lit while a pick waits for the player at a stop), the team's flag and its words; returns its tap rect. */
-export function drawTeamChip(ctx: CanvasRenderingContext2D, sim: CareSim, t: Trip, open: boolean): Rect {
-  const at = encounterChip(t), lit = !!at?.lit;
-  box(ctx, CHIP, open || lit ? ACTIVE : FACE);
+/** The TEAM OUT chip (a trip is out): its box -- lit while the game follows the team -- the team's flag and its words; returns its rect. */
+export function drawTeamChip(ctx: CanvasRenderingContext2D, sim: CareSim, t: Trip, lit: boolean): Rect {
+  box(ctx, CHIP, lit ? ACTIVE : FACE);
   drawSprite(ctx, FLAG_SPRITE, CHIP.x + 7, CHIP.y + 7.5);
   text(ctx, chipText(sim, t), CHIP.x + CHIP.w / 2 + 5, CHIP.y + 4, lit ? FLAG : TEXT, 'center');
   return CHIP;
+}
+
+/**
+ * The follow line's words (BASE_DESIGN 6: the game follows the team from its send until it is home): where the team is --
+ * gathering on the Aerie, setting out over the sky bridge, on its road with the game hours of walking to go, or home.
+ */
+export function followText(sim: CareSim, t: Trip): string {
+  if (t.state === 'muster') return 'FOLLOWING THE TEAM: THEY GATHER ON THE AERIE';
+  if (t.state === 'depart') return 'FOLLOWING THE TEAM: THEY SET OUT OVER THE SKY BRIDGE';
+  if (t.state === 'away') return `FOLLOWING THE TEAM - HOME IN ${hoursLeft(sim, t)}H`;
+  return 'FOLLOWING THE TEAM - HOME!';
+}
+/**
+ * The follow line (while the game follows the team): the team's flag and followText on an ink strip, as the hint and the
+ * action line are, on the bottom row (FOLLOW_LINE_Y) right-aligned at FOLLOW_LINE_X1. Returns its rect.
+ */
+export function drawFollowLine(ctx: CanvasRenderingContext2D, sim: CareSim, t: Trip): Rect {
+  const s = followText(sim, t), w = measureText(s) + 20, r = { x: FOLLOW_LINE_X1 - w, y: FOLLOW_LINE_Y, w, h: 16 };
+  rect(ctx, r, INK);
+  drawSprite(ctx, FLAG_SPRITE, r.x + 7, r.y + 8);
+  text(ctx, s, r.x + 14, r.y + 5, TEXT);
+  return r;
 }
 
 /** How far along the road a trip is (0 at the muster, its walk's share out, 1 once it lands). */

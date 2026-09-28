@@ -60,8 +60,10 @@ export const BACK_Y = 296;
 export const PAIR_BACK = 170, RIDER_AHEAD = 56, PIECE_AHEAD = 150, BADDIE_AHEAD = 200;
 /** The camera keeps the team's middle this far from the screen's left edge. */
 export const CAM_BACK = 260;
-/** The overlay's way back to the barn, and the result card. */
-export const BACK_BUTTON: Readonly<Rect> = Object.freeze({ x: 8, y: 338, w: 110, h: 16 });
+/**
+ * The result card: tapped away, it is the way back to the barn (the scene is the game following the team, BASE_DESIGN
+ * 6: it has no other).
+ */
 export const RESULT_CARD: Readonly<Rect> = Object.freeze({ x: 170, y: 100, w: 300, h: 140 });
 /** A moment (a rider's special, a dragon's move) gives way to idle when its anim ends, or after this many steps at most (a looping one: Tomas's petLow, the REST's sit). */
 export const MOMENT_MAX = 240;
@@ -475,14 +477,6 @@ export function drawMissionScene(ctx: CanvasRenderingContext2D, sim: CareSim, tr
   }
 }
 
-/** The ← BACK TO BARN button (bottom left of the overlay). */
-export function drawBackButton(ctx: CanvasRenderingContext2D): void {
-  const r = BACK_BUTTON;
-  ctx.fillStyle = INK; ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.fillStyle = '#3a2e34'; ctx.fillRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
-  drawText(ctx, '← BACK TO BARN', r.x + r.w / 2, r.y + 5, { color: '#f3e6c8', shadow: false, align: 'center' });
-}
-
 /** What the trip brought home: its coin (half on a failure) and its egg (on a success). Read once the road is done (trip.success decided). */
 export function rewardsOf(trip: Trip): { coin: number; egg: DragonElement | null } {
   return { coin: trip.success ? trip.mission.coin : Math.floor(trip.mission.coin / 2), egg: trip.success ? trip.egg : null };
@@ -492,8 +486,9 @@ export function rewardsOf(trip: Trip): { coin: number; egg: DragonElement | null
 export function resultTitle(trip: Trip): string { return trip.success ? 'HOME SAFE!' : 'NOT THIS TIME'; }
 
 /**
- * The result card (once the road is done, until the team lands and is home): HOME SAFE! (every stop cleared) or NOT THIS
- * TIME, the stops cleared, the rewards, the XP each pair's dragon brought home, and that nobody is hurt.
+ * The result card (once the road is done, until it is tapped away -- the way back to the barn, BASE_DESIGN 6): HOME
+ * SAFE! (every stop cleared) or NOT THIS TIME, the stops cleared, the rewards, the XP each pair's dragon brought home,
+ * that nobody is hurt, and that a tap goes back to the barn.
  */
 export function drawResultCard(ctx: CanvasRenderingContext2D, sim: CareSim, trip: Trip, tick: number): void {
   const r = RESULT_CARD, { coin, egg } = rewardsOf(trip);
@@ -509,5 +504,5 @@ export function drawResultCard(ctx: CanvasRenderingContext2D, sim: CareSim, trip
   const xp = trip.pairs.map((p, i) => `${sim.dragons.find((d) => d.id === p.dragon)?.name ?? '?'} +${trip.xp[i]} XP`).join('   ');
   drawText(ctx, xp, cx, r.y + 74, { color: '#3a6a2e', shadow: false, align: 'center' });
   drawText(ctx, 'NOBODY IS HURT.', cx, r.y + 92, { color: INK, shadow: false, align: 'center' });
-  drawText(ctx, 'TAP TO CLOSE', cx, r.y + 118, { color: '#6b5a44', shadow: false, align: 'center' });
+  drawText(ctx, 'TAP TO GO BACK TO THE BARN', cx, r.y + 118, { color: '#6b5a44', shadow: false, align: 'center' });
 }
