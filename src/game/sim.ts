@@ -87,14 +87,18 @@ export interface SimOptions {
  * table (`reason` null) or refused (missions.ts canSend's reason), and a keeper the player asked for who could not be
  * taken (on a mission's trip); a bout begun in the Arena (`reason` null) or refused (arena.ts canSpar's reason); and a
  * bout decided (its two dragons, the winner's id or null for a draw, the XP each got), a dragon up a level, and a skill
- * learned (arena.ts decide: training.ts).
+ * learned (arena.ts decide: training.ts; a stop on the road brings XP too: encounter.ts). On the road (BASE_DESIGN 11):
+ * the team reaches a stop (`meet`: its index, its name, whether it is a fight with the big baddie) and a stop is
+ * resolved (`stopEnd`: cleared or waited out, and the XP each pair's dragon got).
  */
 export type SimEvent = { kind: 'grow'; dragon: number; stage: Stage } | { kind: 'hatch'; dragon: number; egg: number }
   | { kind: 'retire'; dragon: number } | { kind: 'garden'; dragon: number; plot: number } | { kind: 'full'; egg: number }
   | { kind: 'send'; mission: number; reason: string | null } | { kind: 'refused'; keeper: number; reason: string }
   | { kind: 'bout'; dragons: readonly [number, number]; reason: string | null }
   | { kind: 'boutEnd'; dragons: readonly [number, number]; winner: number | null; xp: readonly [number, number] }
-  | { kind: 'level'; dragon: number; level: number } | { kind: 'learn'; dragon: number; skill: SkillKind };
+  | { kind: 'level'; dragon: number; level: number } | { kind: 'learn'; dragon: number; skill: SkillKind }
+  | { kind: 'meet'; stop: number; name: string; fight: boolean }
+  | { kind: 'stopEnd'; stop: number; name: string; cleared: boolean; fight: boolean; xp: number };
 
 /**
  * An egg in the Hatchery (BASE_DESIGN 7): its id, its element, the seed its baby will have (a stateless draw from the world's

@@ -9,7 +9,11 @@ a need bubble, a job chip or a dragon to Rush it. A day and a night pass in 3 mi
 the keys 1-4) runs it at 2x, 4x or 8x, II (or p) pauses, and MAP (or m) opens the Map Room's world map: a little island
 of places -- the mill by the brook, the mine mouths, the owl's oak, the Storm Roc's crag, the hot springs... -- with the
 day's missions pinned at them and the lands you haven't reached yet under cloud. Tap a pin, BEST TEAM and SEND a team
-off from the Aerie, then watch its flag walk the road on the map, or tap the TEAM OUT chip to watch it on the road. Tap
+off from the Aerie, then watch its flag walk the road on the map, or tap the TEAM OUT chip to watch it on the road --
+and to play it: at each stop the team meets a challenge (a spring flood, a grumpy miller, thick fog...) or, at a hard
+road's end, a big baddie, and you pick what each dragon does turn by turn as in the Arena (its breath, a show-off, a
+rest, its rider's special), or leave it to the trail coach (AUTO); nobody is hurt, the outcome is told at the road's
+end, and every stop brings XP. Tap
 a keeper (or their badge, or Tab) to take them by hand: WASD or the arrows walk and climb, E or Space fetches and does
 the chore in reach, Esc lets go -- and on a touch screen a pad of arrows, E and LET GO does the same. ARENA (or b) opens
 the Arena on the roof: tap your dragon, then its sparring partner, and START BOUT -- the two ride up and spar turn by

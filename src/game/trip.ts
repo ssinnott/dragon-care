@@ -1,8 +1,10 @@
-// A mission and a team's trip (docs/BASE_DESIGN.md 5 and 6): plain data, JSON-safe, every reference an id.
-// missions.ts makes and steps them; the watchable scene (missionview.ts) is a pure function of a Trip
-// and the sim's clock, and never changes one.
+// A mission and a team's trip (docs/BASE_DESIGN.md 5, 6 and 11): plain data, JSON-safe, every reference an id.
+// missions.ts makes and steps them (the road walked in the world's own steps, an encounter at each stop: encounter.ts);
+// the watchable scene (missionview.ts) is a pure function of a Trip's state, and never changes one.
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { RegionId, ChallengeId, Difficulty, BaddieId, BaddieExit } from './missiondata.ts';
+import type { Stats } from './training.ts';
+import type { Encounter } from './encounter.ts';
 
 /** One mission on the Map Room's board. */
 export interface Mission {
@@ -14,7 +16,7 @@ export interface Mission {
   challenges: readonly ChallengeId[];
   /** A hard mission's big baddie at the end of the road, or null. */
   baddie: BaddieId | null;
-  /** Length in game days (1, 2 or 3). */
+  /** Length in game days (1, 2 or 3): the walking; the stops' encounters take their own time on top. */
   days: number;
   coin: number;
   /** The chance of an egg on a success (0..1); `guaranteedEgg` makes it sure (the region's first success). */
@@ -25,43 +27,62 @@ export interface Mission {
 /** A pair on a trip: a dragon and the keeper who rides with it, by id. */
 export interface Pair { dragon: number; keeper: number }
 
-/** A stop on the road: a challenge, or the baddie at the end. */
+/** How a stop went: not reached yet, cleared (an obstacle done, a baddie worn out), or waited out (the team out of puff, or out of turns). */
+export type StopResult = 'ahead' | 'met' | 'unmet';
+
+/** A stop on the road: a challenge (an obstacle), or the baddie at the end (a fight). */
 export interface Stop {
   kind: 'challenge' | 'baddie';
   /** Set when kind is 'challenge'. */
   challenge: ChallengeId | null;
   /** Set when kind is 'baddie'. */
   baddie: BaddieId | null;
-  /** Where on the road it sits, as a fraction of the trip's length: challenge i of n at (i+1)/(n+1)*0.85, the baddie at 0.9. */
+  /** Where on the road it sits, as a fraction of the trip's walk: challenge i of n at (i+1)/(n+1)*0.85, the baddie at 0.9. */
   at: number;
-  /** Whether the team counters it (a baddie: both of its counters met). */
+  /** Whether the team has its counter (a dragon of its element, or the rider with its skill; a baddie: both): the chooser's tick, and STRONG on the menu. */
   covered: boolean;
-  /** Who met it: dragon and keeper names, for the banner (empty if uncovered). */
+  /** Who has the counter: dragon and keeper names (empty if nobody). */
   by: readonly string[];
-  /** The trip log's line for this stop, e.g. "PITCH DARK - WICK LIGHTS THE WAY": how the stop went, never the outcome. */
+  /** How it went, once resolved (`SPRING FLOOD - RIPPLE SWIMS THEM ACROSS`, `... - THE TEAM WAITS IT OUT`); '' before. Never the trip's outcome. */
   log: string;
+  result: StopResult;
+  /** The turns its encounter took, and the clock it was resolved at (null until then: the baddie's exit is timed from it). */
+  turns: number;
+  resolvedAt: number | null;
 }
 
 export type TripState = 'muster' | 'depart' | 'away' | 'return' | 'home';
 
 /**
- * A team out on a mission. The outcome is rolled when it is sent (seeded), so the whole road is known up front; but the
- * road is the same either way -- the team never turns back, it walks every stop -- and the outcome is told at its end.
+ * A team out on a mission. It walks its road in the world's own steps (`walked` of `travel`), halting at each stop for
+ * its encounter (encounter.ts) until the stop is cleared or waited out, and never turns back: it walks every stop to
+ * the road's end, where the outcome -- HOME SAFE! when every stop was cleared -- is told, on the result card.
  */
 export interface Trip {
   mission: Mission;
   pairs: readonly Pair[];
-  /** The odds it was sent with (0.05..0.95), and the roll's result: told only at the road's end (the result card). */
-  odds: number;
-  success: boolean;
-  /** The egg it brings home (its element) and the nest reserved for it at SEND, or null. */
+  /** The trail coach's forecast it was sent with (encounter.ts forecastRoad: the share of its stops the coach would clear). */
+  forecast: number;
+  /** The outcome, decided at the road's end (null until then): every stop cleared. */
+  success: boolean | null;
+  /** The egg it may bring home (its element, drawn at SEND: sure on a region's first success, else its chance) and the nest reserved for it, or null. It comes home on a success. */
   egg: DragonElement | null;
   nest: number | null;
-  stops: readonly Stop[];
+  stops: Stop[];
   state: TripState;
-  /** Clock values (sim.clock) when the team left the Aerie and when it lands again; null until it has departed. */
+  /** The clock (sim.clock) when the team left the Aerie; null until it has departed. */
   departAt: number | null;
-  returnAt: number | null;
-  /** How the road's baddie leaves it (it always does, met or waited out: the team walks on), or null (no baddie). */
+  /** The steps of walking the road takes (its days), and the steps walked so far (the encounters don't count). */
+  travel: number;
+  walked: number;
+  /** Each pair's dragon on the road (encounter.ts): its stats (its spirits on its power, fixed at the send), the puff it has left, and the XP the road has brought it. */
+  stats: Stats[];
+  puff: number[];
+  xp: number[];
+  /** The trail coach picks every move (AUTO). */
+  auto: boolean;
+  /** The encounter at the stop the team stands at, or null: walking. */
+  encounter: Encounter | null;
+  /** How the road's baddie leaves it (it always does, worn out or not: the team walks on), or null (no baddie). */
   exit: BaddieExit | null;
 }

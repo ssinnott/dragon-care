@@ -10,7 +10,7 @@ import { STAGE_DAYS, HATCH_DAYS, RETIRE_DAYS } from './clock.ts';
 import { NEEDS, hasNeed, moodOf } from './needs.ts';
 import { NAMES } from './names.ts';
 import { settleInGarden } from './garden.ts';
-import { send, autoRider, awayNow, rollBoard, LOST_NEST } from './missions.ts';
+import { send, autoRider, awayNow, placeAlong, rollBoard, LOST_NEST } from './missions.ts';
 import { REGIONS } from './regions.ts';
 import type { Pair } from './trip.ts';
 import { demoTrip, parseTripParam } from './tripdemo.ts';
@@ -103,23 +103,26 @@ export const GARDEN_RESIDENTS: readonly string[] = Object.freeze(['BRAMBLE', 'CO
 export const RETIRE_AT = RETIRE_DAYS - 0.1;
 
 /** The `trip` preset's trip when no `trip=` is given (or one that doesn't parse): half way along the Old Mine Road. */
-export const TRIP_DEFAULT: TripParam = Object.freeze({ region: 'oldmine', progress: 0.5, fail: false });
+export const TRIP_DEFAULT: TripParam = Object.freeze({ region: 'oldmine', progress: 0.5, fail: false, auto: false });
 
 /**
- * The new game with a team away on a hard mission (BASE_DESIGN 6: view=base&preset=trip&trip=<region>:<progress>[:fail]):
+ * The new game with a team away on a hard mission (BASE_DESIGN 6, 11: view=base&preset=trip&trip=<region>:<progress>[:fail][:auto]):
  * the region's hard mission (its baddie at the end of the road, if it has one), the best two pairs of the seven with
- * their auto riders and its road (tripdemo.ts demoTrip: the missions' own rider pick, odds and road, missions.ts), the
- * outcome as asked -- a success unless `:fail` -- and the team away as a sent team is once it has left the Aerie
- * (missions.ts awayNow: its dragons off the map, its riders away), left so long ago that at step `at` (the frozen t=;
- * 0 live) exactly `progress` of the trip's length has gone by. The world's own trip (sim.missions.trip): it lands, and
- * its riders come home, as any.
+ * their auto riders and its road (tripdemo.ts demoTrip: the missions' own rider pick, forecast and road, missions.ts),
+ * the team away as a sent team is once it has left the Aerie (missions.ts awayNow: its dragons off the map, its
+ * riders away) and put `progress` of its walk along the road (missions.ts placeAlong: every stop before that point
+ * cleared -- or, with `:fail`, the last of them waited out, so the road's end tells NOT THIS TIME -- and a stop at that
+ * very point met on the first step: `oldmine:0.9` is the Mole King's fight from its walk-in). From there it walks on a
+ * step a step: `at` (the frozen t=) steps in, it is that many steps further (a stop met on the way holds it). The
+ * world's own trip (sim.missions.trip): it lands, and its riders come home, as any.
  */
 export function tripStart(param: TripParam | string | null | undefined, at = 0): StartSpec {
   const p = typeof param === 'string' || param == null ? parseTripParam(param) ?? TRIP_DEFAULT : param;
   return { ...newGame(), after: (sim) => {
-    const trip = demoTrip(sim, p.region, 'hard', !p.fail);
-    const L = trip.mission.days * sim.dayLen;
-    awayNow(sim, trip, sim.clock + at - Math.round(p.progress * L));
+    const trip = demoTrip(sim, p.region, 'hard');
+    trip.auto = p.auto;
+    awayNow(sim, trip, sim.clock - Math.round(p.progress * trip.travel) - at);
+    placeAlong(sim, trip, p.progress, p.fail);
   } };
 }
 

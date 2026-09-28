@@ -7,7 +7,7 @@ import { makeRng } from '../lib/engine/rng.ts';
 import type { RngInstance } from '../lib/engine/rng.ts';
 
 /** What a draw is for: each use gets its own tag, so two uses never share a stream. */
-export const TAG = Object.freeze({ BOARD: 1, MISSION: 2, EGG: 3, NAME: 4, GARDEN: 5, REGION: 6, SKY: 7, BOUT: 8 } as const);
+export const TAG = Object.freeze({ BOARD: 1, MISSION: 2, EGG: 3, NAME: 4, GARDEN: 5, REGION: 6, SKY: 7, BOUT: 8, TRIP: 9 } as const);
 export type Tag = typeof TAG[keyof typeof TAG];
 
 /** murmur3's 32-bit finaliser: every input bit reaches every output bit. */

@@ -16,20 +16,24 @@ export interface Counter { element?: DragonElement; skill?: Skill }
 /**
  * The eleven challenges (BASE_DESIGN 5.3's table): the land's met by an element, the people's by a rider's skill. `met`
  * is the trip log's verb for the one who meets it ("PITCH DARK - WICK LIGHTS THE WAY"); `word`, a short name for a
- * chooser button (15 glyphs a line).
+ * chooser button (15 glyphs a line). On the road (BASE_DESIGN 11, encounter.ts) a challenge is an obstacle the team
+ * works at: `it` is what the menu calls it (`STRONG ON THE FLOOD!`), `clear` what the work is for (`20 WORK TO GET
+ * ACROSS`), `done` its line once cleared by plain work (`THE WATER GOES DOWN`: its counter's `met` when the counter
+ * clears it), `bite` its line for a turn it still stands (the team's puff goes down), and `charmed`, for the two that
+ * are somebody -- the miller and the hurt animal -- what a dragon's show-off does to them.
  */
-export const CHALLENGES: Readonly<Record<ChallengeId, { name: string; word: string; counter: Counter; met: string }>> = Object.freeze({
-  dark: { name: 'PITCH DARK', word: 'DARK', counter: { element: 'dusk' }, met: 'LIGHTS THE WAY' },
-  heavy: { name: 'HEAVY LOAD', word: 'HEAVY', counter: { element: 'rock' }, met: 'CARRIES THE LOAD' },
-  cold: { name: 'THE COLD', word: 'COLD', counter: { element: 'fire' }, met: 'KEEPS EVERYONE WARM' },
-  storm: { name: 'STORM', word: 'STORM', counter: { element: 'lightning' }, met: 'RIDES THE STORM OUT' },
-  flood: { name: 'SPRING FLOOD', word: 'FLOOD', counter: { element: 'water' }, met: 'SWIMS THEM ACROSS' },
-  thorns: { name: 'THORNS', word: 'THORNS', counter: { element: 'spike' }, met: 'PUSHES THROUGH' },
-  lost: { name: 'LOST THINGS', word: 'LOST', counter: { element: 'slinkwing' }, met: 'SNIFFS THEM OUT' },
-  miller: { name: 'GRUMPY MILLER', word: 'MILLER', counter: { skill: 'charm' }, met: 'TALKS HIM ROUND' },
-  hurt: { name: 'HURT ANIMAL', word: 'HURT', counter: { skill: 'medic' }, met: 'BANDAGES IT UP' },
-  fog: { name: 'THICK FOG', word: 'FOG', counter: { skill: 'navigator' }, met: 'FINDS THE WAY' },
-  gap: { name: 'NARROW GAP', word: 'GAP', counter: { skill: 'nimble' }, met: 'SLIPS THROUGH' },
+export const CHALLENGES: Readonly<Record<ChallengeId, { name: string; word: string; counter: Counter; met: string; it: string; clear: string; done: string; bite: string; charmed?: string }>> = Object.freeze({
+  dark: { name: 'PITCH DARK', word: 'DARK', counter: { element: 'dusk' }, met: 'LIGHTS THE WAY', it: 'THE DARK', clear: 'LIGHT THE WAY', done: 'THE WAY IS LIT', bite: 'THE DARK IS SLOW GOING' },
+  heavy: { name: 'HEAVY LOAD', word: 'HEAVY', counter: { element: 'rock' }, met: 'CARRIES THE LOAD', it: 'THE LOAD', clear: 'SHIFT THE LOAD', done: 'THE LOAD IS SHIFTED', bite: 'THE LOAD WEIGHS ON THE TEAM' },
+  cold: { name: 'THE COLD', word: 'COLD', counter: { element: 'fire' }, met: 'KEEPS EVERYONE WARM', it: 'THE COLD', clear: 'SEE THE COLD OFF', done: 'THE COLD IS SEEN OFF', bite: 'THE COLD BITES' },
+  storm: { name: 'STORM', word: 'STORM', counter: { element: 'lightning' }, met: 'RIDES THE STORM OUT', it: 'THE STORM', clear: 'RIDE IT OUT', done: 'THE STORM PASSES', bite: 'THE STORM BUFFETS THE TEAM' },
+  flood: { name: 'SPRING FLOOD', word: 'FLOOD', counter: { element: 'water' }, met: 'SWIMS THEM ACROSS', it: 'THE FLOOD', clear: 'GET ACROSS', done: 'THE WATER GOES DOWN', bite: 'THE FLOOD SOAKS THE TEAM' },
+  thorns: { name: 'THORNS', word: 'THORNS', counter: { element: 'spike' }, met: 'PUSHES THROUGH', it: 'THE THORNS', clear: 'PUSH THROUGH', done: 'THE TANGLE IS PULLED ASIDE', bite: 'THE THORNS SNAG THE TEAM' },
+  lost: { name: 'LOST THINGS', word: 'LOST', counter: { element: 'slinkwing' }, met: 'SNIFFS THEM OUT', it: 'THE SEARCH', clear: 'FIND THEM', done: 'THE LOST THINGS TURN UP', bite: 'THE SEARCH WEARS THE TEAM DOWN' },
+  miller: { name: 'GRUMPY MILLER', word: 'MILLER', counter: { skill: 'charm' }, met: 'TALKS HIM ROUND', it: 'THE MILLER', clear: 'TALK HIM ROUND', done: 'THE MILLER COMES ROUND', bite: 'THE MILLER GRUMBLES ON', charmed: 'THE MILLER CRACKS A SMILE' },
+  hurt: { name: 'HURT ANIMAL', word: 'HURT', counter: { skill: 'medic' }, met: 'BANDAGES IT UP', it: 'THE BIRD', clear: 'CALM IT DOWN', done: 'THE BIRD SETTLES', bite: 'THE BIRD FLUTTERS AND FRETS', charmed: 'THE BIRD PERKS UP' },
+  fog: { name: 'THICK FOG', word: 'FOG', counter: { skill: 'navigator' }, met: 'FINDS THE WAY', it: 'THE FOG', clear: 'FIND THE WAY', done: 'THE FOG THINS', bite: 'THE FOG IS SLOW GOING' },
+  gap: { name: 'NARROW GAP', word: 'GAP', counter: { skill: 'nimble' }, met: 'SLIPS THROUGH', it: 'THE GAP', clear: 'GET THROUGH', done: 'THE TEAM SQUEEZES THROUGH', bite: 'THE SQUEEZE WEARS THE TEAM DOWN' },
 });
 
 /**
