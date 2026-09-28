@@ -9,7 +9,10 @@ a need bubble, a job chip or a dragon to Rush it. A day and a night pass in 3 mi
 the keys 1-4) runs it at 2x, 4x or 8x, II (or p) pauses, and MAP (or m) opens the Map Room's world map: a little island
 of places -- the mill by the brook, the mine mouths, the owl's oak, the Storm Roc's crag, the hot springs... -- with the
 day's missions pinned at them and the lands you haven't reached yet under cloud. Tap a pin, BEST TEAM and SEND a team
-off from the Aerie, then watch its flag walk the road on the map, or tap the TEAM OUT chip to watch it on the road. Tap
+off from the Aerie, and the game follows it on its adventure: the camera stays on the Aerie as the team gathers and
+sets out over the sky bridge, then goes with it down its road -- the keepers mind the barn meanwhile, and there's no
+going back to it (MAP still shows the team's flag on the map) until the team is home and you tap its result card away.
+Tap
 a keeper (or their badge, or Tab) to take them by hand: WASD or the arrows walk and climb, E or Space fetches and does
 the chore in reach, Esc lets go -- and on a touch screen a pad of arrows, E and LET GO does the same. ARENA (or b) opens
 the Arena on the roof: tap your dragon, then its sparring partner, and START BOUT -- the two ride up and spar turn by
