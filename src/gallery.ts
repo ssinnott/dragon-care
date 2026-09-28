@@ -49,9 +49,10 @@
 //                              line show); live, a tap on a keeper or their badge takes them, WASD or the arrows walk
 //                              them, E or Space does the chore in reach, Esc lets go; preset=trip&trip=<region>:
 //                              <progress>[:fail] has a team away on the region's hard mission, that far along its road
-//                              at the frozen t (BASE_DESIGN 6); panel=map | mission | watch opens the Map Room table's world
-//                              map or a mission's chooser (mission=0..2: which of the board's), or the
-//                              watchable scene of the team out, over the barn at the first frame; panel=arena | bout the
+//                              at the frozen t (BASE_DESIGN 6: the game follows it, its road on screen); panel=map |
+//                              mission | watch opens the Map Room table's world map or a mission's chooser (mission=0..2:
+//                              which of the board's), or the watchable scene of the team out, over the barn at the first
+//                              frame (on screen anyway while the team is away); panel=arena | bout the
 //                              Arena's chooser or the bout on (BASE_DESIGN 10: preset=bout has one), b opens the Arena live
 //   anim: idle walk happy eat sleep wake breath pet beg rest (anims.ts ANIM_NAMES), and by name any variant or an
 //   element anim (bath, upset, call); one-shots replay after a pause, an eating pet gets a bowl drawn after it
@@ -151,8 +152,9 @@ export interface GalleryParams {
   take: string | null;
   /**
    * view=base: panel=map | mission, the Map Room table's overlay open from the first frame (BASE_DESIGN 5), panel=watch,
-   * the watchable scene (BASE_DESIGN 6), or panel=arena | bout, the Arena's chooser or the bout on watched (BASE_DESIGN
-   * 10); mission=<i>, the board's mission the chooser shows (0-2); trip=<region>:<progress>[:fail], preset=trip's team away.
+   * the watchable scene (BASE_DESIGN 6: the game shows it anyway while it follows a team away on its road), or
+   * panel=arena | bout, the Arena's chooser or the bout on watched (BASE_DESIGN 10); mission=<i>, the board's mission the
+   * chooser shows (0-2); trip=<region>:<progress>[:fail], preset=trip's team away.
    */
   panel: 'map' | 'mission' | 'watch' | 'arena' | 'bout' | null;
   mission: number;

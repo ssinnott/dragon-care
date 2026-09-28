@@ -15,11 +15,16 @@
 // - The HUD (hud.ts): the top bar, the job strip, the bubbles, the hints, the toasts (life's news waits its turn), a
 //   dragon's card, the TEAM OUT chip, and while a keeper is held the pad and the action line (BASE_DESIGN 4.8, 4.10).
 // - The overlays, one `ui.screen` (none, map, mission, watch, arena or bout): the Map Room's table (maptable.ts; the
-//   world waits under it), the watch overlay (missionview.ts; the world steps on), and the Arena's (arenaui.ts,
-//   BASE_DESIGN 10): its chooser (the world waits under it) and its bout, watched over the world with the camera on the
-//   Arena (the world steps on, but waits while the player's pick does). An open overlay takes every tap under the top
-//   bar before the pad and the world; the top bar's buttons still work; a badge, Tab or Esc goes back to the barn; a
-//   keeper held stays held but stands still under it (BASE_DESIGN 5, 6, 10).
+//   world waits under it), the watch overlay (missionview.ts; the world steps on: following the team, below), and the
+//   Arena's (arenaui.ts, BASE_DESIGN 10): its chooser (the world waits under it) and its bout, watched over the world
+//   with the camera on the Arena (the world steps on, but waits while the player's pick does). An open overlay takes
+//   every tap under the top bar before the pad and the world; the top bar's buttons still work; over the table or the
+//   Arena's, a badge, Tab or Esc goes back to the barn, and a keeper held stays held but stands still (BASE_DESIGN 5, 10).
+// - Following the team (BASE_DESIGN 6): from a team's send until it is home the game follows it, and the barn runs
+//   itself. Gathering on the Aerie and setting out over the sky bridge, the barn is on screen with the camera held on
+//   the deck; away on its road, and landed until its result card is tapped away, the watch overlay is the view, with no
+//   way back to the barn. Nobody is held by hand meanwhile, and a tap in the barn, a badge, Tab, Esc or the Arena says
+//   the game is following the team; the Map Room's table still opens (at once, the world waiting) and shuts back onto it.
 // - Input: taps (tap: in its order), drags, the keys and the touch pad. Everything that changes the world -- a take, a
 //   steer, E, a send -- goes to the simulation as a command, applied at the start of its next step (control.ts).
 import { drawDragon, rootToScreen } from '../art/dragon/rig.ts';
@@ -33,7 +38,7 @@ import { CareSim } from './sim.ts';
 import type { Dragon, Job, Keeper, SimEvent } from './sim.ts';
 import { startSpec, buildSim, tripStart } from './presets.ts';
 import type { Trip } from './trip.ts';
-import { sceneAt, drawMissionScene, drawBackButton, drawResultCard, resultTitle, ScenePets, BACK_BUTTON, RESULT_CARD, ROAD_BOTTOM } from './missionview.ts';
+import { sceneAt, drawMissionScene, drawResultCard, resultTitle, ScenePets, RESULT_CARD, ROAD_BOTTOM } from './missionview.ts';
 import type { SceneFrame } from './missionview.ts';
 import { worldKey, barnKey, fnv1a, serialize } from './save.ts';
 import type { SaveV } from './save.ts';
@@ -63,7 +68,7 @@ import type { KeeperAgent } from '../care/keeper.ts';
 import { drawBubble, drawChip, hit } from './icons.ts';
 import type { Rect } from './icons.ts';
 import { canSend, onTrip, LOST_NEST } from './missions.ts';
-import { newUi, drawMapScreen, drawMissionScreen, editTeam, drawTeamChip, drawTripCard, drawLogButton, hitAt, chosen, eggNotice, tripProgress, TRIP_CARD, PANEL, LOG_BUTTON } from './maptable.ts';
+import { newUi, drawMapScreen, drawMissionScreen, editTeam, drawTeamChip, drawTripCard, drawLogButton, drawFollowLine, hitAt, chosen, eggNotice, tripProgress, TRIP_CARD, PANEL, LOG_BUTTON } from './maptable.ts';
 import type { MapUi, Hit, Screen } from './maptable.ts';
 import { worldCanvas } from './worldmap.ts';
 import { canSpar, boutLook, fighterIndex, FACE_FRAMES } from './arena.ts';
@@ -212,6 +217,15 @@ const ARENA_DECK: Readonly<Rect> = Object.freeze({ x: ARENA_X0 + 8, y: feetY(AER
 const POP_FRAMES = FACE_FRAMES + 12;
 /** A toast over the watch overlay: its text's top, on the verge under the road (y 306), clear of the buttons (y 338). */
 const WATCH_TOAST_Y = ROAD_BOTTOM + 16;
+/**
+ * How far along the game is in following the team out (BASE_DESIGN 6): `gather` from its send until it has walked off
+ * the Aerie over the sky bridge (the barn on screen, the camera held on the deck), then `road`, away on its road and
+ * landed with its result card still up (the watch overlay); null with no team out, or once its result card is tapped
+ * away (the barn is the player's again, while the riders finish coming home).
+ */
+type Follow = 'gather' | 'road' | null;
+/** What the game says to a tap in the barn, a badge, Tab, Esc on the road or the Arena while it follows the team. */
+const FOLLOWING = 'FOLLOWING THE TEAM: THE KEEPERS MIND THE BARN TILL THEY LAND';
 
 /**
  * One dragon on screen: its pet, playing its wake before it goes back to idle, its eat bowl (found once), the stage it
@@ -310,7 +324,7 @@ export class BaseView {
   private lineRect: Rect | null = null;
   /**
    * The overlays (maptable.ts MapUi): the screen on show -- none (the barn), the Map Room table's `map` or `mission`
-   * chooser (the world waits), or `watch`, the team out watched on its road (missionview.ts, the world stepping on
+   * chooser (the world waits), or `watch`, the team out followed on its road (missionview.ts, the world stepping on
    * underneath: BASE_DESIGN 6) -- the mission chosen and the team being put together, the frames before the map opens, and
    * whether the trip's log is open over the watch overlay (`card`); last frame's tap targets on the table, and the TEAM
    * OUT chip's.
@@ -320,7 +334,10 @@ export class BaseView {
   private chipRect: Rect | null = null;
   /** Last frame's bout chip (a bout on, the barn on screen: arenaui.ts BOUT_CHIP), or null. */
   private boutChipRect: Rect | null = null;
-  /** The team's characters for the trip watched; whether its result card was tapped away; the last scene drawn (for the hook). */
+  /**
+   * The team's characters for the trip watched; whether its result card was tapped away (the game's following it over:
+   * followStage); the last scene drawn (for the hook).
+   */
   private watching: ScenePets | null = null;
   private resultClosed = false;
   private scene: { trip: Trip; f: SceneFrame } | null = null;
@@ -435,6 +452,8 @@ export class BaseView {
     // (a grow-up's flash counts the frames shown that step the world: as long at 8x as at 1x, and held while paused)
     if (steps > 0) for (const v of this.cast.values()) if (v.flash > 0) v.flash--;
     for (let n = steps; n > 0 && !this.worldWaits(); n--) this.worldStep();
+    // (a team out: the game follows it -- its view kept as it gathers, sets out, walks its road and lands)
+    this.keepFollowing();
     // (the camera asked for, as the garden widens under it)
     if (this.camAsked && (this.camX !== this.camAsked.x || this.camY !== this.camAsked.y)) this.setCam(this.camAsked.x, this.camAsked.y);
     if (this.camTo) {
@@ -453,13 +472,14 @@ export class BaseView {
   }
 
   /**
-   * Whether the world waits this frame: the Map Room's table or the Arena's chooser open (BASE_DESIGN 5, 10), or a bout
-   * watched with the player's pick waiting (AUTO off) and not yet given -- a pick or AUTO given is a command the world
-   * takes at its next step, so it steps on for it.
+   * Whether the world waits this frame: the Map Room's table or the Arena's chooser open (BASE_DESIGN 5, 10), the team
+   * followed home with its result card up (BASE_DESIGN 6: so that tapped away, the team lands in view), or a bout watched
+   * with the player's pick waiting (AUTO off) and not yet given -- a pick or AUTO given is a command the world takes at
+   * its next step, so it steps on for it.
    */
   private worldWaits(): boolean {
     const s = this.ui.screen, b = this.sim.arena.bout;
-    if (s === 'map' || s === 'mission' || s === 'arena') return true;
+    if (s === 'map' || s === 'mission' || s === 'arena' || this.resultUp()) return true;
     return s === 'bout' && !!b && b.state === 'pick' && !b.auto && !this.sim.commands.some((c) => c.kind === 'skill' || c.kind === 'coach');
   }
 
@@ -641,8 +661,10 @@ export class BaseView {
     const read = readClock(this.sim.clock, this.sim.dayLen), lit = lightsOf(read), step = lit.walls;
     const trip = this.sim.missions.trip;
     this.scene = trip ? { trip, f: sceneAt(this.sim, trip) } : null;
-    // (the team watched on its road: the overlay over the barn, the top bar kept; once the trip is over, the barn again)
-    if (this.ui.screen === 'watch' && !trip) this.closeWatch();
+    // (the team followed on its road: the overlay over the barn, the top bar kept; the watch overlay is the game following
+    // the team, so once that is over -- its result card tapped away, or the trip over -- the barn again)
+    this.keepFollowing();
+    if (this.ui.screen === 'watch' && !this.following()) this.closeWatch();
     // (a bout watched: once it is over -- its two off the Arena deck -- or refused, the barn again)
     if (this.ui.screen === 'bout' && !this.sim.arena.bout && !this.sim.commands.some((c) => c.kind === 'bout')) this.closeArena();
     if (this.ui.screen === 'watch' && all && this.scene) { this.drawWatch(ctx, read, this.scene.trip, this.scene.f); this.publish(read); return; }
@@ -744,24 +766,30 @@ export class BaseView {
   }
 
   /**
-   * The team out, watched (BASE_DESIGN 6): the scene over the barn (missionview.ts: the road, its stops, the baddie, the team,
-   * the banner), the result card once the trip's time is up (until tapped away), the way back to the barn, and the top
-   * bar over it all -- the world steps on underneath (the barn's own frame is not drawn meanwhile).
+   * The team out, followed (BASE_DESIGN 6): the scene over the barn (missionview.ts: the road, its stops, the baddie, the
+   * team, the banner), the result card once the trip's time is up (until tapped away: the way back to the barn), TRIP
+   * LOG, the follow line, and the top bar over it all -- the world steps on underneath (the barn's own frame is not
+   * drawn meanwhile).
    */
   private drawWatch(ctx: CanvasRenderingContext2D, read: ClockRead, trip: Trip, f: SceneFrame): void {
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = CLEAR; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    if (!this.watching || this.watching.trip !== trip) this.watching = new ScenePets(this.sim, trip);
+    // (another trip's scene: its own characters, and its own result card to come)
+    if (!this.watching || this.watching.trip !== trip) { this.watching = new ScenePets(this.sim, trip); this.resultClosed = false; }
     drawMissionScene(ctx, this.sim, trip, this.watching, f);
     // (the result card once the trip's time is up; then the trip's log over it, opened by TRIP LOG -- the stops met,
     // unmet and ahead, the log's latest lines, the time left -- so the log asked for is read whole)
-    if (f.done && !this.resultClosed) drawResultCard(ctx, trip, this.sim.tick);
+    const card = f.done && !this.resultClosed;
+    if (card) drawResultCard(ctx, trip, this.sim.tick);
     if (this.ui.card) drawTripCard(ctx, this.sim, trip);
-    drawBackButton(ctx);
+    // (no way back to the barn but the result card, at the road's end: TRIP LOG at the bottom left, and at the right the
+    // follow line -- the game following the team, the game hours till it is home)
     this.uiHits = [{ r: LOG_BUTTON, act: { kind: 'none' }, name: 'log' }];
+    if (card) this.uiHits.push({ r: RESULT_CARD, act: { kind: 'none' }, name: 'result' });
     drawLogButton(ctx, this.ui.card);
-    // (the top bar as over the barn: the keepers' badges live -- a tap takes that keeper, back in the barn -- the one held
-    // lit; the pad and the line are the barn's, not drawn over the scene)
+    drawFollowLine(ctx, this.sim, trip);
+    // (the top bar as over the barn -- the keepers' badges showing who is at work, away or resting, though following the
+    // team a tap on one takes nobody; the pad and the line are the barn's, not drawn over the scene)
     this.topBar(ctx, read, this.held());
     // (the toast shows over the scene too -- life's news, a landing, the dawn's tip keep coming while the team is
     // watched -- low on the verge under the road, clear of the banner, the log, the result card and the buttons)
@@ -798,9 +826,9 @@ export class BaseView {
   }
 
   /**
-   * Open the watch overlay on the trip that is out (none out: nothing happens). A keeper held by hand stays held but
-   * stands still while it is open (steer: no direction reaches them, E does nothing), walking on as the keys still down
-   * say once it closes.
+   * Open the watch overlay on the trip that is out (none out: nothing happens): the game following the team on its road
+   * (keepFollowing, or a page's panel=watch). A new trip's scene starts afresh -- its characters, its result card up
+   * once its time is up, its log shut.
    */
   private openWatch(): void {
     const trip = this.sim.missions.trip;
@@ -810,8 +838,78 @@ export class BaseView {
     this.setScreen('watch');
   }
 
-  /** Close the watch overlay (BACK TO BARN, Esc, a badge, Tab, the trip over): the barn again, the keeper held steered as the keys and pad say. */
+  /** Close the watch overlay (the game's following the team over, or the Map Room's table opened over it): the barn again, the keeper held steered as the keys and pad say. */
   private closeWatch(): void { this.setScreen('none'); }
+
+  /**
+   * How far along the game is in following the team out (Follow, BASE_DESIGN 6): read off the world's trip -- so a page
+   * loaded with a team out follows it too -- and, once it has landed, whether its result card has been tapped away.
+   */
+  private followStage(): Follow {
+    const t = this.sim.missions.trip;
+    if (!t) return null;
+    if (t.state === 'muster' || t.state === 'depart') return 'gather';
+    if (t.state === 'away') return 'road';
+    return this.resultClosed && this.watching?.trip === t ? null : 'road';
+  }
+  /** Whether the game is following a team out (the barn runs itself meanwhile). */
+  private following(): boolean { return this.followStage() !== null; }
+  /**
+   * Whether the result card is up over the team's road: landed (the trip's time is up, the scene's done), followed, and
+   * the card not yet tapped away. Read off the world's trip, so the world waits from the very step it lands.
+   */
+  private resultUp(): boolean { return this.ui.screen === 'watch' && this.sim.missions.trip?.state === 'return' && this.followStage() === 'road'; }
+
+  /**
+   * Follow mode, kept each step and each frame drawn (BASE_DESIGN 6). While the game follows the team the barn runs
+   * itself: the keeper held by hand is let go, a dragon's card is shut, and so are the Arena's overlays (a bout on goes
+   * on, its coach picking). Gathering, the barn is on screen and the camera is held on the Aerie deck (no drag moves it;
+   * the scene opens as the team sets out); on the road -- and landed, its result card up -- the watch overlay is the view.
+   * The Map Room's table may be open over either (the world waits), and shut, the team's view is back; a page's panel=
+   * overlay waiting for its first frame opens first.
+   */
+  private keepFollowing(): void {
+    const f = this.followStage();
+    if (!f) return;
+    if (this.held()) this.send({ kind: 'release' });
+    this.card = null;
+    if (this.ui.screen === 'arena' || this.ui.screen === 'bout' || (this.ui.opening > 0 && this.ui.opens === 'arena')) this.closeArena();
+    if (f === 'gather') {
+      if (this.ui.screen === 'watch') this.closeWatch();
+      this.camAsked = null;
+      if (!this.camTo && (this.camX !== AERIE_CAM.x || this.camY !== AERIE_CAM.y)) this.camTo = { ...AERIE_CAM };
+    } else if (this.ui.screen === 'none' && this.ui.opening === 0 && !this.pendingPanel) this.openWatch();
+  }
+
+  /**
+   * The result card tapped away: the game's following the team is over (followStage) -- the barn again, the camera
+   * easing to the Aerie, where the team has landed and walks back onto the deck.
+   */
+  private comeHome(): void {
+    this.resultClosed = true;
+    this.closeWatch();
+    this.camAsked = null; this.camTo = { ...AERIE_CAM };
+  }
+
+  /**
+   * A tap in the barn while the game follows the team as it gathers on the Aerie: the barn runs itself, and says so --
+   * but the Map Room's table, in view there, opens the map as MAP does.
+   */
+  private followTap(sx: number, sy: number): void {
+    if (this.layers === 'all' && hit(TABLE, sx + Math.round(this.camX), sy + Math.round(this.camY))) { this.openMapNow(); return; }
+    this.say(FOLLOWING);
+  }
+
+  /**
+   * Esc while the game follows the team: the Map Room's table shut back onto the team's view, else the trip's log shut,
+   * else the result card put away (as a tap on it: comeHome); else it says the game is following the team.
+   */
+  private followEscape(): void {
+    if (this.ui.screen === 'map' || this.ui.screen === 'mission') this.closeTable();
+    else if (this.ui.screen === 'watch' && this.ui.card) this.ui.card = false;
+    else if (this.resultUp()) this.comeHome();
+    else this.say(FOLLOWING);
+  }
 
   /** An overlay on (or none), and the keeper held steered as that allows (under an overlay they stand still). */
   private setScreen(s: Screen): void {
@@ -826,15 +924,17 @@ export class BaseView {
     else this.closeTable();
   }
 
-  /** A tap on the watch overlay (under the top bar): BACK TO BARN, TRIP LOG, the log tapped shut (it is drawn on top), the result card tapped away; anything else swallowed. */
+  /**
+   * A tap on the watch overlay (under the top bar): TRIP LOG, the log tapped shut (it is drawn on top), the result card
+   * tapped away -- the way back to the barn (comeHome); anything else swallowed.
+   */
   private watchTap(sx: number, sy: number): void {
-    if (hit(BACK_BUTTON, sx, sy)) this.closeWatch();
-    else if (hit(LOG_BUTTON, sx, sy)) this.ui.card = !this.ui.card;
+    if (hit(LOG_BUTTON, sx, sy)) this.ui.card = !this.ui.card;
     else if (this.ui.card && hit(TRIP_CARD, sx, sy)) this.ui.card = false;
-    else if (this.scene?.f.done && !this.resultClosed && hit(RESULT_CARD, sx, sy)) this.resultClosed = true;
+    else if (this.scene?.f.done && !this.resultClosed && hit(RESULT_CARD, sx, sy)) this.comeHome();
   }
 
-  /** The hook (window.__dragonCare.base): the world as of this frame, and the overlay and the scene (BASE_DESIGN 6). */
+  /** The hook (window.__dragonCare.base): the world as of this frame, and the overlay, the game following a team out, and the scene (BASE_DESIGN 6). */
   private publish(read: ClockRead): void {
     if (typeof window !== 'undefined' && window.__dragonCare) {
       const st = this.sim.stats, cx = Math.round(this.camX), cy = Math.round(this.camY), all = this.layers === 'all' && this.ui.screen === 'none', chip = this.chipRect as Rect | null;
@@ -876,7 +976,7 @@ export class BaseView {
           // (the map's places with no mission today, and its regions under cloud: a tap on one says what it is)
           places: Object.fromEntries(this.uiHits.filter((h) => h.name?.startsWith('place:')).map((h) => [h.name!.slice(6), { ...h.r }])),
           clouds: Object.fromEntries(this.uiHits.filter((h) => h.name?.startsWith('cloud:')).map((h) => [h.name!.slice(6), { ...h.r }])),
-          chip: chip ? { ...chip } : null, back: this.ui.screen === 'watch' ? { ...BACK_BUTTON } : null, log: this.ui.screen === 'watch' && this.ui.card,
+          chip: chip ? { ...chip } : null, follow: this.followStage(), log: this.ui.screen === 'watch' && this.ui.card,
           // (the chooser's line about the egg, as drawMissionScreen draws it: only while a mission's chooser is open)
           notice: this.ui.screen === 'mission' && chosen(this.sim, this.ui) ? eggNotice(this.sim) : null },
         scene: this.sceneHook(),
@@ -936,32 +1036,38 @@ export class BaseView {
 
   /**
    * The HUD (4.8): the top bar (the time, the jobs, the keepers' badges, NEW, pause and the speed: hud.ts), the job
-   * strip along the bottom, the two gestures at the bottom right, and a dragon's card if one is open.
+   * strip along the bottom, the two gestures at the bottom right, and a dragon's card if one is open -- or, while the
+   * game follows a team out (BASE_DESIGN 6), the follow line in the strip's and the hint's place.
    */
   private hud(ctx: CanvasRenderingContext2D, read: ClockRead): void {
     const text = (s: string, x: number, y: number, color: string) => drawText(ctx, s, x, y, { color, shadow: false });
-    const held = this.held();
+    const held = this.held(), follow = this.following();
     this.topBar(ctx, read, held);
     const q = this.sim.queue(), y = VIEW_H - 21;
     let x = 6;
-    q.slice(0, STRIP).forEach((j, i) => {
-      const w = drawChip(ctx, x, y, i + 1, j.need, j.dragon.name, tierOf(j.dragon.needs[j.need]), !!j.keeper, j.rushed);
-      this.chips.push({ job: j, r: { x, y, w, h: 17 } });
-      x += w + 3;
-    });
-    if (q.length > STRIP) {
-      const s = `+${q.length - STRIP}`;
-      ctx.fillStyle = INK; ctx.fillRect(x, y, 6 * s.length + 7, 17);
-      text(s, x + 4, y + 5, '#f3e6c8');
-      x += 6 * s.length + 7;
+    // (following the team, the barn runs itself: its job strip and hint give way to the follow line -- where the team is)
+    if (follow && this.scene) drawFollowLine(ctx, this.sim, this.scene.trip);
+    else {
+      q.slice(0, STRIP).forEach((j, i) => {
+        const w = drawChip(ctx, x, y, i + 1, j.need, j.dragon.name, tierOf(j.dragon.needs[j.need]), !!j.keeper, j.rushed);
+        this.chips.push({ job: j, r: { x, y, w, h: 17 } });
+        x += w + 3;
+      });
+      if (q.length > STRIP) {
+        const s = `+${q.length - STRIP}`;
+        ctx.fillStyle = INK; ctx.fillRect(x, y, 6 * s.length + 7, 17);
+        text(s, x + 4, y + 5, '#f3e6c8');
+        x += 6 * s.length + 7;
+      }
+      // (the hint gives way to the pad while a keeper is held)
+      if (!held) drawHint(ctx, x, this.hintText());
     }
-    // (the hint gives way to the pad while a keeper is held)
-    if (!held) drawHint(ctx, x, this.hintText());
-    // (a team out -- the Map Room's, or a preview -- its TEAM OUT chip under the top bar, which opens the scene)
-    this.chipRect = this.scene && this.ui.screen === 'none' ? drawTeamChip(ctx, this.sim, this.scene.trip, false) : null;
-    // (a bout on in the Arena: its chip beside it, which opens the bout -- BASE_DESIGN 10)
+    // (a team out -- the Map Room's, or a preview -- its TEAM OUT chip under the top bar: lit while the game follows it)
+    this.chipRect = this.scene && this.ui.screen === 'none' ? drawTeamChip(ctx, this.sim, this.scene.trip, follow) : null;
+    // (a bout on in the Arena: its chip beside it, which opens the bout -- BASE_DESIGN 10 -- but not while the game follows
+    // a team out: the Arena waits till it is home)
     const bout = this.sim.arena.bout;
-    this.boutChipRect = bout && this.ui.screen === 'none' ? drawBoutChip(ctx, this.sim, bout) : null;
+    this.boutChipRect = bout && this.ui.screen === 'none' && !follow ? drawBoutChip(ctx, this.sim, bout) : null;
     const d = this.cardDragon();
     if (d) {
       // (a garden resident has only food and love: GARDEN_NEEDS)
@@ -1071,15 +1177,22 @@ export class BaseView {
 
   // ---------- the Map Room's table (BASE_DESIGN 5) ----------
 
-  /** MAP or M: the camera eases to the Map Room and the map opens (MAP_OPEN_FRAMES on); again, and the table closes. */
+  /**
+   * MAP or M: the camera eases to the Map Room and the map opens (MAP_OPEN_FRAMES on); again, and the table closes.
+   * While the game follows a team out, the map opens at once over the team's view, the camera staying with the team, and
+   * the table shut is the team's view again (keepFollowing).
+   */
   private toggleMap(): void {
     if (this.ui.screen === 'map' || this.ui.screen === 'mission' || (this.ui.opening > 0 && this.ui.opens === 'map')) { this.closeTable(); return; }
-    // (from over the watch overlay or the Arena's: back to the barn, then to the Map Room)
+    if (this.following()) { this.openMapNow(); return; }
+    // (from over the Arena's overlay: back to the barn, then to the Map Room)
     if (this.ui.screen !== 'none' || this.ui.opening > 0) this.closeOverlay();
     this.card = null;
     this.camAsked = null; this.camTo = { ...MAP_CAM };
     this.ui.opens = 'map'; this.ui.opening = MAP_OPEN_FRAMES;
   }
+  /** The map open at once, the camera where it is (the world waits under it): following a team out, or the Map Room's table tapped while it gathers. */
+  private openMapNow(): void { this.card = null; this.ui.opening = 0; this.setScreen('map'); }
   private closeTable(): void { this.ui.opening = 0; this.ui.mission = null; this.ui.pairs = []; this.setScreen('none'); }
   /** A panel= page: its overlay, open now (a mission's by its place on the board; the Arena's bout if one is on, else its chooser). */
   private openPanel(): void {
@@ -1094,10 +1207,12 @@ export class BaseView {
 
   /**
    * ARENA or B: the camera eases to the Arena and its chooser opens (MAP_OPEN_FRAMES on) -- or, a bout on, the bout;
-   * again, and the Arena's overlay closes. From over another overlay: back to the barn first.
+   * again, and the Arena's overlay closes. From over another overlay: back to the barn first. Not while the game follows
+   * a team out: the Arena waits till the team is home, and says so.
    */
   private toggleArena(): void {
     if (this.ui.screen === 'arena' || this.ui.screen === 'bout' || (this.ui.opening > 0 && this.ui.opens === 'arena')) { this.closeArena(); return; }
+    if (this.following()) { this.say(FOLLOWING); return; }
     if (this.ui.screen !== 'none' || this.ui.opening > 0) this.closeOverlay();
     this.openArena();
   }
@@ -1165,8 +1280,9 @@ export class BaseView {
   /**
    * A tap on the table's overlay: a pin opens its mission; BACK goes back a screen; BEST TEAM, the team edits; SEND sends
    * -- as a command (control.ts: the simulation sends the team at its next step, or refuses it, and a `send` event says
-   * which: lifeEvents' toast), the table closed and the camera easing to the Aerie. A team that can't go now is not
-   * sent: the reason is the toast (and SEND's own greyed words).
+   * which: lifeEvents' toast), the table closed and the camera easing to the Aerie, where the game follows the team from
+   * the step it is sent (keepFollowing). A team that can't go now is not sent: the reason is the toast (and SEND's own
+   * greyed words).
    */
   private tableTap(sx: number, sy: number): void {
     const act = hitAt(this.uiHits, sx, sy);
@@ -1202,9 +1318,10 @@ export class BaseView {
    * rushes its job and brings its dragon into view; a bubble rushes its job; a keeper is taken; a tap on a dragon opens
    * its card -- and rushes its job, if one is waiting (BASE_DESIGN 7); a tap on empty space lets go of the keeper held. Any
    * tap but a button's closes the card (the buttons leave it open: the game can be paused to read it). A team out
-   * (BASE_DESIGN 6): the TEAM OUT chip, after the pad, opens the watch overlay; while it is open the buttons still work, a
-   * badge goes back to the barn and takes (or lets go of) that keeper, and every tap under the bar is the overlay's --
-   * BACK TO BARN, the result card tapped away, anything else swallowed -- before the pad or the world could take it.
+   * (BASE_DESIGN 6): the TEAM OUT chip, after the pad, is its status (a tap on it goes nowhere). While the game follows
+   * it, the buttons still work, a badge takes nobody (it says so), every tap under the bar on the road is the watch
+   * overlay's -- TRIP LOG, the result card tapped away (back to the barn), anything else swallowed -- and as the team
+   * gathers, a tap in the barn only says so (but for the Map Room's table: followTap).
    */
   tap(sx: number, sy: number): void {
     if (this.layers === 'all') {
@@ -1213,6 +1330,8 @@ export class BaseView {
       const i = badgeAt(sx, sy, this.sim.keepers.length);
       if (i != null) {
         const k = this.sim.keepers[i];
+        // (following the team, the keepers mind the barn: nobody is taken)
+        if (this.following()) { this.say(FOLLOWING); return; }
         // (over an overlay too: back to the barn, where that keeper is)
         if (this.ui.screen !== 'none' || this.ui.opening > 0) this.closeOverlay();
         if (this.held() === k) this.send({ kind: 'release' });
@@ -1220,25 +1339,28 @@ export class BaseView {
         return;
       }
       if (sy < BAR_H) return;
-      // (an overlay open takes every tap under the bar, before the barn's pad and world: the watch overlay's BACK TO
-      // BARN, its TRIP LOG, the result card tapped away, the log closed; the Map Room table's own; anything else is
-      // swallowed -- and while the map is opening, nothing)
+      // (an overlay open takes every tap under the bar, before the barn's pad and world: the watch overlay's TRIP LOG, the
+      // result card tapped away, the log closed; the Map Room table's own; anything else is swallowed -- and while the
+      // map is opening, nothing)
       if (this.ui.screen === 'watch') { this.watchTap(sx, sy); return; }
       if (this.ui.screen === 'arena') { this.arenaTap(sx, sy); return; }
       if (this.ui.screen === 'bout') { this.boutTap(sx, sy); return; }
       if (this.ui.screen !== 'none') { this.tableTap(sx, sy); return; }
       if (this.ui.opening > 0) return;
+      if (this.following()) { this.followTap(sx, sy); return; }
       if (this.held()) {
         const pb = padAt(sx, sy);
         if (pb === 'act') { this.send({ kind: 'act' }); return; }
         if (pb === 'letgo') { this.send({ kind: 'release' }); return; }
         if (pb) return;
       }
-      // (a team out: the TEAM OUT chip under the top bar opens the scene; a bout on, its chip opens the bout)
-      if (this.chipRect && hit(this.chipRect, sx, sy)) { this.openWatch(); return; }
+      // (a team out: the TEAM OUT chip under the top bar is its status, and takes the tap; a bout on, its chip opens the bout)
+      if (this.chipRect && hit(this.chipRect, sx, sy)) return;
       if (this.boutChipRect && hit(this.boutChipRect, sx, sy)) { this.openArena(); return; }
       if (this.cardDragon() && hit(this.cardRect, sx, sy)) { this.card = null; return; }
     }
+    // (following the team, nothing in the barn answers a tap)
+    if (this.following()) return;
     this.card = null;
     for (const c of this.chips) if (hit(c.r, sx, sy)) { this.sim.rush(c.job); this.focus(c.job.dragon); return; }
     const wx = sx + Math.round(this.camX), wy = sy + Math.round(this.camY);
@@ -1268,9 +1390,11 @@ export class BaseView {
 
   /**
    * Take a keeper (by id), and hand on the direction already held (a take clears it: the keys still down walk the new
-   * one) -- or, a keeper on a mission's trip, say why not (the simulation refuses them too: control.ts take).
+   * one) -- or, a keeper on a mission's trip, say why not (the simulation refuses them too: control.ts take); or, the
+   * game following a team out, say that (the keepers mind the barn till it is home: BASE_DESIGN 6).
    */
   private take(id: number): void {
+    if (this.following()) { this.say(FOLLOWING); return; }
     const k = this.sim.keepers.find((q) => q.id === id);
     if (k && onTrip(k)) { this.say(takeRefusal(k)); return; }
     this.send({ kind: 'take', keeper: id });
@@ -1286,8 +1410,9 @@ export class BaseView {
 
   /** The direction held now -- the keys and the pad's buttons held down -- sent to the simulation when it changes. */
   private steer(): void {
-    // (under an overlay the keeper held stands still: the barn, where they walk, is not on screen)
-    const on = (d: 'up' | 'down' | 'left' | 'right') => this.ui.screen === 'none' && (this.keysHeld.has(d) || [...this.padHeld.values()].includes(d));
+    // (under an overlay the keeper held stands still: the barn, where they walk, is not on screen -- nor is anyone steered
+    // while the game follows a team out: nobody is held)
+    const on = (d: 'up' | 'down' | 'left' | 'right') => this.ui.screen === 'none' && !this.following() && (this.keysHeld.has(d) || [...this.padHeld.values()].includes(d));
     const dx = (+on('right') - +on('left')) as -1 | 0 | 1, dy = (+on('down') - +on('up')) as -1 | 0 | 1;
     if (dx === this.sent.dx && dy === this.sent.dy) return;
     this.sent = { dx, dy };
@@ -1356,20 +1481,24 @@ export class BaseView {
     if (this.takeAsked && !this.sim.commands.some((c) => c.kind === 'take')) this.takeByName(this.takeAsked);
     // the keys: 1-4 the speed, p pause, m the Map Room's table (BASE_DESIGN 5), b the Arena (BASE_DESIGN 10); WASD or the
     // arrows walk the keeper held, E or Space acts (not on a key's repeats), Esc lets go, Tab takes the next keeper
-    // (passing over those on a mission's trip). Over an overlay (the watch overlay, BASE_DESIGN 6, the Map Room's table
-    // and the Arena's alike) the speed keys, m and b work as ever,
-    // the keeper held stands still (steer) and E does nothing, Esc goes back to the barn (the keeper still held), and
-    // Tab goes back to the barn and takes the next keeper, as a badge does
+    // (passing over those on a mission's trip). Over an overlay (the Map Room's table and the Arena's alike) the speed
+    // keys, m and b work as ever, the keeper held stands still (steer) and E does nothing, Esc goes back to the barn (the
+    // keeper still held), and Tab goes back to the barn and takes the next keeper, as a badge does. While the game
+    // follows a team out (BASE_DESIGN 6) nobody is held: the speed keys and m work as ever, Esc shuts the table (back to
+    // the team) or the trip's log, and b, Tab and Esc on the team's own view say the game is following the team
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const i = ['1', '2', '3', '4'].indexOf(e.key), dir = DIR_KEYS[e.key], overlay = this.ui.screen !== 'none';
+      const i = ['1', '2', '3', '4'].indexOf(e.key), dir = DIR_KEYS[e.key], overlay = this.ui.screen !== 'none', follow = this.following();
       if (i >= 0) this.setRate(RATES[i]);
       else if (e.key === 'p' || e.key === 'P') this.togglePause();
       else if (e.key === 'm' || e.key === 'M') this.toggleMap();
       else if (e.key === 'b' || e.key === 'B') this.toggleArena();
       else if (dir) { this.keysHeld.add(dir); this.steer(); }
-      else if (e.key === 'e' || e.key === 'E' || e.key === ' ') { if (!e.repeat && !overlay) this.send({ kind: 'act' }); }
-      else if (e.key === 'Escape') { if (overlay || this.ui.opening > 0) this.closeOverlay(); else this.send({ kind: 'release' }); }
+      else if (e.key === 'e' || e.key === 'E' || e.key === ' ') { if (!e.repeat && !overlay && !follow) this.send({ kind: 'act' }); }
+      else if (e.key === 'Escape') {
+        if (follow) this.followEscape();
+        else if (overlay || this.ui.opening > 0) this.closeOverlay(); else this.send({ kind: 'release' });
+      } else if (e.key === 'Tab' && follow) this.say(FOLLOWING);
       else if (e.key === 'Tab') {
         if (overlay || this.ui.opening > 0) this.closeOverlay();
         const ks = this.sim.keepers, h = this.held(), at = h ? ks.indexOf(h) : -1;
@@ -1413,8 +1542,9 @@ export class BaseView {
       down.set(e.pointerId, { ...p, camX: this.camX, camY: this.camY, drag: false, pad });
       try { canvas.setPointerCapture(e.pointerId); } catch { /* a synthetic pointer */ }
       if (pad) { this.padHeld.set(e.pointerId, pad); if (PAD_DIR[pad]) this.steer(); return; }
-      // (over an overlay the barn's camera stays where the player left it: taps only)
-      if (dragger == null && this.ui.screen === 'none') { dragger = e.pointerId; this.camTo = null; this.camAsked = null; }
+      // (over an overlay the barn's camera stays where the player left it: taps only -- and while the game follows a team
+      // out, it stays with the team)
+      if (dragger == null && this.ui.screen === 'none' && !this.following()) { dragger = e.pointerId; this.camTo = null; this.camAsked = null; }
     };
     const onMove = (e: PointerEvent) => {
       const d = down.get(e.pointerId);

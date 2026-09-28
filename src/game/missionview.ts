@@ -56,8 +56,10 @@ export const BACK_Y = 296;
 export const PAIR_BACK = 170, RIDER_AHEAD = 56, PIECE_AHEAD = 150, BADDIE_AHEAD = 200;
 /** The camera keeps the team's middle this far from the screen's left edge. */
 export const CAM_BACK = 260;
-/** The overlay's way back to the barn, and the result card. */
-export const BACK_BUTTON: Readonly<Rect> = Object.freeze({ x: 8, y: 338, w: 110, h: 16 });
+/**
+ * The result card: tapped away, it is the way back to the barn (the scene is the game following the team, BASE_DESIGN
+ * 6: it has no other).
+ */
 export const RESULT_CARD: Readonly<Rect> = Object.freeze({ x: 170, y: 110, w: 300, h: 120 });
 
 /** A challenge's beat (the team stands while its counter meets it) and the baddie's, for a trip `L` steps long. */
@@ -467,14 +469,6 @@ export function drawMissionScene(ctx: CanvasRenderingContext2D, sim: CareSim, tr
   }
 }
 
-/** The ← BACK TO BARN button (bottom left of the overlay). */
-export function drawBackButton(ctx: CanvasRenderingContext2D): void {
-  const r = BACK_BUTTON;
-  ctx.fillStyle = INK; ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.fillStyle = '#3a2e34'; ctx.fillRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
-  drawText(ctx, '← BACK TO BARN', r.x + r.w / 2, r.y + 5, { color: '#f3e6c8', shadow: false, align: 'center' });
-}
-
 /** What the trip brought home: its coin (half on a failure) and its egg (on a success). */
 export function rewardsOf(trip: Trip): { coin: number; egg: DragonElement | null } {
   return { coin: trip.success ? trip.mission.coin : Math.floor(trip.mission.coin / 2), egg: trip.success ? trip.egg : null };
@@ -483,7 +477,10 @@ export function rewardsOf(trip: Trip): { coin: number; egg: DragonElement | null
 /** The result card's title: the trip's pass or fail, told here at the road's end and nowhere on the road before it. */
 export function resultTitle(trip: Trip): string { return trip.success ? 'HOME SAFE!' : 'NOT THIS TIME'; }
 
-/** The result card (once the trip's time is up, until the team lands): HOME SAFE! or NOT THIS TIME, the rewards, and that nobody is hurt. */
+/**
+ * The result card (once the trip's time is up, until it is tapped away): HOME SAFE! or NOT THIS TIME, the rewards, that
+ * nobody is hurt, and that a tap goes back to the barn.
+ */
 export function drawResultCard(ctx: CanvasRenderingContext2D, trip: Trip, tick: number): void {
   const r = RESULT_CARD, { coin, egg } = rewardsOf(trip);
   ctx.fillStyle = INK; ctx.fillRect(r.x, r.y, r.w, r.h);
@@ -495,6 +492,6 @@ export function drawResultCard(ctx: CanvasRenderingContext2D, trip: Trip, tick: 
   drawText(ctx, line, cx - (egg ? 8 : 0), r.y + 50, { color: INK, shadow: false, align: 'center' });
   if (egg) drawEgg(ctx, egg, cx + measureText(line) / 2 + 4, r.y + 58, 0, tick);
   drawText(ctx, 'NOBODY IS HURT.', cx, r.y + 72, { color: INK, shadow: false, align: 'center' });
-  drawText(ctx, 'TAP TO CLOSE', cx, r.y + 98, { color: '#6b5a44', shadow: false, align: 'center' });
+  drawText(ctx, 'TAP TO GO BACK TO THE BARN', cx, r.y + 98, { color: '#6b5a44', shadow: false, align: 'center' });
 }
 
