@@ -104,21 +104,26 @@ const pairs: string[] = [
   // taking a keeper (BASE_DESIGN 4.10): BEA held by hand from the first step -- the mark over her head in her colour, her badge
   // lit, the line over the pad and the pad at the bottom right, the camera following her
   'shots/base_control.png=view=base&t=120&take=bea',
-  // the watchable scene (BASE_DESIGN 6; frozen, preset=trip: a team away on the region's hard mission, that far along its road
-  // at t=60): on the road past a challenge met (its banner); each big baddie in its beat -- walked in, grumpy (0.906:
-  // the beat is 0.900-0.928 of a three-day trip) -- and leaving (0.921: the Mole King dozing, the Storm Roc wandering
-  // off the wrong way, up the road; 0.918: the Frost Giant shuffling off up it, before it leaves the screen); the Mole King's two counters' moments (dusk's breath, Bea's
-  // wave); a failure, on its road just as a success is; the result card, and a failure's; the game following a team as it
-  // gathers on the Aerie and as it sets out over the sky bridge (the muster preset: the camera held on the deck, the TEAM
-  // OUT chip lit, the follow line in the job strip's place); and the barn at t=1800
+  // the watchable scene (BASE_DESIGN 6, 11; frozen, preset=trip: a team away on the region's hard mission, that far along
+  // its walk, the stops before resolved -- the game following it, its road on screen): on the road past a challenge
+  // cleared (its banner); each big baddie's fight -- 0.9 is its stop, the baddie walked in and the fight's menu up at
+  // t=200 (the pairs' plates, the baddie's, the rows, AUTO) -- played by the trail coach with `:auto` (oldmine at t=209:
+  // BEA's CHARM, the first move, landing on the Mole King -- its popup, surprised; the exits, each a few seconds into its
+  // beat: t=1865 the Mole King dozing off, calmed; t=2180 the Storm Roc wandering off the wrong way, up the road; t=1522
+  // the Frost Giant shuffling off up it, before it leaves the screen); an obstacle's menu (millbrook:0.17 at t=100: LOST
+  // THINGS, the first stop, met on the first step); a failure, on its road just where a success is (its last stop waited
+  // out); the result card, and a failure's; the game following a team as it gathers on the Aerie and as it sets out over
+  // the sky bridge (the muster preset: the camera held on the deck, the TEAM OUT chip lit, the follow line in the job
+  // strip's place); and the barn at t=1800
   'shots/base_watch.png=view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60',
-  'shots/base_baddie_moleking.png=view=base&preset=trip&trip=oldmine:0.906&panel=watch&t=60',
-  'shots/base_baddie_stormroc.png=view=base&preset=trip&trip=highfold:0.906&panel=watch&t=60',
-  'shots/base_baddie_frostgiant.png=view=base&preset=trip&trip=frostmere:0.906&panel=watch&t=60',
-  'shots/base_baddie_moleking_moments.png=view=base&preset=trip&trip=oldmine:0.912&panel=watch&t=60',
-  'shots/base_baddie_moleking_exit.png=view=base&preset=trip&trip=oldmine:0.921&panel=watch&t=60',
-  'shots/base_baddie_stormroc_exit.png=view=base&preset=trip&trip=highfold:0.921&panel=watch&t=60',
-  'shots/base_baddie_frostgiant_exit.png=view=base&preset=trip&trip=frostmere:0.918&panel=watch&t=60',
+  'shots/base_baddie_moleking.png=view=base&preset=trip&trip=oldmine:0.9&panel=watch&t=200',
+  'shots/base_baddie_stormroc.png=view=base&preset=trip&trip=highfold:0.9&panel=watch&t=200',
+  'shots/base_baddie_frostgiant.png=view=base&preset=trip&trip=frostmere:0.9&panel=watch&t=200',
+  'shots/base_obstacle_menu.png=view=base&preset=trip&trip=millbrook:0.17&panel=watch&t=100',
+  'shots/base_baddie_moleking_moments.png=view=base&preset=trip&trip=oldmine:0.9:auto&panel=watch&t=209',
+  'shots/base_baddie_moleking_exit.png=view=base&preset=trip&trip=oldmine:0.9:auto&panel=watch&t=1865',
+  'shots/base_baddie_stormroc_exit.png=view=base&preset=trip&trip=highfold:0.9:auto&panel=watch&t=2180',
+  'shots/base_baddie_frostgiant_exit.png=view=base&preset=trip&trip=frostmere:0.9:auto&panel=watch&t=1522',
   'shots/base_fail_road.png=view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60',
   'shots/base_result.png=view=base&preset=trip&trip=oldmine:1&panel=watch&t=60',
   'shots/base_result_fail.png=view=base&preset=trip&trip=bramblewood:1:fail&panel=watch&t=60',
@@ -141,7 +146,7 @@ const pairs: string[] = [
   // missions (BASE_DESIGN 5): the Map Room table's world map (the island: the three start regions, cloud over the rest,
   // the roads, the places' landmarks, HOME, the board's three missions pinned at their places, each with its plate) and
   // THE LOST NEST's chooser (the climate picture with WILLOW POND standing in it, the challenges and who at home meets
-  // them, the dragons, the odds) -- each over the world stepped a second -- the whole map explored (preset=explored:
+  // them, the dragons, the trail coach's forecast) -- each over the world stepped a second -- the whole map explored (preset=explored:
   // every region out from under its cloud), the map with a team out (its red road from HOME to THE MOLE KING'S HALL, its
   // flag half way along), and the muster preset's team all
   // on the Aerie deck, each rider beside its dragon, the last step of the muster (the chip still MUSTER; they walk off at step 2186: npm

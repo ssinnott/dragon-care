@@ -6,7 +6,7 @@
 import type { CareSim, Dragon, Keeper, Job, SimStats, LiftState, Egg } from './sim.ts';
 import type { RoomPlace } from './layout.ts';
 import { releasedState } from './control.ts';
-import { copyMissions } from './missions.ts';
+import { copyMissions, upgradeMissions } from './missions.ts';
 import type { MissionsState } from './missions.ts';
 import { copyArena, newArena } from './arena.ts';
 import type { ArenaState } from './arena.ts';
@@ -20,11 +20,13 @@ import type { ArenaState } from './arena.ts';
  * or away), its plot (`home`), a resident's rhythm (`garden`) and its XP (`xp`: its level); every keeper -- their
  * station and job by id, route, phase (a mission's phases too), what they carry, and the hand-held state, always saved
  * released (control.ts releasedState); the open jobs; the lift (its car, its rider by id, its calls); the eggs in the
- * Hatchery's nests; the garden's plots; the missions (the board and its day, the map, the coin, the trip out and each
- * pair's deck spot); the Arena (the bout on, its fighters by id, and the bouts begun: arena.ts); and the stats.
- * Version 9 (the first shipped) was the same less the XP and the Arena.
+ * Hatchery's nests; the garden's plots; the missions (the board and its day, the map, the coin, the trip out -- its
+ * road walked so far, its stops' results, the team's stats, puff and XP, the trail coach, the encounter on at a stop:
+ * trip.ts, encounter.ts -- and each pair's deck spot); the Arena (the bout on, its fighters by id, and the bouts
+ * begun: arena.ts); and the stats. Version 10 kept a trip as a timer (its return clock, its odds and its outcome rolled
+ * at the send) and version 9 (the first shipped) was that less the XP and the Arena: each loads brought up to this one.
  */
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }
@@ -102,14 +104,22 @@ export function serialize(sim: CareSim, exact = false): SaveV {
 }
 
 /**
- * A save of the version before this one brought up to this one (storage.ts loadSave, before the view loads it): version
- * 9 had no XP and no Arena, so every dragon starts at 0 XP (level 1) and the Arena with no bout begun; the rest is
- * unchanged. Any other save is returned as it is (a save of this version, or one CareSim.fromSave refuses).
+ * A save of an older version brought up to this one (storage.ts loadSave, before the view loads it), a version at a
+ * time: version 9 had no XP and no Arena, so every dragon starts at 0 XP (level 1) and the Arena with no bout begun;
+ * version 10 kept a trip out as a timer, so a trip is given its road walked so far and its stops' results as the old
+ * scene had them (missions.ts upgradeMissions); the rest is unchanged. Any other save is returned as it is (a save of
+ * this version, or one CareSim.fromSave refuses).
  */
 export function migrateSave(raw: unknown): unknown {
-  if (!raw || typeof raw !== 'object' || (raw as { v?: unknown }).v !== 9) return raw;
-  const s = raw as Omit<SaveV, 'arena'> & { dragons: unknown };
-  return { ...s, v: SAVE_VERSION, dragons: Array.isArray(s.dragons) ? s.dragons.map((d) => (d && typeof d === 'object' ? { ...d, xp: 0 } : d)) : s.dragons, arena: newArena() };
+  if (!raw || typeof raw !== 'object') return raw;
+  let s = raw as Partial<SaveV> & { v?: unknown; dragons?: unknown; missions?: unknown };
+  if (s.v === 9) s = { ...s, v: 10, dragons: Array.isArray(s.dragons) ? s.dragons.map((d) => (d && typeof d === 'object' ? { ...d, xp: 0 } : d)) : s.dragons, arena: newArena() };
+  if (s.v === 10) {
+    const dragons = Array.isArray(s.dragons) ? (s.dragons as { id: number; element: Dragon['element']; stage: Dragon['stage']; xp?: number; mood: number }[]) : [];
+    const dayLen = typeof s.dayLen === 'number' ? s.dayLen : 10800, clock = (typeof s.clock0 === 'number' ? s.clock0 : 0) + (typeof s.tick === 'number' ? s.tick : 0);
+    s = { ...s, v: SAVE_VERSION, missions: upgradeMissions(s.missions, dragons, dayLen, clock) as MissionsState };
+  }
+  return s;
 }
 
 /**

@@ -3,7 +3,7 @@
 // every place's landmark; over it here, each explored region's name, a pin and a name plate for each mission on the
 // board at its place -- the road's challenges and its days on the plate -- and, while a team is out, its road from HOME
 // and its flag walking it) and the mission chooser (the region's climate picture, the mission's rewards, its challenges with
-// what meets them and who at home could, the big baddie, the team's pairs and riders, the eligible dragons, the odds,
+// what meets them and who at home could, the big baddie, the team's pairs and riders, the eligible dragons, the trail coach's forecast,
 // BEST TEAM and SEND FROM THE AERIE) -- and, while a team is out, its TEAM OUT chip under the top bar (lit while the game
 // follows the team: BASE_DESIGN 6), the follow line (where the team is, while the game follows it: over the barn as it
 // gathers on the Aerie, over the watchable scene of its road, missionview.ts) and the trip's log, opened over the scene
@@ -24,10 +24,13 @@ import { INK } from './surfaces.ts';
 import { REGIONS, CHALLENGES, BADDIES, KEEPER_SKILL, SKILL_NAME, regionOf, placeOf } from './regions.ts';
 import type { Counter, Place } from './regions.ts';
 import { MAP_RECT, PLACES, worldCanvas, drawAlive, drawLandmark, footprint, homeRect, regionAt, routeTo, alongRoute, regionBox } from './worldmap.ts';
-import { stopShownAt, roadFraction } from './missionview.ts';
+import { roadFraction } from './missionview.ts';
 import {
-  bestTeam, oddsOf, canSend, coverage, dragonReason, freeRider, autoRider, partnerOf, freeNest, hoursLeft, onTrip, MAX_PAIRS,
+  bestTeam, forecastOf, forecastShare, canSend, coverage, dragonReason, freeRider, autoRider, partnerOf, freeNest, hoursLeft, onTrip, MAX_PAIRS,
 } from './missions.ts';
+import { stopName } from './encounter.ts';
+import type { Ability } from './encounter.ts';
+
 import type { Mission, Pair, Trip } from './trip.ts';
 import type { CareSim, Dragon, Keeper } from './sim.ts';
 import { newArenaPick } from './arenaui.ts';
@@ -52,14 +55,16 @@ export function newUi(): MapUi { return { screen: 'none', mission: null, pairs: 
 
 /**
  * What a tap on an overlay does: the table's (a pin, BEST TEAM, SEND, a dragon or a rider for the team, a rider cycled,
- * a pair removed, a place's or a cloud's note) and the Arena's (a dragon for a corner, a corner emptied, SWAP, START
- * BOUT, a skill picked, AUTO, the result card tapped away); BACK on either.
+ * a pair removed, a place's or a cloud's note), the Arena's (a dragon for a corner, a corner emptied, SWAP, START
+ * BOUT, a skill picked, AUTO, the result card tapped away) and the road's encounter (a pair's ability picked, the trail
+ * coach's AUTO: encounterui.ts); BACK on any.
  */
 export type UiAct =
   | { kind: 'back' } | { kind: 'pin'; mission: number } | { kind: 'best' } | { kind: 'send' }
   | { kind: 'dragon'; dragon: number } | { kind: 'rider'; keeper: number } | { kind: 'cycle'; pair: number } | { kind: 'remove'; pair: number }
   | { kind: 'note'; text: string }
   | { kind: 'corner'; corner: 0 | 1 } | { kind: 'swap' } | { kind: 'start' } | { kind: 'skill'; skill: SkillKind } | { kind: 'auto' } | { kind: 'result' }
+  | { kind: 'ability'; pair: number; ability: Ability } | { kind: 'trail' }
   | { kind: 'none' };
 /**
  * A tap target drawn this frame (screen px), with its name for the page's hook (a pin, BACK, BEST TEAM, SEND; on the map
@@ -74,7 +79,7 @@ export const BACK: Readonly<Rect> = Object.freeze({ x: 560, y: 316, w: 64, h: 16
 export const CLIMATE_RECT: Readonly<Rect> = Object.freeze({ x: 16, y: 26, w: 300, h: 112 });
 export const BEST: Readonly<Rect> = Object.freeze({ x: 324, y: 290, w: 90, h: 18 });
 export const SEND: Readonly<Rect> = Object.freeze({ x: 420, y: 290, w: 204, h: 18 });
-export const ODDS_BAR: Readonly<Rect> = Object.freeze({ x: 324, y: 270, w: 150, h: 10 });
+export const FORECAST_BAR: Readonly<Rect> = Object.freeze({ x: 324, y: 270, w: 150, h: 10 });
 /** The team's two pair slots, and the eligible dragons' grid (96 x 18 buttons, three a row). */
 const PAIR_SLOTS: readonly Rect[] = [{ x: 324, y: 40, w: 300, h: 44 }, { x: 324, y: 88, w: 300, h: 44 }];
 const GRID = { x: 324, y: 142, w: 96, h: 18, dx: 102, dy: 21, cols: 3, rows: 5 } as const;
@@ -321,8 +326,8 @@ export function chosen(sim: CareSim, ui: MapUi): Mission | null { return sim.mis
  * rewards (days, coin, the egg's chance, sure on a first visit, or the Hatchery full), then a row per challenge -- its
  * icon, name and counter, and GOOD: the home dragons and free keepers who meet it (tap one to add it), a tick once the
  * team does -- and the big baddie's row. Right: the team's two pairs (the dragon, its element, stage and mood, its
- * rider's badge -- tap to cycle -- PARTNERS +5 %, and an X to remove), the dragons (a star and the word for what one
- * would meet that nobody on the team does; greyed with the reason one can't go), the odds, BEST TEAM, SEND FROM THE
+ * rider's badge -- tap to cycle -- PARTNERS: POWER +5 %, and an X to remove), the dragons (a star and the word for what one
+ * would meet that nobody on the team does; greyed with the reason one can't go), the forecast, BEST TEAM, SEND FROM THE
  * AERIE (greyed with the reason when it can't) and BACK.
  */
 export function drawMissionScreen(ctx: CanvasRenderingContext2D, sim: CareSim, ui: MapUi, frame = 0): Hit[] {
@@ -401,7 +406,7 @@ export function drawMissionScreen(ctx: CanvasRenderingContext2D, sim: CareSim, u
     drawSprite(ctx, SKILL_ICONS[KEEPER_SKILL[k.look]], br.x + br.w - 7, br.y + 7.5);
     hits.push({ r: br, act: { kind: 'cycle', pair: i } });
     text(ctx, `RIDES - ${SKILL_NAME[KEEPER_SKILL[k.look]]}`, br.x + br.w + 6, br.y + 4, INKY);
-    if (partnerOf(sim, d)?.id === k.id) text(ctx, 'PARTNERS +5 %', r.x + r.w - 6, br.y + 4, GOOD, 'right');
+    if (partnerOf(sim, d)?.id === k.id) text(ctx, 'PARTNERS: POWER +5 %', r.x + r.w - 6, br.y + 4, GOOD, 'right');
   });
   // ---- the dragons ----
   const listed = [...sim.dragons.filter((d) => !dragonReason(sim, d, m)), ...sim.dragons.filter((d) => dragonReason(sim, d, m))].slice(0, GRID.cols * GRID.rows);
@@ -415,11 +420,12 @@ export function drawMissionScreen(ctx: CanvasRenderingContext2D, sim: CareSim, u
     text(ctx, why ?? (on ? 'ON THE TEAM' : star ? CHALLENGES[star].word : d.stage.toUpperCase()), r.x + 3, r.y + 10, why ? OFF : star ? FLAG : OFF);
     if (!why) hits.push({ r, act: { kind: 'dragon', dragon: d.id } });
   });
-  // ---- the odds and the buttons ----
-  const odds = oddsOf(sim, m, pairs), segs = Math.round(odds * 10);
-  box(ctx, ODDS_BAR, INK);
-  for (let i = 0; i < 10; i++) rect(ctx, { x: ODDS_BAR.x + 1 + i * 15, y: ODDS_BAR.y + 1, w: 14, h: ODDS_BAR.h - 2 }, i < segs ? (odds >= 0.5 ? GOOD : '#e3b23e') : '#5a5054');
-  text(ctx, `ODDS ${Math.round(odds * 100)} %`, ODDS_BAR.x + ODDS_BAR.w + 8, ODDS_BAR.y + 2, INKY);
+  // ---- the forecast and the buttons (BASE_DESIGN 11: the trail coach's dry run of the road with this team) ----
+  const fc = forecastOf(sim, m, pairs), share = forecastShare(fc), segs = Math.round(share * 10);
+  text(ctx, pairs.length ? `FORECAST: ${fc.cleared} OF ${fc.stops} STOPS IN ${fc.turns} TURNS, ${Math.round(fc.puff * 100)} % PUFF LEFT` : 'FORECAST: THE TRAIL COACH WALKS THE ROAD FIRST', 324, 257, pairs.length ? INKY : FADED);
+  box(ctx, FORECAST_BAR, INK);
+  for (let i = 0; i < 10; i++) rect(ctx, { x: FORECAST_BAR.x + 1 + i * 15, y: FORECAST_BAR.y + 1, w: 14, h: FORECAST_BAR.h - 2 }, i < segs ? (share >= 0.99 ? GOOD : '#e3b23e') : '#5a5054');
+  text(ctx, `FORECAST ${Math.round(share * 100)} %`, FORECAST_BAR.x + FORECAST_BAR.w + 8, FORECAST_BAR.y + 2, INKY);
   button(ctx, BEST, 'BEST TEAM');
   hits.push({ r: BEST, act: { kind: 'best' }, name: 'best' });
   const why = canSend(sim, m, pairs);
@@ -469,9 +475,10 @@ export function editTeam(sim: CareSim, ui: MapUi, act: UiAct): string | null {
 // ---------- the team out ----------
 
 /**
- * The chip's words: MUSTER, TEAM OUT - 14H (game hours to go); landed, LANDING while a dragon of the team is still
- * coming onto the deck, EGG TO THE NEST while its rider carries the egg down to the Hatchery, then HOME (the riders
- * hanging their saddles up, until the trip is over).
+ * The chip's words: MUSTER, TEAM OUT - 14H (game hours of walking to go; the chip shows only while the barn is on screen,
+ * so never at a stop: the game follows the team on its road, BASE_DESIGN 6); landed, LANDING while a dragon of the team
+ * is still coming onto the deck, EGG TO THE NEST while its rider carries the
+ * egg down to the Hatchery, then HOME (the riders hanging their saddles up, until the trip is over).
  */
 export function chipText(sim: CareSim, t: Trip): string {
   if (t.state === 'muster') return 'MUSTER';
@@ -485,13 +492,13 @@ export function chipText(sim: CareSim, t: Trip): string {
 export function drawTeamChip(ctx: CanvasRenderingContext2D, sim: CareSim, t: Trip, lit: boolean): Rect {
   box(ctx, CHIP, lit ? ACTIVE : FACE);
   drawSprite(ctx, FLAG_SPRITE, CHIP.x + 7, CHIP.y + 7.5);
-  text(ctx, chipText(sim, t), CHIP.x + CHIP.w / 2 + 5, CHIP.y + 4, TEXT, 'center');
+  text(ctx, chipText(sim, t), CHIP.x + CHIP.w / 2 + 5, CHIP.y + 4, lit ? FLAG : TEXT, 'center');
   return CHIP;
 }
 
 /**
  * The follow line's words (BASE_DESIGN 6: the game follows the team from its send until it is home): where the team is --
- * gathering on the Aerie, setting out over the sky bridge, on its road with the game hours to go, or home.
+ * gathering on the Aerie, setting out over the sky bridge, on its road with the game hours of walking to go, or home.
  */
 export function followText(sim: CareSim, t: Trip): string {
   if (t.state === 'muster') return 'FOLLOWING THE TEAM: THEY GATHER ON THE AERIE';
@@ -511,23 +518,18 @@ export function drawFollowLine(ctx: CanvasRenderingContext2D, sim: CareSim, t: T
   return r;
 }
 
-/** How far along the road a trip is (0 at the muster, 1 once it lands). */
-export function tripProgress(sim: CareSim, t: Trip): number {
-  if (t.state === 'muster' || t.state === 'depart' || t.departAt == null || t.returnAt == null) return 0;
+/** How far along the road a trip is (0 at the muster, its walk's share out, 1 once it lands). */
+export function tripProgress(_sim: CareSim, t: Trip): number {
+  if (t.state === 'muster' || t.state === 'depart') return 0;
   if (t.state !== 'away') return 1;
-  return Math.max(0, Math.min(1, (sim.clock - t.departAt) / (t.returnAt - t.departAt)));
+  return t.travel > 0 ? Math.max(0, Math.min(1, t.walked / t.travel)) : 0;
 }
 /**
- * Where each stop is at the world's clock (or `clock`): reached and met, reached and unmet (waited out), or not reached
- * yet -- the team reaches every one, a trip that fails too -- each told only once the scene has shown how it went
- * (missionview.ts stopShownAt: the banner's moment, the scene being the timer), so the card never tells a stop before
- * the scene does; and never the trip's outcome, which is the result card's, at the road's end.
+ * How each stop went so far: cleared, waited out, or not reached yet -- the team reaches every one, a trip that fails too
+ * -- each told as the stop's encounter resolves it (trip.ts Stop.result), never the trip's outcome, which is the result
+ * card's, at the road's end.
  */
-export function stopStates(sim: CareSim, t: Trip, clock = sim.clock): ('met' | 'unmet' | 'ahead')[] {
-  const E = t.state === 'muster' || t.state === 'depart' || t.departAt == null ? -1 : t.state === 'away' ? clock - t.departAt : Infinity;
-  const at = stopShownAt(sim, t);
-  return t.stops.map((s, i) => (E < at[i] ? 'ahead' : s.covered ? 'met' : 'unmet'));
-}
+export function stopStates(_sim: CareSim, t: Trip): ('met' | 'unmet' | 'ahead')[] { return t.stops.map((s) => s.result); }
 
 /** The words fitted to a width (cut on a space), as lines. */
 function wrap(s: string, w: number): string[] {
@@ -545,8 +547,9 @@ function wrap(s: string, w: number): string[] {
 export function drawLogButton(ctx: CanvasRenderingContext2D, open: boolean): void { button(ctx, LOG_BUTTON, 'TRIP LOG', true, open); }
 
 /**
- * The trip's log (over the watch overlay, opened by its TRIP LOG button: BASE_DESIGN 6): the mission and its region, each stop (its icon and name, a tick
- * met, a cross unmet, a mark still ahead), the trip log's latest lines, and the time left.
+ * The trip's log (over the watch overlay, opened by its TRIP LOG button: BASE_DESIGN 6, 11): the mission and its region,
+ * each stop (its icon and name, a tick cleared, a cross waited out, a mark still ahead), each pair's dragon and the puff
+ * it has left, the trip log's latest lines, and the walk left (or the stop the team stands at).
  */
 export function drawTripCard(ctx: CanvasRenderingContext2D, sim: CareSim, t: Trip): void {
   const { x, y, w, h } = TRIP_CARD;
@@ -561,14 +564,22 @@ export function drawTripCard(ctx: CanvasRenderingContext2D, sim: CareSim, t: Tri
     text(ctx, s.kind === 'baddie' ? BADDIES[s.baddie!].name : CHALLENGES[s.challenge!].name, x + 20, ly, TEXT);
     drawSprite(ctx, st[i] === 'met' ? ICONS.check : st[i] === 'unmet' ? CROSS : PENDING, x + 150, ly + 3.5);
   });
-  // the log's latest lines (the stops reached), wrapped to the card
+  // the team's puff (BASE_DESIGN 11: carried along the whole road), a bar a pair, at the right
+  t.pairs.forEach((p, i) => {
+    const d = sim.dragons.find((q) => q.id === p.dragon), py = y + 18 + i * 22, whole = t.stats[i]?.puff ?? 0, share = whole ? t.puff[i] / whole : 0;
+    text(ctx, `${d?.name ?? '?'} ${t.puff[i]}/${whole}`, x + 170, py, TEXT);
+    box(ctx, { x: x + 170, y: py + 10, w: 120, h: 7 }, '#5a5054');
+    if (share > 0) rect(ctx, { x: x + 171, y: py + 11, w: Math.round(118 * Math.min(1, share)), h: 5 }, share > 0.5 ? '#7bbf6a' : share > 0.2 ? '#e3b23e' : '#d8402e');
+  });
+  // the log's latest lines (the stops resolved, and the encounter's own while the team stands at one), wrapped to the card
   const seen = t.stops.filter((_, i) => st[i] !== 'ahead').map((s) => s.log);
-  const lines = seen.slice(-2).flatMap((l) => wrap(l, w - 12)).slice(-3);
+  const enc = t.encounter, latest = enc && enc.state !== 'done' ? enc.log.slice(-1) : [];
+  const lines = [...seen.slice(-2), ...latest].slice(-2).flatMap((l) => wrap(l, w - 12)).slice(-3);
   lines.forEach((l, i) => text(ctx, l, x + 6, y + 76 + i * 10, '#e8d8a8'));
   const left = t.state === 'muster' ? 'MUSTERING ON THE AERIE' : t.state === 'depart' ? 'LEAVING OVER THE SKY BRIDGE'
-    : t.state === 'away' ? `HOME IN ${hoursLeft(sim, t)} HOURS` : 'LANDING ON THE AERIE';
+    : t.state === 'away' ? (enc ? `AT ${stopName(t.stops[enc.stop])}: TURN ${Math.max(1, enc.turn)}` : `HOME IN ${hoursLeft(sim, t)} HOURS OF WALKING`) : 'LANDING ON THE AERIE';
   text(ctx, left, x + 6, y + h - 11, FLAG);
-  text(ctx, `${t.pairs.length} PAIR${t.pairs.length > 1 ? 'S' : ''} - ODDS ${Math.round(t.odds * 100)} %`, x + w - 6, y + h - 11, OFF, 'right');
+  text(ctx, `${t.pairs.length} PAIR${t.pairs.length > 1 ? 'S' : ''} - FORECAST ${Math.round(t.forecast * 100)} %`, x + w - 6, y + h - 11, OFF, 'right');
 }
 /** The baddie's mark on the card's line: a small inked crown. */
 function drawBaddiePortraitSmall(ctx: CanvasRenderingContext2D, x: number, y: number): void {

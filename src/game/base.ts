@@ -39,6 +39,8 @@ import type { Dragon, Job, Keeper, SimEvent } from './sim.ts';
 import { startSpec, buildSim, tripStart } from './presets.ts';
 import type { Trip } from './trip.ts';
 import { sceneAt, drawMissionScene, drawResultCard, resultTitle, ScenePets, RESULT_CARD, ROAD_BOTTOM } from './missionview.ts';
+import { drawEncounterHud } from './encounterui.ts';
+import { pendingPair, stopName } from './encounter.ts';
 import type { SceneFrame } from './missionview.ts';
 import { worldKey, barnKey, fnv1a, serialize } from './save.ts';
 import type { SaveV } from './save.ts';
@@ -473,14 +475,18 @@ export class BaseView {
 
   /**
    * Whether the world waits this frame: the Map Room's table or the Arena's chooser open (BASE_DESIGN 5, 10), the team
-   * followed home with its result card up (BASE_DESIGN 6: so that tapped away, the team lands in view), or a bout watched
-   * with the player's pick waiting (AUTO off) and not yet given -- a pick or AUTO given is a command the world takes at
-   * its next step, so it steps on for it.
+   * followed home with its result card up (BASE_DESIGN 6: so that tapped away, the team lands in view), a bout watched
+   * with the player's pick waiting (AUTO off) and not yet given, or the team followed at a stop with a pair's pick
+   * waiting (BASE_DESIGN 11) -- a pick or AUTO given is a command the world takes at its next step, so it steps on for it.
    */
   private worldWaits(): boolean {
-    const s = this.ui.screen, b = this.sim.arena.bout;
+    const s = this.ui.screen, b = this.sim.arena.bout, t = this.sim.missions.trip;
     if (s === 'map' || s === 'mission' || s === 'arena' || this.resultUp()) return true;
-    return s === 'bout' && !!b && b.state === 'pick' && !b.auto && !this.sim.commands.some((c) => c.kind === 'skill' || c.kind === 'coach');
+    if (s === 'bout') return !!b && b.state === 'pick' && !b.auto && !this.sim.commands.some((c) => c.kind === 'skill' || c.kind === 'coach');
+    // (the team at a stop, followed on its road: the world waits for the pair's pick while its menu is up -- the road's
+    // one choice, as the Arena's bout waits for its pick -- and a pick or AUTO given is a command the world takes at its
+    // next step, so it steps on for it: BASE_DESIGN 11)
+    return s === 'watch' && !!t?.encounter && t.encounter.state === 'pick' && !t.auto && pendingPair(t) >= 0 && !this.sim.commands.some((c) => c.kind === 'ability' || c.kind === 'trail');
   }
 
   /** One world step, and the view kept in step with it (a grow-up's `happy`, a hatch's shell bits, the dawn's tip). */
@@ -518,6 +524,7 @@ export class BaseView {
       if (e.kind === 'refused') { this.say(e.reason); continue; }
       if (e.kind === 'full') { if (!this.news.some((n) => 'text' in n && n.text === BARN_FULL)) this.news.push({ text: BARN_FULL }); continue; }
       if (e.kind === 'bout' || e.kind === 'boutEnd' || e.kind === 'level' || e.kind === 'learn') { this.arenaEvent(e); continue; }
+      if (e.kind === 'meet' || e.kind === 'stopEnd') { this.roadEvent(e); continue; }
       const d = sim.dragons.find((q) => q.id === e.dragon), v = this.cast.get(e.dragon);
       if (!d || !v) continue;
       if (e.kind === 'grow') {
@@ -777,14 +784,18 @@ export class BaseView {
     // (another trip's scene: its own characters, and its own result card to come)
     if (!this.watching || this.watching.trip !== trip) { this.watching = new ScenePets(this.sim, trip); this.resultClosed = false; }
     drawMissionScene(ctx, this.sim, trip, this.watching, f);
-    // (the result card once the trip's time is up; then the trip's log over it, opened by TRIP LOG -- the stops met,
-    // unmet and ahead, the log's latest lines, the time left -- so the log asked for is read whole)
+    // (the team at a stop: the encounter's furniture over the scene -- the plates, the pick menu while a pair's pick
+    // waits (hidden once a pick is given, until the world has taken it), AUTO and the popups: encounterui.ts, BASE_DESIGN 11)
+    this.uiHits = trip.encounter ? drawEncounterHud(ctx, this.sim, trip, trip.encounter, f, this.watching, this.sim.commands.some((c) => c.kind === 'ability')) : [];
+    // (the result card once the road is walked whole; then the trip's log over it, opened by TRIP LOG -- the stops
+    // cleared, waited out and ahead, the team's puff, the log's latest lines, the walk left -- so the log asked for is read whole)
     const card = f.done && !this.resultClosed;
-    if (card) drawResultCard(ctx, trip, this.sim.tick);
+    if (card) drawResultCard(ctx, this.sim, trip, this.sim.tick);
     if (this.ui.card) drawTripCard(ctx, this.sim, trip);
-    // (no way back to the barn but the result card, at the road's end: TRIP LOG at the bottom left, and at the right the
-    // follow line -- the game following the team, the game hours till it is home)
-    this.uiHits = [{ r: LOG_BUTTON, act: { kind: 'none' }, name: 'log' }];
+    // (no way back to the barn but the result card, at the road's end: TRIP LOG at the bottom left, AUTO beside it while
+    // the team stands at a stop, and at the right the follow line -- the game following the team, the game hours till
+    // it is home)
+    this.uiHits.push({ r: LOG_BUTTON, act: { kind: 'none' }, name: 'log' });
     if (card) this.uiHits.push({ r: RESULT_CARD, act: { kind: 'none' }, name: 'result' });
     drawLogButton(ctx, this.ui.card);
     drawFollowLine(ctx, this.sim, trip);
@@ -926,12 +937,20 @@ export class BaseView {
 
   /**
    * A tap on the watch overlay (under the top bar): TRIP LOG, the log tapped shut (it is drawn on top), the result card
-   * tapped away -- the way back to the barn (comeHome); anything else swallowed.
+   * tapped away -- the way back to the barn (comeHome); at a stop (BASE_DESIGN 11), an ability's row picks it for the pair
+   * whose pick waits (a command: the world, waiting for it, takes it at its next step) and AUTO turns the trail coach on
+   * or off; anything else swallowed.
    */
   private watchTap(sx: number, sy: number): void {
-    if (hit(LOG_BUTTON, sx, sy)) this.ui.card = !this.ui.card;
-    else if (this.ui.card && hit(TRIP_CARD, sx, sy)) this.ui.card = false;
-    else if (this.scene?.f.done && !this.resultClosed && hit(RESULT_CARD, sx, sy)) this.comeHome();
+    const trip = this.sim.missions.trip;
+    if (hit(LOG_BUTTON, sx, sy)) { this.ui.card = !this.ui.card; return; }
+    if (this.ui.card && hit(TRIP_CARD, sx, sy)) { this.ui.card = false; return; }
+    if (this.scene?.f.done && !this.resultClosed && hit(RESULT_CARD, sx, sy)) { this.comeHome(); return; }
+    const act = hitAt(this.uiHits, sx, sy);
+    if (act.kind === 'ability' && trip) {
+      this.send({ kind: 'ability', pair: act.pair, ability: act.ability });
+      if (this.speed === 0) this.say('PAUSED: THE MOVE PLAYS WHEN THE GAME PLAYS');
+    } else if (act.kind === 'trail' && trip) this.send({ kind: 'trail', on: !trip.auto });
   }
 
   /** The hook (window.__dragonCare.base): the world as of this frame, and the overlay, the game following a team out, and the scene (BASE_DESIGN 6). */
@@ -999,21 +1018,31 @@ export class BaseView {
       winner: b.winner, xp: [...b.xp], line: b.log[b.log.length - 1] ?? null } : null };
   }
 
-  /** The trip out, for the hook: its state, mission, region, outcome, pairs (by id), times and progress; or null. */
+  /**
+   * The trip out, for the hook (BASE_DESIGN 5, 11): its state, mission, region, outcome (null until the road's end), egg,
+   * pairs (by id), the clock it left, its walk (walked of travel, and its share), each pair's puff and whole, each stop
+   * (its name and how it went), the trail coach, and the encounter at the stop the team stands at, or null.
+   */
   private tripHook() {
     const t = this.sim.missions.trip;
     if (!t) return null;
+    const e = t.encounter;
     return { state: t.state, mission: t.mission.title, region: t.mission.region, success: t.success, egg: t.egg, pairs: t.pairs.map((p) => ({ ...p })),
-      departAt: t.departAt, returnAt: t.returnAt, progress: tripProgress(this.sim, t) };
+      departAt: t.departAt, travel: t.travel, walked: t.walked, progress: tripProgress(this.sim, t), forecast: t.forecast, auto: t.auto,
+      puff: t.puff.map((p, i) => ({ puff: p, max: t.stats[i].puff })), xp: [...t.xp],
+      stops: t.stops.map((s) => ({ name: stopName(s), kind: s.kind, result: s.result, log: s.log })),
+      encounter: e ? { stop: e.stop, kind: e.kind, state: e.state, t: e.t, turn: e.turn, pending: pendingPair(t), picks: [...e.picks], work: e.work, toughness: e.toughness,
+        foe: e.foe ? { id: e.foe.id, puff: e.foe.puff, max: e.foe.stats.puff } : null, outcome: e.outcome, line: e.log[e.log.length - 1] ?? null,
+        move: e.state === 'play' && e.moves[e.cur] ? { by: e.moves[e.cur].by, ability: e.moves[e.cur].ability, foeMove: e.moves[e.cur].foeMove, landed: e.moves[e.cur].landed, hit: e.moves[e.cur].hit, loss: e.moves[e.cur].loss, work: e.moves[e.cur].work } : null } : null };
   }
 
-  /** The scene as the hook reports it (BASE_DESIGN 6): the last stop reached, its banner, the baddie on the road, its exit, how far along it is, and the result card's title once it is done. */
+  /** The scene as the hook reports it (BASE_DESIGN 6, 11): the last stop reached, how it went, whether the team stands at it (its encounter's state), its banner, the baddie on the road, its exit, how far along the walk is, and the result card's title once it is done. */
   private sceneHook(): NonNullable<NonNullable<Window['__dragonCare']>['base']>['scene'] {
     if (!this.scene) return null;
     const { trip, f } = this.scene, s = f.last == null ? null : trip.stops[f.last];
-    return { stop: s ? (s.kind === 'baddie' ? 'baddie' : s.challenge) : null, covered: s ? s.covered : null, beat: f.stop != null, banner: f.banner,
+    return { stop: s ? (s.kind === 'baddie' ? 'baddie' : s.challenge) : null, result: s ? s.result : null, covered: s ? s.covered : null, at: trip.encounter?.state ?? null, banner: f.banner,
       baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, exit: s?.kind === 'baddie' ? trip.exit : null,
-      progress: f.L ? f.E / f.L : 0, done: f.done, result: f.done ? resultTitle(trip) : null };
+      progress: f.travel ? f.n / f.travel : 0, done: f.done, result_card: f.done ? resultTitle(trip) : null };
   }
 
   /** How far on an egg is: 0 laid, 1 due (its HATCH_DAYS in the nest; one past it waits for a sub-slot at 1). */
@@ -1254,6 +1283,16 @@ export class BaseView {
     else if (act.kind === 'skill') {
       this.send({ kind: 'skill', skill: act.skill });
       if (this.speed === 0) this.say('PAUSED: THE MOVE PLAYS WHEN THE GAME PLAYS');
+    }
+  }
+  /**
+   * The road's news (BASE_DESIGN 11): a stop resolved -- cleared, or waited out -- and the XP each pair's dragon got (a
+   * stop met needs no toast: the game follows the team, so the road and its banner are on screen).
+   */
+  private roadEvent(e: SimEvent): void {
+    if (e.kind === 'stopEnd') {
+      const how = e.fight ? (e.cleared ? `${e.name} IS WORN OUT!` : `${e.name} LEAVES: THE TEAM SAT IT OUT`) : e.cleared ? `${e.name} CLEARED!` : `${e.name}: THE TEAM WAITS IT OUT`;
+      this.news.push({ text: `${how} +${e.xp} XP EACH` });
     }
   }
   /**

@@ -12,7 +12,10 @@ day's missions pinned at them and the lands you haven't reached yet under cloud.
 off from the Aerie, and the game follows it on its adventure: the camera stays on the Aerie as the team gathers and
 sets out over the sky bridge, then goes with it down its road -- the keepers mind the barn meanwhile, and there's no
 going back to it (MAP still shows the team's flag on the map) until the team is home and you tap its result card away.
-Tap
+On the road you play it: at each stop the team meets a challenge (a spring flood, a grumpy miller, thick fog...) or, at
+a hard road's end, a big baddie, and you pick what each dragon does turn by turn as in the Arena (its breath, a
+show-off, a rest, its rider's special), or leave it to the trail coach (AUTO); nobody is hurt, the outcome is told at
+the road's end, and every stop brings XP. Tap
 a keeper (or their badge, or Tab) to take them by hand: WASD or the arrows walk and climb, E or Space fetches and does
 the chore in reach, Esc lets go -- and on a touch screen a pad of arrows, E and LET GO does the same. ARENA (or b) opens
 the Arena on the roof: tap your dragon, then its sparring partner, and START BOUT -- the two ride up and spar turn by

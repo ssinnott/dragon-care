@@ -1,8 +1,9 @@
-// Missions (docs/BASE_DESIGN.md 5): the Map Room table's board, who may go, the odds, sending a team, and
-// the trip itself -- the muster on the Aerie, the walk west over the sky bridge, the days away, the landing, the egg
-// carried down to the Hatchery, the saddles hung back in the Tack Room and the riders' rest in the Bunks. DOM-free and
-// deterministic: every draw is a stateless rngAt (the board by its day, a mission's outcome and egg by its id), every
-// loop is in id order, and the whole state is plain data the save keeps (CareSim.missions).
+// Missions (docs/BASE_DESIGN.md 5, 11): the Map Room table's board, who may go, the trail coach's forecast, sending a
+// team, and the trip itself -- the muster on the Aerie, the walk west over the sky bridge, the road walked in the
+// world's own steps with an encounter at every stop (encounter.ts), the landing, the egg carried down to the
+// Hatchery, the saddles hung back in the Tack Room and the riders' rest in the Bunks. DOM-free and deterministic: every
+// draw is a stateless rngAt (the board by its day, a mission's egg by its id, a stop's rolls by its turn), every loop
+// is in id order, and the whole state is plain data the save keeps (CareSim.missions).
 //
 // The board (rollBoard) is rolled at the world's first step and at every 05:00 (the dawn: the one other place the
 // simulation reads the day's hour, BASE_DESIGN 7 -- the board, never the barn's care): the regions a success revealed join
@@ -13,19 +14,21 @@
 // A team is one or two pairs, a dragon and its rider (one of the four keepers, each with a rider's skill:
 // regions.ts KEEPER_SKILL). One team is out at a time, and two keepers always stay home. A dragon's partner is the
 // keeper whose specialty is its element's own need (Bea for fire, Tomas for spike, rock and slinkwing, Pip for
-// lightning, Iris for dusk; water has none): a pair of partners goes 5 % better. A challenge is met by a team dragon of
+// lightning, Iris for dusk; water has none): a pair of partners goes 5 % better (its dragon's POWER on the road, encounter.ts PARTNER_POWER). A challenge is met by a team dragon of
 // its element or a rider of its skill (the chooser shows who, up front); a big baddie needs both of its counters.
 //
-// Sending (send) rolls the whole trip at once (the outcome, the egg and the road's stops), counts the Map Room used,
-// and starts the muster. The road never depends on the outcome: a team never turns back, it walks every stop (meeting
-// what it can, waiting out the rest) and the outcome is told only at the road's end (missionview.ts, the result card).
-// The muster: the team's dragons leave whatever they were doing once they may (a keeper at work
+// Sending (send) draws the egg the trip may bring home, lays out the road's stops, takes each pair's dragon's stats
+// for the road (its puff to carry along it), counts the Map Room used, and starts the muster. Nothing is rolled for the
+// outcome: the road is played -- at each stop the team halts and its encounter runs (encounter.ts: the player's picks,
+// or the trail coach's) until the stop is cleared or waited out; then the walk goes on. A team never turns back: it
+// walks every stop to the road's end, and the outcome -- HOME SAFE! when every stop was cleared -- is told only there
+// (missionview.ts, the result card). The muster: the team's dragons leave whatever they were doing once they may (a keeper at work
 // finishes; a ride in hand is ridden) and ride the Dragon Lift up to the Aerie at the car's first priority, each to
 // the westmost free spot on the deck as it gets there; the riders walk to the Tack Room, take their saddles (the Tack
 // Room used) and climb the left tower's ladder to the deck, beside their dragons. All there, the team walks west off
 // the deck over the sky bridge (the Aerie used: it stands in for `fly`, which rock can't anyway) and is away: not
-// drawn, its dragons' needs frozen, their jobs and stage-ups waiting, its riders nobody's to call. `days` game days
-// later it lands on the bridge and walks back onto the deck (the Aerie used again): the coin is paid, food and sleep
+// drawn, its dragons' needs frozen, their jobs and stage-ups waiting, its riders nobody's to call. `days` game days of
+// walking (and its stops' encounters) later it lands on the bridge and walks back onto the deck (the Aerie used again): the coin is paid, food and sleep
 // are down a little (a burst of bubbles; nobody is hurt), each dragon walks back down into the barn to the nearest free
 // slot and its needs take over; the rider carrying the egg lays it in the reserved nest (sim.addEgg: the Hatchery), and
 // every rider hangs the saddle back in the Tack Room and rests a while in the Bunks (the Bunks used) -- a rider resting
@@ -40,9 +43,14 @@ import type { Room, RoomKind } from './layout.ts';
 import { routeTo, nearestFree, sendTo, dragonInBay, faceWay, raiseCall } from './travel.ts';
 import { CHALLENGES, BADDIES, REGIONS, KEEPER_SKILL, regionOf } from './regions.ts';
 import type { Counter } from './regions.ts';
-import type { RegionId, ChallengeId, Difficulty, BaddieExit } from './missiondata.ts';
-import type { Mission, Pair, Stop, Trip } from './trip.ts';
+import type { RegionId, ChallengeId, Difficulty, BaddieExit, BaddieId } from './missiondata.ts';
+import type { Mission, Pair, Stop, Trip, TripState } from './trip.ts';
 import type { CareSim, Dragon, Keeper } from './sim.ts';
+import { tripStats, partnerPair, forecastRoad, beginEncounter, stepEncounter, stopStart, stopName, checkEncounter, EXIT_STEPS, DONE_STEPS, XP_ROAD } from './encounter.ts';
+import type { Stats } from './training.ts';
+import type { Stage } from '../art/dragon/stages.ts';
+import type { Forecast } from './encounter.ts';
+import { CHALLENGES as CH } from './regions.ts';
 // (a value read only while stepping, never as this module loads: sim.ts imports this one)
 import { PICKUP } from './sim.ts';
 
@@ -94,8 +102,8 @@ export function baddieDay(day: number): boolean { return day >= BADDIE_FROM_DAY 
 export const LOST_NEST = 'THE LOST NEST';
 /** At most this many pairs; and this many keepers always stay home. */
 export const MAX_PAIRS = 2, HOME_KEEPERS = 2;
-/** The odds (BASE_DESIGN 5): a base, per challenge met, the baddie met, per pair in good spirits (mood >= GOOD_MOOD), per pair of partners; clamped. */
-export const ODDS = Object.freeze({ base: 0.2, challenge: 0.15, baddie: 0.15, mood: 0.05, partners: 0.05, min: 0.05, max: 0.95, goodMood: 0.5 });
+/** A team's spirits count as good (the chooser's mood dot) from this mood: the trail coach's forecast reads the spirits through the stats (encounter.ts tripStats). */
+export const GOOD_MOOD = 0.5;
 /** Where the team gathers on the Aerie deck: the dragons (world x, facing west) and each rider beside, just behind its dragon. */
 export const DECK_SPOTS: readonly number[] = Object.freeze([120, 280]);
 export const RIDER_SPOTS: readonly number[] = Object.freeze([211, 371]);
@@ -224,18 +232,16 @@ export function coverage(sim: CareSim, m: Mission, pairs: readonly Pair[]): { ch
   return { challenges, baddie, covered: challenges.filter((w) => w.length).length };
 }
 
-/** The team's odds of a success (BASE_DESIGN 5), clamped to 5-95 %. */
-export function oddsOf(sim: CareSim, m: Mission, pairs: readonly Pair[]): number {
-  if (!pairs.length) return 0;
-  const cov = coverage(sim, m, pairs);
-  let o = ODDS.base + ODDS.challenge * cov.covered + (m.baddie && cov.baddie ? ODDS.baddie : 0);
-  for (const p of pairs) {
-    const d = dragonOf(sim, p.dragon);
-    if (d.mood >= ODDS.goodMood) o += ODDS.mood;
-    if (partnerOf(sim, d)?.id === p.keeper) o += ODDS.partners;
-  }
-  return Math.round(Math.max(ODDS.min, Math.min(ODDS.max, o)) * 1e6) / 1e6;
+/**
+ * The trail coach's forecast for a team on mission m (BASE_DESIGN 11; encounter.ts forecastRoad): the stops it would
+ * clear playing the road itself, and the share of the team's puff it would have left. The chooser's FORECAST bar shows
+ * the stops' share (forecastShare); BEST TEAM ranks teams by it.
+ */
+export function forecastOf(sim: CareSim, m: Mission, pairs: readonly Pair[]): Forecast {
+  return forecastRoad(sim, m, pairs, roadOf(sim, m, pairs));
 }
+/** A forecast as one number: the share of the stops the coach would clear (0..1). */
+export function forecastShare(f: Forecast): number { return f.stops ? Math.round((f.cleared / f.stops) * 1e6) / 1e6 : 0; }
 
 /**
  * The rider a dragon gets on mission m, beside the pairs already chosen (`others`): its partner, if free and not
@@ -258,7 +264,9 @@ export function autoRider(sim: CareSim, d: Dragon, m: Mission, others: readonly 
 
 /**
  * The best team for mission m: every eligible dragon alone, and every two of them (in id order), each with its auto
- * rider; the highest odds win, then fewer pairs, then the lower dragon ids. Empty if nobody can go.
+ * rider; the best forecast wins (the most stops the trail coach would clear, in the fewest turns, then the most puff it
+ * would have left), then the most counters on the team (coverage: a counter clears its stop with a margin the dry run's
+ * even rolls don't show), then fewer pairs, then the lower dragon ids. Empty if nobody can go.
  */
 export function bestTeam(sim: CareSim, m: Mission, taken: Taken = isTaken): Pair[] {
   const can = sim.dragons.filter((d) => !dragonReason(sim, d, m));
@@ -270,10 +278,13 @@ export function bestTeam(sim: CareSim, m: Mission, taken: Taken = isTaken): Pair
   };
   for (const a of can) { const t = build([a]); if (t) teams.push(t); }
   for (let i = 0; i < can.length; i++) for (let j = i + 1; j < can.length; j++) { const t = build([can[i], can[j]]); if (t) teams.push(t); }
-  let best: Pair[] = [], bestOdds = -1;
+  let best: Pair[] = [], bestF: Forecast | null = null, bestCov = -1;
+  const covers = (t: Pair[]) => { const c = coverage(sim, m, t); return c.covered + (c.baddie ? 1 : 0); };
   for (const t of teams) {
-    const o = oddsOf(sim, m, t);
-    if (o > bestOdds || (o === bestOdds && t.length < best.length)) { best = t; bestOdds = o; }
+    const f = forecastOf(sim, m, t), cov = covers(t);
+    const better = !bestF || f.cleared > bestF.cleared || (f.cleared === bestF.cleared && (f.turns < bestF.turns
+      || (f.turns === bestF.turns && (f.puff > bestF.puff + 1e-9 || (Math.abs(f.puff - bestF.puff) <= 1e-9 && (cov > bestCov || (cov === bestCov && t.length < best.length)))))));
+    if (better) { best = t; bestF = f; bestCov = cov; }
   }
   return best;
 }
@@ -305,58 +316,52 @@ export function canSend(sim: CareSim, m: Mission | null, pairs: readonly Pair[],
 
 // ---------- sending ----------
 
-/** Whether a mission is day 1's LOST NEST (the tutorial: met in full, it always succeeds). */
-export function tutorial(m: Mission): boolean { return m.title === LOST_NEST && m.region === 'millbrook' && m.id < 8; }
-
-/**
- * The trip log's line for a stop, always `NAME - WHO WHAT`: a challenge met and by whom, or waited out; the baddie met
- * and by whom, or waited out till it leaves the road its own way. Never the outcome (the road's end tells that): a team
- * never turns back. The watchable scene's banner shows the part before ` - ` as the stop is reached (missionview.ts),
- * and the whole line once it is met.
- */
-function logLine(stop: Stop): string {
-  if (stop.kind === 'baddie') {
-    const b = BADDIES[stop.baddie!];
-    return stop.covered ? `${b.name} - ${stop.by.join(' AND ')}: IT ${b.how}` : `${b.name} - NOBODY COULD HELP, BUT IT ${b.how}`;
-  }
-  const c = CHALLENGES[stop.challenge!];
-  return stop.covered ? `${c.name} - ${stop.by[0]} ${c.met}` : `${c.name} - NOBODY COULD HELP: THEY WAIT IT OUT`;
-}
-
 /**
  * The road a team would meet on mission m (BASE_DESIGN 5): each challenge at (i + 1) / (n + 1) of ROAD_SPAN of the way, the
- * baddie at BADDIE_AT, each with whether the team meets it and who, and its log line. The same whatever the outcome:
- * the team walks all of it.
+ * baddie at BADDIE_AT, each with whether the team has its counter and who (the chooser's tick; STRONG on the menu), not
+ * reached yet. The same whatever happens on it: the team walks all of it.
  */
 export function roadOf(sim: CareSim, m: Mission, pairs: readonly Pair[]): Stop[] {
   const cov = coverage(sim, m, pairs), n = m.challenges.length;
-  const stops: Stop[] = m.challenges.map((c, i) => ({ kind: 'challenge', challenge: c, baddie: null, at: ((i + 1) / (n + 1)) * ROAD_SPAN, covered: cov.challenges[i].length > 0, by: cov.challenges[i].slice(0, 1), log: '' }));
-  if (m.baddie) stops.push({ kind: 'baddie', challenge: null, baddie: m.baddie, at: BADDIE_AT, covered: !!cov.baddie, by: cov.baddie ?? [], log: '' });
-  return stops.map((s) => ({ ...s, log: logLine(s) }));
+  const stops: Stop[] = m.challenges.map((c, i) => ({ kind: 'challenge', challenge: c, baddie: null, at: ((i + 1) / (n + 1)) * ROAD_SPAN, covered: cov.challenges[i].length > 0, by: cov.challenges[i].slice(0, 1), log: '', result: 'ahead', turns: 0, resolvedAt: null }));
+  if (m.baddie) stops.push({ kind: 'baddie', challenge: null, baddie: m.baddie, at: BADDIE_AT, covered: !!cov.baddie, by: cov.baddie ?? [], log: '', result: 'ahead', turns: 0, resolvedAt: null });
+  return stops;
 }
 
-/** How a mission's baddie leaves the road (met or waited out, it always does), or null: no baddie. */
+/** How a mission's baddie leaves the road (worn out or waited out, it always does), or null: no baddie. */
 export function exitOf(m: Mission): BaddieExit | null { return m.baddie ? BADDIES[m.baddie].exit : null; }
 
+/** The egg a trip on mission m may bring home: sure on the region's first success, else its chance (rngAt(seed, EGG, id)); its element one of the region's. Null: none, or no nest free. */
+export function eggOf(sim: CareSim, m: Mission): DragonElement | null {
+  const region = regionOf(m.region);
+  if (freeNest(sim) == null || !(m.guaranteedEgg || rngAt(sim.seed, TAG.EGG, m.id).next() < m.eggChance)) return null;
+  return region.eggs[rngAt(sim.seed, TAG.EGG, m.id, 1).int(0, region.eggs.length - 1)];
+}
+
 /**
- * Send a team on board mission `missionId` (the Map Room table's SEND): refused with canSend's reason, else
- * the whole trip rolled now -- the outcome (rngAt(seed, MISSION, id) under the odds), the nest reserved and the egg
- * (sure on a region's first success, else rngAt(seed, EGG, id) under its chance; its element one of the region's), the
- * road -- the mission taken off the board, the Map Room counted, and the muster begun (musterStart).
- * `awaySteps`: a test's own trip length (else the mission's days).
+ * A trip on mission m with this team, not yet sent (send and the trip preset, tripdemo.ts, build one): its road, the
+ * egg it may bring home and the nest reserved for it, each pair's dragon's stats for the road (encounter.ts
+ * tripStats: its spirits on its power, fixed now) and its puff, full; its walk `travel` steps long (the mission's days,
+ * or a test's own), the forecast it goes with.
+ */
+export function tripOf(sim: CareSim, m: Mission, pairs: readonly Pair[], travel = m.days * sim.dayLen): Trip {
+  const egg = eggOf(sim, m), nest = egg ? freeNest(sim) : null;
+  const stats = pairs.map((p) => { const d = dragonOf(sim, p.dragon); return tripStats(d.element, d.stage, d.xp, d.mood, partnerPair(d, keeperOf(sim, p.keeper))); });
+  return { mission: m, pairs: pairs.map((p) => ({ ...p })), forecast: forecastShare(forecastOf(sim, m, pairs)), success: null, egg, nest, stops: roadOf(sim, m, pairs), state: 'muster', departAt: null,
+    travel, walked: 0, stats, puff: stats.map((s) => s.puff), xp: pairs.map(() => 0), auto: false, encounter: null, exit: exitOf(m) };
+}
+
+/**
+ * Send a team on board mission `missionId` (the Map Room table's SEND): refused with canSend's reason, else the trip
+ * made (tripOf: the road, the egg and its nest, the team's stats and puff, the forecast), the mission taken off the
+ * board, the Map Room counted, and the muster begun (musterStart). `awaySteps`: a test's own walk length (else the
+ * mission's days).
  */
 export function send(sim: CareSim, missionId: number, pairs: readonly Pair[], opts: { taken?: Taken; awaySteps?: number } = {}): Trip | string {
   const m = sim.missions.board.find((q) => q.id === missionId) ?? null;
   const why = canSend(sim, m, pairs, opts.taken);
   if (why) return why;
-  const mission = m!, odds = oddsOf(sim, mission, pairs);
-  // (day 1's LOST NEST is the first mission: a team meeting both of its challenges always brings its sure egg home)
-  const success = (tutorial(mission) && coverage(sim, mission, pairs).covered === mission.challenges.length) || rngAt(sim.seed, TAG.MISSION, mission.id).next() < odds;
-  const region = regionOf(mission.region), nest = freeNest(sim);
-  let egg: DragonElement | null = null;
-  if (success && nest != null && (mission.guaranteedEgg || rngAt(sim.seed, TAG.EGG, mission.id).next() < mission.eggChance)) egg = region.eggs[rngAt(sim.seed, TAG.EGG, mission.id, 1).int(0, region.eggs.length - 1)];
-  const trip: Trip & { awaySteps?: number } = { mission, pairs: pairs.map((p) => ({ ...p })), odds, success, egg, nest: egg ? nest : null, stops: roadOf(sim, mission, pairs), state: 'muster', departAt: null, returnAt: null, exit: exitOf(mission) };
-  if (opts.awaySteps != null) trip.awaySteps = opts.awaySteps;
+  const mission = m!, trip = tripOf(sim, mission, pairs, opts.awaySteps ?? mission.days * sim.dayLen);
   const ms = sim.missions;
   ms.board = ms.board.filter((q) => q.id !== mission.id);
   ms.trip = trip; ms.deck = pairs.map(() => null); ms.sent++;
@@ -482,11 +487,10 @@ function stepDepart(sim: CareSim, t: Trip): void {
   goAway(sim, t, sim.clock);
 }
 
-/** The team is away from `departAt` for its days (or a test's awaySteps): its dragons off the map, its riders away, at the bridge's end. */
+/** The team is away from `departAt`, its road ahead of it (walked 0 of its travel): its dragons off the map, its riders away, at the bridge's end. */
 function goAway(sim: CareSim, t: Trip, departAt: number): void {
   t.state = 'away';
   t.departAt = departAt;
-  t.returnAt = t.departAt + ((t as { awaySteps?: number }).awaySteps ?? t.mission.days * sim.dayLen);
   for (const d of teamDragons(sim, t)) {
     d.place = 'away'; d.slot = null; d.legs = []; d.move = 'still'; d.gaitT = 0; d.turn = -1; d.waited = 0; d.f = AERIE_F; d.x = BRIDGE_X; d.facing = -1;
   }
@@ -510,12 +514,54 @@ export function awayNow(sim: CareSim, t: Trip, departAt: number): void {
 }
 
 /**
- * The team lands (at returnAt, exactly): on the bridge, walking east onto the deck (#11: the Aerie used); the coin paid;
- * food and sleep down to LAND_NEEDS at most; the riders set off down -- the one with the egg to its nest, the others to
- * the Tack Room with their saddles.
+ * A trip away put that far along its road (the `trip` preset, presets.ts tripStart, after awayNow): its walk at
+ * `progress` of its travel, and every stop before that point resolved as its counter would have -- cleared (its
+ * counter's line, or the plain one), or, with `fail`, the last of them waited out, so the road's end tells NOT THIS
+ * TIME -- as if resolved when the team walked past (its clock set back by the steps walked since and its beat, and
+ * the XP it brought credited); a stop at that very point begins its encounter on the first step; at the road's end
+ * (progress 1) the team lands, the outcome told. Only for a trip away with nothing resolved yet.
+ */
+export function placeAlong(sim: CareSim, t: Trip, progress: number, fail = false): void {
+  if (t.state !== 'away' || t.encounter || t.stops.some((s) => s.result !== 'ahead')) throw new Error('missions: placeAlong wants a trip away at its road\'s start');
+  t.walked = Math.max(0, Math.min(t.travel, Math.round(progress * t.travel)));
+  const passed = t.stops.map((_, j) => j).filter((j) => stopStart(t, j) < t.walked);
+  passed.forEach((j, k) => {
+    const s = t.stops[j], unmet = fail && k === passed.length - 1, name = stopName(s);
+    s.result = unmet ? 'unmet' : 'met';
+    s.turns = 1;
+    s.resolvedAt = sim.clock - (t.walked - stopStart(t, j)) - (s.kind === 'baddie' ? EXIT_STEPS : DONE_STEPS);
+    s.log = s.kind === 'baddie' ? (unmet ? `${name} - THE TEAM SITS DOWN FOR A BREATHER, BUT IT ${BADDIES[s.baddie!].how}` : `${name} - WORN OUT: IT ${BADDIES[s.baddie!].how}`)
+      : unmet ? `${name} - THE TEAM WAITS IT OUT` : s.covered && s.by[0] ? `${name} - ${s.by[0]} ${CH[s.challenge!].met}` : `${name} - ${CH[s.challenge!].done}`;
+    // (the XP the stop would have brought: encounter.ts resolve)
+    const xp = s.kind === 'baddie' ? (unmet ? XP_ROAD.lost : XP_ROAD.won) : unmet ? XP_ROAD.waited : XP_ROAD.cleared;
+    t.pairs.forEach((p, i) => { t.xp[i] += xp; dragonOf(sim, p.dragon).xp += xp; });
+  });
+  if (t.walked >= t.travel && passed.length === t.stops.length) land(sim, t);
+}
+
+/**
+ * The team away (BASE_DESIGN 11): at a stop, its encounter steps on (encounter.ts) until the stop is resolved and its
+ * beat is over; else the next stop reached (its `at` of the walk) begins its encounter, or the team walks a step on;
+ * at the road's end, it lands.
+ */
+function stepAway(sim: CareSim, t: Trip): void {
+  if (t.encounter) { stepEncounter(sim, t); return; }
+  const j = t.stops.findIndex((s) => s.result === 'ahead');
+  if (j >= 0 && t.walked >= stopStart(t, j)) { beginEncounter(sim, t, j); return; }
+  // (the step that walks the last of the road lands the team: the road done and the outcome decided in one)
+  if (t.walked < t.travel) { t.walked++; if (t.walked < t.travel) return; }
+  land(sim, t);
+}
+
+/**
+ * The team lands (the road's end: every stop resolved, the walk done): the outcome decided -- HOME SAFE! when every stop
+ * was cleared -- the team on the bridge, walking east onto the deck (#11: the Aerie used); the coin paid (half on a
+ * failure); food and sleep down to LAND_NEEDS at most; the riders set off down -- the one with the egg (a success's) to
+ * its nest, the others to the Tack Room with their saddles.
  */
 function land(sim: CareSim, t: Trip): void {
   t.state = 'return';
+  t.success = t.stops.every((s) => s.result === 'met');
   sim.use('aerie');
   sim.missions.coin += t.success ? t.mission.coin : Math.floor(t.mission.coin / 2);
   const cap = t.success ? LAND_NEEDS.success : LAND_NEEDS.failure;
@@ -531,7 +577,7 @@ function land(sim: CareSim, t: Trip): void {
     const k = keeperOf(sim, p.keeper);
     // (the lead pair's rider lands a little behind its dragon, the other at the bridge's end: never one on the other)
     k.phase = 'deliver'; k.f = AERIE_F; k.x = i === order[0] && order.length > 1 ? LAND_LEAD_X - RIDER_LAND_GAP : BRIDGE_X; k.y = feetY(AERIE_F); k.facing = 1; k.t = 0;
-    k.carrying = t.egg && i === 0 ? 'egg' : 'saddle';
+    k.carrying = t.success && t.egg && i === 0 ? 'egg' : 'saddle';
     sim.walkTo(k, k.carrying === 'egg' ? nestSpot(sim, t) : tackSpot(sim));
   });
 }
@@ -571,7 +617,7 @@ function stepReturn(sim: CareSim, t: Trip): void {
 function stepDeliver(sim: CareSim, t: Trip, k: Keeper): void {
   if (k.legs.length) { sim.move(k); return; }
   if (k.carrying === 'egg') {
-    if (t.egg) sim.addEgg(t.egg, sim.clock, t.nest ?? undefined);
+    if (t.success && t.egg) sim.addEgg(t.egg, sim.clock, t.nest ?? undefined);
     k.carrying = 'saddle'; sim.walkTo(k, tackSpot(sim));
     return;
   }
@@ -594,8 +640,8 @@ function stepRest(sim: CareSim, k: Keeper): void {
 
 /**
  * The missions' half of a step (after the garden): at 05:00 the regions revealed join the map and the board is rolled
- * for the day; the trip steps on (the muster, the departure, the days away, the landing); keepers resting finish their
- * rest.
+ * for the day; the trip steps on (the muster, the departure, the road walked and its stops' encounters, the landing);
+ * keepers resting finish their rest.
  */
 export function stepMissions(sim: CareSim): void {
   const ms = sim.missions;
@@ -604,7 +650,7 @@ export function stepMissions(sim: CareSim): void {
   if (t) {
     if (t.state === 'muster') stepMuster(sim, t);
     else if (t.state === 'depart') stepDepart(sim, t);
-    else if (t.state === 'away' && t.returnAt != null && sim.clock >= t.returnAt) land(sim, t);
+    else if (t.state === 'away') stepAway(sim, t);
     if (t.state === 'return') stepReturn(sim, t);
   }
   for (const k of sim.keepers) if (k.phase === 'rest') stepRest(sim, k);
@@ -616,9 +662,9 @@ export function missionCall(sim: CareSim, d: Dragon): boolean {
   return d.goal === 'muster' || (!!t && t.state === 'return' && d.goal === 'settle' && t.pairs.some((p) => p.dragon === d.id));
 }
 
-/** Game hours left until the team lands (the TEAM OUT chip), rounded up; 0 when not away. */
+/** Game hours of walking left until the team lands (the TEAM OUT chip), rounded up; 0 when not away. The stops' encounters take their own time on top. */
 export function hoursLeft(sim: CareSim, t: Trip): number {
-  return t.state === 'away' && t.returnAt != null ? Math.max(0, Math.ceil((t.returnAt - sim.clock) / hourSteps(sim.dayLen))) : 0;
+  return t.state === 'away' ? Math.max(0, Math.ceil((t.travel - t.walked) / hourSteps(sim.dayLen))) : 0;
 }
 
 // ---------- saves ----------
@@ -628,9 +674,10 @@ export function copyMissions(m: MissionsState): MissionsState { return JSON.pars
 
 /**
  * A save's missions, checked and copied (CareSim.fromSave): a board of real missions (known regions, challenges and
- * baddies), a map of known regions, whole coin, and a trip whose pairs are dragons and keepers the save has and whose
- * stops are real ones -- else it throws, and the view starts a new barn (base.ts load). The trip's road is told again
- * by this build (retell).
+ * baddies), a map of known regions, whole coin, and a trip whose pairs are dragons and keepers the save has, whose
+ * stops are real ones with results this build knows (resolved in road order), whose walk, stats and puff are whole and
+ * within their wholes, and whose encounter, if one is on, is one this build can play (encounter.ts checkEncounter) --
+ * else it throws, and the view starts a new barn (base.ts load).
  */
 export function checkMissions(raw: unknown, dragons: readonly { id: number }[], keepers: readonly { id: number; phase: string }[]): MissionsState {
   const bad = (why: string): never => { throw new Error(`save: the missions ${why}`); };
@@ -642,32 +689,74 @@ export function checkMissions(raw: unknown, dragons: readonly { id: number }[], 
   const mission = (q: Mission) => q && typeof q === 'object' && whole(q.id) && ids.has(q.region) && typeof q.title === 'string' && q.difficulty in DIFFICULTY
     && Array.isArray(q.challenges) && q.challenges.every((c) => c in CHALLENGES) && (q.baddie === null || q.baddie in BADDIES) && whole(q.days, 1) && whole(q.coin) && typeof q.eggChance === 'number';
   const stop = (s: Stop) => s && typeof s === 'object' && (s.kind === 'baddie' ? s.baddie! in BADDIES : s.kind === 'challenge' && s.challenge! in CHALLENGES)
-    && typeof s.at === 'number' && typeof s.covered === 'boolean' && Array.isArray(s.by) && s.by.every((w) => typeof w === 'string');
+    && typeof s.at === 'number' && typeof s.covered === 'boolean' && Array.isArray(s.by) && s.by.every((w) => typeof w === 'string') && typeof s.log === 'string'
+    && ['ahead', 'met', 'unmet'].includes(s.result) && whole(s.turns) && (s.result === 'ahead' ? s.resolvedAt === null : Number.isInteger(s.resolvedAt));
   if (!Array.isArray(m.board) || m.board.length > BOARD_MAX || !m.board.every(mission)) bad('board is not one this build can show');
   const t = m.trip;
   if (t !== null) {
-    if (!t || typeof t !== 'object' || !mission(t.mission) || !['muster', 'depart', 'away', 'return'].includes(t.state) || !Array.isArray(t.pairs) || !t.pairs.length || t.pairs.length > MAX_PAIRS
+    const STATES: readonly TripState[] = ['muster', 'depart', 'away', 'return'];
+    const stats = (s: Stats) => s && typeof s === 'object' && ['puff', 'power', 'guard', 'speed'].every((k) => whole(s[k as keyof Stats], 1));
+    const resolved = t && Array.isArray(t.stops) ? t.stops.filter((q) => q && q.result !== 'ahead').length : 0;
+    if (!t || typeof t !== 'object' || !mission(t.mission) || !STATES.includes(t.state) || !Array.isArray(t.pairs) || !t.pairs.length || t.pairs.length > MAX_PAIRS
       || !t.pairs.every((p) => dragons.some((d) => d.id === p.dragon) && keepers.some((k) => k.id === p.keeper)) || !Array.isArray(t.stops) || !t.stops.every(stop)
       || !Array.isArray(m.deck) || m.deck.length !== t.pairs.length || !m.deck.every((s) => s === null || (whole(s) && s < DECK_SPOTS.length))
-      // (away: whole clocks, the return after the leaving -- which may be before the world's clock 0: the trip preset's
-      // team left before its world began, missions.ts awayNow)
-      || (t.state === 'away' && (!Number.isInteger(t.departAt) || !Number.isInteger(t.returnAt) || t.returnAt! <= t.departAt!))) bad(`trip (${JSON.stringify({ state: t?.state, pairs: t?.pairs })}) is not one this build can run`);
+      || !whole(t.travel, 1) || !whole(t.walked) || t.walked > t.travel
+      || !Array.isArray(t.stats) || t.stats.length !== t.pairs.length || !t.stats.every(stats)
+      || !Array.isArray(t.puff) || t.puff.length !== t.pairs.length || !t.puff.every((p, i) => whole(p) && p <= t.stats[i].puff)
+      || !Array.isArray(t.xp) || t.xp.length !== t.pairs.length || !t.xp.every((x) => whole(x))
+      || typeof t.auto !== 'boolean' || typeof t.forecast !== 'number' || !(t.forecast >= 0 && t.forecast <= 1)
+      || !(t.success === null || typeof t.success === 'boolean') || (t.state === 'return') !== (t.success !== null)
+      || (t.state === 'away' ? !Number.isInteger(t.departAt) : t.state !== 'return' && t.departAt !== null)
+      || !(t.exit === null || ['calmed', 'outwitted', 'drivenOff'].includes(t.exit))
+      // (the stops resolve in road order: the resolved ones are the road's first; nothing resolves before the road is walked, nor on the way home)
+      || t.stops.some((s, i) => (s.result !== 'ahead') !== (i < resolved)) || (resolved > 0 && t.state !== 'away' && t.state !== 'return') || (t.state === 'return' && resolved !== t.stops.length)
+      || (t.encounter !== null && (t.state !== 'away' || typeof t.encounter !== 'object'))) bad(`trip (${JSON.stringify({ state: t?.state, pairs: t?.pairs })}) is not one this build can run`);
+    if (t.encounter !== null) checkEncounter(t.encounter, t.pairs.length, t.stops);
   }
   // (a keeper on a trip is the trip's rider)
   for (const k of keepers) if (TRIP_PHASES.has(k.phase) && !t?.pairs.some((p) => p.keeper === k.id)) bad(`have keeper ${k.id} ${k.phase} with no team`);
-  const out = copyMissions(m);
-  if (out.trip) retell(out.trip);
-  return out;
+  return copyMissions(m);
+}
+
+/** A trip as saves from before the road was played kept it (save version 10): its clocks, its odds, its roll. */
+interface OldTrip {
+  mission: Mission; pairs: Pair[]; state: TripState; departAt: number | null; returnAt?: number | null; odds?: number; success?: boolean;
+  egg: DragonElement | null; nest: number | null; exit?: BaddieExit | null;
+  stops: { kind: 'challenge' | 'baddie'; challenge: ChallengeId | null; baddie: BaddieId | null; at: number; covered?: boolean; by?: string[] }[];
 }
 
 /**
- * A saved trip's road told by this build: its stops, and who met each, as they were; every stop's line, and the
- * baddie's exit, as roadOf and send tell them. (A save from before teams walked every road whole carries the stop it
- * turned back at, and lines and an exit that told a failure early: so the team it holds walks the whole road too, and
- * its outcome waits for the road's end. A save from this build is told the same, unchanged.)
+ * A save's missions from before the road was played (save version 10: save.ts migrateSave), brought up to this build:
+ * a trip out gets its walk (`travel`, the length its days made it; `walked`, how far along it the old scene had it,
+ * by its beats), every stop the old scene had reached resolved as its counter would have (cleared with its counter,
+ * waited out without), the team's stats and puff (full), no XP yet, the trail coach off and no encounter; its old odds
+ * are its forecast, and its old roll is dropped -- the outcome is the road's now, told at its end (a team already
+ * landing keeps the outcome it landed with). Anything else is left as it is. `dragons` are the save's, `dayLen` and
+ * `clock` its.
  */
-function retell(t: Trip): void {
-  delete (t as { turnBack?: unknown }).turnBack;
-  t.stops = t.stops.map((s) => ({ ...s, log: logLine(s) }));
-  t.exit = exitOf(t.mission);
+export function upgradeMissions(raw: unknown, dragons: readonly { id: number; element: DragonElement; stage: Stage; xp?: number; mood: number }[], dayLen: number, clock: number): unknown {
+  if (!raw || typeof raw !== 'object') return raw;
+  const m = raw as { trip?: unknown }, o = m.trip as OldTrip | null | undefined;
+  if (!o || typeof o !== 'object' || !Array.isArray(o.stops) || !Array.isArray(o.pairs) || !o.mission || 'travel' in o) return raw;
+  const L = o.departAt != null && o.returnAt != null && o.returnAt > o.departAt ? o.returnAt - o.departAt : Math.max(1, (o.mission.days || 1) * dayLen);
+  const beat = (s: OldTrip['stops'][number]) => (s.kind === 'baddie' ? Math.min(900, Math.round(0.12 * L)) : Math.min(600, Math.round(0.08 * L)));
+  const starts = o.stops.map((s) => Math.round((s.at || 0) * L)), lens = o.stops.map(beat), all = lens.reduce((n, v) => n + v, 0);
+  const landed = o.state === 'return' || o.state === 'home';
+  const E = o.state === 'away' && o.departAt != null ? Math.max(0, Math.min(L, clock - o.departAt)) : landed ? L : 0;
+  let n = E;
+  for (let j = 0; j < o.stops.length; j++) if (starts[j] <= E) n -= Math.min(E - starts[j], lens[j]);
+  let walked = Math.max(0, Math.min(L, Math.round((n / Math.max(1, L - all)) * L)));
+  const stops: Stop[] = o.stops.map((s, j) => {
+    const reached = E >= starts[j], met = !!s.covered, by = Array.isArray(s.by) ? [...s.by] : [];
+    const name = s.kind === 'baddie' ? BADDIES[s.baddie!]?.name ?? 'THE BADDIE' : CH[s.challenge!]?.name ?? 'THE STOP';
+    const log = !reached ? '' : s.kind === 'baddie' ? (met ? `${name} - WORN OUT: IT ${BADDIES[s.baddie!]?.how ?? 'LEAVES'}` : `${name} - THE TEAM SITS DOWN FOR A BREATHER, BUT IT ${BADDIES[s.baddie!]?.how ?? 'LEAVES'}`)
+      : met ? `${name} - ${by[0] ?? 'THE TEAM'} ${CH[s.challenge!]?.met ?? 'MEETS IT'}` : `${name} - THE TEAM WAITS IT OUT`;
+    if (reached) walked = Math.max(walked, starts[j]);
+    return { kind: s.kind, challenge: s.challenge ?? null, baddie: s.baddie ?? null, at: s.at, covered: met, by, log, result: reached ? (met ? 'met' : 'unmet') : 'ahead', turns: reached ? 1 : 0, resolvedAt: reached ? Math.min(clock, (o.departAt ?? clock) + starts[j] + lens[j]) : null };
+  });
+  const stats = o.pairs.map((p) => { const d = dragons.find((q) => q.id === p.dragon); return d ? tripStats(d.element, d.stage, d.xp ?? 0, d.mood) : { puff: 40, power: 12, guard: 10, speed: 10 }; });
+  const { odds, returnAt: _returnAt, turnBack: _turnBack, ...rest } = o as OldTrip & { turnBack?: unknown };
+  const trip: Trip = { ...(rest as unknown as Trip), forecast: typeof odds === 'number' ? Math.max(0, Math.min(1, odds)) : 0, success: landed ? !!o.success : null, stops,
+    travel: L, walked, stats, puff: stats.map((s) => s.puff), xp: o.pairs.map(() => 0), auto: false, encounter: null, exit: o.exit ?? null };
+  return { ...m, trip };
 }
