@@ -1,9 +1,13 @@
 // The watchable scene (docs/BASE_DESIGN.md 6, 11): a team out on a mission, walking the road of its region and halting
 // at each stop for its encounter -- an obstacle worked at turn by turn (each pair's dragon's move its own anim, its
-// rider's special the rider's moment), or a fight with the region's big baddie at a hard road's end (it walks in
-// grumpy, stomps and grumbles through its turns, and leaves calmed, outwitted or driven off, worn out or not -- nobody
-// hurt, ever: BASE_DESIGN B8) -- and the result card once the team has walked the whole road. The team never turns
-// back: every trip walks its whole road, and only the result card, at the end, tells the outcome.
+// rider's special the rider's moment), or a fight: with a pack of the region's little enemies between the challenges,
+// or with its boss at the road's end. The enemies run in fierce; the riders step back behind their dragons, out of
+// the way; each dragon's breath is thrown, a bolt of its element from its mouth, and each enemy's attack is its
+// region's missile (fightfx.ts); a hit is a spark and a flash, never a wound (BASE_DESIGN B8). A pack worn out goes up
+// in puffs of smoke, one of it for each share of its puff, and one not worn out scampers off; a boss worn out sits
+// down seeing stars and runs off up the road, and one not worn out stomps off up it unbeaten. Then the result card, once
+// the team has walked the whole road. The team never turns back: every trip walks its whole road, and only the result
+// card, at the end, tells the outcome.
 // The scene is the trip's state (B5, amended): nothing here is stepped or saved; every quantity is a pure function of
 // the Trip (its walk, its stops' results, the encounter on) and the world's clock (`sceneAt`), so a frozen view (t=)
 // and a view opened half way along show the same road. The simulation never reads any of it.
@@ -16,7 +20,7 @@
 // riders walk beside their dragons (56 px ahead of the root, a step behind in depth) at V.
 import type { CareSim, Dragon, Keeper } from './sim.ts';
 import type { Trip } from './trip.ts';
-import type { BaddieFace, BaddiePose, BaddieId, StopState } from './missiondata.ts';
+import type { BaddieFace, BaddiePose, BaddieId, FoeId, FoePose, StopState } from './missiondata.ts';
 import type { Rect } from './icons.ts';
 import { gaitOf } from './gait.ts';
 import type { Gait } from './gait.ts';
@@ -26,7 +30,10 @@ import { FLOORS, INK, ROAD_SCENE } from './surfaces.ts';
 import { drawClimate } from './backdrops.ts';
 import { drawSetPiece } from './setpieces.ts';
 import { drawPassage, hasPassage, PASSAGE_FROM, PASSAGE_LEN } from './passages.ts';
-import { drawBaddie, exitLook, BADDIE_ART } from './baddies.ts';
+import { drawBaddie, BADDIE_ART } from './baddies.ts';
+import { drawFoe, FOE_ART } from './foes.ts';
+import { drawBolt, drawMissile, drawSpark, drawPoof, REGION_MISSILE, SPARK_LEN, POOF_LEN } from './fightfx.ts';
+import type { MissileKind } from './fightfx.ts';
 import { drawMiller } from './npcs.ts';
 import { SADDLE } from './missionicons.ts';
 import { regionOf } from './regions.ts';
@@ -41,13 +48,14 @@ import type { KeeperAgent } from '../care/keeper.ts';
 import { KEEPERS } from '../art/keeper/cast.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
+import type { Stage } from '../art/dragon/stages.ts';
 import { drawDragon, rootToScreen as dragonRootToScreen } from '../art/dragon/rig.ts';
 import { TopPass, AmbientBudget } from '../art/dragon/fx.ts';
 import { ELEMENT_ANIM_FALLBACK } from '../art/dragon/anims.ts';
 import { dfaceIndex } from '../art/dragon/pose.ts';
 import { drawText, drawTextOutlined, measureText } from '../lib/engine/text.ts';
-import { stopStart, stopName, pairLook, pickAnim, foeShow, FOE, FOE_ENTER, EXIT_STEPS } from './encounter.ts';
-import type { Encounter } from './encounter.ts';
+import { stopStart, stopName, pairLook, pickAnim, foeShow, packLeft, FOE, FOE_ENTER, FOE_THROW, EXIT_STEPS, BREATH_SNAP, FLASH_FRAMES } from './encounter.ts';
+import type { Encounter, EMove, Foe } from './encounter.ts';
 
 // ---------- the scene's shape ----------
 
@@ -55,10 +63,26 @@ import type { Encounter } from './encounter.ts';
 export const SCENE_RECT: Readonly<Rect> = Object.freeze({ x: 0, y: 16, w: 640, h: 344 });
 /** The team's feet on the road (screen y), and the road's straw-pale band (FLOORS.road). */
 export const ROAD_Y = 300, ROAD_TOP = 292, ROAD_BOTTOM = 306;
-/** Set pieces, the miller and the baddie stand a few px deeper than the team (drawn behind it). */
+/** Set pieces, the miller and the enemies stand a few px deeper than the team (drawn behind it). */
 export const BACK_Y = 296;
-/** Pair 1's dragon walks this far behind pair 0's; each rider this far ahead of their dragon's root; a stop's set piece this far ahead of the lead as the stop begins, a baddie further. */
-export const PAIR_BACK = 170, RIDER_AHEAD = 56, PIECE_AHEAD = 150, BADDIE_AHEAD = 200;
+/**
+ * Pair 1's dragon walks this far behind pair 0's; each rider this far ahead of their dragon's root (RIDER_FIGHT in a
+ * fight: stepped back behind it, out of the way); a stop's set piece this far ahead of the lead as the stop begins, a
+ * pack's front one FOE_AHEAD (the rest FOE_GAP apart behind it), a boss further.
+ */
+export const PAIR_BACK = 170, RIDER_AHEAD = 56, RIDER_FIGHT = -22, PIECE_AHEAD = 150, FOE_AHEAD = 118, FOE_GAP = 30, BADDIE_AHEAD = 200;
+/** A rider steps back (or forward again) in this many steps at most: their own walk's pace, or brisker. */
+export const RIDER_STEP_MAX = 100;
+/**
+ * A boss worn out sits down seeing stars for this share of its exit beat, then runs off up the road FLEE_PACE px a
+ * step; one not worn out stomps off up it STOMP_PACE px a step, and a pack not worn out scampers off SCAMPER_PACE (each
+ * quicker than the team walks: never back through it).
+ */
+export const DOWN_SHARE = 0.55, FLEE_PACE = 1.6, STOMP_PACE = 1, SCAMPER_PACE = 3;
+/** A bolt that goes wide, or a missile dodged, flies on past its mark this many steps. */
+export const PAST_STEPS = 12;
+/** A pack runs in over this many steps, each one ENTER_STAGGER after the one in front of it. */
+export const PACK_RUN = 96, ENTER_STAGGER = 14;
 /** A passage ends at least this far before where the lead halts for the next stop (a short road's stops stand close: the passage is cut to fit between them). */
 export const PASSAGE_CLEAR = 20;
 /** The camera keeps the team's middle this far from the screen's left edge. */
@@ -119,6 +143,48 @@ export function frameAt(g: Gait, tau: number): number {
   return g.frames.length - 1;
 }
 
+// ---------- a fight's places: where a dragon breathes from, where a hit lands ----------
+
+const MOUTH = new Map<string, readonly [number, number]>();
+/**
+ * A dragon's mouth at its breath's snap (the breath anim's step BREATH_SNAP, where its bolt leaves: encounter.ts), px
+ * from its root (facing up the road): the rig's own mouth joint, played to that step once and kept (a pure function of
+ * the look).
+ */
+export function mouthOf(el: DragonElement, stage: Stage, seed: number): readonly [number, number] {
+  const key = `${el}:${stage}:${seed}`;
+  let m = MOUTH.get(key);
+  if (!m) {
+    const p = makePet(el, stage, seed, 'breath', 0, 0, { desync: false }), o = { x: 0, y: 0 };
+    for (let f = 0; f < BREATH_SNAP; f++) stepPet(p);
+    dragonRootToScreen(p.rig, p.rig.j.mouth.x, p.rig.j.mouth.y, o);
+    m = Object.freeze([Math.round(o.x * 10) / 10, Math.round(o.y * 10) / 10] as const);
+    MOUTH.set(key, m);
+  }
+  return m;
+}
+/** Where an enemy's missile lands on a dragon standing at x: over its shoulders, from its mouth's place. */
+const bodyAt = (x: number, mouth: readonly [number, number]): [number, number] => [x + mouth[0] * 0.15, ROAD_Y + mouth[1] * 0.7];
+/** A thrown thing's arc, by the distance it flies: a bolt's flatter than a missile's. */
+const boltArc = (dist: number) => 12 + dist * 0.12, missileArc = (dist: number) => 24 + dist * 0.16;
+/**
+ * A thrown thing at step t of its move: launched at t0 from (x0, y0), landing at t1 on (x1, y1) over an arc `arc` px
+ * high (past t1 it flies on the same way: one that goes wide, or is dodged); where it is, and its step's way (the
+ * sprite's facing and its trail).
+ */
+function flight(x0: number, y0: number, x1: number, y1: number, arc: number, t0: number, t1: number, t: number): { x: number; y: number; dx: number; dy: number } {
+  const span = Math.max(1, t1 - t0), at = (u: number) => ({ x: x0 + (x1 - x0) * u, y: y0 + (y1 - y0) * u - arc * 4 * u * (1 - u) });
+  const u = (t - t0) / span, p = at(u), p2 = at(u + 1 / span);
+  return { x: Math.round(p.x), y: Math.round(p.y), dx: p2.x - p.x, dy: p2.y - p.y };
+}
+/** An enemy's point, facing the team (its art's own, measured facing up the road): where a hit lands on it, or where it throws from. */
+function enemyPoint(id: BaddieId | FoeId, pack: boolean, x: number, which: 'hitAt' | 'throwAt'): [number, number] {
+  const a = pack ? FOE_ART[id as FoeId][which] : BADDIE_ART[id as BaddieId][which];
+  return [x - a[0], BACK_Y + a[1]];
+}
+/** A rider's step back behind their dragon for a fight (and forward again after it), in steps: at their walk's own pace, RIDER_STEP_MAX at most. */
+const riderStep = (k: Keeper | null) => Math.min(RIDER_STEP_MAX, Math.round((RIDER_AHEAD - RIDER_FIGHT) / (k ? KEEPERS[k.look].speed : 1)));
+
 // ---------- the scene as a pure function ----------
 
 /** What one of the team does at a moment of the scene: its anim, since which clock, and how fast; a walk's start phase. */
@@ -128,27 +194,40 @@ export interface Piece { stop: number; x: number; state: StopState }
 /** The passage a land stop opens onto (passages.ts): the stretch of road from `x0` to `x1` walked through after the stop, drawn as the stop went. */
 export interface Passage { stop: number; x0: number; x1: number; state: StopState }
 /**
- * The baddie on the road: where, which way it faces, its face and pose, its marks (the calmed one's "z"s, the driven-off
- * one's dust: the art kit's drawBaddie draws them for a sleepy sit and a leave, baddies.ts), and its beat's time. The
- * outwitted one wanders off at a walk (the kit's exitLook: a plain walk, neutral; 'leave' is the driven-off shuffle,
- * with its dust and grumble cloud).
+ * The boss on the road: where, which way it faces, its face and pose (the art kit draws a sit-down's stars and a run's
+ * dust from them: baddies.ts drawBaddie), whether a hit is flashing on it, and its step (its bob and stride).
  */
-export interface BaddieAt { id: BaddieId; x: number; face: BaddieFace; pose: BaddiePose; facing: 1 | -1; fx: 'z' | 'dust' | null; t: number }
+export interface BaddieAt { id: BaddieId; x: number; face: BaddieFace; pose: BaddiePose; facing: 1 | -1; flash: boolean; t: number }
+/** One of a pack of little enemies on the road, likewise (foes.ts drawFoe). */
+export interface FoeAt { id: FoeId; x: number; face: BaddieFace; pose: FoePose; facing: 1 | -1; flash: boolean; t: number }
+/** Something in flight: a dragon's breath bolt (its element) or an enemy's missile (its region's kind, a boss's big), where it is and which way it moves. */
+export interface ShotAt { el: DragonElement | null; missile: MissileKind | null; big: boolean; x: number; y: number; dx: number; dy: number }
+/** A mark where a hit landed (a spark) or one of a pack was worn out (a puff of smoke), and its age. */
+export interface MarkAt { kind: 'spark' | 'poof'; x: number; y: number; age: number }
+/** Each rider's place from its dragon's root (px along the road), and which way they face. */
+export interface RiderAt { dx: number; facing: 1 | -1 }
 
 /**
  * The scene at a moment (`SceneFrame`: BASE_DESIGN 6's scene, plus what the view needs to draw it): the walk so far
  * (`n`, of `travel`), the stop the team stands at (`stop`: its encounter on, else null), the last stop reached (its
  * banner stays up until the next); xs each pair's dragon's road x (the team walks up the road, east, all the way: it
- * never turns back), `speeds` each one's walk speed; `camX` the road x at the screen's left edge. Nothing in it tells
- * the trip's outcome before the road's end: that is the result card's, once `done`.
+ * never turns back), `speeds` each one's walk speed, `riders` each rider's place by it; `camX` the road x at the
+ * screen's left edge. A fight's: the boss, the pack (front one first), what is in flight, the marks of the hits, and
+ * which dragons a hit is flashing on. Nothing in it tells the trip's outcome before the road's end: that is the result
+ * card's, once `done`.
  */
 export interface SceneFrame {
   n: number; travel: number;
   stop: number | null; last: number | null;
   xs: number[]; speeds: number[];
+  riders: RiderAt[];
   camX: number;
   banner: string | null; bannerOk: boolean;
   baddie: BaddieAt | null;
+  foes: FoeAt[];
+  shots: ShotAt[];
+  marks: MarkAt[];
+  flash: boolean[];
   pieces: Piece[];
   /** The passages the land stops open onto, and the one the lead's dragon is walking through now (its stop), or null. */
   passages: Passage[];
@@ -157,12 +236,10 @@ export interface SceneFrame {
   done: boolean;
 }
 
-// (the scene's type guards, BASE_DESIGN B8: a baddie on the road has no hurt, health or defeat, and its face is one of
-// the four; the art kit's own guards over its Baddie record -- no hurt, health or defeat field, and the three cozy
-// exits alone -- are baddies.ts's _NoHurt and _Exits)
+// (the scene's type guard, BASE_DESIGN B8: an enemy on the road has no health, wound or defeat -- only puff to wear down,
+// on the encounter's own plate; the art kit's own guard over its Baddie record is baddies.ts's)
 type Assert<T extends true> = T;
-export type _NoHurt = Assert<Extract<keyof BaddieAt | keyof SceneFrame, 'hurt' | 'hp' | 'health' | 'defeated' | 'damage'> extends never ? true : false>;
-export type _Faces = Assert<[BaddieFace] extends ['neutral' | 'grumpy' | 'surprised' | 'sleepy'] ? true : false>;
+export type _NoHurt = Assert<Extract<keyof BaddieAt | keyof FoeAt | keyof SceneFrame, 'hurt' | 'hp' | 'health' | 'defeated' | 'damage'> extends never ? true : false>;
 
 /** Each rider's special on the road (BASE_DESIGN 6, 11): CHARM waves, MEDIC kneels to pet, NAVIGATOR hushes, NIMBLE cheers. */
 export const RIDER_MOMENT: Readonly<Record<KeeperId, string>> = Object.freeze({ bea: 'wave', tomas: 'petLow', iris: 'shh', pip: 'cheer' });
@@ -229,7 +306,7 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
     // (the passage runs PASSAGE_LEN from just past the piece, but ends before the lead halts for the next stop)
     if (hasPassage(stops[j].challenge!)) { const x0 = x + PASSAGE_FROM, end = j + 1 < stops.length ? leadAt(j + 1) - PASSAGE_CLEAR : Infinity; passages.push({ stop: j, x0, x1: Math.max(x0 + 1, Math.min(x0 + PASSAGE_LEN, end)), state }); }
   }
-  const passage = passages.find((p) => xs.length && xs[0] >= p.x0 && xs[0] < p.x1)?.stop ?? null;
+  const passage = !stop ? passages.find((p) => xs.length && xs[0] >= p.x0 && xs[0] < p.x1)?.stop ?? null : null;
 
   // the banner: the stop the team stands at -- its name as it is met (a fight's with a "!"), then the encounter's latest
   // line -- or the last stop's line (how it went, with a check when it was cleared), up until the next stop
@@ -240,36 +317,101 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
     else { banner = enc.log[enc.log.length - 1] ?? stopName(s); bannerOk = enc.state === 'done' && s.result === 'met'; }
   } else if (last != null) { banner = stops[last].log || stopName(stops[last]); bannerOk = stops[last].result === 'met'; }
 
-  // the baddie: in from the right as the fight begins, standing through its turns (stomping through its own move,
-  // surprised as one lands on it), then its exit (worn out or waited out, it always leaves: the team walks on)
+  // the boss: in from the right as its fight begins, fierce through its turns (its lunge as it throws, rocked back and
+  // flashing as a hit lands: encounter.ts foeShow), then its exit, timed from the stop's resolution -- worn out, it sits
+  // down seeing stars and then runs off up the road; not worn out, it stomps off up it unbeaten -- ahead of the team
+  // (never back through it) until it is well off the screen
   let baddie: BaddieAt | null = null;
-  const kb = stops.findIndex((s) => s.kind === 'baddie');
+  const kb = stops.findIndex((s) => s.kind === 'baddie'), bossX = kb >= 0 ? leadAt(kb) + BADDIE_AHEAD : 0;
   if (kb >= 0 && reached(kb)) {
-    const id = stops[kb].baddie!, x0 = leadAt(kb) + BADDIE_AHEAD, exit = trip.exit!;
-    const e = enc && enc.stop === kb ? enc : null;
+    const id = stops[kb].baddie!, x0 = bossX, e = enc && enc.stop === kb ? enc : null;
     if (e && e.state === 'meet') {
       const walkIn = Math.round(0.7 * FOE_ENTER), from = x0 + 190, bt = e.t;
-      baddie = { id, x: bt < walkIn ? from + (x0 - from) * (bt / walkIn) : x0, face: 'grumpy', pose: bt < walkIn ? 'walk' : 'stand', facing: -1, fx: null, t: bt };
+      baddie = { id, x: bt < walkIn ? from + (x0 - from) * (bt / walkIn) : x0, face: 'fierce', pose: bt < walkIn ? 'walk' : 'stand', facing: -1, flash: false, t: bt };
     } else if (e && e.state !== 'done') {
       const show = foeShow(e);
-      baddie = { id, x: x0, face: show.face, pose: show.pose, facing: -1, fx: null, t: e.t };
+      baddie = { id, x: x0, face: show.face, pose: show.pose, facing: -1, flash: show.flash, t: e.t };
     } else {
-      // (its exit is the art kit's own, played through EXIT_STEPS from the moment the stop was resolved -- exitLook: the
-      // pose, face and facing, and how far it has gone; calmed sits and dozes where it stood, outwitted turns and then
-      // walks off up the road, ahead of the team, driven off shuffles off up it -- and one that leaves goes on at its
-      // exit's last pace once the beat is over, until it is off the screen: never back through the team)
-      const et = Math.max(0, clock - (stops[kb].resolvedAt ?? clock));
-      const look = exitLook(exit, et / EXIT_STEPS), end = exitLook(exit, 1), half = exitLook(exit, 0.5);
-      const pace = (end.dx - half.dx) / (0.5 * EXIT_STEPS), on = Math.max(0, et - EXIT_STEPS) * pace;
-      const fx = look.pose === 'leave' ? 'dust' : look.pose === 'sit' && look.face === 'sleepy' ? 'z' : null;
-      baddie = { id, x: x0 + look.dx + on, face: look.face, pose: look.pose, facing: look.facing, fx, t: et };
+      const et = Math.max(0, clock - (stops[kb].resolvedAt ?? clock)), down = Math.round(DOWN_SHARE * EXIT_STEPS);
+      if (stops[kb].result !== 'met') baddie = { id, x: x0 + et * STOMP_PACE, face: 'fierce', pose: 'walk', facing: 1, flash: false, t: et };
+      else if (et < down) baddie = { id, x: x0, face: 'dazed', pose: 'down', facing: -1, flash: false, t: et };
+      else baddie = { id, x: x0 + (et - down) * FLEE_PACE, face: 'hurt', pose: 'flee', facing: 1, flash: false, t: et };
     }
-    // (gone once it is well off the screen: walked off, or left behind)
     if (baddie && Math.abs(baddie.x - (camX + 320)) > 520) baddie = null;
   }
 
+  // the pack at the stop the team stands at: in from the right as its fight begins (the front one first), fierce through
+  // its turns -- lunging together as they throw, the front one rocked back and flashing as a hit lands on it (the
+  // dragons aim at the nearest) -- one of it gone in a puff of smoke for every share of its puff worn down (encounter.ts
+  // packLeft), and the rest, if the team sits down for a breather first, scampering off up the road
+  const foes: FoeAt[] = [], shots: ShotAt[] = [], marks: MarkAt[] = [], flash = team.ds.map(() => false);
+  const fight = enc && enc.kind === 'fight' && enc.foe ? enc : null, f0 = fight?.foe ?? null;
+  const pack = !!fight && stops[fight.stop].kind === 'foes', packX = (e: number) => leadAt(fight!.stop) + FOE_AHEAD + e * FOE_GAP;
+  const mv: EMove | null = fight && fight.state === 'play' ? fight.moves[fight.cur] ?? null : null;
+  // (how many of the pack stood before the move playing landed: more than now, if it sent some up in smoke)
+  const left = f0 ? packLeft(f0) : 0, before = f0 && mv && mv.by !== FOE && mv.landed && mv.loss > 0 ? packLeft({ ...f0, puff: f0.puff + mv.loss } as Foe) : left;
+  if (fight && pack && f0) {
+    const id = stops[fight.stop].foe!, show = foeShow(fight), n = f0.pack;
+    for (let e = n - left; e < n; e++) {
+      const spot = packX(e), t = fight.t + e * 7;
+      if (fight.state === 'meet') {
+        const run = fight.t - e * ENTER_STAGGER, x = run < PACK_RUN ? spot + 300 * (1 - Math.max(0, run) / PACK_RUN) : spot;
+        foes.push({ id, x: Math.round(x * 100) / 100, face: 'fierce', pose: run < PACK_RUN ? 'walk' : 'stand', facing: -1, flash: false, t });
+      } else if (fight.state === 'done') foes.push({ id, x: spot + fight.t * SCAMPER_PACE, face: 'fierce', pose: 'walk', facing: 1, flash: false, t });
+      else {
+        // (a hit is the front one's -- none's if it went up in smoke; a lunge, a stomp, a daze the whole pack's)
+        const mine = show.pose !== 'hit' || (e === n - left && before === left);
+        foes.push({ id, x: spot, face: mine ? show.face : 'fierce', pose: mine ? show.pose : 'stand', facing: -1, flash: mine && show.flash, t });
+      }
+    }
+    // the puffs of smoke: the ones the move playing wore out -- or, the pack worn out, the last move's, into the stop's beat
+    const last = fight.state === 'done' && fight.outcome === 'cleared' ? fight.moves[fight.moves.length - 1] ?? null : null;
+    const poof = last ?? mv, was = last ? packLeft({ ...f0, puff: last.loss } as Foe) : before, now = last ? 0 : left;
+    if (poof && poof.landed) {
+      const age = poof.t - poof.at + (last ? fight.t : 0);
+      if (age < POOF_LEN) for (let e = n - was; e < n - now; e++) { const [x, y] = enemyPoint(id, true, packX(e), 'hitAt'); marks.push({ kind: 'poof', x: Math.round(x), y: Math.round(y), age }); }
+    }
+  }
+
+  // what is in flight in a fight's move: a breath's bolt, from its dragon's mouth at its snap to the enemy (a pack's
+  // front one), landing at the move's impact; an enemy's attack, its region's missile from each thrower's hand (a boss's
+  // big one; a pack's one each, a few steps apart), landing on the dragon it is at -- a spark where either hits (and a
+  // flash on a dragon), and one that goes wide or is dodged flying on past
+  if (fight && f0 && mv) {
+    const id = pack ? stops[fight.stop].foe! : stops[fight.stop].baddie!, at = (e: number, which: 'hitAt' | 'throwAt') => enemyPoint(id, pack, pack ? packX(e) : bossX, which);
+    const past = mv.landed && !mv.hit && mv.t < mv.at + PAST_STEPS, age = mv.t - mv.at;
+    if (mv.by !== FOE && (mv.ability === 'breath' || mv.ability === 'big') && team.ds[mv.by]) {
+      const d = team.ds[mv.by], mouth = mouthOf(d.element, d.stage, d.seed), [x0, y0] = [xs[mv.by] + mouth[0], ROAD_Y + mouth[1]];
+      const [x1, y1] = at(pack ? f0.pack - before : 0, 'hitAt');
+      if (mv.t >= BREATH_SNAP && (mv.t < mv.at || past)) shots.push({ el: d.element, missile: null, big: mv.ability === 'big', ...flight(x0, y0, x1, y1, boltArc(Math.abs(x1 - x0)), BREATH_SNAP, mv.at, mv.t) });
+      else if (mv.landed && mv.hit && age < SPARK_LEN) marks.push({ kind: 'spark', x: Math.round(x1), y: Math.round(y1), age });
+    }
+    if (mv.by === FOE && mv.foeMove === 'attack' && team.ds[mv.target]) {
+      const i = mv.target, d = team.ds[i], [x1, y1] = bodyAt(xs[i], mouthOf(d.element, d.stage, d.seed)), kind = REGION_MISSILE[trip.mission.region];
+      const throwers = pack ? Array.from({ length: left }, (_, k) => f0.pack - left + k) : [0];
+      throwers.forEach((e, k) => {
+        const [x0, y0] = at(e, 'throwAt'), t0 = FOE_THROW + 3 * k;
+        if (mv.t >= t0 && (mv.t < mv.at || past)) shots.push({ el: null, missile: kind, big: !pack, ...flight(x0, y0, x1, y1, missileArc(Math.abs(x1 - x0)), t0, mv.at, mv.t) });
+      });
+      if (mv.landed && mv.hit) {
+        if (age < SPARK_LEN) marks.push({ kind: 'spark', x: Math.round(x1), y: Math.round(y1), age });
+        if (age < FLASH_FRAMES) flash[i] = true;
+      }
+    }
+  }
+
+  // each rider's place: beside its dragon's head, stepping back behind it as a fight begins and forward again as it ends
+  const riders: RiderAt[] = team.ds.map((_, i) => {
+    if (!fight || (fight.state !== 'meet' && fight.state !== 'done')) return { dx: fight ? RIDER_FIGHT : RIDER_AHEAD, facing: 1 };
+    const u = Math.min(1, fight.t / riderStep(team.ks[i]));
+    return fight.state === 'meet'
+      ? { dx: Math.round((RIDER_AHEAD + (RIDER_FIGHT - RIDER_AHEAD) * u) * 100) / 100, facing: u < 1 ? -1 : 1 }
+      : { dx: Math.round((RIDER_FIGHT + (RIDER_AHEAD - RIDER_FIGHT) * u) * 100) / 100, facing: 1 };
+  });
+
   // what each of the team does: walk between stops; at a stop stand, each pair playing its move as it comes (the
-  // dragon's skill, the REST's sit, or the rider's special); home, stand
+  // dragon's skill, the REST's sit, or the rider's special), and in a fight each rider walking back behind their dragon
+  // and forward again; home, stand
   const done = roadDone(trip);
   const m = enc && enc.state === 'play' ? enc.moves[enc.cur] ?? null : null;
   const acts = team.ds.map((d, i) => {
@@ -286,6 +428,10 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
     if (enc) {
       const at = `s${enc.stop}`;
       let dragon: Act = stand(at), rider: Act | null = k ? stand(at) : null, face: 'surprised' | 'happy' | null = null;
+      if (k && fight && (fight.state === 'meet' || fight.state === 'done')) {
+        const step = riderStep(k), pace = (RIDER_AHEAD - RIDER_FIGHT) / step / KEEPERS[k.look].speed;
+        if (fight.t < step) rider = { key: `${fight.state === 'meet' ? 'r' : 'f'}${enc.stop}`, anim: 'walk', start: clock - fight.t, speed: pace, phase: 0 };
+      }
       if (m && m.by === i && m.t < m.len && m.ability !== 'sit') {
         const key = `m${enc.stop}-${enc.turn}-${m.n}`;
         if (m.ability === 'rider') { if (k) rider = { key, anim: RIDER_MOMENT[k.look], start: clock - m.t, speed: 1, phase: 0 }; }
@@ -298,10 +444,10 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
     return { dragon: walkAct('d'), rider: k ? walkAct('k') : null, face: null };
   });
 
-  return { n, travel, stop, last, xs, speeds: team.speeds, camX, banner, bannerOk, baddie, pieces, passages, passage, acts, done };
+  return { n, travel, stop, last, xs, speeds: team.speeds, riders, camX, banner, bannerOk, baddie, foes, shots, marks, flash, pieces, passages, passage, acts, done };
 }
 
-/** Whether the baddie's own move is playing now (its stomp): the view's popup timing reads the encounter itself. */
+/** Whether the enemy's own move is playing now (its throw, its stomp): the view's popup timing reads the encounter itself. */
 export function foeMoving(enc: Encounter | null): boolean {
   if (!enc || enc.state !== 'play') return false;
   const m = enc.moves[enc.cur];
@@ -321,7 +467,9 @@ interface Actor { pet: Pet | null; agent: KeeperAgent | null; key: string | null
  * else replayed from its start (a move's worth at most: a frozen view shows the same moment a live one did) -- and one
  * they were playing steps on by the clock's advance (SYNC_GAP steps at most; a bigger jump, or a rewind, restarts a
  * walk at the road's phase, and steps anything else on by 120 at most). A face a move left on a dragon (surprised at
- * the baddie's cost, a grin at a dodge) goes over its pose.
+ * the enemy's cost, a grin at a dodge) goes over its pose, and a hit landing on it flashes it (its fills flat and pale
+ * inside its ink: the grow-up's flash, ART_BIBLE 4.2). The riders stand where the frame puts them (stepped back behind
+ * their dragons in a fight), facing the way it says.
  */
 export class ScenePets {
   readonly trip: Trip;
@@ -329,6 +477,7 @@ export class ScenePets {
   private readonly top = new TopPass(96);
   private readonly budget = new AmbientBudget();
   private frame = 0;
+  private flash: boolean[] = [];
 
   constructor(sim: CareSim, trip: Trip) {
     this.trip = trip;
@@ -344,17 +493,18 @@ export class ScenePets {
 
   /** Catch the team up to the frame at `clock`. */
   sync(f: SceneFrame, clock: number): void {
+    this.flash = f.flash;
     this.actors.forEach((a, i) => {
       const act = f.acts[i];
       if (!act) return;
-      const x = f.xs[i];
-      this.play(a.d, act.dragon, clock, x, ROAD_Y);
-      if (a.k && act.rider) this.play(a.k, act.rider, clock, x + RIDER_AHEAD, ROAD_Y - 3);
+      const x = f.xs[i], r = f.riders[i] ?? { dx: RIDER_AHEAD, facing: 1 };
+      this.play(a.d, act.dragon, clock, x, ROAD_Y, 1);
+      if (a.k && act.rider) this.play(a.k, act.rider, clock, x + r.dx, ROAD_Y - 3, r.facing);
       if (act.face && a.d.pet) a.d.pet.player.pose.face = dfaceIndex(act.face);
     });
   }
 
-  private play(a: Actor, act: Act, clock: number, x: number, y: number): void {
+  private play(a: Actor, act: Act, clock: number, x: number, y: number, facing: 1 | -1): void {
     let ticks: number;
     // (a clock that jumped -- a view closed and reopened, a fast speed's draws, a rewind -- plays the act afresh: a
     // walk at the phase the road says, so its paws never fall out of step with its body; see sim-check 24)
@@ -371,24 +521,24 @@ export class ScenePets {
       ticks = a.pet && act.anim === 'walk' ? 0 : Math.max(0, Math.min(act.anim === 'walk' ? 120 : 960, Math.round(clock - act.start)));
     } else ticks = Math.max(0, Math.min(gap > SYNC_GAP ? 120 : SYNC_GAP, gap));
     a.clock = clock;
-    for (let t = 0; t < ticks; t++) this.tick(a, act, x, y);
-    // (placed where the frame says even when nothing ticked; facing up the road, as the team always does)
-    if (a.pet) { a.pet.x = x; a.pet.y = y; a.pet.facing = 1; }
-    else if (a.agent) { a.agent.x = x; a.agent.y = y; a.agent.facing = 1; }
+    for (let t = 0; t < ticks; t++) this.tick(a, act, x, y, facing);
+    // (placed where the frame says even when nothing ticked; the dragons facing up the road, as the team always does)
+    if (a.pet) { a.pet.x = x; a.pet.y = y; a.pet.facing = facing; }
+    else if (a.agent) { a.agent.x = x; a.agent.y = y; a.agent.facing = facing; }
   }
 
-  private tick(a: Actor, act: Act, x: number, y: number): void {
+  private tick(a: Actor, act: Act, x: number, y: number, facing: 1 | -1): void {
     a.age++;
     const moment = act.anim !== 'walk' && act.anim !== 'idle';
     if (a.pet) {
       const p = a.pet;
       if (moment && !a.momentDone && (p.player.done || a.age >= MOMENT_MAX)) { p.player.play('idle', { blend: 8 }); p.anim = 'idle'; a.momentDone = true; }
-      p.x = x; p.y = y; p.facing = 1;
+      p.x = x; p.y = y; p.facing = facing;
       stepPet(p);
     } else {
       const k = a.agent!;
       if (moment && !a.momentDone && (k.player.done || a.age >= MOMENT_MAX)) { k.player.play('idle', { blend: 8 }); a.momentDone = true; }
-      k.x = x; k.y = y; k.facing = 1; k.pinX = true;
+      k.x = x; k.y = y; k.facing = facing; k.pinX = true;
       stepKeeperAgent(k);
     }
   }
@@ -402,18 +552,22 @@ export class ScenePets {
     return this.actors.map((a) => { const p = a.d.pet!; dragonRootToScreen(p.rig, p.rig.j.cran.x, p.rig.j.top, pt); return { x: pt.x, y: pt.y }; });
   }
 
-  /** Draw the team (already synced): the riders a step behind their dragons, each with its saddle in the near hand (the art kit's SADDLE, as a rider carries it in the barn's muster), then the dragons, then the top pass. */
+  /**
+   * Draw the team (already synced): the riders a step behind their dragons, each with its saddle in the near hand (the
+   * art kit's SADDLE, as a rider carries it in the barn's muster), then the dragons -- one a hit has just landed on
+   * drawn flat in its glow's highlight inside its own ink -- then the top pass.
+   */
   draw(ctx: CanvasRenderingContext2D): void {
-    const cast: { y: number; pet?: Pet; agent?: KeeperAgent }[] = [];
-    for (const a of this.actors) {
+    const cast: { y: number; pet?: Pet; agent?: KeeperAgent; flat?: boolean }[] = [];
+    this.actors.forEach((a, i) => {
       if (a.k?.agent) cast.push({ y: a.k.agent.y, agent: a.k.agent });
-      if (a.d.pet) cast.push({ y: a.d.pet.y, pet: a.d.pet });
-    }
+      if (a.d.pet) cast.push({ y: a.d.pet.y, pet: a.d.pet, flat: !!this.flash[i] });
+    });
     cast.sort((p, q) => p.y - q.y);
     this.budget.begin(cast.filter((c) => c.pet).length, this.frame++);
     let slot = 0;
     for (const c of cast) {
-      if (c.pet) drawDragon(ctx, c.pet.rig, c.pet.player.pose, petOpts(c.pet, { still: true, top: this.top, budget: this.budget, slot: slot++ }));
+      if (c.pet) drawDragon(ctx, c.pet.rig, c.pet.player.pose, petOpts(c.pet, { still: true, top: this.top, budget: this.budget, slot: slot++, flat: c.flat }));
       else if (c.agent) {
         drawKeeperAgent(ctx, c.agent);
         keeperJoint(c.agent.rig, 'handN', HAND);
@@ -439,10 +593,11 @@ function drawRoad(ctx: CanvasRenderingContext2D, green: boolean): void {
   ctx.fillStyle = ROAD_SCENE.earth; ctx.fillRect(0, y, R.w, bottom - y);
 }
 
-/** Where the baddie's head is on screen (its drawing's top, over its feet at BACK_Y), for the encounter's popups; null when none is in view. */
+/** Where the enemy's head is on screen (its drawing's top, over its feet at BACK_Y: the boss's, or a pack's front one's), for the encounter's popups; null when none is in view. */
 export function baddieHead(f: SceneFrame): { x: number; y: number } | null {
-  if (!f.baddie) return null;
-  return { x: Math.round(f.baddie.x - f.camX), y: BACK_Y - BADDIE_ART[f.baddie.id].h };
+  if (f.baddie) return { x: Math.round(f.baddie.x - f.camX), y: BACK_Y - BADDIE_ART[f.baddie.id].h };
+  const q = f.foes[0];
+  return q ? { x: Math.round(q.x - f.camX), y: BACK_Y - FOE_ART[q.id].h } : null;
 }
 /** Where a stop's set piece stands on screen (its middle at the road), for the encounter's work popups; null when it is not in view. */
 export function pieceAt(f: SceneFrame, stop: number): { x: number; y: number } | null {
@@ -455,8 +610,8 @@ export function pieceAt(f: SceneFrame, stop: number): { x: number; y: number } |
 /**
  * The scene (BASE_DESIGN 6), inside SCENE_RECT: the region's climate (parallax: backdrops.ts drawClimate), the road, the
  * passages the land stops open onto (passages.ts: the cave after the dark, the canyon after the gap..., each behind the
- * team), the set pieces the road has reached (each behind the team: the fog bank too), the miller at his mill, the
- * baddie, the team, then the banner. Syncs `cast` to the frame first.
+ * team), the set pieces the road has reached (each behind the team: the fog bank too), the miller at his mill, the boss
+ * and pack (behind the team too), the team, its fight effects, then the banner. Syncs `cast` to the frame first.
  */
 export function drawMissionScene(ctx: CanvasRenderingContext2D, sim: CareSim, trip: Trip, cast: ScenePets, f: SceneFrame = sceneAt(sim, trip)): void {
   const R = SCENE_RECT, cam = Math.round(f.camX), climate = regionOf(trip.mission.region).climate;
@@ -478,13 +633,18 @@ export function drawMissionScene(ctx: CanvasRenderingContext2D, sim: CareSim, tr
     if (s.challenge === 'miller') drawMiller(ctx, p.state === 'met' ? 'talkedRound' : 'grumpy', p.x + 34, BACK_Y, -1, sim.clock);
   }
   const bd = f.baddie;
-  if (bd) {
-    // (its marks -- the calmed one's "z"s stepping up over its head, the driven-off one's dust at its heels and its
-    // grumble cloud, the outwitted one's "!" as it turns -- are the art kit's, drawn by drawBaddie from the pose and
-    // face: bd.fx says which the frame shows)
-    drawBaddie(ctx, bd.id, bd.x, BACK_Y, bd.facing, bd.face, bd.pose, bd.t);
-  }
+  // (its marks -- a sit-down's stars circling its head, a run's dust at its heels -- are the art kit's, drawn by
+  // drawBaddie from the pose)
+  if (bd) drawBaddie(ctx, bd.id, bd.x, BACK_Y, bd.facing, bd.face, bd.pose, bd.t, bd.flash);
+  // (the pack drawn back to front, the front one last)
+  for (let i = f.foes.length - 1; i >= 0; i--) { const q = f.foes[i]; if (seen(q.x, 20)) drawFoe(ctx, q.id, q.x, BACK_Y, q.facing, q.face, q.pose, q.t, q.flash); }
   cast.draw(ctx);
+  for (const m of f.marks) if (m.kind === 'poof') drawPoof(ctx, m.x, m.y, m.age);
+  for (const s of f.shots) {
+    if (s.el) drawBolt(ctx, s.el, s.x, s.y, s.dx, s.dy);
+    else if (s.missile) drawMissile(ctx, s.missile, s.big, s.x, s.y, s.dx, s.dy);
+  }
+  for (const m of f.marks) if (m.kind === 'spark') drawSpark(ctx, m.x, m.y, m.age);
   ctx.restore();
   if (f.banner) {
     // (on an ink strip, as the barn's hint and action line are: the weather's marks never show between its letters)

@@ -1,27 +1,28 @@
 // The Map Room's table (docs/BASE_DESIGN.md 5): the two overlays a mission is chosen and sent from -- the
 // world map (worldmap.ts's little pixel-art world: the regions explored and the cloud over the rest, the roads, HOME,
 // every place's landmark; over it here, each explored region's name, a pin and a name plate for each mission on the
-// board at its place -- the road's challenges and its days on the plate -- and, while a team is out, its road from HOME
-// and its flag walking it) and the mission chooser (the region's climate picture, the mission's rewards, its challenges with
-// what meets them and who at home could, the big baddie, the team's pairs and riders, the eligible dragons, the trail coach's forecast,
+// board at its place -- the road's challenges, its boss's crown and its days on the plate -- and, while a team is out,
+// its road from HOME and its flag walking it) and the mission chooser (the region's climate picture, the mission's
+// rewards, its challenges with what meets them and who at home could, its boss and its fights with the region's little
+// enemies, the team's pairs and riders, the eligible dragons, the trail coach's forecast,
 // BEST TEAM and SEND FROM THE AERIE) -- and, while a team is out, its TEAM OUT chip under the top bar (lit while the game
 // follows the team: BASE_DESIGN 6), the follow line (where the team is, while the game follows it: over the barn as it
 // gathers on the Aerie, over the watchable scene of its road, missionview.ts) and the trip's log, opened over the scene
-// by its TRIP LOG button (each stop met, unmet or still ahead, the log so far, the time left). Drawing and hit rects
+// by its TRIP LOG button (the road's fights, each stop met, unmet or still ahead, the log so far, the time left). Drawing and hit rects
 // only, at the view's 640 x 360: base.ts owns what a tap does (tableTap, watchTap), and
 // missions.ts every rule. House style: 1 px ink outlines, flat fills, the engine's 5 x 7 font (it has no tick, cross or
 // arrow glyphs: those are small inked sprites), no alpha anywhere -- the regions not explored yet lie under cloud, never
-// faded. The mission art (the climate picture, the challenge and skill icons, the baddie's portrait) is the mission art
-// kit's (ART_BIBLE 5.10: backdrops.ts, baddies.ts, missionicons.ts).
+// faded. The mission art (the climate picture, the challenge, skill and fight icons, the boss's portrait) is the mission
+// art kit's (ART_BIBLE 5.10: backdrops.ts, baddies.ts, missionicons.ts).
 import { drawText, drawTextOutlined, measureText } from '../lib/engine/text.ts';
 import { drawSprite, ICONS, hit } from './icons.ts';
 import type { Rect, Sprite } from './icons.ts';
 import { drawClimate } from './backdrops.ts';
 import { drawBaddiePortrait } from './baddies.ts';
-import { CHALLENGE_ICONS, SKILL_ICONS } from './missionicons.ts';
+import { CHALLENGE_ICONS, SKILL_ICONS, FIGHT_ICON } from './missionicons.ts';
 import { barnRoom } from './life.ts';
 import { INK } from './surfaces.ts';
-import { REGIONS, CHALLENGES, BADDIES, KEEPER_SKILL, SKILL_NAME, regionOf, placeOf } from './regions.ts';
+import { REGIONS, CHALLENGES, BADDIES, FOES, KEEPER_SKILL, SKILL_NAME, regionOf, placeOf } from './regions.ts';
 import type { Counter, Place } from './regions.ts';
 import { MAP_RECT, PLACES, worldCanvas, drawAlive, drawLandmark, footprint, homeRect, regionAt, routeTo, alongRoute, regionBox } from './worldmap.ts';
 import { roadFraction } from './missionview.ts';
@@ -88,7 +89,7 @@ const GRID = { x: 324, y: 142, w: 96, h: 18, dx: 102, dy: 21, cols: 3, rows: 5 }
  * plate at the start camera (the upper floor's plates sit just under the bar there, and the dorm's starts at screen x
  * 513); at x 394 it sits over the lift shaft's and the ladder bay's tops, where no plate or window is, still clear of the
  * buttons over it and of the canvas point (350, 200) where the smoke test's drag starts. And over the watch overlay, the
- * trip's log (its stops and the time left: under the scene's banner line, clear of the team's heads and the baddie's)
+ * trip's log (its stops and the time left: under the scene's banner line, clear of the team's heads and the enemies')
  * and its TRIP LOG button at the bottom left, where the scene has no way back to the barn (BASE_DESIGN 6: the game
  * follows the team).
  */
@@ -168,14 +169,14 @@ const COMPASS: Sprite = {
   rows: ['....r....', '....r....', '...rRr...', '.c.rRr.c.', 'wwwwkWWWW', '.c.wWw.c.', '...wWw...', '....w....', '....w....'],
   colors: { r: '#d8402e', R: '#a83028', w: '#f3e6c8', W: '#c8b890', c: '#8a6a4a', k: INK },
 };
-/** The small crown a baddie's road shows on its plate (the trip log's too). */
+/** The small crown every road's plate shows for its boss at the end (the trip log's too). */
 const CROWN: Sprite = { rows: ['c.c.c', 'ccccc', 'ccccc'], colors: { c: FLAG } };
 /** A mission's number on its pin's red head, its top left at (x, y). */
 function pinBadge(ctx: CanvasRenderingContext2D, n: number, x: number, y: number): void { box(ctx, { x, y, w: 11, h: 11 }, PIN); text(ctx, String(n), x + 3, y + 2, '#fff8ee'); }
 
 /** A mission's plate: its size for a title and a road (the number's badge and the title, then the icons and the days). */
 function plateSize(m: Mission): { w: number; h: number } {
-  const icons = m.challenges.length + (m.baddie ? 1 : 0), days = `${m.days} DAY${m.days > 1 ? 'S' : ''}`;
+  const icons = m.challenges.length + 1, days = `${m.days} DAY${m.days > 1 ? 'S' : ''}`;
   return { w: Math.max(18 + measureText(m.title) + 4, 6 + icons * 11 + 4 + measureText(days) + 5), h: 27 };
 }
 /**
@@ -196,7 +197,7 @@ const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y
 
 /**
  * A mission on the map at its place (BASE_DESIGN 5.1): its plate (the number's badge, the title, the road's challenge
- * icons -- the baddie's crown last -- and its days) and a stalk from it down (or up) to the landmark, whose top it marks
+ * icons -- the boss's crown last -- and its days) and a stalk from it down (or up) to the landmark, whose top it marks
  * with a dot.
  */
 function drawMission(ctx: CanvasRenderingContext2D, n: number, m: Mission, p: Place, r: Rect): void {
@@ -210,7 +211,7 @@ function drawMission(ctx: CanvasRenderingContext2D, n: number, m: Mission, p: Pl
   text(ctx, m.title, r.x + 17, r.y + 5, INKY);
   let x = r.x + 9;
   for (const c of m.challenges) { drawSprite(ctx, CHALLENGE_ICONS[c], x, r.y + 20); x += 11; }
-  if (m.baddie) { drawSprite(ctx, CROWN, x, r.y + 20); x += 11; }
+  drawSprite(ctx, CROWN, x, r.y + 20); x += 11;
   text(ctx, `${m.days} DAY${m.days > 1 ? 'S' : ''}`, x + 1, r.y + 17, FADED);
 }
 
@@ -325,10 +326,12 @@ export function chosen(sim: CareSim, ui: MapUi): Mission | null { return sim.mis
  * The chooser (BASE_DESIGN 5). Left: the climate picture (no dragons in it), the title, the region and its climate, the
  * rewards (days, coin, the egg's chance, sure on a first visit, or the Hatchery full), then a row per challenge -- its
  * icon, name and counter, and GOOD: the home dragons and free keepers who meet it (tap one to add it), a tick once the
- * team does -- and the big baddie's row. Right: the team's two pairs (the dragon, its element, stage and mood, its
- * rider's badge -- tap to cycle -- PARTNERS: POWER +5 %, and an X to remove), the dragons (a star and the word for what one
- * would meet that nobody on the team does; greyed with the reason one can't go), the forecast, BEST TEAM, SEND FROM THE
- * AERIE (greyed with the reason when it can't) and BACK.
+ * team does -- the boss's row (its portrait, its name, its two counters, a tick once the team has both), and the road's
+ * fights with the region's little enemies (how many, and how many in a pack). Right: the team's two pairs (the dragon,
+ * its element, stage and mood, its rider's badge -- tap to cycle -- PARTNERS: POWER +5 %, and an X to remove), the
+ * dragons (a star and the word for what one would meet that nobody on the team does -- a challenge, or the boss's
+ * element; greyed with the reason one can't go), the forecast, BEST TEAM, SEND FROM THE AERIE (greyed with the reason
+ * when it can't) and BACK.
  */
 export function drawMissionScreen(ctx: CanvasRenderingContext2D, sim: CareSim, ui: MapUi, frame = 0): Hit[] {
   const hits: Hit[] = [], m = chosen(sim, ui);
@@ -376,13 +379,14 @@ export function drawMissionScreen(ctx: CanvasRenderingContext2D, sim: CareSim, u
     if (met) drawSprite(ctx, ICONS.check, 309, y + 15);
     y += 22;
   });
-  if (m.baddie) {
-    const b = BADDIES[m.baddie];
-    drawBaddiePortrait(ctx, m.baddie, 16, y);
-    text(ctx, `BIG BADDIE: ${b.name}`, 46, y + 3, INKY);
-    text(ctx, `NEEDS ${b.counters.map(counterWord).join(' + ')}`, 46, y + 14, FADED);
-    if (cov.baddie) drawSprite(ctx, ICONS.check, 309, y + 15);
-  }
+  // the boss at the road's end (BASE_DESIGN 5.3), and the fights on the way with the region's little enemies
+  const b = BADDIES[m.baddie];
+  drawBaddiePortrait(ctx, m.baddie, 16, y);
+  text(ctx, `BOSS: ${b.name}`, 46, y + 3, INKY);
+  text(ctx, `NEEDS ${b.counters.map(counterWord).join(' + ')}`, 46, y + 14, FADED);
+  if (cov.baddie) drawSprite(ctx, ICONS.check, 309, y + 15);
+  drawSprite(ctx, FIGHT_ICON, 21, y + 32);
+  text(ctx, `${m.fights} FIGHTS WITH ${FOES[m.foe].name}, ${m.pack} IN A PACK`, 30, y + 29, FADED);
   // ---- the right column: the team ----
   text(ctx, 'TEAM', 324, 28, INKY);
   text(ctx, `${pairs.length} OF ${MAX_PAIRS} PAIRS - 2 KEEPERS STAY HOME`, 624, 28, FADED, 'right');
@@ -411,13 +415,16 @@ export function drawMissionScreen(ctx: CanvasRenderingContext2D, sim: CareSim, u
   // ---- the dragons ----
   const listed = [...sim.dragons.filter((d) => !dragonReason(sim, d, m)), ...sim.dragons.filter((d) => dragonReason(sim, d, m))].slice(0, GRID.cols * GRID.rows);
   const unmet = m.challenges.filter((_, i) => !cov.challenges[i].length);
+  // (the boss's element, while nobody on the team is of it: STRONG on it)
+  const bossEl = b.counters.find((c) => c.element)!, bossUnmet = !team.some((q) => meetsD(bossEl, q));
   listed.forEach((d, i) => {
     const r = { x: GRID.x + (i % GRID.cols) * GRID.dx, y: GRID.y + Math.floor(i / GRID.cols) * GRID.dy, w: GRID.w, h: GRID.h };
     const why = dragonReason(sim, d, m), on = pairs.some((p) => p.dragon === d.id);
     const star = !why && !on ? unmet.find((c) => meetsD(CHALLENGES[c].counter, d)) : undefined;
+    const boss = !why && !on && !star && bossUnmet && meetsD(bossEl, d);
     box(ctx, r, why ? '#5a5054' : on ? ACTIVE : FACE);
-    text(ctx, `${star ? '★' : ''}${d.name}`, r.x + 3, r.y + 2, why ? OFF : TEXT);
-    text(ctx, why ?? (on ? 'ON THE TEAM' : star ? CHALLENGES[star].word : d.stage.toUpperCase()), r.x + 3, r.y + 10, why ? OFF : star ? FLAG : OFF);
+    text(ctx, `${star || boss ? '★' : ''}${d.name}`, r.x + 3, r.y + 2, why ? OFF : TEXT);
+    text(ctx, why ?? (on ? 'ON THE TEAM' : star ? CHALLENGES[star].word : boss ? b.word : d.stage.toUpperCase()), r.x + 3, r.y + 10, why ? OFF : star || boss ? FLAG : OFF);
     if (!why) hits.push({ r, act: { kind: 'dragon', dragon: d.id } });
   });
   // ---- the forecast and the buttons (BASE_DESIGN 11: the trail coach's dry run of the road with this team) ----
@@ -547,22 +554,32 @@ function wrap(s: string, w: number): string[] {
 export function drawLogButton(ctx: CanvasRenderingContext2D, open: boolean): void { button(ctx, LOG_BUTTON, 'TRIP LOG', true, open); }
 
 /**
- * The trip's log (over the watch overlay, opened by its TRIP LOG button: BASE_DESIGN 6, 11): the mission and its region,
- * each stop (its icon and name, a tick cleared, a cross waited out, a mark still ahead), each pair's dragon and the puff
- * it has left, the trip log's latest lines, and the walk left (or the stop the team stands at).
+ * The trip's log (over the watch overlay, opened by its TRIP LOG button: BASE_DESIGN 6, 11): the mission and its region;
+ * a row for the road's fights with its little enemies (a mark each, in road order: a tick fought off, a cross waited
+ * out, a mark still ahead), then each challenge and the boss (its icon and name, and its mark); each pair's dragon and
+ * the puff it has left, the trip log's latest lines, and the walk left (or the stop the team stands at).
  */
 export function drawTripCard(ctx: CanvasRenderingContext2D, sim: CareSim, t: Trip): void {
   const { x, y, w, h } = TRIP_CARD;
   box(ctx, TRIP_CARD, FACE);
   title(ctx, t.mission.title, x + 6, y + 5);
   text(ctx, regionOf(t.mission.region).name, x + w - 6, y + 5, OFF, 'right');
-  const st = stopStates(sim, t);
+  const st = stopStates(sim, t), mark = (i: number) => (st[i] === 'met' ? ICONS.check : st[i] === 'unmet' ? CROSS : PENDING);
+  let ly = y + 18;
+  const packs = t.stops.map((_, i) => i).filter((i) => t.stops[i].kind === 'foes');
+  if (packs.length) {
+    drawSprite(ctx, FIGHT_ICON, x + 11, ly + 3.5);
+    text(ctx, FOES[t.stops[packs[0]].foe!].name, x + 20, ly, TEXT);
+    packs.forEach((i, n) => drawSprite(ctx, mark(i), x + 150 - (packs.length - 1 - n) * 10, ly + 3.5));
+    ly += 11;
+  }
   t.stops.forEach((s, i) => {
-    const ly = y + 18 + i * 11;
+    if (s.kind === 'foes') return;
     const icon = s.kind === 'baddie' ? null : CHALLENGE_ICONS[s.challenge!];
     if (icon) drawSprite(ctx, icon, x + 11, ly + 3.5); else drawBaddiePortraitSmall(ctx, x + 7, ly - 1);
     text(ctx, s.kind === 'baddie' ? BADDIES[s.baddie!].name : CHALLENGES[s.challenge!].name, x + 20, ly, TEXT);
-    drawSprite(ctx, st[i] === 'met' ? ICONS.check : st[i] === 'unmet' ? CROSS : PENDING, x + 150, ly + 3.5);
+    drawSprite(ctx, mark(i), x + 150, ly + 3.5);
+    ly += 11;
   });
   // the team's puff (BASE_DESIGN 11: carried along the whole road), a bar a pair, at the right
   t.pairs.forEach((p, i) => {
@@ -579,9 +596,11 @@ export function drawTripCard(ctx: CanvasRenderingContext2D, sim: CareSim, t: Tri
   const left = t.state === 'muster' ? 'MUSTERING ON THE AERIE' : t.state === 'depart' ? 'LEAVING OVER THE SKY BRIDGE'
     : t.state === 'away' ? (enc ? `AT ${stopName(t.stops[enc.stop])}: TURN ${Math.max(1, enc.turn)}` : `HOME IN ${hoursLeft(sim, t)} HOURS OF WALKING`) : 'LANDING ON THE AERIE';
   text(ctx, left, x + 6, y + h - 11, FLAG);
-  text(ctx, `${t.pairs.length} PAIR${t.pairs.length > 1 ? 'S' : ''} - FORECAST ${Math.round(t.forecast * 100)} %`, x + w - 6, y + h - 11, OFF, 'right');
+  // (the pairs and the forecast at the right: the forecast alone when the walk's line leaves no room for both)
+  const fc = `FORECAST ${Math.round(t.forecast * 100)} %`, both = `${t.pairs.length} PAIR${t.pairs.length > 1 ? 'S' : ''} - ${fc}`;
+  text(ctx, measureText(left) + measureText(both) + 18 <= w ? both : fc, x + w - 6, y + h - 11, OFF, 'right');
 }
-/** The baddie's mark on the card's line: a small inked crown. */
+/** The boss's mark on the card's line: a small inked crown. */
 function drawBaddiePortraitSmall(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   drawSprite(ctx, CROWN, x + 4, y + 4.5);
 }

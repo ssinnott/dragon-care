@@ -11,11 +11,18 @@ import { INK } from './surfaces.ts';
 export interface Cel extends ShadeTarget { override: string | null }
 
 const cache = new Map<string, Tones>();
-/** A cel target lit from the screen's top left for a drawing mirrored by `facing` (1 as drawn, -1 mirrored). */
-export function celTarget(facing: 1 | -1 = 1, flat: string | null = null): Cel {
+/**
+ * A cel target lit from the screen's top left for a drawing mirrored by `facing` (1 as drawn, -1 mirrored). `flat`
+ * paints every fill in one colour, its outline too (a silhouette) -- unless `ink` keeps the outline: a fight's hit flash
+ * (HIT_FLASH: the fills flat and pale inside their own ink, as the dragons' grow-up flash, ART_BIBLE 4.2).
+ */
+export function celTarget(facing: 1 | -1 = 1, flat: string | null = null, ink: string | null = null): Cel {
   return {
     tones: cache, ramp: RAMP, override: flat, shading: true, light: { x: LIGHT_X * facing, y: LIGHT_Y },
-    outline: flat ?? INK, ow: 1, contactAlpha: 0, tonesN: 3,
-    col(hex: string) { return this.override ?? hex; },
+    outline: ink ?? flat ?? INK, ow: 1, contactAlpha: 0, tonesN: 3,
+    // (the outline goes through here too: a kept ink stays ink under the flat colour)
+    col(hex: string) { return this.override != null && !(ink != null && hex === ink) ? this.override : hex; },
   };
 }
+/** The fills of an enemy a hit has just landed on (a few steps: missionview.ts), flat inside its ink. */
+export const HIT_FLASH = '#fff6e4';

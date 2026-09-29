@@ -25,7 +25,8 @@ export function backupSave(): void {
 /**
  * The barn as saved: `ok` with the save, or no save and why -- `none` (never saved), `old` (another version) or `bad`
  * (not JSON, or not a save). A save of the version before this one is brought up to this one first (save.ts
- * migrateSave: version 9, before the Arena, loads with every dragon at level 1). An old or bad save is copied to
+ * migrateSave: version 9, before the Arena, loads with every dragon at level 1; version 11, before every road was a
+ * fight, with its roads' little enemies and bosses). An old or bad save is copied to
  * BACKUP_KEY. Never throws. (A save of this version whose insides are broken is found only when the view loads it --
  * BaseView's load(): CareSim.fromSave, then a trial step and draw -- and the caller backs it up the same way: backupSave.)
  */

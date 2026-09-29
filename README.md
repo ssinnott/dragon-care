@@ -12,14 +12,15 @@ day's missions pinned at them and the lands you haven't reached yet under cloud.
 off from the Aerie, and the game follows it on its adventure: the camera stays on the Aerie as the team gathers and
 sets out over the sky bridge, then goes with it down its road -- the keepers mind the barn meanwhile, and there's no
 going back to it (MAP still shows the team's flag on the map) until the team is home and you tap its result card away.
-On the road you play it: at each stop the team meets a challenge (a spring flood, a grumpy miller, thick fog...) or, at
-a hard road's end, a big baddie. A challenge is a skill check: a mark to beat, and each dragon's move a try at it -- a
-roll of a d20 plus its bonus, the menu telling you each try's chance (`95 %: STRONG ON THE FLOOD!`, `55 %: HELPS`),
-the rider's special clearing it outright -- three tries, the mark easing after each that falls short; a big baddie is
-fought turn by turn as in the Arena (its breath, a show-off, a rest, its rider's special), its puff worn down; or leave
-either to the trail coach (AUTO). Past a land stop the road runs on through its passage -- the cave beyond the dark's
-mouth, lit by lanterns if the way was lit, the canyon after the gap, the bramble tunnel, the fog bank... -- and nobody
-is hurt, the outcome is told at the road's end, and every stop brings XP. Tap
+On the road you play it: each stop is a skill check (a spring flood, a grumpy miller, thick fog...) or a pack of the
+region's little enemies (mud goblins, mole miners, thorn sprites, storm imps, frost imps, cinder imps); the road ends
+with its region's boss (the Bridge Troll, Mole King, Briar Boar, Storm Roc, Frost Giant, or Cinder Golem). Challenges
+are marks to beat: each dragon rolls a d20 plus its bonus, and its menu shows the chance; the rider's special clears
+the challenge outright. Packs are always beaten, while a boss may be too strong for the team. Pick what each dragon
+does turn by turn as in the Arena (its breath, a show-off, a rest, its rider's special), or leave it to the trail coach
+(AUTO). Past a land stop, the road runs through its passage -- the cave beyond the dark's mouth, lit by lanterns if the
+way was lit, the canyon after the gap, the bramble tunnel, the fog bank... Nobody is hurt: foes vanish in puffs, a
+beaten boss sits down seeing stars and runs off, and the outcome is told at the road's end. Every stop brings XP. Tap
 a keeper (or their badge, or Tab) to take them by hand: WASD or the arrows walk and climb, E or Space fetches and does
 the chore in reach, Esc lets go -- and on a touch screen a pad of arrows, E and LET GO does the same. ARENA (or b) opens
 the Arena on the roof: tap your dragon, then its sparring partner, and START BOUT -- the two ride up and spar turn by

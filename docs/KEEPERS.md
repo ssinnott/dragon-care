@@ -40,7 +40,8 @@ reaches the stand spot before the dragon stands in `watch` until it walks in, an
 stands in `idle`. On a mission (`docs/BASE_DESIGN.md` 5) a rider carries a saddle (the mission art kit's `SADDLE`: ART_BIBLE 5.10) from the Tack
 Room up to the Aerie and back, and the egg a team brings home down the left tower and up the centre ladder to its nest in the hayloft's Hatchery, in `carry`; takes the saddle down or
 hangs it back in `hold`; and rests in the Bunks in `idle`; away, a rider is not drawn in the barn (the watchable scene
-draws the team on its road, each rider with the saddle in the near hand: ART_BIBLE 5.11). This is a plainer join than
+draws the team on its road, each rider with the saddle in the near hand, and in a fight stepped back behind their
+dragon, out of the line of fire: ART_BIBLE 5.11). This is a plainer join than
 the yard's: it skips the plan (6.3), so a base keeper's stand and stroke are not
 proven eye-clear or on the mark the way the yard's and the two audits' are. **The base now has a player loop** (#6;
 `docs/BASE_DESIGN.md` 4.10): the player may take any one keeper by hand -- walked with WASD, the arrows or a touch pad
@@ -104,7 +105,9 @@ skill above (`src/game/regions.ts` `KEEPER_SKILL`). A dragon's **partner** is th
 need -- Bea for fire (food), Tomas for spike, rock and slinkwing (love), Pip for lightning (play), Iris for dusk
 (sleep); water has none, as nobody has baths -- and a pair of partners goes 5 % better. Each dragon sent takes its
 partner if free, else a keeper whose skill meets a challenge nobody on the team does, else any free keeper; two
-keepers always stay home. The mockups' riders, Rosa and Tam (`docs/base/`), are superseded by these four.
+keepers always stay home. The riders don't fight: the dragons fight the road's enemies (`docs/BASE_DESIGN.md` 5.3,
+B8), and a rider's face stays the keepers' set (K3: never angry). The mockups' riders, Rosa and Tam (`docs/base/`), are
+superseded by these four.
 
 ## 3. Colour
 

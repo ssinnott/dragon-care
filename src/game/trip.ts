@@ -2,7 +2,7 @@
 // missions.ts makes and steps them (the road walked in the world's own steps, an encounter at each stop: encounter.ts);
 // the watchable scene (missionview.ts) is a pure function of a Trip's state, and never changes one.
 import type { DragonElement } from '../art/dragon/palettes.ts';
-import type { RegionId, ChallengeId, Difficulty, BaddieId, BaddieExit } from './missiondata.ts';
+import type { RegionId, ChallengeId, Difficulty, BaddieId, FoeId } from './missiondata.ts';
 import type { Stats } from './training.ts';
 import type { Encounter } from './encounter.ts';
 
@@ -12,10 +12,14 @@ export interface Mission {
   region: RegionId;
   title: string;
   difficulty: Difficulty;
-  /** The challenges, in road order (2 easy, 3 normal, 3 or 4 hard). */
+  /** The challenges, in road order (2 easy, 3 normal and hard). */
   challenges: readonly ChallengeId[];
-  /** A hard mission's big baddie at the end of the road, or null. */
-  baddie: BaddieId | null;
+  /** The boss at the end of the road (its region's: BASE_DESIGN 5.3), fought as the road's last stop. */
+  baddie: BaddieId;
+  /** The little enemies on the road (its region's), how many fights with them, and how many in each pack. */
+  foe: FoeId;
+  fights: number;
+  pack: number;
   /** Length in game days (1, 2 or 3): the walking; the stops' encounters take their own time on top. */
   days: number;
   coin: number;
@@ -27,19 +31,21 @@ export interface Mission {
 /** A pair on a trip: a dragon and the keeper who rides with it, by id. */
 export interface Pair { dragon: number; keeper: number }
 
-/** How a stop went: not reached yet, cleared (an obstacle done, a baddie worn out), or waited out (the team out of puff, or out of turns). */
+/** How a stop went: not reached yet, cleared (an obstacle done, a pack or a boss worn out), or waited out (the team out of puff, or out of turns). */
 export type StopResult = 'ahead' | 'met' | 'unmet';
 
-/** A stop on the road: a challenge (an obstacle), or the baddie at the end (a fight). */
+/** A stop on the road: a challenge (an obstacle), a pack of the road's little enemies (a fight), or the boss at the end (a fight). */
 export interface Stop {
-  kind: 'challenge' | 'baddie';
+  kind: 'challenge' | 'foes' | 'baddie';
   /** Set when kind is 'challenge'. */
   challenge: ChallengeId | null;
+  /** Set when kind is 'foes'. */
+  foe: FoeId | null;
   /** Set when kind is 'baddie'. */
   baddie: BaddieId | null;
-  /** Where on the road it sits, as a fraction of the trip's walk: challenge i of n at (i+1)/(n+1)*0.85, the baddie at 0.9. */
+  /** Where on the road it sits, as a fraction of the trip's walk: stop i of the K before the boss at (i + 1) / (K + 1) x ROAD_SPAN, the boss at BADDIE_AT (missions.ts). */
   at: number;
-  /** Whether the team has its counter (a dragon of its element, or the rider with its skill; a baddie: both): the chooser's tick, and STRONG on the menu. */
+  /** Whether the team has its counter (a dragon of its element, or the rider with its skill; a boss: both; a pack has none, and is always so): the chooser's tick, and STRONG on the menu. */
   covered: boolean;
   /** Who has the counter: dragon and keeper names (empty if nobody). */
   by: readonly string[];
@@ -83,6 +89,4 @@ export interface Trip {
   auto: boolean;
   /** The encounter at the stop the team stands at, or null: walking. */
   encounter: Encounter | null;
-  /** How the road's baddie leaves it (it always does, worn out or not: the team walks on), or null (no baddie). */
-  exit: BaddieExit | null;
 }

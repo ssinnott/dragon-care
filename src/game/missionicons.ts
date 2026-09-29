@@ -1,5 +1,5 @@
 // The missions' small sprites (BASE_DESIGN 5; ART_BIBLE 5.10): a 9 x 9 icon for each challenge (the chooser's rows, the trip log, the
-// scene's banners) and each rider skill, a saddle (a rider's, carried from the Tack Room), and the egg a rider carries
+// scene's banners), each rider skill and a fight on the road, a saddle (a rider's, carried from the Tack Room), and the egg a rider carries
 // home (the Hatchery's egg art, eggs.ts, whole). The icons.ts sprite format: rows of letters, each letter a colour, drawn by icons.ts
 // drawSprite with every pixel ringed in #1a1018 ink, so an icon reads at 1x (11 x 11 with its ink). Flat fills, a lit
 // pixel or two toward the top left, nothing under 2 px across once inked. Plain data and one hook: safe from Node.
@@ -48,6 +48,19 @@ export const SKILL_ICONS: Readonly<Record<Skill, Sprite>> = Object.freeze({
   // NIMBLE: a feather
   nimble: sp(['.......ff', '......fff', '.....fwff', '....fwff.', '...fwff..', '..fwff...', '.fff.....', '.f.......', 'f........'], { f: '#78b84a', w: '#e8f4d8' }),
 });
+
+/** A fight on the road (the trip log's row for the road's little enemies, BASE_DESIGN 6), 9 x 9: two claws crossed over a clash's spark. */
+export const FIGHT_ICON: Sprite = sp([
+  'c.......c',
+  '.c.....c.',
+  '..c.y.c..',
+  '...cyc...',
+  '..yyWyy..',
+  '...cyc...',
+  '..c.y.c..',
+  '.c.....c.',
+  'c.......c',
+], { c: '#d8d0c2', y: '#ffd24a', W: '#fff2a8' });
 
 /** A rider's saddle (11 x 7): its seat, its pommel and cantle, a strap and a stirrup either side. */
 export const SADDLE: Sprite = sp([

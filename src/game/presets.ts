@@ -107,7 +107,7 @@ export const TRIP_DEFAULT: TripParam = Object.freeze({ region: 'oldmine', progre
 
 /**
  * The new game with a team away on a hard mission (BASE_DESIGN 6, 11: view=base&preset=trip&trip=<region>:<progress>[:fail][:auto]):
- * the region's hard mission (its baddie at the end of the road, if it has one), the best two pairs of the seven with
+ * the region's hard mission (its packs of little enemies between its challenges, its boss at the road's end), the best two pairs of the seven with
  * their auto riders and its road (tripdemo.ts demoTrip: the missions' own rider pick, forecast and road, missions.ts),
  * the team away as a sent team is once it has left the Aerie (missions.ts awayNow: its dragons off the map, its
  * riders away) and put `progress` of its walk along the road (missions.ts placeAlong: every stop before that point

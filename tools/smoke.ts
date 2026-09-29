@@ -43,9 +43,12 @@
 // three residents live on three plots, by day and by night (each dragon says where it lives: the barn or the garden).
 // The watchable scene (BASE_DESIGN 6, 11): frozen with a team away (preset=trip&trip=...), the game follows it -- its road is
 // on screen with no panel= asking, TRIP LOG and no way back to the barn, and a take= refused -- just past the Mole King's
-// fight (the Mole King in view, dozing off calmed, the fight won -- and dozing off just the same where the team sat it
-// out, the team on its road just where the winning one is), at the fight itself with the picks waiting (the encounter's
-// menu, its rows and AUTO on screen, every head clear of them) and played by the trail coach (`:auto`), at a challenge
+// fight (the Mole King gone off up the road, the fight won -- and gone just the same where the team sat it out, the team
+// on its road just where the winning one is), at the fight itself with the picks waiting (the encounter's menu, its rows
+// and AUTO on screen, every head clear of them) and played by the trail coach (`:auto`): a hit landing on the Mole
+// King (rocked back and flashing) and the Mole King worn out, down seeing stars; a pack of mud goblins fought on the
+// Millbrook road -- a dragon's bolt in flight, the goblins' clods in flight, one gone up in a puff of smoke -- each
+// frame the scene's own pure function at that step (the page's hook against Node's); at a challenge
 // the team cleared (with its banner), on a road with a stop waited out (the team walks on: it never turns back, and
 // nothing tells the outcome early), and home with the result card (HOME SAFE!, or NOT THIS TIME when a stop was waited
 // out); live, the road is on screen from the start and the world steps on under it, Esc, a badge, Tab, b, ARENA and a
@@ -54,7 +57,8 @@
 // put away by Esc) it is the barn again, the world on, with the camera on the Aerie as the team lands.
 // The encounter, live (BASE_DESIGN 11): at the Mole King's stop the menu comes up on the road the game follows and the
 // world waits for the pick, the first row takes the first pair's pick (the menu turning to the second pair's), AUTO lets
-// the trail coach play the fight, and the team walks on past the dozing Mole King, the road still on screen.
+// the trail coach play the fight, the Mole King worn out sits down seeing stars and runs off, and the team walks on, the
+// road still on screen.
 // Taking a keeper (BASE_DESIGN 4.10, #6; take= frames too): a tap on a keeper or their badge takes them, d and the pad's
 // arrows walk them, the pad and the line over it (what E does) show while one is held, Esc and LET GO let go, a touch
 // in the pad's gaps is the pad's, and a badge takes and lets go while paused; no dragon's head is under the pad or the
@@ -68,8 +72,8 @@
 // landmark. The mission loop, live at 8x: the muster to the deck (the barn on screen), the team's road on screen by
 // itself as it leaves, TRIP LOG open and shut, Esc leaving the road there.
 // The mission art kit (ART_BIBLE 5.10, view=missionart): every sheet -- the climates (and one as a scrolling road scene), the
-// set pieces, the baddies, the people (the miller beside the keepers) and the icons -- draws every item on it, with
-// no page error, in enough colours.
+// set pieces, the six bosses, the six little enemies, the fights' marks, the people (the miller beside the keepers), the
+// icons and the places -- draws every item on it, with no page error, in enough colours.
 // Barn capacity (BASE_DESIGN 4.7): the hook counts the barn's dragons against its cap (7 of 12 in the new game, the twelve
 // preset at the cap, the full preset forced over it with its due egg waiting in its nest, and the capped preset at the
 // cap with its due egg waiting in plain view, nobody in front of its nest).
@@ -92,11 +96,14 @@ import { REACH_MISS } from '../src/care/limits.ts';
 import { CareSim } from '../src/game/sim.ts';
 import { buildSim, tripStart } from '../src/game/presets.ts';
 import { sceneAt } from '../src/game/missionview.ts';
+import type { SceneFrame } from '../src/game/missionview.ts';
+import type { Trip } from '../src/game/trip.ts';
+import { MISSILES, SPARK_LEN, POOF_LEN } from '../src/game/fightfx.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts';
 import { serialize, SAVE_VERSION } from '../src/game/save.ts';
 import { SAVE_KEY, BACKUP_KEY } from '../src/game/storage.ts';
 import { FLOORS, STRAW_SEAM, PATH_EDGE } from '../src/game/surfaces.ts';
-import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS } from '../src/game/missiondata.ts';
+import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS, FOE_IDS } from '../src/game/missiondata.ts';
 import { PASSAGES } from '../src/game/passages.ts';
 import { PHASE_ORDER } from '../src/game/clock.ts';
 import { PLACES, growthSamples } from '../src/game/worldmap.ts';
@@ -520,8 +527,46 @@ function succeedingScene(trip: string, t: number): Partial<NonNullable<BaseHook[
   const w = buildSim(tripStart(trip, t), 1);
   for (let i = 0; i < t; i++) w.step();
   const tr = w.missions.trip!, f = sceneAt(w, tr), s = f.last == null ? null : tr.stops[f.last];
-  return { stop: s ? (s.kind === 'baddie' ? 'baddie' : s.challenge) : null, result: s ? s.result : null, covered: s ? s.covered : null, at: tr.encounter?.state ?? null, banner: f.banner, done: false, result_card: null };
+  return { stop: s ? (s.kind === 'challenge' ? s.challenge : s.kind) : null, result: s ? s.result : null, covered: s ? s.covered : null, at: tr.encounter?.state ?? null, banner: f.banner, done: false, result_card: null };
 }
+/**
+ * The first step (1..max) at which a trip preset's world, stepped on, shows what `pred` asks of its scene (a fight's
+ * moment for a frozen page's t=: the encounter plays the same whatever step the team left at), or it throws.
+ */
+function firstStep(trip: string, pred: (f: SceneFrame, t: Trip) => boolean, max = 6000): number {
+  const w = buildSim(tripStart(trip, 0), 1);
+  for (let i = 1; i <= max; i++) { w.step(); const tr = w.missions.trip; if (tr && pred(sceneAt(w, tr), tr)) return i; }
+  throw new Error(`smoke: trip=${trip} never shows the moment wanted in ${max} steps`);
+}
+/**
+ * A fight's frozen frame (BASE_DESIGN 6, 11): the page's scene, read from its hook, just what Node's own run of the
+ * scene's pure function says at that step -- the stop and its encounter's state, the boss (its face, pose and flash),
+ * the pack's ones in view, what is in flight, the sparks and puffs of smoke, the riders' places and the dragons'
+ * flashes -- and `also` of it (the moment the case is for).
+ */
+function fightIs(trip: string, t: number, also: (s: NonNullable<BaseHook['scene']>) => string | null) {
+  const w = buildSim(tripStart(trip, t), 1);
+  for (let i = 0; i < t; i++) w.step();
+  const tr = w.missions.trip!, f = sceneAt(w, tr), last = f.last == null ? null : tr.stops[f.last];
+  const want = { stop: last ? (last.kind === 'challenge' ? last.challenge : last.kind) : null, at: tr.encounter?.state ?? null, baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, flash: !!f.baddie?.flash,
+    foes: f.foes.map((q) => `${q.id}:${q.pose}:${q.facing}`).join(), shots: f.shots.length, marks: f.marks.map((m) => `${m.kind}:${m.age}`).join(), riders: f.riders.map((r) => r.dx).join(), hit: f.flash.join() };
+  return (b: BaseHook): string[] => {
+    const s = b.scene;
+    if (!s) return ['no scene in the hook'];
+    const got = { stop: s.stop, at: s.at, baddie: s.baddie, face: s.face, pose: s.pose, flash: s.flash, foes: s.foes.map((q) => `${q.id}:${q.pose}:${q.facing}`).join(), shots: s.shots, marks: s.marks.map((m) => `${m.kind}:${m.age}`).join(), riders: s.riders.join(), hit: s.hit.join() };
+    const out = Object.entries(want).filter(([k, v]) => (got as Record<string, unknown>)[k] !== v).map(([k, v]) => `scene.${k} is ${JSON.stringify((got as Record<string, unknown>)[k])}, not the pure scene's ${JSON.stringify(v)}`);
+    const why = also(s);
+    return why ? [...out, why] : out;
+  };
+}
+/** The fights' moments the frozen cases show (the first step each is on screen): a bolt at a pack of mud goblins, their clods in flight, one gone up in smoke; a hit on the Mole King, and the Mole King down seeing stars. */
+const PACK_TRIP = 'millbrook:0.12:auto', BOSS_TRIP = 'oldmine:0.9:auto';
+const atPack = (tr: Trip) => !!tr.encounter && tr.stops[tr.encounter.stop].kind === 'foes';
+const PACK_BOLT_T = firstStep(PACK_TRIP, (f, tr) => atPack(tr) && f.shots.some((q) => q.el) && f.foes.length >= 2);
+const PACK_THROW_T = firstStep(PACK_TRIP, (f, tr) => atPack(tr) && f.shots.filter((q) => q.missile).length >= 2);
+const PACK_POOF_T = firstStep(PACK_TRIP, (f, tr) => atPack(tr) && f.marks.some((m) => m.kind === 'poof' && m.age === 8));
+const BOSS_HIT_T = firstStep(BOSS_TRIP, (f) => f.baddie?.pose === 'hit' && f.baddie.flash);
+const BOSS_DOWN_T = firstStep(BOSS_TRIP, (f) => f.baddie?.pose === 'down') + 120;
 /**
  * The same page with `:fail`: the team on its road just where the succeeding one is (the same stop, the same standing),
  * the last stop reached waited out -- its result and its banner (`THORNS - THE TEAM WAITS IT OUT`, a baddie's `... SITS
@@ -584,18 +629,20 @@ async function baseEncounter(page: any): Promise<string[]> {
   if (!(await until('window.__dragonCare?.base?.trip?.encounter?.state === "play"', 3000))) out.push(`AUTO left the encounter at ${(await st()).trip?.encounter?.state}`);
   else if ((await st()).trip?.encounter?.move?.by === -1 ? false : (await st()).trip?.encounter?.move?.ability == null) out.push(`the move playing is ${JSON.stringify((await st()).trip?.encounter?.move)}`);
   await page.keyboard.press('4');
-  if (!(await until('window.__dragonCare?.base?.trip?.stops?.[3]?.result !== "ahead"', 80000))) return [...out, `the fight never ended (${JSON.stringify((await st()).trip?.encounter)})`];
-  const done = await st(), fight = done.trip!.stops[3];
-  if (fight.result !== 'met' || !fight.log.includes('WORN OUT')) out.push(`the fight ended ${JSON.stringify(fight)}`);
+  // (the boss is the road's last stop)
+  if (!(await until('((s) => !!s && s[s.length - 1].result !== "ahead")(window.__dragonCare?.base?.trip?.stops)', 80000))) return [...out, `the fight never ended (${JSON.stringify((await st()).trip?.encounter)})`];
+  const done = await st(), fight = done.trip!.stops[done.trip!.stops.length - 1];
+  if (fight.kind !== 'baddie' || fight.result !== 'met' || !fight.log.includes('WORN OUT: IT SEES STARS')) out.push(`the fight ended ${JSON.stringify(fight)}`);
+  if (done.scene?.baddie !== 'moleking' || (done.scene.pose !== 'down' && done.scene.pose !== 'flee')) out.push(`as the fight ended the Mole King is ${JSON.stringify(done.scene && { baddie: done.scene.baddie, pose: done.scene.pose })}, not down seeing stars`);
   if (!(await until('window.__dragonCare?.base?.trip?.encounter === null', 30000))) out.push(`the Mole King's exit never let the team walk on (${JSON.stringify((await st()).trip?.encounter)})`);
   const on = await st();
-  if (on.scene?.baddie !== 'moleking' || on.scene.exit !== 'calmed' || on.trip!.walked <= done.trip!.walked - 1) out.push(`after the fight the scene shows ${JSON.stringify(on.scene)}, walked ${on.trip?.walked}`);
+  if ((on.scene?.baddie != null && on.scene.pose !== 'flee') || on.trip!.walked <= done.trip!.walked - 1) out.push(`after the fight the scene shows ${JSON.stringify(on.scene)}, walked ${on.trip?.walked}`);
   await page.keyboard.press('1');
   await page.keyboard.press('Escape');
   if (!(await until('(window.__dragonCare?.base?.toast ?? "").startsWith("FOLLOWING THE TEAM")', 2000))) out.push(`Esc on the road after the fight said ${JSON.stringify((await st()).toast)}`);
   const e = await st();
   if (e.ui.screen !== 'watch' || e.ui.follow !== 'road') out.push(`after the fight the view is ${e.ui.screen} (following ${e.ui.follow}), not the road`);
-  if (!out.length) console.log(`        encounter: the Mole King's picks waited at step ${a.tick} on the road the game follows, the menu up with ${Object.keys(a.ui.buttons).filter((q) => q.startsWith('ability')).length} rows and the world waiting; the first row took RIPPLE's pick and the menu turned to the second pair; AUTO on, the fight ended at step ${done.tick} in a win ("${fight.log}"), the Mole King dozing off as the team walked on, the road still on screen`);
+  if (!out.length) console.log(`        encounter: the Mole King's picks waited at step ${a.tick} on the road the game follows, the menu up with ${Object.keys(a.ui.buttons).filter((q) => q.startsWith('ability')).length} rows and the world waiting; the first row took RIPPLE's pick and the menu turned to the second pair; AUTO on, the fight ended at step ${done.tick} in a win ("${fight.log}"), the Mole King down seeing stars and off up the road as the team walked on, the road still on screen`);
   return out;
 }
 
@@ -853,7 +900,7 @@ async function baseMapPlaces(page: any): Promise<string[]> {
   await click((await st()).buttons.map);
   if (!(await until('window.__dragonCare?.base?.ui?.screen === "map"', 2000))) return [`MAP did not open the map (screen ${(await st()).ui.screen})`];
   const m = await st(), places = Object.entries(m.ui.places), clouds = Object.entries(m.ui.clouds);
-  if (places.length !== 7 || clouds.length !== 3) out.push(`the new game's map has ${places.length} quiet places (want 7: the start's ten less the board's three) and ${clouds.length} clouds (want 3)`);
+  if (places.length !== 9 || clouds.length !== 3) out.push(`the new game's map has ${places.length} quiet places (want 9: the start regions' twelve, their bosses' lairs among them, less the board's three) and ${clouds.length} clouds (want 3)`);
   const [name, pr] = places[0] ?? [], said: string[] = [];
   if (pr) {
     await click(pr);
@@ -1273,14 +1320,18 @@ const CASES: Case[] = [
   // walk-in: at t=200 the picks wait -- the menu on screen, its rows and AUTO among the buttons, the fighters' plates and
   // the Mole King's, every head clear of them; 0.3 on Millbrook's road is past its first stop, cleared, as the scene's
   // own function says)
-  { query: 'view=base&preset=trip&trip=oldmine:0.905&take=tomas&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', result: 'met', baddie: 'moleking', exit: 'calmed', at: null })(b), ...(b.controlled === null && b.toast?.startsWith('FOLLOWING THE TEAM') ? [] : [`take=tomas on the road: ${b.controlled ?? 'nobody'} held, the toast ${JSON.stringify(b.toast)}`])] },
-  { query: 'view=base&preset=trip&trip=oldmine:0.905:fail&t=60', minColours: 150, allScales: false, check: sceneIs({ ...failingScene('oldmine:0.905', 60), baddie: 'moleking', exit: 'calmed' }) },
-  { query: 'view=base&preset=trip&trip=oldmine:0.9&t=200', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', result: 'ahead', at: 'pick', baddie: 'moleking', face: 'grumpy' })(b), ...encounterMenu(b)] },
+  { query: 'view=base&preset=trip&trip=oldmine:0.905&take=tomas&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', result: 'met', baddie: null, at: null })(b), ...(b.controlled === null && b.toast?.startsWith('FOLLOWING THE TEAM') ? [] : [`take=tomas on the road: ${b.controlled ?? 'nobody'} held, the toast ${JSON.stringify(b.toast)}`])] },
+  { query: 'view=base&preset=trip&trip=oldmine:0.905:fail&t=60', minColours: 150, allScales: false, check: sceneIs({ ...failingScene('oldmine:0.905', 60), baddie: null }) },
+  { query: 'view=base&preset=trip&trip=oldmine:0.9&t=200', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', result: 'ahead', at: 'pick', baddie: 'moleking', face: 'fierce', pose: 'stand' })(b), ...encounterMenu(b)] },
   // (`:auto`: the trail coach plays the fight -- at t=209 BEA's CHARM, the first move, has just landed on the Mole King:
   // the encounter at play, the Mole King surprised, no menu on screen (THE TRAIL COACH PICKS in its place) and AUTO lit)
-  { query: 'view=base&preset=trip&trip=oldmine:0.9:auto&t=209', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', result: 'ahead', at: 'play', baddie: 'moleking', face: 'surprised' })(b), ...(b.trip?.auto && !Object.keys(b.ui.buttons).some((k) => k.startsWith('ability')) && b.ui.buttons.trail ? [] : [`with AUTO the buttons are ${Object.keys(b.ui.buttons).join(' ')}, auto ${b.trip?.auto}`])] },
+  { query: `view=base&preset=trip&trip=${BOSS_TRIP}&t=${BOSS_HIT_T}`, minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', result: 'ahead', at: 'play', baddie: 'moleking', face: 'hurt', pose: 'hit', flash: true })(b), ...fightIs(BOSS_TRIP, BOSS_HIT_T, () => null)(b), ...(b.trip?.auto && !Object.keys(b.ui.buttons).some((k) => k.startsWith('ability')) && b.ui.buttons.trail ? [] : [`with AUTO the buttons are ${Object.keys(b.ui.buttons).join(' ')}, auto ${b.trip?.auto}`])] },
+  { query: `view=base&preset=trip&trip=${BOSS_TRIP}&t=${BOSS_DOWN_T}`, minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', result: 'met', at: 'done', baddie: 'moleking', face: 'dazed', pose: 'down' })(b), ...fightIs(BOSS_TRIP, BOSS_DOWN_T, (s) => (s.riders.every((r) => r === 56) ? null : `the riders stand at ${s.riders.join(', ')}, not beside their dragons again`))(b)] },
+  { query: `view=base&preset=trip&trip=${PACK_TRIP}&t=${PACK_BOLT_T}`, minColours: 150, allScales: false, check: fightIs(PACK_TRIP, PACK_BOLT_T, (s) => (s.stop === 'foes' && s.at === 'play' && s.foes.length >= 2 && s.shots >= 1 && s.riders.every((r) => r < 0) ? null : `a pack's fight shows ${JSON.stringify({ stop: s.stop, at: s.at, foes: s.foes.length, shots: s.shots, riders: s.riders })}`)) },
+  { query: `view=base&preset=trip&trip=${PACK_TRIP}&t=${PACK_THROW_T}`, minColours: 150, allScales: false, check: fightIs(PACK_TRIP, PACK_THROW_T, (s) => (s.shots >= 2 && s.foes.every((q) => q.id === 'mudgoblin') ? null : `the goblins' throw shows ${s.shots} in flight`)) },
+  { query: `view=base&preset=trip&trip=${PACK_TRIP}&t=${PACK_POOF_T}`, minColours: 150, allScales: false, check: fightIs(PACK_TRIP, PACK_POOF_T, (s) => (s.marks.some((m) => m.kind === 'poof') ? null : 'no puff of smoke')) },
   { query: 'view=base&preset=trip&trip=millbrook:0.3&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ ...succeedingScene('millbrook:0.3', 60), result: 'met', baddie: null, at: null })(b), ...(b.scene?.stop && b.scene.stop !== 'baddie' ? [] : [`the last stop is ${b.scene?.stop}, not a challenge`])] },
-  { query: 'view=base&preset=trip&trip=bramblewood:0.7:fail&t=60', minColours: 150, allScales: false, check: sceneIs({ ...failingScene('bramblewood:0.7', 60), exit: null }) },
+  { query: 'view=base&preset=trip&trip=bramblewood:0.7:fail&t=60', minColours: 150, allScales: false, check: sceneIs({ ...failingScene('bramblewood:0.7', 60), baddie: null }) },
   { query: 'view=base&preset=trip&trip=oldmine:1&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result_card: 'HOME SAFE!' }) },
   { query: 'view=base&preset=trip&trip=bramblewood:1:fail&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result_card: 'NOT THIS TIME' }) },
   // (panel=watch asks for the scene the game shows anyway)
@@ -1294,8 +1345,11 @@ const CASES: Case[] = [
   { query: 'view=missionart&sheet=setpieces&t=60', minColours: 1000, allScales: false, art: { sheet: 'setpieces', want: CHALLENGE_IDS } },
   { query: 'view=missionart&sheet=passages&t=60', minColours: 300, allScales: false, art: { sheet: 'passages', want: (Object.keys(PASSAGES) as string[]).flatMap((id) => [`${id}:unmet`, `${id}:met`]) } },
   { query: 'view=missionart&sheet=baddies&t=30', minColours: 1000, allScales: false, art: { sheet: 'baddies', want: [...BADDIE_IDS, ...BADDIE_IDS.map((b) => `${b}:portrait`)] } },
+  { query: 'view=missionart&sheet=foes&t=30', minColours: 400, allScales: false, art: { sheet: 'foes', want: FOE_IDS } },
+  { query: 'view=missionart&sheet=fights&t=30', minColours: 100, allScales: false, art: { sheet: 'fights', want: [...DRAGON_ELEMENTS.map((e) => `bolt:${e}`), ...Object.keys(MISSILES).map((k) => `missile:${k}`),
+    ...Array.from({ length: SPARK_LEN / 2 }, (_, i) => `spark:${i * 2}`), ...Array.from({ length: POOF_LEN / 5 }, (_, i) => `poof:${i * 5}`), 'stars'] } },
   { query: 'view=missionart&sheet=people&t=50', minColours: 1000, allScales: false, keepers: true, art: { sheet: 'people', want: ['miller:grumpy', 'miller:talkedRound', ...KEEPER_IDS] } },
-  { query: 'view=missionart&sheet=icons&t=0', minColours: 300, allScales: false, art: { sheet: 'icons', want: [...CHALLENGE_IDS.map((c) => `challenge:${c}`), ...SKILLS.map((k) => `skill:${k}`), 'saddle', ...DRAGON_ELEMENTS.map((e) => `egg:${e}`), ...BADDIE_IDS.map((b) => `portrait:${b}`)] } },
+  { query: 'view=missionart&sheet=icons&t=0', minColours: 300, allScales: false, art: { sheet: 'icons', want: [...CHALLENGE_IDS.map((c) => `challenge:${c}`), ...SKILLS.map((k) => `skill:${k}`), 'saddle', ...DRAGON_ELEMENTS.map((e) => `egg:${e}`), ...BADDIE_IDS.map((b) => `portrait:${b}`), 'fight'] } },
   // (the world map's landmarks, HOME and the land's growths: BASE_DESIGN 5.1)
   { query: 'view=missionart&sheet=places&t=0', minColours: 90, allScales: false, art: { sheet: 'places', want: [...new Set(PLACES.map((p) => `place:${p.art}`)), 'home', ...growthSamples().map((g) => `growth:${g.name}`)] } },
   // missions (BASE_DESIGN 5): the Map Room's world map and a mission's chooser (frozen, the world stepped first), the muster

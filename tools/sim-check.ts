@@ -31,9 +31,12 @@
 //    and with the garden (BASE_DESIGN 3, The Garden): residents napping, sitting, strolling, waiting and being met, elders
 //    setting off, riding down, passing the gate and arriving; and with a mission's team out (BASE_DESIGN 5): mid-muster,
 //    departing, away, landing (the egg carried down, the saddles hung back) and resting; a save survives JSON unchanged,
-//    every field is in it; another version throws, and so does one whose missions this build can't run; and a failing
-//    trip saved the way a build from before teams walked every road whole saved it (its turn-back, lines telling the
-//    failure, no exit) loads told as this build tells it, and steps on the same.
+//    every field is in it; another version throws, and so does one whose missions this build can't run; the saves of
+//    the builds before brought up to this one (save.ts migrateSave): a version 10 trip kept as a timer, given its road
+//    walked so far; a version 11 one from before every road was a fight, mid-fight with the Mole King, keeping its road
+//    and its fight, and a mustering one laid its road again with its fights, the very world this build makes; every
+//    board this build's own, with every road's boss and little enemies; and the four real saves the first shipped build
+//    wrote (version 9: tools/fixtures) load through every upgrade since, step on, and save again to the same world.
 // 7. rngAt: the same keys give the same draws, different tags different ones, and the draws are even.
 // 8. Rooms (#11): every room kind and structure has a purpose, each need is met in exactly one kind of room (its rooms
 //    repeated on the floors: the barn room by room as BASE_DESIGN 3's table says -- floor, module, post, the keepers'
@@ -103,17 +106,19 @@
 //    under another's body, nor two at rest lying one over the other (bodies overlapping REST_OVERLAP px at most); the
 //    barn beside them keeps its service; the keeper visits per resident are printed.
 // 17. The Map Room's board (#5: "a world map with different places to explore", "a mission chooser"): the same twice
-//    for seeds 1-5 and days 1-10; day 1 starts with THE LOST NEST; three missions at most, one an explored region; no
-//    baddie before day 3, and a road ending in one on every baddie's day (3, 7, ...); each difficulty's road its length, from
-//    its region's pool; a world rolls it at its start and at every 05:00. The world map's places: every region's titles
-//    and its baddie's are its places (a landmark each), every board mission is met at one of its own region's places
+//    for seeds 1-5 and days 1-10; day 1 starts with THE LOST NEST (and the Bridge Troll at its end); three missions at
+//    most, one an explored region; every road ends in its region's boss and has its region's little enemies, its
+//    difficulty's packs of them (the user's "every mission should have little enemies to fight intermittently and also
+//    a final big boss"), a hard road titled for the boss's ground; each difficulty's road its length, from its region's
+//    pool; a world rolls it at its start and at every 05:00. The world map's places: every region's titles and its
+//    boss's are its places (a landmark each), every board mission is met at one of its own region's places
 //    (THE LOST NEST at WILLOW POND), the map's layout is sound (worldmap.ts mapProblems: each landmark on its own
 //    region's dry land, clear of the brook and of every other, each region's name on its land, every big shape placed,
 //    no road over the water, every place reached by road from HOME), and under the new game's clouds no pixel of a
 //    place shows.
 // 18. The forecast (BASE_DESIGN 5.4: the trail coach's dry run of the road, no roll): five hand-picked teams read as the
-//    rules say (the stops cleared, the turns, the puff left), an empty team 0, and BEST TEAM on THE LOST NEST is its two
-//    counters.
+//    rules say (the stops cleared -- the fights with the little enemies and the boss among them -- the turns, the puff
+//    left), an empty team 0, and BEST TEAM on THE LOST NEST clears every stop, in no more turns than its two counters.
 // 19. Who may go: no baby, no young dragon on a normal or hard road, no garden resident; a keeper taken by hand is
 //    never an auto rider nor on BEST TEAM, is never given a job, can't be sent (canSend, and a send command refused
 //    with its reason), and a rider on a trip can't be taken by hand (control.ts take: a `refused` event) -- all through
@@ -122,7 +127,8 @@
 //    most, two keepers always home; one team out.
 // 20. A full trip (#5: eggs, launched from the Aerie using the Map Room; #11; BASE_DESIGN 11): THE LOST NEST with RIPPLE and
 //    ECHO -- the Map Room, the Tack Room, the lift up and the Aerie; the muster in 3600 steps or fewer; away, the team asks
-//    for nothing and its needs wait; each stop met as the walk reaches it (a `meet` event) and played by the trail coach
+//    for nothing and its needs wait; each stop -- its two challenges, its two packs of mud goblins and the Bridge Troll --
+//    met as the walk reaches it (a `meet` event) and played by the trail coach
 //    once nobody has picked for PICK_WAIT_TRAIL (a `stopEnd` event, its XP); landed once the road is walked whole (the
 //    outcome decided there), food and sleep down; the egg laid in its reserved nest (and hatched two days on), the saddles
 //    back, the Bunks, the riders on duty again, the coin paid, the neighbour revealed at the next dawn. And the step the
@@ -142,19 +148,21 @@
 //    results and lines, the same outcome, egg and coin (every roll a stateless rngAt); THE LOST NEST with both counters
 //    clears both stops on every seed (the tutorial: a sure egg, laid), and BEST TEAM on the day's second mission wins.
 // 23. Care while a team is away (BASE_DESIGN 5.2: two keepers home are enough): a two-pair team away a 30-minute walk of
-//    the real day and its two stops; no need at home ever empties, and the barn's service holds (the average wait within
+//    the real day and its five stops; no need at home ever empties, and the barn's service holds (the average wait within
 //    25 % of section 2's gate).
-// 24. The watchable scene (#5: the challenges on the road, "end with a big baddie"; BASE_DESIGN 6, 11): an easy, a normal
-//    and each baddie's hard road (Old Mine Road's, Highfold's and Frostmere's) by their best two pairs, and the Mole
-//    King's road by a lone pair that can't wear it out, the trail coach playing, read from the scene's pure function at
-//    every step of the trip: the team at its places as it leaves and done when it lands (the result card's title the
-//    outcome's), its walk never falling, its dragons never walking back (a team never turns back: every stop reached, a
-//    failure's too), standing still through every stop's encounter (met at exactly its step, ended at exactly the
-//    `stopEnd` event's, its line `NAME - HOW`), each walk step moving each dragon by exactly its walk's distance over
-//    that step at its speed (no skate: s times the frame's move, within 1e-9), a baddie's face only one of the four,
-//    and its exit (calmed, outwitted, driven off) shown on every trip, the baddie only ever moving the way it faces, and
-//    one that walks off (outwitted, driven off: the art kit's exitLook) ahead of every rider until it is off the
-//    screen's right edge; the banner never telling the outcome; the set pieces and the TRIP LOG telling each stop
+// 24. The watchable scene (#5: the challenges on the road, "end with a big baddie"; the user's "every mission should have
+//    little enemies to fight intermittently and also a final big boss"; BASE_DESIGN 6, 11): every boss's road -- an easy,
+//    two normal and two hard ones by its best two pairs, and the Mole King's by a lone pair that can't wear it out --
+//    the trail coach playing, read from the scene's pure function at every step of the trip: the team at its
+//    places as it leaves and done when it lands (the result card's title the outcome's), its walk never falling, its
+//    dragons never walking back (a team never turns back: every stop reached, a failure's too), standing still through
+//    every stop's encounter (met at exactly its step, ended at exactly the `stopEnd` event's, its line `NAME - HOW`),
+//    each walk step moving each dragon by exactly its walk's distance over that step at its speed (no skate: s times the
+//    frame's move, within 1e-9); a pack only at its own stop, each of it only ever moving the way it faces, worn out in
+//    puffs of smoke; the bolts and missiles thrown and the sparks where they land; the riders stepped back behind their
+//    dragons through a fight and beside them on the walk; the boss's face one of its three, the boss only ever moving
+//    the way it faces, and its exit shown on every trip (worn out: down seeing stars, then off up the road; not: stomping
+//    off unbeaten) ahead of every rider until it is off the screen's right edge; the banner never telling the outcome; the set pieces and the TRIP LOG telling each stop
 //    (ahead, met, unmet) as its result stands; the view's team (ScenePets), synced by clock jumps of 1, 8 and 40 and
 //    across a 1000-step gap, playing the walk frame the road says on every walk step; the trip preset puts a team
 //    exactly that far along at the frozen step, the stops before resolved (`:fail` the last of them waited out) and a
@@ -208,22 +216,16 @@
 //    Arena's text (nobody is hurt: the Decisions' B8, amended for the Arena).
 // 28. Encounters on the road ("when you encounter a challenge you need to use special abilities from your dragons to
 //    overcome them ... when we encounter enemies we need to fight them ... similar to the battle arena"; BASE_DESIGN 11):
-//    the offers (encounter.ts offersFor) at ten stop-and-pair cases -- STRONG for the counter element, HELPS for another,
-//    a little at the miller and the hurt animal where a show-off CHARMS, the rider's special where the rider has the
-//    stop's counter, PREEN and YAWN in a fight only, the ring's STRONG on the baddie -- each try's chance by its bonus
-//    and the mark, and each difficulty's mark; the rules alone (every roll even: an 11): a STRONG dragon passes an
-//    easy flood's check on its first try with no bite, one that helps takes another try and is bitten each turn the
-//    stop stands (the mark easing), a lone breath that does little at a hard miller is waited out after
-//    MAX_OBSTACLE_TURNS tries, the CHARM clears it in one, a dragon out of puff sits, the special costs the Mole King a
-//    quarter of its puff and a POWER stage, and the best team wears it out; the balance: each baddie's road by its best
-//    two pairs on three seeds won every time in ten turns or fewer, a lone pair with neither counter sat every one out,
-//    and THE LOST NEST's two counters cleared both stops in a turn or two on ten seeds; a whole road in the world by
-//    commands (seed 2's LOST NEST): met at its step, the picks waited PICK_WAIT_TRAIL for the player then the coach's
-//    turn played, each move its dragon's own anim landing at its impact for its roll against the mark; a pick for a pair there
-//    isn't, an ability the pair hasn't and a special nobody has refused, a pick by hand taken, AUTO filling the rest at
-//    once (the quicker first); the XP, the level and the skill it brings; the same twice, and saves at the meet, the
-//    pick, mid-move and the resolution stepping on to the same world; 13 encounters this build can't run thrown out;
-//    and no word of harm in any encounter's line or the road's text (the Decisions' B8).
+//    the offers (encounter.ts offersFor) at ten stop-and-pair cases and at a pack -- STRONG for the counter element,
+//    HELPS for another, a little at the miller and the hurt animal where a show-off CHARMS, the rider's special where the
+//    rider has the stop's counter, PREEN and YAWN in a fight only, the ring's STRONG on the boss, every element even on a
+//    pack and no special there; each difficulty's mark, a pack's puff and a boss's scaled stats; the rules alone (every
+//    roll even): a STRONG dragon passes an easy flood in one try with no bite, one that helps takes more tries and is
+//    bitten each turn the stop stands as the mark eases, a hard miller is waited out or talked round, and a dragon out of
+//    puff sits; the special costs the Mole King a quarter of its puff and a POWER stage, and the best team wears it out;
+//    three mole miners are fought off one by one, never resting; fights not won (a pack scampers off, a boss stomps off
+//    unbeaten); the balance of all six bosses' roads and THE LOST NEST; and a whole road in the world by commands,
+//    including its packs, challenges and boss, with saves at each step and no words of harm.
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -236,12 +238,14 @@ import { CASTS, parseCast, placeCast, runOne } from './capacity.ts';
 import { NAMES, NAME_MAX, hatchName } from '../src/game/names.ts';
 import { GROWUP_IN, HATCH_IN, EGGS_PRESET, RETIRE_AT, BOUT_PAIR, sendLostNest } from '../src/game/presets.ts';
 import {
-  boardFor, forecastOf, forecastShare, autoRider, bestTeam, dragonReason, canSend, send, onTrip, roadOf, tripOf, awayNow, placeAlong, upgradeMissions, baddieDay, isTaken, standsAt, DIFFICULTY, BADDIE_FROM_DAY, BOARD_MAX, LOST_NEST, HOME_KEEPERS,
+  boardFor, forecastOf, forecastShare, autoRider, bestTeam, dragonReason, canSend, send, onTrip, roadOf, tripOf, awayNow, placeAlong, upgradeMissions, roadFor, isTaken, standsAt, DIFFICULTY, BOARD_MAX, LOST_NEST, HOME_KEEPERS,
 } from '../src/game/missions.ts';
 import {
   newEncounter, offersFor, coachPick, foePick, beginTurn, landMove, endTurn, stopLine, partyOf, pendingPair, stopStart, stopName, forecastRoad, walkRest, evenRoll, checkEncounter, pairLook, foeShow,
+  foeStats, packLeft, isPack, xpOf, beatOf, fightLine,
   MARK, SIDES, MARK_EASE, BITE, REST_GAIN, CHECK_STRONG, CHECK_HELP, CHECK_LITTLE, CHECK_CHARM, FOE_SPECIAL, passes, chanceOf, MEET_STEPS, FOE_ENTER, DONE_STEPS, EXIT_STEPS, PICK_WAIT_TRAIL, MAX_OBSTACLE_TURNS, MAX_FIGHT_TURNS,
-  WALK_REST, XP_ROAD, FOE_STATS, FOE_MOVES, FOE, ABILITIES, FACE_FRAMES as ROAD_FACE_FRAMES,
+  WALK_REST, XP_ROAD, FOE_STATS, FOE_SCALE, PACK_STATS, FOE_MOVES, FOE, ABILITIES, FACE_FRAMES as ROAD_FACE_FRAMES,
+  PACK_EXIT, FOE_MOVE_STEPS, FOE_THROW, FOE_IMPACT, BREATH_SNAP, BOLT_STEPS, FLASH_FRAMES as ROAD_FLASH,
 } from '../src/game/encounter.ts';
 import type { Ability, Encounter, Party } from '../src/game/encounter.ts';
 import { boutNow, stepArena, canSpar, fighterReason, fighterIndex, boutLook, overLen, FACE_STEPS, PICK_WAIT, MAX_TURNS, NAP_STEPS, TIRED, FACE_FRAMES, LOW_NEED } from '../src/game/arena.ts';
@@ -252,9 +256,9 @@ import {
 } from '../src/game/training.ts';
 import type { SkillKind } from '../src/game/training.ts';
 import type { Taken } from '../src/game/missions.ts';
-import { REGIONS, CHALLENGES, BADDIES, regionOf, placeOf } from '../src/game/regions.ts';
+import { REGIONS, CHALLENGES, BADDIES, FOES, regionOf, placeOf } from '../src/game/regions.ts';
 import { mapProblems, worldRaster, footprint, PLACES, MAP_COLOURS } from '../src/game/worldmap.ts';
-import type { RegionId, ChallengeId, BaddieId } from '../src/game/missiondata.ts';
+import type { RegionId, ChallengeId, BaddieId, FoeId } from '../src/game/missiondata.ts';
 import type { Mission, Trip } from '../src/game/trip.ts';
 import type { DragonPlace } from '../src/game/start.ts';
 import type { Keeper, Dragon } from '../src/game/sim.ts';
@@ -293,7 +297,7 @@ import { DRAGON_ELEMENTS } from '../src/art/dragon/palettes.ts';
 import type { DragonElement } from '../src/art/dragon/palettes.ts';
 import type { Stage } from '../src/art/dragon/stages.ts';
 import { STAGES } from '../src/art/dragon/stages.ts';
-import { sceneAt, walkDist, frameAt, resultTitle, roadFraction, roadDone, PAIR_BACK, RIDER_AHEAD, BADDIE_AHEAD, PIECE_AHEAD, PASSAGE_CLEAR, ScenePets } from '../src/game/missionview.ts';
+import { sceneAt, walkDist, frameAt, resultTitle, roadFraction, roadDone, PAIR_BACK, RIDER_AHEAD, RIDER_FIGHT, BADDIE_AHEAD, PIECE_AHEAD, PASSAGE_CLEAR, ScenePets } from '../src/game/missionview.ts';
 import type { SceneFrame } from '../src/game/missionview.ts';
 import { hasPassage, PASSAGES, PASSAGE_FROM, PASSAGE_LEN } from '../src/game/passages.ts';
 import { demoTrip } from '../src/game/tripdemo.ts';
@@ -1072,11 +1076,17 @@ if (ROLE === 'saves') {
     if (!threw) fail(`save: one with ${what} loaded`);
   }
   // (a save from before the road was played -- version 10 kept a trip as a timer: its return clock, its odds, its
-  // outcome rolled at the send, its stops with no results -- brought up to this build (save.ts migrateSave, missions.ts
-  // upgradeMissions): a team half way along the Old Mine Road's hard mission, past its first stop's beat, is put that
-  // far along its walk with that stop resolved as its counter would have (and the rest ahead), full of puff, no
-  // encounter, its odds its forecast and no outcome yet; a version 10 save of a team not yet away is left whole; and the
-  // upgraded world loads, steps on and lands by the road)
+  // outcome rolled at the send, its stops with no results, and no road but a hard one had a big baddie, none had little
+  // enemies -- brought up to this build (save.ts migrateSave, missions.ts upgradeMissions, then upgradeRoads): a team
+  // half way along the Old Mine Road's hard mission, past its first stop's beat, is put that far along its walk with
+  // that stop resolved as its counter would have (and the rest ahead), full of puff, no encounter, its odds its
+  // forecast and no outcome yet, the road it was walking kept; the board's missions come up with their roads' fights,
+  // the very missions this build rolls; a version 10 save of a team not yet away comes up whole, its road laid again
+  // with its fights; and the upgraded world loads, steps on and lands by the road)
+  // (a mission as the saves before the fights kept it: no little enemies, and a boss at a hard road's end alone; a
+  // road the same, with no packs on it)
+  const beforeFights = (m: any) => { delete m.foe; delete m.fights; delete m.pack; if (m.difficulty !== 'hard') m.baddie = null; };
+  const oldRoad = (stops: any[]) => stops.filter((q) => q.kind !== 'foes').map(({ foe: _foe, ...q }) => q);
   {
     const was = buildSim(tripStart('oldmine:0.5'), 1), t = was.missions.trip!, L = t.travel, departAt = t.departAt!;
     const v10 = through(serialize(was)) as any;
@@ -1084,9 +1094,12 @@ if (ROLE === 'saves') {
     const ot = v10.missions.trip;
     ot.returnAt = departAt + L; ot.odds = 0.65; ot.success = false;
     for (const k of ['travel', 'walked', 'stats', 'puff', 'xp', 'auto', 'encounter', 'forecast']) delete ot[k];
-    ot.stops = ot.stops.map((s: any) => ({ kind: s.kind, challenge: s.challenge, baddie: s.baddie, at: s.at, covered: s.covered, by: s.by, log: s.covered ? `${s.log.split(' - ')[0]} - MET` : `${s.log.split(' - ')[0]} - NOBODY COULD HELP: THEY WAIT IT OUT` }));
+    for (const m of v10.missions.board) beforeFights(m);
+    beforeFights(ot.mission);
+    ot.stops = oldRoad(ot.stops).map((s: any) => ({ kind: s.kind, challenge: s.challenge, baddie: s.baddie, at: s.at, covered: s.covered, by: s.by, log: s.covered ? `${s.log.split(' - ')[0]} - MET` : `${s.log.split(' - ')[0]} - NOBODY COULD HELP: THEY WAIT IT OUT` }));
     const up = migrateSave(v10) as SaveV;
     if (up.v !== SAVE_VERSION) fail(`save (v10): migrated to version ${up.v}`);
+    if (!isDeepStrictEqual(up.missions.board, was.missions.board)) fail(`save (v10): the board came up as ${JSON.stringify(up.missions.board.map((m) => [m.title, m.baddie, m.foe, m.fights]))}`);
     const ut = up.missions.trip!;
     const reached = ot.stops.filter((s: any) => Math.round(s.at * L) <= 0.5 * L).length;
     if (ut.travel !== L || !(ut.walked >= 0.5 * L - 1 && ut.walked <= L) || ut.encounter !== null || ut.success !== null || Math.abs(ut.forecast - 0.65) > 1e-9 || ut.auto !== false
@@ -1097,16 +1110,97 @@ if (ROLE === 'saves') {
     let landed = false;
     for (let i = 0; i < 60000 && loaded.missions.trip; i++) { loaded.step(); if (loaded.missions.trip?.state === 'return') landed = true; }
     if (!landed || loaded.missions.trip) fail(`save (v10): the upgraded trip never landed (${loaded.missions.trip?.state})`);
-    // (a team not yet away: nothing to place; its trip comes up with its walk at 0 and every stop ahead)
+    // (a team not yet away: nothing to place; its trip comes up with its walk at 0 and every stop ahead, its road laid
+    // again as this build lays it -- its packs among its challenges, its boss at the end)
     const mw = buildSim(startSpec('muster'), 1), m10 = through(serialize(mw)) as any;
     m10.v = 10; m10.missions.trip.returnAt = null; m10.missions.trip.odds = 0.55; m10.missions.trip.success = true;
     for (const k of ['travel', 'walked', 'stats', 'puff', 'xp', 'auto', 'encounter', 'forecast']) delete m10.missions.trip[k];
+    for (const m of m10.missions.board) beforeFights(m);
+    beforeFights(m10.missions.trip.mission);
+    m10.missions.trip.stops = oldRoad(m10.missions.trip.stops);
     const mu = (migrateSave(m10) as SaveV).missions.trip!;
-    if (mu.walked !== 0 || mu.stops.some((s) => s.result !== 'ahead') || mu.success !== null || mu.travel !== mw.missions.trip!.travel) fail(`save (v10): a mustering team came up as ${JSON.stringify({ walked: mu.walked, stops: mu.stops.map((s) => s.result), success: mu.success })}`);
+    if (mu.walked !== 0 || mu.stops.some((s) => s.result !== 'ahead') || mu.success !== null || mu.travel !== mw.missions.trip!.travel || !isDeepStrictEqual(mu.stops, mw.missions.trip!.stops)) fail(`save (v10): a mustering team came up as ${JSON.stringify({ walked: mu.walked, stops: mu.stops.map((s) => [s.kind, s.result]), success: mu.success })}`);
     CareSim.fromSave(migrateSave(m10) as SaveV);
     noteUse(loaded);
-    console.log(`  6 saves (missions, a 600-step day): ${forks.map((f) => `step ${f.at} (${f.what})`).join(', ')} step on 5000 to the same world; ${bad.length} saves whose missions can't be run (${bad.map(([w]) => w).join(', ')}) throw; a version 10 save's team half way along the Old Mine Road came up walked ${ut.walked} of ${ut.travel} with ${reached} stop(s) resolved, full of puff, and landed by the road; a mustering team's came up whole`);
+    console.log(`  6 saves (missions, a 600-step day): ${forks.map((f) => `step ${f.at} (${f.what})`).join(', ')} step on 5000 to the same world; ${bad.length} saves whose missions can't be run (${bad.map(([w]) => w).join(', ')}) throw; a version 10 save's team half way along the Old Mine Road came up walked ${ut.walked} of ${ut.travel} with ${reached} stop(s) resolved, full of puff, its old road kept, and landed by the road, its board this build's own; a mustering team's came up whole, its road laid again with its fights`);
   }
+  // (a save from before every road was a fight -- version 11: a big baddie at a hard road's end alone, no little enemies
+  // -- brought up to this build (missions.ts upgradeRoads): its board's missions get their roads' fights, the very
+  // missions this build rolls; a team out mid-fight with the Mole King keeps the road it has been walking and its fight
+  // (the boss one of its kind), drops its baddie's old exit, and steps on to its landing; a mustering team has its road
+  // laid again with its fights, and comes up the very world this build would have)
+  {
+    const was = buildSim(tripStart('oldmine:0.9'), 1);
+    was.missions.trip!.auto = true;
+    for (let i = 0; i < 2000 && was.missions.trip?.encounter?.state !== 'play'; i++) was.step();
+    const v11 = through(serialize(was)) as any, ot = v11.missions.trip;
+    v11.v = 11;
+    for (const m of v11.missions.board) beforeFights(m);
+    beforeFights(ot.mission);
+    ot.exit = 'calmed';
+    ot.stops = oldRoad(ot.stops);
+    ot.encounter.stop = ot.stops.findIndex((q: any) => q.kind === 'baddie');
+    delete ot.encounter.foe.pack;
+    const up = migrateSave(v11) as SaveV, ut = up.missions.trip!;
+    if (up.v !== SAVE_VERSION || !isDeepStrictEqual(up.missions.board, was.missions.board) || 'exit' in ut || ut.stops.length !== ot.stops.length || ut.stops.some((q) => q.foe !== null)
+      || ut.encounter?.foe?.pack !== 1 || ut.encounter.stop !== ut.stops.length - 1 || ut.encounter.state !== 'play') fail(`save (v11): the trip came up as ${JSON.stringify({ stops: ut.stops.map((q) => q.kind), encounter: ut.encounter && { stop: ut.encounter.stop, state: ut.encounter.state, foe: ut.encounter.foe } })}`);
+    const loaded = CareSim.fromSave(up);
+    let landed = false;
+    for (let i = 0; i < 60000 && loaded.missions.trip; i++) { loaded.step(); if (loaded.missions.trip?.state === 'return') landed = true; }
+    if (!landed || loaded.missions.trip) fail(`save (v11): the upgraded trip never landed (${loaded.missions.trip?.state})`);
+    const mw = buildSim(startSpec('muster'), 1), m11 = through(serialize(mw)) as any;
+    m11.v = 11;
+    for (const m of m11.missions.board) beforeFights(m);
+    beforeFights(m11.missions.trip.mission);
+    m11.missions.trip.exit = null;
+    m11.missions.trip.stops = oldRoad(m11.missions.trip.stops);
+    const mm = CareSim.fromSave(migrateSave(m11) as SaveV);
+    if (mm.digest() !== mw.digest()) fail(`save (v11): a mustering team came up another world (${JSON.stringify(mm.missions.trip?.stops.map((q) => q.kind))})`);
+    noteUse(loaded);
+    console.log(`  6 saves (version 11, before every road was a fight): a team mid-fight with the Mole King came up with its old road (${ut.stops.map((q) => q.kind).join(', ')}) and its fight, and landed by the road; a mustering team came up the very world this build makes, its road laid again with its fights; both boards this build's own`);
+  }
+}
+if (ROLE === 'saves') {
+  // saves the first shipped build wrote (version 9: tools/fixtures/save-v9-*.json, written by the builds before the
+  // Arena -- a team away half way along the Mole King's hard road; THE LOST NEST mustering on a short day; a board on day
+  // 3 with a hard road of four challenges and no baddie; and a failing team away on Highfold's hard road, the Storm Roc's
+  // exit set) load through every upgrade since (save.ts migrateSave: the XP and the Arena, the road played, every road
+  // a fight): every mission on the board and the trip's gets its region's boss and little enemies and its difficulty's
+  // packs, keeping its id, title and challenges; the trip out keeps its egg, state and clocks, and drops its baddie's
+  // exit; a trip not yet at its first stop has its road laid again as roadOf lays it now (its packs among its stops,
+  // the boss last), one further along keeps the road it was walking; the world steps on 1000, and saved again (this
+  // version) and loaded, steps on 1000 more to the same world as the one it came from
+  const lines: string[] = [];
+  for (const name of ['away', 'muster', 'board', 'walk']) {
+    const raw = JSON.parse(fs.readFileSync(new URL(`./fixtures/save-v9-${name}.json`, import.meta.url), 'utf8'));
+    if (raw.v !== 9) fail(`save (v9 ${name}): the fixture is version ${raw.v}`);
+    let w: CareSim;
+    try { w = CareSim.fromSave(migrateSave(raw) as SaveV); } catch (e) { fail(`save (v9 ${name}): it did not load: ${(e as Error).message}`); continue; }
+    const ms = w.missions, old = raw.missions, since = uses(w);
+    for (const m of [...ms.board, ...(ms.trip ? [ms.trip.mission] : [])]) {
+      const R = regionOf(m.region), D = DIFFICULTY[m.difficulty];
+      if (m.baddie !== R.baddie || m.foe !== R.foe || m.fights !== D.fights || m.pack !== D.pack) fail(`save (v9 ${name}): ${m.title} came up as ${JSON.stringify({ baddie: m.baddie, foe: m.foe, fights: m.fights, pack: m.pack })}`);
+    }
+    old.board.forEach((q: Mission, i: number) => { const m = ms.board[i]; if (!m || m.id !== q.id || m.title !== q.title || m.challenges.join() !== q.challenges.join()) fail(`save (v9 ${name}): board mission ${q.id} (${q.title}) came up as ${m?.title}`); });
+    let road = 'no team out';
+    if (old.trip) {
+      const t = ms.trip, o = old.trip;
+      if (!t || t.egg !== o.egg || t.state !== o.state || t.departAt !== o.departAt || 'exit' in t || 'turnBack' in t) fail(`save (v9 ${name}): the trip out came up as ${JSON.stringify({ egg: t?.egg, state: t?.state, departAt: t?.departAt })}`);
+      else {
+        const fresh = t.stops.every((q) => q.result === 'ahead') && !t.encounter;
+        if (fresh ? !isDeepStrictEqual(roadOf(w, t.mission, t.pairs), t.stops) || !t.stops.some((q) => q.kind === 'foes') || t.stops[t.stops.length - 1].kind !== 'baddie' : t.stops.length !== o.stops.length) fail(`save (v9 ${name}): the trip's road came up as ${t.stops.map((q) => `${q.kind} ${q.result}`).join(', ')}`);
+        road = `the trip ${t.state}, ${fresh ? 'its road laid again' : 'its road kept'}: ${t.stops.map((q) => (q.kind === 'foes' ? 'PACK' : q.kind === 'baddie' ? 'BOSS' : q.challenge)).join(' ')}${o.exit ? ` (its old exit ${o.exit} dropped)` : ''}`;
+      }
+    }
+    for (let i = 0; i < 1000; i++) w.step();
+    const blob = serialize(w), back = CareSim.fromSave(through(blob));
+    if (blob.v !== SAVE_VERSION) fail(`save (v9 ${name}): saved again at version ${blob.v}`);
+    for (let i = 0; i < 1000; i++) { w.step(); back.step(); }
+    if (back.digest() !== w.digest()) fail(`save (v9 ${name}): saved again and loaded, it drifted within 1000 steps`);
+    noteUse(w, since);
+    lines.push(`${name} (${ms.board.map((m) => `${m.title} ${m.difficulty} to ${BADDIES[m.baddie].name}`).join(', ')}; ${road})`);
+  }
+  console.log(`  6 saves (version 9, the first shipped): ${lines.join('; ')} load brought up to version ${SAVE_VERSION}, step on, and save again to the same world`);
 }
 if (ROLE === 'saves') {
   // missions and a keeper held by hand together (BASE_DESIGN 7, Saves: mid-muster and mid-away, the hand let go on
@@ -1524,8 +1618,9 @@ if (ROLE === 'babies') {
 // ---------- 23. care while a team is away (two keepers home are enough: BASE_DESIGN 5.3) ----------
 if (ROLE === 'babies') {
   // (in this worker too: 30 minutes of the real day beside the rest.) THE LOST NEST's two pairs (RIPPLE and ECHO, with
-  // their riders) sent at once, a 30-minute walk (a test's own length: missions.ts send's awaySteps) and its two stops'
-  // encounters (the trail coach's, after each pick's wait); from the send until
+  // their riders) sent at once, a 30-minute walk (a test's own length: missions.ts send's awaySteps) and its five stops'
+  // encounters (its challenges, its packs of mud goblins and the Bridge Troll: the trail coach's, after each pick's
+  // wait); from the send until
   // it lands, the five dragons home and the two keepers home: no need empties, no keeper gives up, a rider is never
   // given a job, and the waits keep section 2's gates -- the average within 25 % over its gate (BASE_DESIGN 5.2)
   const away = newSim(1), AWAY_STEPS = 30 * 60 * FPS;
@@ -1538,8 +1633,8 @@ if (ROLE === 'babies') {
     for (const k of away.keepers) if (riderIds.has(k.id) && k.job) riderJobs++;
   }
   const ast = away.stats, aAvg = ast.waitSum / Math.max(1, ast.started) / FPS, aMax = ast.waitMax / FPS, aK = ast.keeperWaitSum / Math.max(1, ast.keeperWaits) / FPS;
-  // (the walk is the 30 minutes; the two stops' encounters take their own time on top)
-  if (awaySteps < AWAY_STEPS || awaySteps > AWAY_STEPS + 6000) fail(`away: the team was away ${awaySteps} steps, not the ${AWAY_STEPS} of its walk and its two stops`);
+  // (the walk is the 30 minutes; the five stops' encounters take their own time on top)
+  if (awaySteps < AWAY_STEPS || awaySteps > AWAY_STEPS + 15000) fail(`away: the team was away ${awaySteps} steps, not the ${AWAY_STEPS} of its walk and its five stops`);
   if (riderJobs) fail(`away: a rider on the trip had a job for ${riderJobs} steps`);
   if (ast.emptySteps) fail(`away: a need at home sat at 0 for ${ast.emptySteps} dragon-steps with two keepers home`);
   if (ast.waitTimeouts) fail(`away: ${ast.waitTimeouts} keepers gave up waiting`);
@@ -2096,35 +2191,34 @@ if (MAIN) {
 // ---------- 17. the Map Room's board (#5: the mission chooser, the world map) ----------
 if (MAIN) {
   // the board is a pure function of the seed, the day and the map: the same twice; day 1 has THE LOST NEST first; three
-  // missions at most, one a region, each an explored region's; no baddie before day 3, and one on every baddie's day
-  // (3, 7, ...) whose board has a baddie's region; each difficulty's road as long as it should be, from its region's
-  // pool, no challenge twice
+  // missions at most, one a region, each an explored region's; every road ends in its region's boss and has its
+  // region's little enemies, its difficulty's packs of them (a hard road's title the boss's ground); each difficulty's
+  // road as long as it should be, from its region's pool, no challenge twice
   const all = REGIONS.map((r) => r.id), start = REGIONS.filter((r) => r.start).map((r) => r.id);
-  let boards = 0, baddies = 0, baddieDays = 0;
-  const kinds = new Map<string, number>();
+  let boards = 0;
+  const kinds = new Map<string, number>(), bosses = new Set<string>();
   for (let seed = 1; seed <= 5; seed++) for (let day = 1; day <= 10; day++) for (const map of [start, all]) {
     const a = boardFor(seed, day, map, []), b = boardFor(seed, day, map, []);
     boards++;
     if (!isDeepStrictEqual(a, b)) fail(`board: seed ${seed} day ${day} rolled twice differs`);
-    if (day === 1 && (a[0]?.title !== LOST_NEST || a[0].region !== 'millbrook' || a[0].difficulty !== 'easy' || a[0].challenges.join() !== 'flood,lost' || !a[0].guaranteedEgg || a[0].coin !== 40)) fail(`board: seed ${seed} day 1 does not start with THE LOST NEST (${a[0]?.title})`);
+    if (day === 1 && (a[0]?.title !== LOST_NEST || a[0].region !== 'millbrook' || a[0].difficulty !== 'easy' || a[0].challenges.join() !== 'flood,lost' || !a[0].guaranteedEgg || a[0].coin !== 40
+      || a[0].baddie !== 'bridgetroll' || a[0].foe !== 'mudgoblin' || a[0].fights !== DIFFICULTY.easy.fights || a[0].pack !== DIFFICULTY.easy.pack)) fail(`board: seed ${seed} day 1 does not start with THE LOST NEST and its troll (${a[0]?.title}, ${a[0]?.baddie})`);
     if (a.length > BOARD_MAX || a.length !== Math.min(BOARD_MAX, map.length)) fail(`board: seed ${seed} day ${day} has ${a.length} missions for ${map.length} regions`);
     if (new Set(a.map((m) => m.region)).size !== a.length || a.some((m) => !map.includes(m.region))) fail(`board: seed ${seed} day ${day} has two missions in a region, or one in an unexplored one`);
     if (new Set(a.map((m) => m.id)).size !== a.length) fail(`board: seed ${seed} day ${day}'s missions share an id`);
-    // (a baddie's day: a region with a baddie on the board shows its hard road -- a big baddie to meet from day 3)
-    if (baddieDay(day) && a.some((m) => regionOf(m.region).baddie) && !a.some((m) => m.baddie)) fail(`board: seed ${seed} day ${day}, a baddie's day, has no road ending in a baddie (${a.map((m) => `${m.title} ${m.difficulty}`).join(', ')})`);
     for (const m of a) {
-      const D = DIFFICULTY[m.difficulty], pool = regionOf(m.region).pool;
+      const D = DIFFICULTY[m.difficulty], R = regionOf(m.region), pool = R.pool;
       kinds.set(m.difficulty, (kinds.get(m.difficulty) ?? 0) + 1);
-      if (m.baddie) baddies++;
-      if (m.baddie && day < BADDIE_FROM_DAY) fail(`board: seed ${seed} day ${day}: ${m.title} ends in a baddie before day ${BADDIE_FROM_DAY}`);
-      if (m.baddie && baddieDay(day)) baddieDays++;
-      if (m.baddie && (m.difficulty !== 'hard' || m.baddie !== regionOf(m.region).baddie)) fail(`board: ${m.title}'s baddie ${m.baddie} is not its hard road's`);
-      const want = m.difficulty === 'hard' && !m.baddie ? D.challenges + 1 : D.challenges;
+      bosses.add(m.baddie);
+      // (every road: its region's boss at the end, its region's little enemies, its difficulty's packs of them)
+      if (m.baddie !== R.baddie || m.foe !== R.foe || m.fights !== D.fights || m.pack !== D.pack) fail(`board: ${m.title} (${m.region} ${m.difficulty}) has ${JSON.stringify({ baddie: m.baddie, foe: m.foe, fights: m.fights, pack: m.pack })}`);
+      if (m.difficulty === 'hard' && m.title !== R.baddieTitle) fail(`board: ${m.title}, a hard road, is not titled for its boss's ground (${R.baddieTitle})`);
+      const want = D.challenges;
       if (m.challenges.length !== want || new Set(m.challenges).size !== want || m.challenges.some((c) => !pool.includes(c))) fail(`board: seed ${seed} day ${day}: ${m.title} (${m.difficulty}) has ${m.challenges.join(', ')}`);
       if (m.days !== D.days || m.coin !== D.coin || (m.title !== LOST_NEST && m.eggChance !== D.egg)) fail(`board: ${m.title}'s days, coin or egg chance are not its difficulty's`);
     }
   }
-  // the world map's places (BASE_DESIGN 5.1): every region's titles and its baddie's are its places, in order; THE LOST
+  // the world map's places (BASE_DESIGN 5.1): every region's titles and its boss's are its places, in order; THE LOST
   // NEST is met at WILLOW POND; every board mission above is at one of its own region's places
   for (const r of REGIONS) {
     const names = r.places.map((p) => p.name), want = [...r.titles, ...(r.baddieTitle ? [r.baddieTitle] : [])];
@@ -2158,41 +2252,41 @@ if (MAIN) {
   }
   if (rolls.join() !== '725,1325,1925' || w.missions.day !== 4) fail(`board: rolled at clocks ${rolls.join(', ')} (day ${w.missions.day}), not at each 05:00 (725, 1325, 1925 on a 600-step day from 07:00)`);
   noteUse(w);
-  console.log(`  17 board: ${boards} boards (seeds 1-5, days 1-10, the start's map and the whole) the same rolled twice, day 1's always THE LOST NEST first; ${[...kinds].map(([k, n]) => `${n} ${k}`).join(', ')}, ${baddies} ending in a baddie (none before day ${BADDIE_FROM_DAY}; ${baddieDays} on a baddie's day, one on every such board with a baddie's region); a world's board rolled at clocks ${rolls.join(' and ')} (each 05:00); the world map's ${PLACES.length} places each a title of its region, every board mission at its place (THE LOST NEST at WILLOW POND), its layout sound and every place under the new game's clouds hidden`);
+  if (bosses.size !== REGIONS.length) fail(`board: only ${[...bosses].join(', ')} were met on the boards`);
+  console.log(`  17 board: ${boards} boards (seeds 1-5, days 1-10, the start's map and the whole) the same rolled twice, day 1's always THE LOST NEST first; ${[...kinds].map(([k, n]) => `${n} ${k}`).join(', ')}, every one ending in its region's boss (${[...bosses].join(', ')}) with its packs of little enemies (${(['easy', 'normal', 'hard'] as const).map((d) => `${d} ${DIFFICULTY[d].fights} of ${DIFFICULTY[d].pack}`).join(', ')}); a world's board rolled at clocks ${rolls.join(' and ')} (each 05:00); the world map's ${PLACES.length} places each a title of its region, every board mission at its place (THE LOST NEST at WILLOW POND), its layout sound and every place under the new game's clouds hidden`);
 }
 
 // ---------- 18. the forecast (#5: the team meets the road's challenges; BASE_DESIGN 11) ----------
 if (MAIN) {
   // the trail coach's dry run of a road (encounter.ts forecastRoad, through missions.ts forecastOf), read for hand-picked
   // teams (moods set by hand: every need full, or food at 0.2 for a low one): THE LOST NEST with both counters (RIPPLE the
-  // flood, ECHO the lost things) is cleared in one try a stop with no puff lost; RIPPLE alone clears both (the flood
-  // STRONG, the lost things by a helping try that just makes the easy mark in good spirits, and falls short once when
-  // low); a hard road with both of the Storm Roc's counters is cleared whole; EMBER alone on the Mole King's road clears
-  // its three obstacles (a second try each) and loses the fight (three of four); an empty team clears nothing; the
-  // share is the stops'; and BEST TEAM on THE LOST NEST is the two counters
+  // flood, ECHO the lost things) are forecast with their packs and boss as well as their skill checks; RIPPLE alone
+  // clears challenges and packs but cannot wear the boss out, while the best team clears the whole road; other regions
+  // exercise their own boss counters, and an empty team clears nothing.
   const w = newSim(1), by = (n: string) => w.dragons.find((d) => d.name === n)!, keeper = (n: string) => w.keepers.find((k) => k.name === n)!.id;
   const mood = (n: string, good: boolean) => { const d = by(n); for (const k of NEEDS) if (hasNeed(d.element, k)) d.needs[k] = 1; if (!good) d.needs.food = 0.2; d.mood = moodOf(d.element, d.needs); };
   const nest = w.missions.board.find((m) => m.title === LOST_NEST)!;
-  const mission = (region: RegionId, challenges: ChallengeId[], baddie: BaddieId | null): Mission => ({ id: 999, region, title: 'TEST', difficulty: 'hard', challenges, baddie, days: 3, coin: 150, eggChance: 0.6, guaranteedEgg: false });
+  const mission = (region: RegionId, challenges: ChallengeId[]): Mission => ({ id: 999, ...roadFor(region, 'hard'), title: 'TEST', challenges, days: 3, coin: 150, eggChance: 0.6, guaranteedEgg: false });
   const cases: [string, Mission, [string, string][], Record<string, boolean>, { cleared: number; turns?: number; puff?: (p: number) => boolean }][] = [
-    ['THE LOST NEST, RIPPLE (IRIS) and ECHO (TOMAS), both in good spirits', nest, [['RIPPLE', 'IRIS'], ['ECHO', 'TOMAS']], { RIPPLE: true, ECHO: true }, { cleared: 2, turns: 2, puff: (p) => p === 1 }],
-    ['THE LOST NEST, RIPPLE alone, in good spirits', nest, [['RIPPLE', 'IRIS']], { RIPPLE: true }, { cleared: 2, turns: 2, puff: (p) => p === 1 }],
-    ['THE LOST NEST, RIPPLE alone, low', nest, [['RIPPLE', 'IRIS']], { RIPPLE: false }, { cleared: 2, turns: 3, puff: (p) => p > 0.75 && p < 1 }],
-    ['a hard road, both of the Storm Roc\'s counters: ZAP (PIP) and WICK (IRIS)', mission('highfold', ['storm', 'dark', 'gap'], 'stormroc'), [['ZAP', 'PIP'], ['WICK', 'IRIS']], { ZAP: true, WICK: true }, { cleared: 4 }],
-    ['the Mole King\'s road with neither counter: EMBER (PIP) alone', mission('oldmine', ['dark', 'heavy', 'lost'], 'moleking'), [['EMBER', 'PIP']], { EMBER: true }, { cleared: 3 }],
+    ['THE LOST NEST, RIPPLE (IRIS) and ECHO (TOMAS), both in good spirits', nest, [['RIPPLE', 'IRIS'], ['ECHO', 'TOMAS']], { RIPPLE: true, ECHO: true }, { cleared: 5, puff: (p) => p > 0.9 }],
+    ['THE LOST NEST, RIPPLE alone, in good spirits', nest, [['RIPPLE', 'IRIS']], { RIPPLE: true }, { cleared: 4 }],
+    ['THE LOST NEST, RIPPLE alone, low', nest, [['RIPPLE', 'IRIS']], { RIPPLE: false }, { cleared: 4 }],
+    ['a hard road, both of the Storm Roc\'s counters: ZAP (PIP) and WICK (IRIS)', mission('highfold', ['storm', 'dark', 'gap']), [['ZAP', 'PIP'], ['WICK', 'IRIS']], { ZAP: true, WICK: true }, { cleared: 7 }],
+    ['the Mole King\'s road with neither counter: EMBER (PIP) alone', mission('oldmine', ['dark', 'heavy', 'lost']), [['EMBER', 'PIP']], { EMBER: true }, { cleared: 6 }],
   ];
   const rows: string[] = [];
   for (const [what, m, team, moods, want] of cases) {
     for (const [n, good] of Object.entries(moods)) mood(n, good);
     const pairs = team.map(([d, k]) => ({ dragon: by(d).id, keeper: keeper(k) })), got = forecastOf(w, m, pairs);
-    if (got.cleared !== want.cleared || got.stops !== m.challenges.length + (m.baddie ? 1 : 0) || (want.turns != null && got.turns !== want.turns) || (want.puff && !want.puff(got.puff))) fail(`forecast: ${what}: ${JSON.stringify(got)}, not ${JSON.stringify(want)}`);
+    if (got.cleared !== want.cleared || got.stops !== m.challenges.length + m.fights + 1 || (want.turns != null && got.turns !== want.turns) || (want.puff && !want.puff(got.puff))) fail(`forecast: ${what}: ${JSON.stringify(got)}, not ${JSON.stringify(want)}`);
     if (Math.abs(forecastShare(got) - got.cleared / got.stops) > 1e-6) fail(`forecast: ${what}: the share is ${forecastShare(got)}`);
     rows.push(`${got.cleared}/${got.stops} in ${got.turns} turns, ${Math.round(got.puff * 100)} % puff`);
   }
   if (forecastOf(w, nest, []).cleared !== 0 || forecastShare(forecastOf(w, nest, [])) !== 0) fail('forecast: an empty team clears a stop');
-  const best = bestTeam(w, nest).map((p) => by(w.dragons[p.dragon].name).name).sort();
-  if (!isDeepStrictEqual(best, ['ECHO', 'RIPPLE'])) fail(`forecast: BEST TEAM on THE LOST NEST is ${best.join(' and ')}, not RIPPLE and ECHO`);
-  console.log(`  18 forecast: ${cases.length} hand-picked teams: ${rows.join('; ')}; an empty team 0; BEST TEAM on THE LOST NEST ${best.join(' and ')}`);
+  const bestPairs = bestTeam(w, nest), best = bestPairs.map((p) => w.dragons.find((d) => d.id === p.dragon)!.name).sort(), bf = forecastOf(w, nest, bestPairs);
+  const counters = forecastOf(w, nest, [['RIPPLE', 'IRIS'], ['ECHO', 'TOMAS']].map(([d, k]) => ({ dragon: by(d).id, keeper: keeper(k) })));
+  if (bf.cleared !== bf.stops || bf.turns > counters.turns || bestPairs.length !== 2) fail(`forecast: BEST TEAM on THE LOST NEST (${best.join(' and ')}) forecasts ${JSON.stringify(bf)}, its two counters ${JSON.stringify(counters)}`);
+  console.log(`  18 forecast: ${cases.length} hand-picked teams: ${rows.join('; ')}; an empty team 0; BEST TEAM on THE LOST NEST ${best.join(' and ')} (all ${bf.stops} stops in ${bf.turns} turns; its two counters in ${counters.turns})`);
 }
 
 // ---------- 19. who may go (#5: dragons and people as solutions; BASE_DESIGN 5.2: 2 keepers home) ----------
@@ -2320,9 +2414,9 @@ if (MAIN) {
   }
   // (b) THE LOST NEST with RIPPLE and ECHO on a short day (seed 2: both counters, a sure egg), stepped through: the muster
   // (the Map Room, the Tack Room and the Aerie used; both up by the lift; 3600 steps or fewer), away (no job for the team,
-  // no job for its riders, the needs frozen), its two stops met and cleared by the trail coach (nobody watching: each
-  // pick waits PICK_WAIT_TRAIL for the player first), XP for both, back once the road is walked whole -- a day's walk and
-  // the stops' turns -- with food and sleep down, the egg in its reserved nest, the saddles hung back, the riders rested
+  // no job for its riders, the needs frozen), its five stops met and cleared by the trail coach (nobody watching: each
+  // pick waits PICK_WAIT_TRAIL for the player first) -- its challenges, its packs of mud goblins, the Bridge Troll -- XP
+  // for both (each stop's own), back once the road is walked whole -- a day's walk and the stops' turns -- with food and sleep down, the egg in its reserved nest, the saddles hung back, the riders rested
   // in the Bunks and back on duty, the coin paid, the trip over, and the region's neighbour revealed at the next dawn
   const w = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 2, dayLen: 600 });
   const rides0 = w.stats.liftRides, used0 = { ...w.stats.used }, uses0 = uses(w);
@@ -2338,7 +2432,7 @@ if (MAIN) {
     w.step();
     for (const e of w.events) {
       if (e.kind === 'meet') { met.push(e.name); if (t.walked !== stopStart(t, e.stop) || t.encounter?.stop !== e.stop || t.encounter.state !== 'meet') fail(`trip, step ${w.tick}: ${e.name} met at walked ${t.walked} (its start ${stopStart(t, e.stop)}), the encounter ${JSON.stringify(t.encounter && { stop: t.encounter.stop, state: t.encounter.state })}`); }
-      if (e.kind === 'stopEnd') { ends.push(`${e.name} ${e.cleared ? 'cleared' : 'waited out'} +${e.xp}`); if (!e.cleared || e.xp !== XP_ROAD.cleared) fail(`trip, step ${w.tick}: ${e.name} ended ${JSON.stringify(e)}`); }
+      if (e.kind === 'stopEnd') { ends.push(`${e.name} ${e.cleared ? 'cleared' : 'waited out'} +${e.xp}`); if (!e.cleared || e.xp !== xpOf(t.stops[e.stop].kind, true)) fail(`trip, step ${w.tick}: ${e.name} ended ${JSON.stringify(e)}`); }
     }
     // (the walk stands still at a stop, and the picks wait PICK_WAIT_TRAIL for the player each turn before the coach's)
     if (encBefore && t.encounter === encBefore && t.walked !== (encBefore ? t.walked : -1)) fail(`trip, step ${w.tick}: the team walked on at a stop`);
@@ -2357,7 +2451,8 @@ if (MAIN) {
     if (t.state === 'return' && before === 'away') {
       landedAt = w.tick;
       if (t.walked !== t.travel || t.encounter || t.stops.some((q) => q.result !== 'met') || t.success !== true) fail(`trip: landed with the road ${JSON.stringify({ walked: t.walked, travel: t.travel, stops: t.stops.map((q) => q.result), success: t.success })}`);
-      if (team.some((d, i) => d.xp !== xp0[i] + 2 * XP_ROAD.cleared)) fail(`trip: the team came home with XP ${team.map((d) => d.xp).join(', ')} (want +${2 * XP_ROAD.cleared} each)`);
+      const roadXp = t.stops.reduce((n, q) => n + xpOf(q.kind, true), 0);
+      if (team.some((d, i) => d.xp !== xp0[i] + roadXp)) fail(`trip: the team came home with XP ${team.map((d) => d.xp).join(', ')} (want +${roadXp} each)`);
       team.forEach((d, i) => { for (const k of ['food', 'sleep'] as const) if (Math.abs(d.needs[k] - Math.min(pre[i][k], 0.45)) > 1e-9) fail(`trip: ${d.name}'s ${k} landed at ${d.needs[k]}, not min(${pre[i][k]}, 0.45)`); });
       landNeeds = team.map((d) => `${d.name} food ${d.needs.food.toFixed(2)} sleep ${d.needs.sleep.toFixed(2)}`).join(', ');
     }
@@ -2368,22 +2463,22 @@ if (MAIN) {
       revealed = JSON.stringify({ first: w.missions.firstSuccess, pending: w.missions.pendingReveal, frost: w.missions.explored.includes('frostmere') });
       if (revealed !== JSON.stringify({ first: ['millbrook'], pending: ['frostmere'], frost: false })) fail(`trip: as it ended, ${revealed}`);
     }
-    if (overAt > 0 && w.clock % w.dayLen === 125 && !w.missions.explored.includes('frostmere')) fail('trip: FROSTMERE was not revealed at the dawn after the success');
+    if (overAt > 0 && w.tick > overAt && w.clock % w.dayLen === 125 && !w.missions.explored.includes('frostmere')) fail('trip: FROSTMERE was not revealed at the dawn after the success');
   }
   const used = (k: string) => (w.stats.used[k] ?? 0) - (used0[k] ?? 0);
   if (departed < 0 || departed > 3600) fail(`trip: the muster took ${departed} steps (want <= 3600)`);
   if (w.stats.liftRides - rides0 < 2 || upBy.size !== 2) fail(`trip: the team rode up to the Aerie ${upBy.size} of 2 (rides ${w.stats.liftRides - rides0})`);
   for (const k of ['maproom', 'tack', 'aerie', 'bunks']) if (!used(k)) fail(`trip: the ${k} was not used`);
   if (used('aerie') !== 2 || used('tack') !== 4 || used('maproom') !== 1) fail(`trip: used the Aerie ${used('aerie')}, the Tack Room ${used('tack')}, the Map Room ${used('maproom')} times (want 2, 4, 1)`);
-  if (awayAt < 0 || landedAt < 0 || landedAt - awayAt < w.dayLen + 2 * MEET_STEPS) fail(`trip: away at ${awayAt}, landed at ${landedAt} (want a day's walk, ${w.dayLen} steps, and its two stops' turns)`);
-  if (met.length !== 2 || ends.length !== 2 || picksWaited < 2) fail(`trip: the road met ${met.join(', ')} and ended ${ends.join(', ')}; the coach picked after the player's wait ${picksWaited} times`);
+  if (awayAt < 0 || landedAt < 0 || landedAt - awayAt < w.dayLen + t.stops.length * MEET_STEPS) fail(`trip: away at ${awayAt}, landed at ${landedAt} (want a day's walk, ${w.dayLen} steps, and its ${t.stops.length} stops' turns)`);
+  if (met.length !== t.stops.length || ends.length !== t.stops.length || t.stops.length !== 5 || picksWaited < t.stops.length) fail(`trip: the road met ${met.join(', ')} and ended ${ends.join(', ')}; the coach picked after the player's wait ${picksWaited} times`);
   const egg = w.eggs.find((e) => e.nest === t.nest) ?? null;
   if (laid < 0 || (egg && egg.element !== t.egg)) fail(`trip: the ${t.egg} egg was not laid in nest ${t.nest} (${JSON.stringify(w.eggs)})`);
   if (w.missions.trip || overAt < 0) fail('trip: the trip never ended');
   if (w.missions.coin !== 40) fail(`trip: the coin is ${w.missions.coin}, not 40`);
   if (riders.some((k) => onTrip(k) || k.phase === 'rest' || k.carrying === 'saddle' || k.carrying === 'egg')) fail(`trip: the riders are ${riders.map((k) => `${k.name} ${k.phase} ${k.carrying}`).join(', ')}, not back on duty`);
   if (team.some((d) => d.place !== 'barn' || d.goal === 'muster')) fail(`trip: the team is ${team.map((d) => `${d.name} ${d.place} ${d.goal}`).join(', ')}, not home`);
-  const dawn = () => w.clock % w.dayLen === 125;
+  const dawn = () => w.tick > overAt && w.clock % w.dayLen === 125;
   while (!dawn()) w.step();
   if (!w.missions.explored.includes('frostmere') || w.missions.pendingReveal.length) fail(`trip: FROSTMERE was not revealed at the next dawn (explored ${w.missions.explored})`);
   // (and the egg hatches, two days after it was laid, into a baby of its element)
@@ -2548,14 +2643,12 @@ if (ROLE === 'babies') {
 
 // ---------- 24. the watchable scene (BASE_DESIGN 6, 11; #5: challenges on the road, the big baddie) ----------
 if (ROLE === 'service') {
-  // an easy, a normal and a hard road with each of the three baddies (the best two pairs), and the Mole King's road with a
-  // lone pair that can't wear it out, on a 600-step day, the trail coach playing (AUTO): every step of the trip read
-  // from the scene's pure function and checked against the last step's
-  const runs: [RegionId, Difficulty, boolean][] = [['millbrook', 'easy', false], ['bramblewood', 'normal', false], ['oldmine', 'hard', false], ['highfold', 'hard', false], ['frostmere', 'hard', false], ['oldmine', 'hard', true]];
-  const EXITS: readonly string[] = ['calmed', 'outwitted', 'drivenOff'];
-  // (the outwitted one wanders off at a plain walk: the art kit's exitLook, baddies.ts; 'leave' is the driven-off shuffle)
-  const EXIT_LOOK: Readonly<Record<string, { pose: string; face: string }>> = { calmed: { pose: 'sit', face: 'sleepy' }, outwitted: { pose: 'walk', face: 'neutral' }, drivenOff: { pose: 'leave', face: 'grumpy' } };
-  let travelSteps = 0, inFrame = 0, frames = 0, petChecks = 0;
+  // every boss's road -- an easy one (the Bridge Troll), two normal (the Briar Boar, the Cinder Golem) and two hard ones
+  // (the Storm Roc, the Frost Giant) by the best two pairs, and the Mole King's hard road by a lone pair that can't wear
+  // it out -- on a 600-step day, the trail coach playing (AUTO): every step of the trip read from the scene's pure
+  // function and checked against the last step's
+  const runs: [RegionId, Difficulty, boolean][] = [['millbrook', 'easy', false], ['bramblewood', 'normal', false], ['emberfell', 'normal', false], ['highfold', 'hard', false], ['frostmere', 'hard', false], ['oldmine', 'hard', true]];
+  let travelSteps = 0, inFrame = 0, frames = 0, petChecks = 0, packFrames = 0, shotFrames = 0;
   const lines: string[] = [];
   for (const [region, diff, lone] of runs) {
     const sim = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 1, dayLen: 600 });
@@ -2574,7 +2667,8 @@ if (ROLE === 'service') {
     const z = sceneAt(sim, trip);
     if (z.xs.some((x, i) => x !== -PAIR_BACK * i) || z.n !== 0 || z.done || z.stop != null || z.last != null) fail(`${what}: at the start the team is at ${z.xs.join(', ')} (n ${z.n}, done ${z.done}, stop ${z.stop}), not at its places`);
     if (!isDeepStrictEqual(sceneAt(sim, trip), sceneAt(sim, trip))) fail(`${what}: two reads of one state differ`);
-    let prev: SceneFrame | null = null, prevU: number | null = null, exitSeen: string | null = null, lastOff: number | null = null, reached = -1, bad = 0;
+    let prev: SceneFrame | null = null, prevU: number | null = null, lastOff: number | null = null, reached = -1, bad = 0;
+    const exits = new Set<string>(), marks = new Set<string>(), boss = stops[stops.length - 1];
     const met: number[] = [], ended: number[] = [], walkedThrough: number[] = [];
     let inPassage = 0;
     let title: string | null = null, endWalked = -1;
@@ -2606,16 +2700,31 @@ if (ROLE === 'service') {
       // (the banner: the stop's name as it is met, the encounter's lines through it, how it went after -- never the outcome)
       if (f.banner && /HOME SAFE|NOT THIS TIME/.test(f.banner)) fail(`${what}: the banner tells the outcome at E ${E}: ${f.banner}`);
       if (f.stop != null && (!enc || enc.stop !== f.stop || !f.banner)) fail(`${what}: the team stands at stop ${f.stop} with ${enc ? `the encounter at ${enc.stop}` : 'no encounter'}, banner ${JSON.stringify(f.banner)} at E ${E}`);
-      // (the baddie: a face of the four; it moves only the way it faces -- in from the right facing the team, then its
-      // exit's way, the art kit's exitLook -- and one that walks off (outwitted, driven off) stays ahead of every rider
-      // until it is off the screen's right edge: never back through the team)
-      if (f.baddie && trip.exit && f.baddie.pose === EXIT_LOOK[trip.exit].pose && f.baddie.face === EXIT_LOOK[trip.exit].face) exitSeen = trip.exit;
-      if (f.baddie && !['neutral', 'grumpy', 'surprised', 'sleepy'].includes(f.baddie.face)) fail(`${what}: the baddie's face is ${f.baddie.face}`);
-      if (f.baddie && prev?.baddie && (f.baddie.x - prev.baddie.x) * f.baddie.facing < -1e-9) fail(`${what}: the baddie moved ${f.baddie.x - prev.baddie.x} facing ${f.baddie.facing} (${f.baddie.pose}) at E ${E}`);
-      if (f.baddie && (trip.exit === 'outwitted' || trip.exit === 'drivenOff') && stops.some((q) => q.kind === 'baddie' && q.result !== 'ahead')) {
-        if (f.xs.some((x) => x + RIDER_AHEAD >= f.baddie!.x)) fail(`${what}: the baddie (${trip.exit}, ${f.baddie.pose} at x ${f.baddie.x}) is not ahead of the team (${f.xs.map((x) => x + RIDER_AHEAD).join(', ')}) at E ${E}`);
-        lastOff = f.baddie.x - f.camX;
+      // (the boss: a face of its three; it moves only the way it faces -- in from the right facing the team, then off up
+      // the road -- and once it has turned to leave (worn out: down seeing stars, then off; not: stomping off unbeaten)
+      // it stays ahead of every rider until it is off the screen's right edge: never back through the team)
+      if (f.baddie && !['fierce', 'hurt', 'dazed'].includes(f.baddie.face)) fail(`${what}: the boss's face is ${f.baddie.face}`);
+      if (f.baddie && prev?.baddie && (f.baddie.x - prev.baddie.x) * f.baddie.facing < -1e-9) fail(`${what}: the boss moved ${f.baddie.x - prev.baddie.x} facing ${f.baddie.facing} (${f.baddie.pose}) at E ${E}`);
+      if (f.baddie && boss.result !== 'ahead') {
+        if (boss.result === 'met' && (f.baddie.pose === 'down' || f.baddie.pose === 'flee')) exits.add(f.baddie.pose);
+        if (boss.result === 'unmet' && f.baddie.pose === 'walk' && f.baddie.facing === 1) exits.add('stomp');
+        if (f.baddie.facing === 1) {
+          if (f.xs.some((x, i) => x + f.riders[i].dx >= f.baddie!.x)) fail(`${what}: the boss (${f.baddie.pose} at x ${f.baddie.x}) is not ahead of the team (${f.xs.map((x, i) => x + f.riders[i].dx).join(', ')}) at E ${E}`);
+          lastOff = f.baddie.x - f.camX;
+        }
       }
+      // (a pack: only at its own stop, each of it moving only the way it faces -- in from the right facing the team, then,
+      // not worn out, scampering off up the road -- and gone from the road once its stop is over; the fights' marks)
+      if (f.foes.length) {
+        packFrames++;
+        if (f.stop == null || stops[f.stop].kind !== 'foes' || f.foes.some((q) => q.id !== stops[f.stop!].foe)) fail(`${what}: ${f.foes.length} of a pack on the road at E ${E}, the team at stop ${f.stop}`);
+        if (prev && prev.foes.length === f.foes.length && f.foes.some((q, k) => (q.x - prev!.foes[k].x) * q.facing < -1e-9) && bad++ < 3) fail(`${what}: one of the pack moved against the way it faces at E ${E}`);
+      }
+      for (const mk of f.marks) marks.add(mk.kind);
+      if (f.shots.length) shotFrames++;
+      // (the riders: beside their dragons on the walk and at an obstacle, stepped back behind them through a fight's turns)
+      if (enc?.kind === 'fight' && (enc.state === 'pick' || enc.state === 'play') && f.riders.some((r) => r.dx !== RIDER_FIGHT) && bad++ < 3) fail(`${what}: in a fight the riders stand at ${f.riders.map((r) => r.dx).join(', ')} at E ${E}`);
+      if ((!enc || enc.kind === 'obstacle') && f.riders.some((r) => r.dx !== RIDER_AHEAD) && bad++ < 3) fail(`${what}: off a fight the riders stand at ${f.riders.map((r) => r.dx).join(', ')} at E ${E}`);
       // (the Map Room map's flag on the road, missionview.ts roadFraction: climbing while the team walks on, standing still
       // through a stop, never going back, never outside 0..1, 1 at the road's end)
       const u = roadFraction(sim, trip);
@@ -2665,20 +2774,15 @@ if (ROLE === 'service') {
     if (walkedThrough.some((j, k) => !landStops.includes(j) || (k > 0 && j <= walkedThrough[k - 1]))) fail(`${what}: the lead walked passages ${walkedThrough.join(',')} (${inPassage} frames), the land stops are ${landStops.join(',')}`);
     const cleared = stops.filter((q) => q.result === 'met').length;
     if (trip.success !== (cleared === stops.length) || title !== (trip.success ? 'HOME SAFE!' : 'NOT THIS TIME')) fail(`${what}: ${cleared} of ${stops.length} cleared, success ${trip.success}, the result card ${title}`);
-    // (the fight: the best team, with both counters, wears the baddie out; a lone pair with neither sits it out -- the
-    // obstacles are checks the road's own rolls decide, so a best team can still come home NOT THIS TIME)
-    const kb = stops.findIndex((q) => q.kind === 'baddie');
-    if (lone && (trip.success || (kb >= 0 && stops[kb].result === 'met'))) fail(`${what}: a lone pair wore the Mole King out (${stops.map((q) => q.result).join(', ')})`);
-    if (!lone && kb >= 0 && stops[kb].result !== 'met') fail(`${what}: the best team sat the fight out (${stops.map((q) => `${q.result} in ${q.turns}`).join(', ')})`);
-    // (a baddie always leaves the road, worn out or waited out, by its own exit: the team walks on past where it stood)
-    if (trip.exit !== (trip.mission.baddie ? BADDIES[trip.mission.baddie].exit : null)) fail(`${what}: the baddie's exit is ${trip.exit}`);
-    if (trip.mission.baddie) {
-      if (!trip.exit || !EXITS.includes(trip.exit)) fail(`${what}: the baddie's exit is ${trip.exit}`);
-      if (exitSeen !== trip.exit) fail(`${what}: the baddie's exit (${trip.exit}) was never shown`);
-      if (trip.exit !== 'calmed' && (lastOff == null || lastOff <= 640)) fail(`${what}: the baddie (${trip.exit}) was last seen at screen x ${lastOff}, not off the right edge`);
-    }
+    if (lone && trip.success) fail(`${what}: a lone pair wore the Mole King out (${stops.map((q) => q.result).join(', ')})`);
+    // (the boss always leaves the road, worn out or not -- down seeing stars and then off up it, or stomping off unbeaten
+    // -- ahead of the team, off the screen's right edge; the packs fought off went up in smoke; bolts and missiles flew)
+    const exit = boss.result === 'met' ? ['down', 'flee'] : ['stomp'];
+    if (boss.kind !== 'baddie' || !exit.every((x) => exits.has(x))) fail(`${what}: the boss's exit (${exit.join(' then ')}) was never shown (${[...exits].join(', ') || 'nothing'})`);
+    if (lastOff == null || lastOff <= 640) fail(`${what}: the boss was last seen at screen x ${lastOff}, not off the right edge`);
+    if (!stops.some((q) => q.kind === 'foes') || (stops.some((q) => q.kind === 'foes' && q.result === 'met') && !marks.has('poof')) || !marks.has('spark')) fail(`${what}: the road's fights showed marks ${[...marks].join(', ') || 'none'}`);
     noteUse(sim);
-    lines.push(`${region} ${diff}${lone ? ' (RIPPLE alone)' : ''}: all ${stops.length} stops met (${stops.map((q) => `${q.result} in ${q.turns}`).join(', ')}), ${walkedThrough.length} passages walked through (${walkedThrough.map((j) => PASSAGES[stops[j].challenge!]).join(', ')}, ${inPassage} frames), ${title} at the end${trip.mission.baddie ? `, ${trip.mission.baddie} ${trip.exit}${lastOff != null ? ` (off ahead of the team, last seen at screen x ${lastOff.toFixed(0)})` : ''}` : ''}`);
+    lines.push(`${region} ${diff}${lone ? ' (RIPPLE alone)' : ''}: all ${stops.length} stops met (${stops.map((q) => `${q.kind === 'foes' ? 'pack' : q.kind === 'baddie' ? 'boss' : q.challenge} ${q.result} in ${q.turns}`).join(', ')}), ${title} at the end; ${BADDIES[trip.mission.baddie].name} ${boss.result === 'met' ? 'down seeing stars, then off' : 'off unbeaten'} (last seen at screen x ${lastOff?.toFixed(0)})`);
   }
   // (a long road -- the dark, thorns and fog on a 15000-step walk, the stops far apart -- read every fourth step: each
   // land stop's passage is PASSAGE_LEN long from PASSAGE_FROM past its set piece, drawn as the stop went (the cave lit
@@ -2687,9 +2791,10 @@ if (ROLE === 'service') {
   // a stop inside one)
   {
     const sim = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 3, dayLen: 600 });
-    const m: Mission = { id: 997, region: 'oldmine', title: 'THE LONG ROAD', difficulty: 'normal', challenges: ['dark', 'thorns', 'fog'], baddie: null, days: 2, coin: 80, eggChance: 0, guaranteedEgg: false };
+    const m: Mission = { id: 997, region: 'oldmine', title: 'THE LONG ROAD', difficulty: 'normal', challenges: ['dark', 'thorns', 'fog'], baddie: 'moleking', foe: 'moleminer', fights: 1, pack: 2, days: 2, coin: 80, eggChance: 0, guaranteedEgg: false };
     const wick = sim.dragons.find((d) => d.name === 'WICK')!, ember = sim.dragons.find((d) => d.name === 'EMBER')!, iris = sim.keepers.find((k) => k.name === 'IRIS')!, bea = sim.keepers.find((k) => k.name === 'BEA')!;
     const trip = tripOf(sim, m, [{ dragon: wick.id, keeper: iris.id }, { dragon: ember.id, keeper: bea.id }], 15000);
+    const landStops = trip.stops.flatMap((q, j) => q.kind === 'challenge' ? [j] : []);
     trip.auto = true;
     awayNow(sim, trip, sim.clock);
     const runs: { stop: number; frames: number; from: number; state: string; resolved: boolean }[] = [];
@@ -2698,15 +2803,16 @@ if (ROLE === 'service') {
       sim.step();
       if (s % 4) continue;
       const f = sceneAt(sim, trip);
-      if (f.passages.length !== 3 || f.passages.some((p, j) => p.stop !== j || p.x1 - p.x0 !== PASSAGE_LEN || p.x0 !== f.pieces[j].x + PASSAGE_FROM || p.state !== f.pieces[j].state)) fail(`scene (long road): the passages are ${JSON.stringify(f.passages)} beside the pieces ${JSON.stringify(f.pieces)} at step ${s}`);
+      if (f.passages.length !== 3 || f.passages.some((p, j) => p.stop !== landStops[j] || p.x1 - p.x0 !== PASSAGE_LEN || p.x0 !== f.pieces[j].x + PASSAGE_FROM || p.state !== f.pieces[j].state)) fail(`scene (long road): the passages are ${JSON.stringify(f.passages)} beside the pieces ${JSON.stringify(f.pieces)} at step ${s}`);
       if (f.passage == null) { lastIn = null; continue; }
       if (f.stop != null) fail(`scene (long road): the lead stands at stop ${f.stop} inside stop ${f.passage}'s passage at step ${s}`);
-      if (lastIn !== f.passage) { runs.push({ stop: f.passage, frames: 0, from: s, state: f.passages[f.passage].state, resolved: trip.stops[f.passage].result !== 'ahead' }); lastIn = f.passage; }
+      const passage = f.passages.find((q) => q.stop === f.passage)!;
+      if (lastIn !== f.passage) { runs.push({ stop: f.passage, frames: 0, from: s, state: passage.state, resolved: trip.stops[f.passage].result !== 'ahead' }); lastIn = f.passage; }
       runs[runs.length - 1].frames++;
     }
     const V = Math.min(...trip.pairs.map((p) => { const d = sim.dragons.find((q) => q.id === p.dragon)!; return gaitOf(d.element, d.stage).avg; }));
     const want = Math.floor(PASSAGE_LEN / V / 4);
-    if (runs.length !== 3 || runs.some((r, j) => r.stop !== j || !r.resolved || r.state === 'ahead' || Math.abs(r.frames - want) > 3)) fail(`scene (long road): the lead walked the passages as ${JSON.stringify(runs)} (want three, stops 0-2 in order, each resolved, about ${want} reads of ${PASSAGE_LEN} px at V ${V.toFixed(3)})`);
+    if (runs.length !== 3 || runs.some((r, j) => r.stop !== landStops[j] || !r.resolved || r.state === 'ahead' || Math.abs(r.frames - want) > 3)) fail(`scene (long road): the lead walked the passages as ${JSON.stringify(runs)} (want three, stops ${landStops.join(', ')} in order, each resolved, about ${want} reads of ${PASSAGE_LEN} px at V ${V.toFixed(3)})`);
     if (trip.stops.some((q) => q.result === 'ahead')) fail(`scene (long road): the road ended with stops ${trip.stops.map((q) => q.result).join(', ')}`);
     noteUse(sim);
     lines.push(`the long road (${m.challenges.join(', ')}, a 15000-step walk): the lead walked ${runs.length} passages whole, in order (${runs.map((r) => `${PASSAGES[trip.stops[r.stop].challenge!]} ${r.state}, ${r.frames} reads`).join('; ')}), each after its stop, none while standing at one`);
@@ -2744,7 +2850,7 @@ if (ROLE === 'service') {
     w.command({ kind: 'take', keeper: bea.id }); w.step();
     if (!before || !isTaken(w, bea.id) || rides()) fail(`scene: the rider pick with BEA taken: she rode ${before} before, taken ${isTaken(w, bea.id)}, rides ${rides()}`);
   }
-  console.log(`  24 scene: ${lines.join('; ')}; ${frames} steps read, ${travelSteps} walk steps without a skate, the baddie in view ${inFrame} of them; the view's walks on the road's frame at ${petChecks} synced walk steps (jumps of 1, 8, 40 and a 1000-step gap); the scene's types have no hurt state, and exits only calmed, outwitted or driven off; the trip preset's worlds placed and saved exactly (${presetSaves.join('; ')}); a keeper taken by hand is never picked to ride (missions.ts isTaken)`);
+  console.log(`  24 scene: ${lines.join('; ')}; ${frames} steps read, ${travelSteps} walk steps without a skate, the boss in view ${inFrame} of them, a pack ${packFrames}, something in flight ${shotFrames}; the view's walks on the road's frame at ${petChecks} synced walk steps (jumps of 1, 8, 40 and a 1000-step gap); the scene's types have no hurt state; the trip preset's worlds placed and saved exactly (${presetSaves.join('; ')}); a keeper taken by hand is never picked to ride (missions.ts isTaken)`);
 }
 
 // ---------- 25. taking a keeper (#6) ----------
@@ -3577,7 +3683,8 @@ if (ROLE === 'babies') {
   const dayW = (seed = 1) => new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed, dayLen: 600 });
   const named = (w: CareSim, n: string) => w.dragons.find((d) => d.name === n)!;
   const kid = (w: CareSim, n: string) => w.keepers.find((k) => k.name === n)!.id;
-  const test = (challenges: ChallengeId[], baddie: BaddieId | null, difficulty: Difficulty = 'hard'): Mission => ({ id: 998, region: 'oldmine', title: 'TEST', difficulty, challenges, baddie, days: 3, coin: 150, eggChance: 0, guaranteedEgg: false });
+  // (a test road: its challenges alone before its boss, or `fights` packs of the Old Mine Road's mole miners among them)
+  const test = (challenges: ChallengeId[], baddie: BaddieId = 'moleking', difficulty: Difficulty = 'hard', fights = 0): Mission => ({ id: 998, ...roadFor('oldmine', difficulty), baddie, fights, title: 'TEST', challenges, days: 3, coin: 150, eggChance: 0, guaranteedEgg: false });
   // (a) what each ability does at each kind of stop (encounter.ts offersFor): a LV 4 water dragon (its show-off and YAWN
   // known) riding with BEA (CHARM) and a LV 1 fire with TOMAS (MEDIC), on a road of a flood (water's), the grumpy miller
   // (CHARM's), thick fog (NAVIGATOR's), a hurt animal (MEDIC's), the cold (fire's) and the Mole King (dusk and CHARM)
@@ -3603,16 +3710,27 @@ if (ROLE === 'babies') {
     for (const [j, i, exp, what] of want) { const got = at(j, i); if (!isDeepStrictEqual(got, exp)) fail(`encounter (offers): ${what}: offered ${JSON.stringify(got)}, not ${JSON.stringify(exp)}`); }
     const t2 = tripOf(w, m, [{ dragon: named(w, 'WICK').id, keeper: kid(w, 'IRIS') }], 1000), o2 = offersFor(newEncounter(t2, 5), partyOf(w, t2), t2.stops[5], 0);
     if (o2.find((o) => o.ability === 'breath')?.weight !== STRONG || o2.some((o) => o.ability === 'rider')) fail(`encounter (offers): WICK at the Mole King is offered ${JSON.stringify(o2.map((o) => [o.ability, o.weight]))} (want its NIGHTFALL STRONG, no special for IRIS)`);
-    for (const d of ['easy', 'normal', 'hard'] as const) { const e = newEncounter(tripOf(w, test(['flood'], null, d), pairs, 100), 0); if (e.mark0 !== MARK[d] || e.mark !== MARK[d] || e.kind !== 'obstacle' || e.foe) fail(`encounter: a ${d} road's obstacle has a mark of ${e.mark} from ${e.mark0}`); }
+    for (const d of ['easy', 'normal', 'hard'] as const) {
+      const td = tripOf(w, test(['flood'], 'moleking', d, 1), pairs, 100), e = newEncounter(td, 1), p = newEncounter(td, 0), b = newEncounter(td, 2);
+      if (e.mark0 !== MARK[d] || e.mark !== MARK[d] || e.kind !== 'obstacle' || e.foe) fail(`encounter: a ${d} road's obstacle has a mark of ${e.mark} from ${e.mark0}`);
+      // (a pack: its kind's stats, its puff its size's worth; the boss: its puff and POWER its road's share of its own)
+      const n = DIFFICULTY[d].pack, ps = PACK_STATS.moleminer, bs = FOE_STATS.moleking;
+      if (p.kind !== 'fight' || !p.foe || p.foe.id !== 'moleminer' || p.foe.pack !== n || p.foe.stats.puff !== ps.puff * n || p.foe.puff !== ps.puff * n || p.foe.stats.power !== ps.power || packLeft(p.foe) !== n || !isPack(p.foe.id)) fail(`encounter: a ${d} road's pack begins as ${JSON.stringify(p.foe)}`);
+      if (b.kind !== 'fight' || !b.foe || b.foe.id !== 'moleking' || b.foe.pack !== 1 || b.foe.stats.puff !== Math.round(bs.puff * FOE_SCALE[d]) || b.foe.stats.power > bs.power || (d === 'hard') !== (b.foe.stats.power === bs.power) || !isDeepStrictEqual(b.foe.stats, foeStats('moleking', d, 1))) fail(`encounter: a ${d} road's boss begins as ${JSON.stringify(b.foe)}`);
+    }
     const ef = newEncounter(t, 5);
     if (ef.kind !== 'fight' || !ef.foe || ef.foe.puff !== FOE_STATS.moleking.puff || ef.mark0 !== 0) fail(`encounter: the fight begins as ${JSON.stringify({ kind: ef.kind, foe: ef.foe })}`);
+    // (at a pack every element is even and no rider has a special: it has no counter)
+    const tp = tripOf(w, test(['flood'], 'moleking', 'hard', 1), pairs, 100), pp = partyOf(w, tp), pe = newEncounter(tp, 0);
+    const packOffers = [0, 1].map((i) => Object.fromEntries(offersFor(pe, pp, tp.stops[0], i).map((o) => [o.ability, o.weight])));
+    if (!isDeepStrictEqual(packOffers, [{ breath: 1, show: 1, preen: 0, yawn: 0, rest: 0 }, { breath: 1, preen: 0, rest: 0 }])) fail(`encounter (offers): at a pack of mole miners: ${JSON.stringify(packOffers)}`);
     // (each try's chance: the rolls of the die that pass its bonus against the mark -- STRONG at the flood 95 %, a
     // little at the miller 5 %; a 20 always passes, a 1 never, and the note says the chance)
     const o0 = offersFor(newEncounter(t, 0), party, t.stops[0], 0), strong = o0.find((o) => o.ability === 'breath')!, little = offersFor(newEncounter(t, 1), party, t.stops[1], 1).find((o) => o.ability === 'breath')!;
     if (strong.chance !== 0.95 || strong.chance !== chanceOf(strong.bonus, MARK.hard) || !strong.note.startsWith('95 %') || strong.what !== `ROLL + ${strong.bonus}`) fail(`encounter (offers): RIPPLE's STRONG try at the hard flood is ${JSON.stringify(strong)}`);
     if (little.chance !== 0.05 || little.bonus + SIDES - 1 >= MARK.hard || !little.note.startsWith('5 %')) fail(`encounter (offers): EMBER's little try at the hard miller is ${JSON.stringify(little)}`);
     if (!passes(SIDES, 0, 99) || passes(1, 99, 2) || !passes(11, 13, 24) || passes(11, 12, 24) || chanceOf(13, 24) !== 0.5 || chanceOf(22, 24) !== 0.95) fail('encounter (offers): the die\'s rules');
-    lines28.push(`the offers at ${want.length} stop-and-pair cases as the rules say (STRONG x${CHECK_STRONG}, HELPS x${CHECK_HELP}, a little x${CHECK_LITTLE}, CHARMS x${CHECK_CHARM}; the fight's ring x${STRONG}); the mark ${MARK.easy}/${MARK.normal}/${MARK.hard}, a d${SIDES} plus the bonus against it (RIPPLE's STRONG try ${strong.note}, EMBER's little one ${little.note})`);
+    lines28.push(`the offers at ${want.length} stop-and-pair cases and a pack as the rules say (STRONG x${CHECK_STRONG}, HELPS x${CHECK_HELP}, a little x${CHECK_LITTLE}, CHARMS x${CHECK_CHARM}; a pack even to all); marks ${MARK.easy}/${MARK.normal}/${MARK.hard}, a d${SIDES} plus the bonus; a pack its size times its kind's puff, a boss ${FOE_SCALE.easy}/${FOE_SCALE.normal}/${FOE_SCALE.hard} of its own`);
   }
   // (b) a stop by the rules alone (encounter.ts beginTurn, landMove, endTurn, stopLine), every roll even (an 11): a
   // STRONG dragon passes an easy flood's check on its first try with no bite; a dragon that only helps (RIPPLE in the
@@ -3635,18 +3753,18 @@ if (ROLE === 'babies') {
       logs28.push(...enc.log);
       return { enc, party, out, line: stopLine(enc, party, stop, out) };
     };
-    const one = (name: string, rider: string, challenges: ChallengeId[], baddie: BaddieId | null, difficulty: Difficulty) => tripOf(w, test(challenges, baddie, difficulty), [{ dragon: named(w, name).id, keeper: kid(w, rider) }], 100);
-    const a = play(one('RIPPLE', 'IRIS', ['flood'], null, 'easy'), 0);
+    const one = (name: string, rider: string, challenges: ChallengeId[], difficulty: Difficulty) => tripOf(w, test(challenges, 'moleking', difficulty), [{ dragon: named(w, name).id, keeper: kid(w, rider) }], 100);
+    const a = play(one('RIPPLE', 'IRIS', ['flood'], 'easy'), 0);
     const a1 = a.enc.moves[0];
     if (a.out !== 'cleared' || a.enc.turn !== 1 || a.party.puff[0] !== a.party.members[0].stats.puff || a.line !== 'SPRING FLOOD - RIPPLE SWIMS THEM ACROSS' || a1.roll !== 11 || !a1.hit || a1.score < MARK.easy || a.enc.mark !== 0 || !a.enc.log.some((l) => l.endsWith(`= ${a1.score} BEATS ${MARK.easy}!`))) fail(`encounter (rules): RIPPLE at an easy flood: ${a.out} in ${a.enc.turn} turns, puff ${a.party.puff[0]}, "${a.line}", ${JSON.stringify(a1)}: ${a.enc.log.join(' | ')}`);
-    const b = play(one('RIPPLE', 'IRIS', ['cold'], null, 'easy'), 0), b1 = b.enc.moves[0];
+    const b = play(one('RIPPLE', 'IRIS', ['cold'], 'easy'), 0), b1 = b.enc.moves[0];
     if (b.out !== 'cleared' || b.enc.turn < 2 || b.party.puff[0] !== b.party.members[0].stats.puff - (b.enc.turn - 1) * BITE || b.line !== 'THE COLD - THE COLD IS SEEN OFF' || !b1.hit || b1.score < MARK.easy - (b.enc.turn - 1) * MARK_EASE || b1.score >= MARK.easy - (b.enc.turn - 2) * MARK_EASE || !b.enc.log.some((l) => l.includes(`FALLS SHORT OF ${MARK.easy}`)) || !b.enc.log.some((l) => l.endsWith(`THE MARK EASES TO ${MARK.easy - MARK_EASE}`))) fail(`encounter (rules): RIPPLE in an easy cold: ${b.out} in ${b.enc.turn} turns, puff ${b.party.puff[0]} of ${b.party.members[0].stats.puff}, "${b.line}": ${b.enc.log.join(' | ')}`);
-    const c = play(one('EMBER', 'IRIS', ['miller'], null, 'hard'), 0);
+    const c = play(one('EMBER', 'IRIS', ['miller'], 'hard'), 0);
     if (c.out !== 'waited' || c.enc.turn !== MAX_OBSTACLE_TURNS || c.party.puff[0] !== c.party.members[0].stats.puff - MAX_OBSTACLE_TURNS * BITE || c.line !== 'GRUMPY MILLER - THE TEAM WAITS IT OUT' || c.enc.mark !== MARK.hard - (MAX_OBSTACLE_TURNS - 1) * MARK_EASE) fail(`encounter (rules): EMBER alone at a hard miller: ${c.out} in ${c.enc.turn} turns, puff ${c.party.puff[0]}, mark ${c.enc.mark}, "${c.line}"`);
-    const d = play(one('EMBER', 'BEA', ['miller'], null, 'hard'), 0);
+    const d = play(one('EMBER', 'BEA', ['miller'], 'hard'), 0);
     if (d.out !== 'cleared' || d.enc.turn !== 1 || d.enc.special[0] || d.line !== 'GRUMPY MILLER - BEA TALKS HIM ROUND' || d.enc.moves[0].roll !== 0 || d.enc.mark !== 0) fail(`encounter (rules): EMBER with BEA at a hard miller: ${d.out} in ${d.enc.turn} turns, special left ${d.enc.special[0]}, "${d.line}"`);
     // (out of puff: the pick is to sit, the move does nothing; the bite stops at 0)
-    const e = one('EMBER', 'IRIS', ['flood'], null, 'hard'), ep = partyOf(w, e), ee = newEncounter(e, 0);
+    const e = one('EMBER', 'IRIS', ['flood'], 'hard'), ep = partyOf(w, e), ee = newEncounter(e, 0);
     ep.puff[0] = 2;
     ee.picks = [coachPick(ee, ep, e.stops[0], 0, 0.49)];
     beginTurn(ee, ep, evenRoll, true); landMove(ee, ep, e.stops[0], ee.moves[0], evenRoll);
@@ -3669,34 +3787,63 @@ if (ROLE === 'babies') {
       out = endTurn(fe, fp, f.stops[1]);
     }
     logs28.push(...fe.log);
-    if (out !== 'cleared' || fe.turn > MAX_FIGHT_TURNS || fe.foe!.puff !== 0 || stopLine(fe, fp, f.stops[1], out) !== 'THE MOLE KING - WORN OUT: IT CURLS UP AND DOZES') fail(`encounter (rules): the best team's fight: ${out} in ${fe.turn} turns, the Mole King at ${fe.foe!.puff}: "${stopLine(fe, fp, f.stops[1], out)}"`);
-    lines28.push(`by the rules: RIPPLE passes an easy flood's check on try ${a.enc.turn} (${a1.roll} + ${a1.score - a1.roll} = ${a1.score} against ${MARK.easy}), and the cold's on try ${b.enc.turn} (bitten ${(b.enc.turn - 1) * BITE}, the mark eased to ${MARK.easy - (b.enc.turn - 1) * MARK_EASE}), EMBER alone waits a hard miller out after ${c.enc.turn} tries, BEA's CHARM clears it in ${d.enc.turn} with no roll; a dragon at 2 puff is bitten to 0 and sits; BEA's CHARM costs the Mole King ${special.loss} of ${whole} and a POWER stage, and the best team wears it out in ${fe.turn} turns (${rests} rests)`);
+    if (out !== 'cleared' || fe.turn > MAX_FIGHT_TURNS || fe.foe!.puff !== 0 || stopLine(fe, fp, f.stops[1], out) !== 'THE MOLE KING - WORN OUT: IT SEES STARS AND RUNS OFF') fail(`encounter (rules): the best team's fight: ${out} in ${fe.turn} turns, the Mole King at ${fe.foe!.puff}: "${stopLine(fe, fp, f.stops[1], out)}"`);
+    // (a pack of three mole miners, RIPPLE and EMBER against it: one goes up in smoke for every share of its puff worn
+    // down -- the lines say so as it happens -- the pack never rests, and fought off, its last one goes up too)
+    const g = tripOf(w, test(['dark'], 'moleking', 'hard', 1), [{ dragon: named(w, 'RIPPLE').id, keeper: kid(w, 'BEA') }, { dragon: named(w, 'EMBER').id, keeper: kid(w, 'TOMAS') }], 100);
+    const gp = partyOf(w, g), ge = newEncounter(g, 0), counts: number[] = [packLeft(ge.foe!)];
+    let gout: 'cleared' | 'waited' | null = null;
+    while (!gout) {
+      ge.picks = gp.members.map((_, i) => coachPick(ge, gp, g.stops[0], i, 0.49));
+      beginTurn(ge, gp, evenRoll, true);
+      for (const mv of ge.moves) {
+        if (mv.by !== FOE && gp.puff[mv.by] <= 0) continue;
+        landMove(ge, gp, g.stops[0], mv, evenRoll);
+        if (mv.by === FOE && mv.foeMove === 'rest') fail('encounter (rules): a pack rested');
+        if (packLeft(ge.foe!) !== counts[counts.length - 1]) counts.push(packLeft(ge.foe!));
+      }
+      gout = endTurn(ge, gp, g.stops[0]);
+    }
+    logs28.push(...ge.log);
+    const smoke = ge.log.filter((l) => / UP IN (A PUFF|PUFFS) OF SMOKE/.test(l)).length, gline = stopLine(ge, gp, g.stops[0], gout);
+    if (gout !== 'cleared' || counts.join() !== '3,2,1,0' || smoke !== 2 || gline !== 'MOLE MINERS - FOUGHT OFF: THE LAST ONE GOES UP IN A PUFF OF SMOKE') fail(`encounter (rules): a pack of mole miners: ${gout} in ${ge.turn} turns, standing ${counts.join(' then ')}, ${smoke} smoke lines, "${gline}": ${ge.log.join(' | ')}`);
+    // (and the fights not won: the team sat down for a breather, a pack scampers off and a boss stomps off unbeaten)
+    const waitedPack = fightLine('MOLE MINERS', true, false), waitedBoss = stopLine(fe, fp, f.stops[1], 'waited');
+    if (waitedPack !== 'MOLE MINERS - THE TEAM SITS DOWN FOR A BREATHER, AND THEY SCAMPER OFF' || waitedBoss !== 'THE MOLE KING - THE TEAM SITS DOWN FOR A BREATHER, AND IT STOMPS OFF UNBEATEN') fail(`encounter (rules): fights not won read "${waitedPack}" and "${waitedBoss}"`);
+    logs28.push(waitedPack, waitedBoss);
+    lines28.push(`by the rules: RIPPLE passes an easy flood in ${a.enc.turn} try (${a1.roll} + ${a1.score - a1.roll} = ${a1.score} against ${MARK.easy}), and the cold in ${b.enc.turn} (bitten ${(b.enc.turn - 1) * BITE}, the mark eased); EMBER alone waits a hard miller out after ${c.enc.turn} tries, BEA's CHARM clears it in ${d.enc.turn} with no roll; a dragon at 2 puff is bitten to 0 and sits; BEA's CHARM costs the Mole King ${special.loss} of ${whole} and a POWER stage, and the best team wears it out in ${fe.turn} turns (${rests} rests); RIPPLE and EMBER fight off a pack of three mole miners in ${ge.turn} turns, standing ${counts.join(', ')}`);
   }
-  // (c) the balance in the world, the trail coach playing (AUTO): each baddie's best two pairs (the trip preset's,
-  // both counters) put at its stop on seeds 1-3 wear it out every time within 10 turns; a lone pair with neither
-  // counter sits its fight out every time; and THE LOST NEST's two counters clear both stops on seeds 1-10
+  // (c) the balance in the world, the trail coach playing (AUTO): each boss's best two pairs (the trip preset's, both
+  // counters where they can be had) put at its stop (the Mole King, the Storm Roc and the Frost Giant on seeds 1-3, the
+  // Bridge Troll, the Briar Boar and the Cinder Golem on seed 1) wear it out every time within 10 turns; a lone pair
+  // with neither counter sits its fight out every time; and THE LOST NEST's two counters clear every stop on seeds 1-10
+  // -- its challenges in a turn or two, its packs of mud goblins in three at most, and the Bridge Troll
   {
     let wins = 0, fights = 0, turns = 0, lost = 0, lone = 0, nests = 0;
-    const foeOf = (region: RegionId) => REGIONS.find((r) => r.id === region)!.baddie!;
-    const lonePairs: Record<string, [string, string]> = { oldmine: ['RIPPLE', 'IRIS'], highfold: ['COBBLE', 'BEA'], frostmere: ['RIPPLE', 'TOMAS'] };
-    for (const region of ['oldmine', 'highfold', 'frostmere'] as RegionId[]) {
-      for (let seed = 1; seed <= 3; seed++) {
-        const w = buildSim(tripStart(`${region}:0.9`), seed), t = w.missions.trip!;
+    const foeOf = (region: RegionId) => REGIONS.find((r) => r.id === region)!.baddie;
+    const lonePairs: Record<RegionId, [string, string]> = { millbrook: ['RIPPLE', 'IRIS'], oldmine: ['RIPPLE', 'IRIS'], bramblewood: ['EMBER', 'BEA'], highfold: ['COBBLE', 'BEA'], frostmere: ['RIPPLE', 'TOMAS'], emberfell: ['ZAP', 'PIP'] };
+    for (const region of REGIONS.map((r) => r.id)) {
+      // (the three bosses that were the hard roads' before every road was a fight on seeds 1-3; the three new with the
+      // fights on seed 1)
+      for (let seed = 1; seed <= (['oldmine', 'highfold', 'frostmere'].includes(region) ? 3 : 1); seed++) {
+        const w = buildSim(tripStart(`${region}:0.9`), seed), t = w.missions.trip!, k = t.stops.length - 1;
         t.auto = true;
-        for (let s = 0; s < 20000 && t.stops[3].result === 'ahead'; s++) w.step();
-        fights++; turns += t.stops[3].turns;
-        if (t.stops[3].result === 'met') wins++; else fail(`encounter (balance): ${region}'s best team (${t.pairs.map((p) => w.dragons[p.dragon].name).join(', ')}) sat the ${foeOf(region)} out on seed ${seed} after ${t.stops[3].turns} turns`);
-        if (t.stops[3].turns > 10) fail(`encounter (balance): ${region}'s best team took ${t.stops[3].turns} turns on seed ${seed}`);
+        for (let s = 0; s < 20000 && t.stops[k].result === 'ahead'; s++) w.step();
+        fights++; turns += t.stops[k].turns;
+        if (t.stops[k].kind !== 'baddie' || t.stops[k].baddie !== foeOf(region)) fail(`encounter (balance): ${region}'s road ends in ${t.stops[k].kind} ${t.stops[k].baddie}`);
+        if (t.stops[k].result === 'met') wins++; else fail(`encounter (balance): ${region}'s best team (${t.pairs.map((p) => w.dragons[p.dragon].name).join(', ')}) sat the ${foeOf(region)} out on seed ${seed} after ${t.stops[k].turns} turns`);
+        if (t.stops[k].turns > 10) fail(`encounter (balance): ${region}'s best team took ${t.stops[k].turns} turns on seed ${seed}`);
         logs28.push(...t.stops.map((s) => s.log));
         noteUse(w);
         const v = dayW(seed), dm = demoTrip(v, region, 'hard'), [dn, kn] = lonePairs[region];
-        const lt = tripOf(v, dm.mission, [{ dragon: named(v, dn).id, keeper: kid(v, kn) }], 1000);
+        const lt = tripOf(v, dm.mission, [{ dragon: named(v, dn).id, keeper: kid(v, kn) }], 1000), lk = lt.stops.length - 1;
+        if (lt.stops[lk].covered || BADDIES[foeOf(region)].counters.some((c) => c.element === named(v, dn).element)) fail(`encounter (balance): ${dn} with ${kn} has a counter of the ${foeOf(region)}`);
         lt.auto = true;
         awayNow(v, lt, v.clock);
         placeAlong(v, lt, 0.9);
-        for (let s = 0; s < 20000 && lt.stops[3].result === 'ahead'; s++) v.step();
+        for (let s = 0; s < 20000 && lt.stops[lk].result === 'ahead'; s++) v.step();
         lone++;
-        if (lt.stops[3].result === 'unmet') lost++; else fail(`encounter (balance): ${dn} alone wore the ${foeOf(region)} out on seed ${seed} in ${lt.stops[3].turns} turns`);
+        if (lt.stops[lk].result === 'unmet') lost++; else fail(`encounter (balance): ${dn} alone wore the ${foeOf(region)} out on seed ${seed} in ${lt.stops[lk].turns} turns`);
         noteUse(v);
       }
     }
@@ -3707,16 +3854,17 @@ if (ROLE === 'babies') {
       t.auto = true;
       awayNow(w, t, w.clock);
       for (let s = 0; s < 20000 && w.missions.trip && w.missions.trip.state === 'away'; s++) w.step();
-      if (t.success !== true || t.stops.some((s) => s.result !== 'met' || s.turns > 2)) fail(`encounter (balance): THE LOST NEST with RIPPLE and ECHO on seed ${seed}: ${JSON.stringify(t.stops.map((s) => [s.result, s.turns]))}`);
+      if (t.success !== true || t.stops.some((s) => s.result !== 'met' || s.turns > (s.kind === 'challenge' ? 2 : s.kind === 'foes' ? 3 : 8))) fail(`encounter (balance): THE LOST NEST with RIPPLE and ECHO on seed ${seed}: ${JSON.stringify(t.stops.map((s) => [s.kind, s.result, s.turns]))}`);
       else nests++;
       noteUse(w);
     }
-    lines28.push(`balance: the best two pairs wore their baddie out ${wins} of ${fights} times (${(turns / fights).toFixed(1)} turns on average), a lone pair with neither counter sat it out ${lost} of ${lone}; THE LOST NEST's two counters cleared both stops in a turn or two each on ${nests} of 10 seeds`);
+    lines28.push(`balance: the best two pairs wore their boss out ${wins} of ${fights} times (all six bosses; ${(turns / fights).toFixed(1)} turns on average), a lone pair with neither counter sat it out ${lost} of ${lone}; THE LOST NEST's two counters cleared every stop -- its challenges, its mud goblins and the Bridge Troll -- on ${nests} of 10 seeds`);
   }
   // (d) a whole road in the world by commands (seed 2's LOST NEST, RIPPLE and ECHO, away at once with a 600-step walk):
-  // the team halts at the first stop as it reaches it; nobody picks, so the picks wait PICK_WAIT_TRAIL and the coach's
-  // turn plays -- each move its dragon's own anim, landing at its impact with its roll of the die against the mark (a
-  // pass takes the mark to 0 and ends the turn; a short one leaves it); at the second stop a pick
+  // the team halts at the first stop -- a pack of mud goblins -- as it reaches it; nobody picks, so the picks wait
+  // PICK_WAIT_TRAIL and the coach's turn plays -- each dragon's breath thrown (landing BREATH_SNAP + BOLT_STEPS in, its
+  // anim held that long), the pack's throw landing at FOE_IMPACT, each for exactly its cost; challenges test their mark
+  // with the roll and bonus; at the second stop a pick
   // for a pair there isn't, an ability the pair hasn't and the special nobody has are refused, RIPPLE's breath is taken
   // by command, and AUTO fills ECHO's pick at once (the quicker moving first); the stop cleared, XP for both (a level
   // and its skill), the walk on and the landing; the same script twice gives the same world; saves taken at the meet, at
@@ -3758,13 +3906,27 @@ if (ROLE === 'babies') {
     while (t.encounter?.state === 'pick') step();
     out.waited = w.tick - p0;
     if (out.waited !== PICK_WAIT_TRAIL) fail(`encounter (road): the first stop's picks waited ${out.waited} steps (want PICK_WAIT_TRAIL, ${PICK_WAIT_TRAIL})`);
-    // (the turn's moves: each its dragon's anim, landing at its impact for exactly its work)
+    // (the turns' moves: each dragon's its breath, thrown -- landing when its bolt does, its anim held that long -- the
+    // pack's its throw, each landing at its impact for exactly its cost)
     const party = partyOf(w, t);
-    while (t.encounter?.state === 'play') {
-      const enc: Encounter = t.encounter, mv = enc.moves[enc.cur], me = party.members[mv.by], sk = skillOf(me.el, mv.ability as SkillKind), mark0 = enc.mark;
-      if (mv.len !== animLen(me.el, me.stage, sk.anim) || mv.at !== Math.max(1, Math.round(mv.len * sk.impact))) fail(`encounter (road): ${me.name}'s ${sk.name} lasts ${mv.len} and lands at ${mv.at}`);
+    if (t.stops[0].kind !== 'foes' || t.encounter?.kind !== 'fight') fail(`encounter (road): THE LOST NEST's first stop is ${t.stops[0].kind}`);
+    while (t.encounter?.stop === 0 && (t.encounter.state === 'play' || t.encounter.state === 'pick')) {
+      const enc: Encounter = t.encounter;
+      if (enc.state === 'pick') { step(); continue; }
+      const mv = enc.moves[enc.cur], foe0 = enc.foe!.puff, puff0 = [...t.puff];
+      if (mv.by === FOE) { if (mv.len !== FOE_MOVE_STEPS || mv.at !== FOE_IMPACT) fail(`encounter (road): the goblins' ${mv.foeMove} lasts ${mv.len} and lands at ${mv.at}`); }
+      else if (mv.ability !== 'sit' && mv.ability !== 'rest' && mv.ability !== 'rider') {
+        const me = party.members[mv.by], sk = skillOf(me.el, mv.ability as SkillKind), at = BREATH_SNAP + BOLT_STEPS;
+        const want = sk.anim === 'breath' ? { len: Math.max(animLen(me.el, me.stage, 'breath'), at + 12), at } : { len: animLen(me.el, me.stage, sk.anim), at: Math.max(1, Math.round(animLen(me.el, me.stage, sk.anim) * sk.impact)) };
+        if (mv.len !== want.len || mv.at !== want.at) fail(`encounter (road): ${me.name}'s ${sk.name} lasts ${mv.len} and lands at ${mv.at} (want ${want.len} and ${want.at})`);
+      }
       step();
-      if (t.encounter === enc && mv.landed && mv.t === mv.at) { out.moves++; if (mv.roll < 1 || mv.roll > SIDES || mv.score <= mv.roll || mv.hit !== passes(mv.roll, mv.score - mv.roll, mark0) || enc.mark !== (mv.hit ? 0 : mark0) || (mv.hit && enc.moves.length !== mv.n + 1)) fail(`encounter (road): ${me.name}'s ${sk.name} landed as ${JSON.stringify(mv)} against ${mark0}, the mark now ${enc.mark}`); if (!seen.has('mid-move')) fork('mid-move'); }
+      if (t.encounter === enc && mv.landed && mv.t === mv.at) {
+        out.moves++;
+        const cost = mv.by === FOE ? (mv.foeMove === 'attack' ? puff0[mv.target] - t.puff[mv.target] : 0) : foe0 - enc.foe!.puff;
+        if (cost !== mv.loss || (mv.hit && mv.foeMove !== 'grumble' && mv.ability !== 'preen' && mv.ability !== 'yawn' && mv.ability !== 'rest' && mv.loss <= 0)) fail(`encounter (road): a move landed for ${mv.loss}, the puff down ${cost}`);
+        if (!seen.has('mid-move')) fork('mid-move');
+      }
     }
     if (t.encounter?.state !== 'done' || t.stops[0].result !== 'met') fail(`encounter (road): the first stop ended ${t.encounter?.state}, ${t.stops[0].result}`);
     logs28.push(...(t.encounter?.log ?? []));
@@ -3801,7 +3963,7 @@ if (ROLE === 'babies') {
   const r1 = roadRun(true), r2 = roadRun(false);
   if (r1.w.tick !== r2.w.tick || r1.w.digest() !== r2.w.digest()) fail(`encounter (road): the same road twice gave two worlds (steps ${r1.w.tick} and ${r2.w.tick})`);
   const levels = r1.events.filter((e) => e.includes('"level"')).length, learns = r1.events.filter((e) => e.includes('"learn"')).length;
-  if (levels !== 2 || learns !== 2) fail(`encounter (road): the road brought ${levels} levels and ${learns} skills (want RIPPLE and ECHO each LV 2 with YAWN): ${r1.events.join(' ')}`);
+  if (levels !== 4 || learns !== 2) fail(`encounter (road): the road brought ${levels} levels and ${learns} skills (want RIPPLE and ECHO each LV 3, YAWN learned on the way): ${r1.events.join(' ')}`);
   lines28.push(`a road by commands (seed 2, THE LOST NEST): the first stop's picks waited ${r1.waited} steps for the player, ${r1.moves} moves landed at their impacts; the second stop's refusals, RIPPLE's breath by command and AUTO (${r1.order}); ${levels} levels and ${learns} skills (${r1.events.filter((e) => e.includes('stopEnd')).length} stops ended); the same twice; saves ${r1.saved.join(', ')} stepped on 600 to the same world`);
   // (e) encounters this build can't run (encounter.ts checkEncounter, through the save): each throws
   {
@@ -3822,7 +3984,9 @@ if (ROLE === 'babies') {
       ['a move by a pair there isn\'t', (s) => { enc(s).moves[0].by = 5; }],
       ['a move of an ability it doesn\'t know', (s) => { enc(s).moves[0].ability = 'fireball'; enc(s).moves[0].foeMove = null; }],
       ['an outcome it doesn\'t know', (s) => { enc(s).outcome = 'won'; }],
-      ['a stop resolved while it plays', (s) => { s.missions.trip.stops[3].result = 'met'; s.missions.trip.stops[3].resolvedAt = 0; }],
+      ['a stop resolved while it plays', (s) => { const q = s.missions.trip.stops[s.missions.trip.stops.length - 1]; q.result = 'met'; q.resolvedAt = 0; }],
+      ['a pack at the boss', (s) => { enc(s).foe.pack = 3; }],
+      ['another enemy at the boss', (s) => { enc(s).foe.id = 'mudgoblin'; }],
       ['a stage past +2', (s) => { enc(s).guard = [3, 0]; }],
       ['more puff than its whole', (s) => { s.missions.trip.puff[0] = s.missions.trip.stats[0].puff + 1; }],
     ];

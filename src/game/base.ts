@@ -40,7 +40,7 @@ import { startSpec, buildSim, tripStart } from './presets.ts';
 import type { Trip } from './trip.ts';
 import { sceneAt, drawMissionScene, drawResultCard, resultTitle, ScenePets, RESULT_CARD, ROAD_BOTTOM } from './missionview.ts';
 import { drawEncounterHud } from './encounterui.ts';
-import { pendingPair, stopName } from './encounter.ts';
+import { pendingPair, stopName, packLeft } from './encounter.ts';
 import type { SceneFrame } from './missionview.ts';
 import { worldKey, barnKey, fnv1a, serialize } from './save.ts';
 import type { SaveV } from './save.ts';
@@ -985,7 +985,7 @@ export class BaseView {
         line: this.lineRect ? { ...this.lineRect } : null,
         doneBy: { ...st.doneBy },
         coin: this.sim.missions.coin,
-        board: this.sim.missions.board.map((m) => ({ id: m.id, region: m.region, title: m.title, difficulty: m.difficulty, challenges: [...m.challenges], baddie: m.baddie, days: m.days, coin: m.coin })),
+        board: this.sim.missions.board.map((m) => ({ id: m.id, region: m.region, title: m.title, difficulty: m.difficulty, challenges: [...m.challenges], baddie: m.baddie, foe: m.foe, fights: m.fights, pack: m.pack, days: m.days, coin: m.coin })),
         trip: this.tripHook(),
         arena: this.arenaHook(),
         ui: { screen: this.ui.screen, mission: this.ui.mission, pairs: this.ui.pairs.map((p) => ({ ...p })), corners: [...this.ui.arena.corners],
@@ -1032,17 +1032,24 @@ export class BaseView {
       puff: t.puff.map((p, i) => ({ puff: p, max: t.stats[i].puff })), xp: [...t.xp],
       stops: t.stops.map((s) => ({ name: stopName(s), kind: s.kind, result: s.result, log: s.log })),
       encounter: e ? { stop: e.stop, kind: e.kind, state: e.state, t: e.t, turn: e.turn, pending: pendingPair(t), picks: [...e.picks], mark: e.mark, mark0: e.mark0,
-        foe: e.foe ? { id: e.foe.id, puff: e.foe.puff, max: e.foe.stats.puff } : null, outcome: e.outcome, line: e.log[e.log.length - 1] ?? null,
+        foe: e.foe ? { id: e.foe.id, puff: e.foe.puff, max: e.foe.stats.puff, pack: e.foe.pack, left: packLeft(e.foe) } : null, outcome: e.outcome, line: e.log[e.log.length - 1] ?? null,
         move: e.state === 'play' && e.moves[e.cur] ? { by: e.moves[e.cur].by, ability: e.moves[e.cur].ability, foeMove: e.moves[e.cur].foeMove, landed: e.moves[e.cur].landed, hit: e.moves[e.cur].hit, loss: e.moves[e.cur].loss, roll: e.moves[e.cur].roll, score: e.moves[e.cur].score } : null } : null };
   }
 
-  /** The scene as the hook reports it (BASE_DESIGN 6, 11): the last stop reached, how it went, whether the team stands at it (its encounter's state), its banner, the passage the lead is walking through (its challenge), the baddie on the road, its exit, how far along the walk is, and the result card's title once it is done. */
+  /**
+   * The scene as the hook reports it (BASE_DESIGN 6, 11): the last stop reached, how it went, whether the team stands at
+   * it (its encounter's state), its banner, the boss on the road, the pack's ones in view, what is in flight and the
+   * marks of the hits, the riders' places and the dragons' flashes, how far along the walk is, and the result card's
+   * title once it is done.
+   */
   private sceneHook(): NonNullable<NonNullable<Window['__dragonCare']>['base']>['scene'] {
     if (!this.scene) return null;
     const { trip, f } = this.scene, s = f.last == null ? null : trip.stops[f.last];
-    return { stop: s ? (s.kind === 'baddie' ? 'baddie' : s.challenge) : null, result: s ? s.result : null, covered: s ? s.covered : null, at: trip.encounter?.state ?? null, banner: f.banner, passage: f.passage == null ? null : trip.stops[f.passage].challenge,
-      baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, exit: s?.kind === 'baddie' ? trip.exit : null,
-      progress: f.travel ? f.n / f.travel : 0, done: f.done, result_card: f.done ? resultTitle(trip) : null };
+    return { stop: s ? (s.kind === 'challenge' ? s.challenge : s.kind) : null, result: s ? s.result : null, covered: s ? s.covered : null, at: trip.encounter?.state ?? null, banner: f.banner,
+      passage: f.passage == null ? null : trip.stops[f.passage].challenge,
+      baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, flash: !!f.baddie?.flash,
+      foes: f.foes.map((q) => ({ id: q.id, x: Math.round(q.x - f.camX), pose: q.pose, face: q.face, facing: q.facing })), shots: f.shots.length, marks: f.marks.map((m) => ({ kind: m.kind, age: m.age })),
+      riders: f.riders.map((r) => r.dx), hit: [...f.flash], progress: f.travel ? f.n / f.travel : 0, done: f.done, result_card: f.done ? resultTitle(trip) : null };
   }
 
   /** How far on an egg is: 0 laid, 1 due (its HATCH_DAYS in the nest; one past it waits for a sub-slot at 1). */
@@ -1286,12 +1293,15 @@ export class BaseView {
     }
   }
   /**
-   * The road's news (BASE_DESIGN 11): a stop resolved -- cleared, or waited out -- and the XP each pair's dragon got (a
-   * stop met needs no toast: the game follows the team, so the road and its banner are on screen).
+   * The road's news (BASE_DESIGN 11): a stop resolved -- cleared, or waited out: a pack fought off or scampering off, a
+   * boss worn out or stomping off -- and the XP each pair's dragon got (a stop met needs no toast: the game follows the
+   * team, so the road and its banner are on screen).
    */
   private roadEvent(e: SimEvent): void {
     if (e.kind === 'stopEnd') {
-      const how = e.fight ? (e.cleared ? `${e.name} IS WORN OUT!` : `${e.name} LEAVES: THE TEAM SAT IT OUT`) : e.cleared ? `${e.name} CLEARED!` : `${e.name}: THE TEAM WAITS IT OUT`;
+      const pack = this.sim.missions.trip?.stops[e.stop]?.kind === 'foes';
+      const how = e.fight ? (pack ? (e.cleared ? `${e.name} FOUGHT OFF!` : `${e.name} SCAMPER OFF: THE TEAM SAT IT OUT`) : e.cleared ? `${e.name} IS WORN OUT!` : `${e.name} STOMPS OFF: THE TEAM SAT IT OUT`)
+        : e.cleared ? `${e.name} CLEARED!` : `${e.name}: THE TEAM WAITS IT OUT`;
       this.news.push({ text: `${how} +${e.xp} XP EACH` });
     }
   }

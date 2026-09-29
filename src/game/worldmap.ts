@@ -218,6 +218,8 @@ export const ROADS: readonly (readonly [string, string])[] = [
   ['LANTERN RUN', 'THE DEEP SEAM'], ['THE DEEP SEAM', 'THE MOLE KING\'S HALL'], ['LANTERN RUN', 'THE OLD CART TRACK'],
   ['THE OLD CART TRACK', 'ASHFALL'], ['ASHFALL', 'THE CINDER FIELDS'], ['ASHFALL', 'THE HOT SPRINGS'],
   ['THUNDER RIDGE', 'northroad'], ['northroad', 'THE CINDER FIELDS'], ['THE HOT SPRINGS', 'THE FROZEN FALLS'],
+  // (the three bosses' lairs that came with the fights: BASE_DESIGN 5.3)
+  ['THE MILL RACE', 'UNDER THE TROLL BRIDGE'], ['THE OWL WOOD', 'THE BRIAR BOAR\'S DEN'], ['ASHFALL', 'THE GOLEM\'S FORGE'],
 ];
 
 /** Every place on the map with its region. */
@@ -472,6 +474,11 @@ export const PLACE_ART: Readonly<Record<PlaceArt, Sprite>> = Object.freeze({
   bridge: sp([
     '...sssssssss...', '.sSsssSsssSsss.', 'sssssssssssssss', 'sssSs.....sSsss', 'ssss.bbbbb.ssss', 'sss.bbWbbbb.sss', 'sss.bbbbbbb.sss',
   ], { s: STONE, S: STONE_SHADE, b: WATER, W: WATER_LIT }),
+  // the Bridge Troll's lair: an old mossy arch over the brook, and two eyes in the dark under it
+  trollbridge: sp([
+    '....sssssss....', '..sMsssSsssMs..', '.ssssMssssssss.', 'sssSs.....sSsss', 'ssss.ddddd.ssss', 'sss.ddydydd.sss', 'sss.ddddddd.sss',
+    'sss.bbWbbbb.sss',
+  ], { s: '#a29a8c', S: '#7e776e', M: '#6a8a4a', d: MOUTH, y: LAMP, b: WATER, W: WATER_LIT }),
   // Old Mine Road: the deep seam's timbered mouth and its rails, the lamps along the run, the cart, the Mole King's door
   mine: sp([
     '......hhhhh......', '....hhhhhhhhh....', '...hhhhhhhhhhhH..', '..hhhwwwwwwwhhHH.', '.hhhhwdddddwhhHHH', 'hhhyhwdddddwhhHHH',
@@ -496,6 +503,11 @@ export const PLACE_ART: Readonly<Record<PlaceArt, Sprite>> = Object.freeze({
   hollow: sp([
     '..mwm.....mm...', '.mmmmm...mwmm..', '...c......c....', '.GGGGGGGGGGGeee', 'bbbbbbbbbbbeoe.', 'bbbbbbbbbbbeooe', 'bBbbbbBbbbbeoe.', '.BBBBBBBBBBBee.',
   ], { m: '#d8503c', w: CREAM, c: CREAM, G: '#7cbe5a', b: WOOD, B: DARK_WOOD, e: '#c89a6a', o: MOUTH }),
+  // the Briar Boar's den: a mound of brambles, berries on it, red eyes and tusks at its door
+  boarden: sp([
+    '......t.....t....', '....GGgGgggGgg...', '..GGgggpgggggpD..', '.GggpggddddgggDD.', 'GggggdddddddgggDD', 'ggpggdrdddrdggpgD',
+    'gggggwdddddwggggD', '.ggggwdddddwgggDD', '..ggg.......ggg..',
+  ], { G: '#6aa24a', g: '#4a7a3a', D: '#34583a', p: '#c04a7a', t: '#d8c888', d: MOUTH, r: '#e8503c', w: CREAM }),
   owltree: sp([
     '.....lllll.....', '...llllmmmmm...', '..llmmmmmmmmm..', '.llmmmmmmmmmss.', 'llmmmmmmmmmmsss', 'lmmmmmmmmmmmsss', 'lmmmmmmmmmmssss',
     '.mmmmmmmmmsssss', '..mmmsmmsssss..', '......tttt.....', '.....tooooT....', '.....toyoyT....', '.....tooooT....', '.....ttttTT....',
@@ -543,6 +555,11 @@ export const PLACE_ART: Readonly<Record<PlaceArt, Sprite>> = Object.freeze({
   springs: sp([
     '..sssss.....sss..', '.sbbbbbss..sbbbs.', 'sbbWbbbbbs.sbWbs.', 'sbbbbbbbbs..sbs..', '.sbbbbbbs........', '..ssssss.........',
   ], { s: STONE, b: '#5ec8c0', W: '#c8f4f0' }),
+  // the Cinder Golem's forge: a stone forge under its chimney, its fire never out, and an anvil by it
+  forge: sp([
+    '..........kk...', '..........kK...', '...ssssssskKs..', '..sssssssssssS.', '.ssSsssssssssSS', '.ssSsoooooosSSS', '.ssSsohhhhosSSS',
+    '.ssSsohhhhosSSS', '.ssSssssssssSSS', 'aaa.ssssssssSS.', '.a..nnnnnnnnnn.',
+  ], { k: CONE.cinder, K: CONE.shade, s: STONE_SHADE, S: '#6e665e', o: CONE.glow, h: CONE.hot, a: '#5a5a66', n: CONE.cinder }),
   village: sp([
     '...aaa...........', '..aaaaa......c...', '.aaaaaaa...aaac..', 'aaaaaaaaa.aaaaaa.', '.wwwwwww.aaaaaaaa', '.wyywdww..wwwwww.',
     '.wyywdww..wydwyw.', '.wwwwdww..wwdwww.',
@@ -1033,7 +1050,7 @@ export function mapProblems(): string[] {
     if (off) out.push(`${p.name}: ${off} px of its landmark off ${regionOf(p.region).name}`);
     let brook = 0;
     for (let v = f.y; v < f.y + f.h; v++) for (let u = f.x; u < f.x + f.w; u++) { const at = landAt(u, v); if (at >= 0 && ways().river[at]) brook++; }
-    if (brook && p.art !== 'bridge') out.push(`${p.name}: its landmark stands in the brook (${brook} px)`);
+    if (brook && p.art !== 'bridge' && p.art !== 'trollbridge') out.push(`${p.name}: its landmark stands in the brook (${brook} px)`);
     if (wet > f.w * f.h * 0.15) out.push(`${p.name}: ${wet} of its landmark's ${f.w * f.h} px over water`);
   }
   const boxes = [...PLACES.map((p) => ({ name: p.name, r: footprint(p.art, p.at) })), { name: 'HOME', r: homeRect() }];

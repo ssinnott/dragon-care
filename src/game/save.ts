@@ -6,7 +6,7 @@
 import type { CareSim, Dragon, Keeper, Job, SimStats, LiftState, Egg } from './sim.ts';
 import type { RoomPlace } from './layout.ts';
 import { releasedState } from './control.ts';
-import { copyMissions, upgradeMissions } from './missions.ts';
+import { copyMissions, upgradeMissions, upgradeRoads } from './missions.ts';
 import type { MissionsState } from './missions.ts';
 import { copyArena, newArena } from './arena.ts';
 import type { ArenaState } from './arena.ts';
@@ -15,7 +15,7 @@ import { upgradeEncounterV11 } from './encounter.ts';
 /**
  * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded (the
  * page keeps it aside and starts a new barn: storage.ts) -- but for the one before it, which migrateSave brings up to
- * this one. Version 10 holds the whole world: the rooms and their uses (stats.used by kind, stats.usedRoom by room id);
+ * this one. Version 12 holds the whole world: the rooms and their uses (stats.used by kind, stats.usedRoom by room id);
  * every dragon -- its slot by room id and index, its goal and that goal's job by id, its route, its walk and the speed
  * it last played at (`gaitS`), its turn, its `hold`, its act, its stage and the step it began, its place (barn, garden
  * or away), its plot (`home`), a resident's rhythm (`garden`) and its XP (`xp`: its level); every keeper -- their
@@ -24,9 +24,10 @@ import { upgradeEncounterV11 } from './encounter.ts';
  * Hatchery's nests; the garden's plots; the missions (the board and its day, the map, the coin, the trip out -- its
  * road walked so far, its stops' results, the team's stats, puff and XP, the trail coach, the encounter on at a stop:
  * trip.ts, encounter.ts -- and each pair's deck spot); the Arena (the bout on, its fighters by id, and the bouts
- * begun: arena.ts); and the stats. Version 11 played an obstacle as work to grind down (its toughness and the work
- * left), version 10 kept a trip as a timer (its return clock, its odds and its outcome rolled at the send) and version 9
- * (the first shipped) was that less the XP and the Arena: each loads brought up to this one.
+ * begun: arena.ts); and the stats. Version 11 had a big baddie at the end of some hard roads only, no little enemies,
+ * and obstacles as work to grind down; version 10 kept a trip as a timer (its return clock, its odds and its outcome
+ * rolled at the send); and version 9 (the first shipped) was that less the XP and the Arena: each loads brought up to this
+ * one.
  */
 export const SAVE_VERSION = 12;
 
@@ -109,13 +110,13 @@ export function serialize(sim: CareSim, exact = false): SaveV {
  * A save of an older version brought up to this one (storage.ts loadSave, before the view loads it), a version at a
  * time: version 9 had no XP and no Arena, so every dragon starts at 0 XP (level 1) and the Arena with no bout begun;
  * version 10 kept a trip out as a timer, so a trip is given its road walked so far and its stops' results as the old
- * scene had them (missions.ts upgradeMissions); version 11 ground an obstacle down as work, so an encounter on at one
- * gets its mark to beat in the work's place (encounter.ts upgradeEncounterV11); the rest is unchanged. Any other save is
- * returned as it is (a save of this version, or one CareSim.fromSave refuses).
+ * scene had them (missions.ts upgradeMissions); version 11 had work-based obstacles and no packs, so its encounter
+ * gets a mark instead (encounter.ts upgradeEncounterV11) and its roads get their fights (missions.ts upgradeRoads); the
+ * rest is unchanged. Any other save is returned as it is (a save of this version, or one CareSim.fromSave refuses).
  */
 export function migrateSave(raw: unknown): unknown {
   if (!raw || typeof raw !== 'object') return raw;
-  let s = raw as Partial<SaveV> & { v?: unknown; dragons?: unknown; missions?: unknown };
+  let s = raw as Partial<SaveV> & { v?: unknown; dragons?: unknown; keepers?: unknown; missions?: unknown };
   if (s.v === 9) s = { ...s, v: 10, dragons: Array.isArray(s.dragons) ? s.dragons.map((d) => (d && typeof d === 'object' ? { ...d, xp: 0 } : d)) : s.dragons, arena: newArena() };
   if (s.v === 10) {
     const dragons = Array.isArray(s.dragons) ? (s.dragons as { id: number; element: Dragon['element']; stage: Dragon['stage']; xp?: number; mood: number }[]) : [];
@@ -125,7 +126,8 @@ export function migrateSave(raw: unknown): unknown {
   if (s.v === 11) {
     const ms = s.missions as { trip?: { encounter?: unknown; mission?: { difficulty?: 'easy' | 'normal' | 'hard' } } | null } | undefined;
     const trip = ms?.trip;
-    const missions = trip && typeof trip === 'object' && trip.encounter ? { ...ms, trip: { ...trip, encounter: upgradeEncounterV11(trip.encounter, trip.mission?.difficulty ?? 'normal') } } : ms;
+    const upgraded = trip && typeof trip === 'object' && trip.encounter ? { ...ms, trip: { ...trip, encounter: upgradeEncounterV11(trip.encounter, trip.mission?.difficulty ?? 'normal') } } : ms;
+    const missions = upgradeRoads(upgraded, Array.isArray(s.dragons) ? s.dragons : [], Array.isArray(s.keepers) ? s.keepers : []);
     s = { ...s, v: SAVE_VERSION, missions: missions as MissionsState };
   }
   return s;

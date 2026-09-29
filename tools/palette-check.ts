@@ -83,13 +83,14 @@
 //                   the nest heap's plain straw (src/game/layout.ts NEST_RX, NEST_RY, eggBottom: a px in from the
 //                   heap's inked edge, over the floor's band, off the strands), never the Hatchery's wall.
 // BADDIES (counted apart, its own RESULT line: BADDIES):
-//   (x) baddies   : each fill on a big baddie's silhouette edge (src/game/baddies.ts BADDIE_EDGE) keeps >= 25 %
+//   (x) baddies   : each fill on a boss's silhouette edge (src/game/baddies.ts BADDIE_EDGE) keeps >= 25 %
 //                   luminance from the mission road (FLOORS.road) and from every band of its home climate at every
 //                   phase; every fill >= OKL_MIN Oklab L from the ink; the colours that touch inside it pass the ladder.
-//                   Every fill the scene sees a baddie by (src/game/baddies.ts BADDIE_FILLS: the edge fills) keeps
+//                   Every fill the scene sees a boss by (src/game/baddies.ts BADDIE_FILLS: the edge fills) keeps
 //                   >= 25 % luminance from the road the team walks in the watchable scene (FLOORS.road), the ground
 //                   under and below it (surfaces.ts ROAD_SCENE), and its region's backdrop bands at every phase
-//                   (backdrops.ts climateBands), and >= OKL_MIN Oklab L from the ink.
+//                   (backdrops.ts climateBands), and >= OKL_MIN Oklab L from the ink. The little enemies the same
+//                   (src/game/foes.ts FOE_EDGE, FOE_FILLS, FOE_PAIRS): each against its own region's road and climate.
 // REPORTED, NOT GATED:
 //   (g) any scale pair that passes (b) on hue alone at the same stage (it would merge in greyscale); any body pair
 //       that passes (f) on simulated value alone under the dark-pair floor (they are told apart by zone); glow colours
@@ -112,8 +113,9 @@ import { PASSAGE_COLOURS } from '../src/game/passages.ts';
 import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, STRAW_SEAM, PATH_EDGE, ROAD_SCENE, CAVE, NIGHT, stepped, nightColour } from '../src/game/surfaces.ts';
 import { lampPool, climateBands } from '../src/game/backdrops.ts';
 import { BADDIE_ART, BADDIE_HOME, BADDIE_EDGE, BADDIE_PAIRS, BADDIE_WHITE, BADDIE_FILLS } from '../src/game/baddies.ts';
-import { BADDIES, REGIONS } from '../src/game/regions.ts';
-import { CLIMATES, BADDIE_IDS } from '../src/game/missiondata.ts';
+import { FOE_ART, FOE_HOME, FOE_EDGE, FOE_PAIRS, FOE_WHITE, FOE_GLOW, FOE_FILLS } from '../src/game/foes.ts';
+import { BADDIES, FOES, REGIONS } from '../src/game/regions.ts';
+import { CLIMATES, BADDIE_IDS, FOE_IDS } from '../src/game/missiondata.ts';
 import type { BaddieId } from '../src/game/missiondata.ts';
 import { NEST_RX, NEST_RY, NEST_STRANDS, WALL_H, floorTop, nestBase, eggBottom } from '../src/game/layout.ts';
 import { SHELL, WOBBLE } from '../src/game/eggs.ts';
@@ -994,21 +996,21 @@ for (const e of DRAGON_ELEMENTS) {
   out.push(`${bad ? '  FAIL' : '  ok  '} egg-lie    every egg lies against the nest's straw alone: the ${seen} pixels round its ink ring over its ${new Set(WOBBLE).size} wobbles, all in the heap (${NEST_RX} x ${NEST_RY} px), over the band, off the strands${bad ? ` -- ${bad}` : ''}`);
 }
 
-// ---------- (x) the big baddies (src/game/baddies.ts, ART_BIBLE 5.10; the watchable scene: src/game/missionview.ts) ----------
-// Every fill on a baddie's silhouette edge (BADDIE_EDGE) keeps >= 25 % luminance from the mission road
+// ---------- (x) the bosses and the little enemies (src/game/baddies.ts, foes.ts, ART_BIBLE 5.10; the watchable scene: src/game/missionview.ts) ----------
+// Every fill on a boss's silhouette edge (BADDIE_EDGE) keeps >= 25 % luminance from the mission road
 // (FLOORS.road) and from every band of its home climate (the three sky bands, the far ridge, the near forms and their
 // second colour) at every phase, so it reads on the road and against its region at any hour; every fill keeps >= 6
 // Oklab L from the ink; and the colours that touch inside it (BADDIE_PAIRS) pass the house ladder.
-// Every fill the watchable scene sees a baddie by (baddies.ts BADDIE_FILLS: the edge fills) keeps >= 25 % luminance
+// Every fill the watchable scene sees a boss by (baddies.ts BADDIE_FILLS: the edge fills) keeps >= 25 % luminance
 // from what it stands on and in front of: the road (FLOORS.road), the scene's ground under and below it (ROAD_SCENE: its
 // slab, the grass strip, the earth), and its region's backdrop bands at every phase of the day (backdrops.ts
-// climateBands), and >= 6 Oklab L from the ink. A baddie's face comes only from
-// BaddieFace (neutral, grumpy, surprised, sleepy: no angry one), which the types hold (missiondata.ts; baddies.ts
-// _NoHurt/_Exits; missionview.ts _NoHurt/_Faces).
+// climateBands), and >= 6 Oklab L from the ink. The little enemies (foes.ts FOE_EDGE, FOE_FILLS, FOE_PAIRS) are held
+// to all of it the same way, each against its own region. (An enemy's faces are the fight's -- fierce, hurt, dazed:
+// missiondata.ts BaddieFace -- drawn in ink and the eye's own white, pupil or glow, so no face colour is gated here.)
 let xGates = 0, xFailures = 0;
 const xFailed: string[] = [];
 function xcount(label: string, ok: boolean): boolean { xGates++; if (!ok) { xFailures++; xFailed.push(label); } return ok; }
-head(`(x) BADDIES  (each fill on a baddie's silhouette edge >= ${LUM_MIN * 100}% luminance from the road ${FLOORS.road} and from every band of its home climate at every phase; every fill >= ${OKL_MIN} Oklab L from the ink; touching colours by the ladder)`);
+head(`(x) BADDIES  (the bosses, then the little enemies: each fill on a silhouette edge >= ${LUM_MIN * 100}% luminance from the road ${FLOORS.road} and from every band of its home climate at every phase; every fill >= ${OKL_MIN} Oklab L from the ink; touching colours by the ladder)`);
 for (const id of BADDIE_IDS) {
   const B = BADDIE_ART[id], home = BADDIE_HOME[id];
   out.push(` ${B.name} (${B.w} x ${B.h}; home ${home})`);
@@ -1051,6 +1053,34 @@ for (const id of BADDIE_IDS) {
       out.push(`${least >= LUM_MIN && ink >= OKL_MIN ? '  ok  ' : '  FAIL'} ${BADDIES[id].name.padEnd(16)} ${fill}  L ${lumOf(fill).toFixed(3)}  least ${pct(least)} (${by})  ${okf(ink)} from ink`);
     }
     out.push(`       ${BADDIES[id].name}: ${bandsSeen} ${climate} backdrop bands gated`);
+  }
+}
+{
+  // the little enemies (foes.ts): every edge fill against its region's road, the scene's ground and every band of its
+  // climate at every phase, and the ink; every fill against the ink; the colours that touch inside it by the ladder
+  const ground: [string, string][] = [['road', FLOORS.road], ['road slab', ROAD_SCENE.slab], ['road grass', ROAD_SCENE.grass], ['road earth', ROAD_SCENE.earth]];
+  out.push(` the little enemies (foes.ts: each edge fill >= ${LUM_MIN * 100}% in luminance from the road, the scene's ground and every band of its home climate at every phase; every fill >= ${OKL_MIN} Oklab L from the ink; touching colours by the ladder)`);
+  for (const id of FOE_IDS) {
+    const F = FOE_ART[id], climate = FOE_HOME[id], against: [string, string][] = [...ground];
+    for (const ph of PHASE_ORDER) climateBands(climate, ph).forEach((hex, i) => against.push([`${climate} ${ph} band ${i}`, hex]));
+    out.push(` ${FOES[id].name} (${F.w} x ${F.h}; home ${climate}: ${against.length} backgrounds)`);
+    for (const fill of FOE_FILLS[id]) {
+      let least = Infinity, by = '';
+      for (const [what, hex] of against) { const d = relDiff(fill, hex); xcount(`(x) foe ${id} ${fill} / ${what}`, d >= LUM_MIN); if (d < least) { least = d; by = `${what} ${hex}`; } }
+      const ink = okDiff(fill, INK);
+      xcount(`(x) foe ${id} ${fill} / ink`, ink >= OKL_MIN);
+      out.push(`${least >= LUM_MIN && ink >= OKL_MIN ? '  ok  ' : '  FAIL'} edge ${fill}  L ${lumOf(fill).toFixed(3)}  least ${pct(least)} (${by})  ${okf(ink)} from ink`);
+    }
+    for (const [key, hex] of Object.entries(F.palette)) {
+      const ink = okDiff(hex, INK), ok = xcount(`(x) foe ${id} ${key} / ink`, ink >= OKL_MIN);
+      if (!ok) out.push(`  FAIL ${key} ${hex} only ${okf(ink)} from ink`);
+    }
+    for (const [a, b, where] of FOE_PAIRS[id]) {
+      const col = (k: string) => (k === 'white' ? FOE_WHITE : k === 'glow' && !(k in F.palette) ? FOE_GLOW : F.palette[k]);
+      const ca = col(a), cb = col(b), m = ladder(ca, cb);
+      xcount(`(x) foe ${id} ${a}/${b}`, m.pass);
+      out.push(`${m.pass ? '  ok  ' : '  FAIL'} ${(a + '/' + b).padEnd(16)} lum ${pct(m.lum)}  hue ${deg(m.hue)}  ${m.by.padEnd(8)} ${ca} ${cb}  (${where})`);
+    }
   }
 }
 

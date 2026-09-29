@@ -1,16 +1,20 @@
 // Encounters on the road (docs/BASE_DESIGN.md 11): what a mission's team does at each stop of its road, played turn by
-// turn like the Arena's bouts (10) and kept cozy (B8). A stop is an OBSTACLE -- one of the eleven challenges: the land's
-// (pitch dark, a heavy load, the cold, a storm, a spring flood, thorns, lost things) or the people's (the grumpy
-// miller, a hurt animal, thick fog, a narrow gap) -- a CHECK with a MARK to beat, or a FIGHT with the region's big
-// baddie at a hard road's end, which has PUFF to wear down (never health: it is calmed, outwitted or driven off, and
-// nobody is hurt). Each turn every pair acts: the player picks its dragon's ability -- a skill from the Arena's own menu
-// (its breath, its show-off, PREEN, YAWN: training.ts), REST (a breather: puff back), or, once a stop, its rider's
-// special where the rider's skill is the stop's counter (the CHARM that talks the miller round, the MEDIC's bandage,
-// the NAVIGATOR's way through the fog, the NIMBLE slip through the gap; and on the big baddie, its counter skill) -- or
+// turn like the Arena's bouts (10), fought but never wounding (B8). A stop is an OBSTACLE -- one of the eleven
+// challenges: the land's (pitch dark, a heavy load, the cold, a storm, a spring flood, thorns, lost things) or the
+// people's (the grumpy miller, a hurt animal, thick fog, a narrow gap) -- a CHECK with a MARK to beat, or a FIGHT: with
+// a pack of the region's little enemies between the challenges (every road has some: missions.ts roadOf), or with the
+// region's boss at every road's end. An enemy has PUFF to wear down, never health: a pack worn out goes up in puffs of
+// smoke, one of them for each share of its puff, and a boss worn out sits down seeing stars and runs off; one the team
+// can't wear out leaves anyway (a pack scampers off, a boss stomps off unbeaten), and the team walks on.
+//
+// Each turn every pair acts: the player picks its dragon's ability -- a skill from the Arena's own menu (its breath,
+// its show-off, PREEN, YAWN: training.ts), REST (a breather: puff back), or, once a stop, its rider's special where the
+// rider's skill is the stop's counter (the CHARM that talks the miller round, the MEDIC's bandage, the NAVIGATOR's way
+// through the fog, the NIMBLE slip through the gap; and on a boss, its counter skill) -- or
 // the trail coach picks (AUTO on, or once a pick has waited PICK_WAIT_TRAIL with nobody watching: the view makes the
 // world wait while its menu is up, so the wait runs out only with the team left on its own). The quicker moves first;
 // each move is its dragon's own anim (or its rider's moment), played through while the team stands at the stop, and
-// lands at its impact.
+// lands at its impact (in a fight a breath is thrown: its bolt lands, as an enemy's missile does).
 //
 // An obstacle is a skill check, not a fight: a dragon's move is a TRY at it -- a roll of a d20 (1 to SIDES) plus the move's
 // BONUS (the skill's power weighed by the dragon's POWER, STRONG (x2) for the element that meets the challenge
@@ -21,11 +25,13 @@
 // still stands, it BITES: each pair's dragon with puff left loses BITE puff (the cold bites, the flood soaks), and the
 // mark EASES by MARK_EASE (the team gets its measure). The team waits it out after MAX_OBSTACLE_TURNS tries, or when
 // every dragon is out of puff.
-// A fight: the team's moves cost the baddie puff as a bout's cost the other dragon (training.ts's cost, STRONG for the
-// baddie's counter element), the rider's special a quarter of its whole puff and its POWER down a stage; the baddie's
-// coach picks one of its three moves a turn (an attack on one pair's dragon, a grumble that puts its POWER down, a rest)
-// and it takes its exit when it is out of puff -- or when every dragon is, or after MAX_FIGHT_TURNS: it always leaves,
-// met or not, and the team walks on (5.5). A dragon out of puff sits the rest of the stop out. Puff is carried along the
+// A fight: the team's moves cost the enemy puff as a bout's cost the other dragon (training.ts's cost, STRONG for the
+// boss's counter element; a pack has none: every element even on it), the rider's special on a boss a quarter of its
+// whole puff and its POWER down a stage; the enemy's coach picks one of its three moves a turn (an attack on one pair's
+// dragon -- its region's missile thrown -- a grumble that puts that dragon's POWER down, a rest: a boss's only) and it
+// leaves when it is out of puff -- or when every dragon is, or after MAX_FIGHT_TURNS: it always leaves, worn out or not,
+// and the team walks on (5.5). A boss's stats are its road's difficulty's share of its own (FOE_SCALE); a pack's are its
+// kind's, times its size (the mission's `pack`). A dragon out of puff sits the rest of the stop out. Puff is carried along the
 // whole road (a hard fight at the end of a tiring road), with a rest on the walk between stops (WALK_REST); every stop
 // brings XP (training.ts levels, the Arena's skills).
 //
@@ -38,9 +44,9 @@ import type { DFaceName } from '../art/dragon/pose.ts';
 import type { KeeperId } from '../art/keeper/cast.ts';
 import { rngAt, TAG } from './rand.ts';
 import { animLen } from './gait.ts';
-import { CHALLENGES, BADDIES, KEEPER_SKILL, SKILL_NAME } from './regions.ts';
+import { CHALLENGES, BADDIES, FOES, KEEPER_SKILL, SKILL_NAME } from './regions.ts';
 import type { Counter } from './regions.ts';
-import type { BaddieId, Difficulty, Skill as RiderSkill } from './missiondata.ts';
+import type { BaddieId, BaddieFace, FoeId, Difficulty, Skill as RiderSkill } from './missiondata.ts';
 import { statsOf, spirits, skillsOf, skillOf, stageMult, levelOf, learnedBetween, LOSS_SCALE, STRONG, STAGE_MIN, STAGE_MAX } from './training.ts';
 import type { Stats, SkillKind, Skill } from './training.ts';
 import type { Mission, Pair, Stop, Trip } from './trip.ts';
@@ -55,20 +61,23 @@ export const ABILITIES: readonly Ability[] = Object.freeze(['breath', 'big', 'sh
 /** A pair's pick for the turn: an ability, or `sit` (out of puff: it does nothing). */
 export type Pick = Ability | 'sit';
 export type EncounterKind = 'obstacle' | 'fight';
-/** An encounter's state: the team meets the stop (a fight: the baddie walks in); the picks wait; the turn's moves play; resolved (an obstacle's beat, a fight's exit), then the trip walks on. */
+/** An encounter's state: the team meets the stop (a fight: the enemy walks in); the picks wait; the turn's moves play; resolved (an obstacle's beat, a fight's exit), then the trip walks on. */
 export type EncounterState = 'meet' | 'pick' | 'play' | 'done';
 export const ENCOUNTER_STATES: readonly EncounterState[] = Object.freeze(['meet', 'pick', 'play', 'done'] as EncounterState[]);
-/** The baddie's three moves: an attack on one dragon (puff), a grumble (that dragon's POWER down), a rest (its own puff back). */
+/** The enemy's three moves: an attack on one dragon (puff: its region's missile thrown), a grumble (that dragon's POWER down), a rest (a boss's own puff back). */
 export type FoeMoveKind = 'attack' | 'grumble' | 'rest';
 export const FOE_MOVE_KINDS: readonly FoeMoveKind[] = Object.freeze(['attack', 'grumble', 'rest'] as FoeMoveKind[]);
-/** The baddie's index among the movers (a pair's is 0 or 1). */
+/** The enemy's index among the movers (a pair's is 0 or 1). */
 export const FOE = -1;
 
-/** The baddie in a fight: which, its stats, the puff it has left, its stats' stages this fight. */
-export interface Foe { id: BaddieId; stats: Stats; puff: number; power: number; guard: number }
+/**
+ * The enemy in a fight: which -- a boss, or a pack of a region's little enemies -- its stats (a pack's: its whole
+ * pack's puff), the puff it has left, its stats' stages this fight, and (a pack) how many it began with.
+ */
+export interface Foe { id: BaddieId | FoeId; stats: Stats; puff: number; power: number; guard: number; pack: number }
 
 /**
- * A move in a turn: whose (a pair's index, or FOE), what (a pair's pick, or the baddie's move and the pair it is at),
+ * A move in a turn: whose (a pair's index, or FOE), what (a pair's pick, or the enemy's move and the pair it is at),
  * its place in the turn, the steps it has played, its length and the step it lands at; and once landed, whether it
  * hit (a fight) or passed (an obstacle's check), the puff it cost (a fight), its roll and its score (an obstacle: the
  * roll plus the bonus; 0 when it rolled nothing), the puff it gave back (a rest) and the stage it moved.
@@ -94,7 +103,7 @@ export interface EMove {
 /**
  * An encounter at a stop: its stop's index on the road, its kind, state and the steps in it, the turns begun, this
  * turn's picks (one a pair; null while waited for) and moves (the one playing: `cur`), an obstacle's mark as the stop
- * began and as it stands now (eased by the tries that fell short), a fight's baddie, each pair's POWER and GUARD
+ * began and as it stands now (eased by tries that fell short), a fight's enemy (boss or pack), each pair's POWER and GUARD
  * stages, whether each pair's rider special is still to be had, the outcome once resolved, and its lines (the latest
  * last).
  */
@@ -133,41 +142,87 @@ export const BITE = 3, REST_GAIN = 8, BONUS_BASE = 12;
 export const CHECK_STRONG = 2, CHECK_HELP = 1, CHECK_LITTLE = 0.4, CHECK_CHARM = 1.5;
 /** The rider's special in a fight: this share of the baddie's whole puff, and its POWER down a stage. */
 export const FOE_SPECIAL = 0.25;
-/** Steps: the team meets an obstacle (its banner), a baddie walks in; a REST and a rider's special play; the baddie's move; between moves; an obstacle's resolution beat; a fight's exit beat. */
-export const MEET_STEPS = 60, FOE_ENTER = 160, REST_STEPS = 90, RIDER_STEPS = 90, FOE_MOVE_STEPS = 60, MOVE_GAP = 24, DONE_STEPS = 90, EXIT_STEPS = 360;
+/**
+ * Steps: the team meets an obstacle (its banner), an enemy walks in (the riders step back behind their dragons
+ * meanwhile: missionview.ts); a REST and a rider's special play; the enemy's move (its missile leaves its hand at
+ * FOE_THROW and lands at FOE_IMPACT); between moves; an obstacle's resolution beat, a pack's, and a boss's exit beat (down
+ * seeing stars, then off up the road).
+ */
+export const MEET_STEPS = 60, FOE_ENTER = 160, REST_STEPS = 90, RIDER_STEPS = 90, FOE_MOVE_STEPS = 72, FOE_THROW = 18, FOE_IMPACT = 48, MOVE_GAP = 24, DONE_STEPS = 90, PACK_EXIT = 120, EXIT_STEPS = 360;
+/** In a fight a breath is thrown: its bolt leaves the mouth at the breath's snap (its cue, BREATH_SNAP steps in, on every stage) and lands BOLT_STEPS later. */
+export const BREATH_SNAP = 22, BOLT_STEPS = 30;
 /** The player's pick waits this long for them (7.5 s at 1x; nobody watching: the view makes the world wait while its menu is up), then the trail coach picks. */
 export const PICK_WAIT_TRAIL = 450;
 /** The turns a stop lasts at most: an obstacle's tries, then the team waits it out; a fight's, then the team sits down for a breather while the baddie leaves. */
 export const MAX_OBSTACLE_TURNS = 3, MAX_FIGHT_TURNS = 12;
 /** The walk between stops gives each dragon back this share of its whole puff (at the next stop's start). */
 export const WALK_REST = 0.3;
-/** What a stop brings each pair's dragon: an obstacle cleared or waited out, a fight won or not. */
-export const XP_ROAD = Object.freeze({ cleared: 15, waited: 5, won: 40, lost: 15 });
+/** What a stop brings each pair's dragon: an obstacle cleared or waited out, a boss's fight won or not, a pack's. */
+export const XP_ROAD = Object.freeze({ cleared: 15, waited: 5, won: 40, lost: 15, pack: 8, packLost: 3 });
 /** How long the one a move landed on shows its face (surprised, or a dodge's grin), steps. */
 export const FACE_FRAMES = 36;
 /** A REST plays the sit (`beg`: the dragon sits down for a breather), a rider's special the rider's own moment (missionview.ts RIDER_MOMENT). */
 export const REST_ANIM = 'beg';
-/** The big baddies in a fight (BASE_DESIGN 11): their stats -- the Roc quick and light, the Giant slow and stout, the Mole King in between -- and their three moves' names. */
+/**
+ * The bosses in a fight (BASE_DESIGN 5.3, 11), at a hard road's end: their stats -- the Roc quick and light, the Giant
+ * and the Golem slow and stout, the Troll and the Mole King in between, the Boar quick to charge -- and their three
+ * moves' names (the attack is its region's missile: missionview.ts, fightfx.ts REGION_MISSILE).
+ */
 export const FOE_STATS: Readonly<Record<BaddieId, Readonly<Stats>>> = Object.freeze({
+  bridgetroll: { puff: 100, power: 13, guard: 12, speed: 5 },
   moleking: { puff: 96, power: 12, guard: 12, speed: 6 },
+  briarboar: { puff: 92, power: 14, guard: 11, speed: 12 },
   stormroc: { puff: 88, power: 13, guard: 10, speed: 16 },
   frostgiant: { puff: 104, power: 14, guard: 13, speed: 4 },
+  cindergolem: { puff: 100, power: 13, guard: 13, speed: 3 },
 });
-export const FOE_MOVES: Readonly<Record<BaddieId, Readonly<Record<FoeMoveKind, string>>>> = Object.freeze({
+/** A boss on an easier road: this share of its puff and its POWER (an easy road's boss is met by young dragons too). */
+export const FOE_SCALE: Readonly<Record<Difficulty, number>> = Object.freeze({ easy: 0.5, normal: 0.75, hard: 1 });
+/** One of a pack of little enemies (BASE_DESIGN 5.3): its stats -- a pack's puff is its size times this one's. */
+export const PACK_STATS: Readonly<Record<FoeId, Readonly<Stats>>> = Object.freeze({
+  mudgoblin: { puff: 10, power: 8, guard: 8, speed: 10 },
+  moleminer: { puff: 11, power: 8, guard: 9, speed: 7 },
+  thornsprite: { puff: 9, power: 9, guard: 8, speed: 12 },
+  stormimp: { puff: 9, power: 9, guard: 7, speed: 14 },
+  frostimp: { puff: 11, power: 8, guard: 9, speed: 8 },
+  cinderimp: { puff: 10, power: 9, guard: 8, speed: 9 },
+});
+export const FOE_MOVES: Readonly<Record<BaddieId | FoeId, Readonly<Record<FoeMoveKind, string>>>> = Object.freeze({
+  bridgetroll: { attack: 'CLOD TOSS', grumble: 'GROWL', rest: 'LEAN ON CLUB' },
   moleking: { attack: 'DIRT FLING', grumble: 'GRUMBLE', rest: 'SNUFFLE' },
-  stormroc: { attack: 'GALE FLAP', grumble: 'SCREECH', rest: 'PREEN' },
-  frostgiant: { attack: 'SNOW STAMP', grumble: 'COLD SIGH', rest: 'SHAKE OFF' },
+  briarboar: { attack: 'BURR SHAKE', grumble: 'SNORT', rest: 'WALLOW' },
+  stormroc: { attack: 'SKY ZAP', grumble: 'SCREECH', rest: 'PREEN' },
+  frostgiant: { attack: 'SNOWBALL', grumble: 'COLD SIGH', rest: 'SHAKE OFF' },
+  cindergolem: { attack: 'EMBER TOSS', grumble: 'RUMBLE', rest: 'SMOULDER' },
+  mudgoblin: { attack: 'MUD FLING', grumble: 'JEER', rest: 'HUDDLE' },
+  moleminer: { attack: 'PEBBLE TOSS', grumble: 'GRUMBLE', rest: 'HUDDLE' },
+  thornsprite: { attack: 'BURR THROW', grumble: 'CACKLE', rest: 'HUDDLE' },
+  stormimp: { attack: 'LITTLE ZAPS', grumble: 'CRACKLE', rest: 'HUDDLE' },
+  frostimp: { attack: 'SNOWBALLS', grumble: 'TEASE', rest: 'HUDDLE' },
+  cinderimp: { attack: 'EMBER TOSS', grumble: 'HISS', rest: 'HUDDLE' },
 });
-/** The baddie's attack (power, its chance to land) and its rest (the puff back). */
+/** The enemy's attack (power, its chance to land) and a boss's rest (the puff back: a pack never rests). */
 export const FOE_ATTACK = Object.freeze({ power: 12, acc: 0.9 }), FOE_REST_GAIN = 10;
-/** The baddie's own words for each move landing (the line: `THE MOLE KING FLINGS DIRT: RIPPLE -9 PUFF`). */
-const FOE_VERBS: Readonly<Record<BaddieId, Readonly<Record<FoeMoveKind, string>>>> = Object.freeze({
+/** The enemy's own words for each move landing (the line: `THE MOLE KING FLINGS DIRT: RIPPLE -9 PUFF`, `MUD GOBLINS FLING MUD: ...`). */
+const FOE_VERBS: Readonly<Record<BaddieId | FoeId, Readonly<Record<FoeMoveKind, string>>>> = Object.freeze({
+  bridgetroll: { attack: 'TOSSES A CLOD', grumble: 'GROWLS', rest: 'LEANS ON ITS CLUB' },
   moleking: { attack: 'FLINGS DIRT', grumble: 'GRUMBLES', rest: 'SNUFFLES' },
-  stormroc: { attack: 'FLAPS UP A GALE', grumble: 'SCREECHES', rest: 'PREENS' },
-  frostgiant: { attack: 'STAMPS UP A FLURRY', grumble: 'SIGHS A COLD SIGH', rest: 'SHAKES THE SNOW OFF' },
+  briarboar: { attack: 'SHAKES A BURR OFF', grumble: 'SNORTS', rest: 'WALLOWS' },
+  stormroc: { attack: 'SENDS DOWN A ZAP', grumble: 'SCREECHES', rest: 'PREENS' },
+  frostgiant: { attack: 'LOBS A SNOWBALL', grumble: 'SIGHS A COLD SIGH', rest: 'SHAKES THE SNOW OFF' },
+  cindergolem: { attack: 'TOSSES AN EMBER', grumble: 'RUMBLES', rest: 'SMOULDERS' },
+  mudgoblin: { attack: 'FLING MUD', grumble: 'JEER', rest: 'HUDDLE' },
+  moleminer: { attack: 'TOSS PEBBLES', grumble: 'GRUMBLE', rest: 'HUDDLE' },
+  thornsprite: { attack: 'THROW BURRS', grumble: 'CACKLE', rest: 'HUDDLE' },
+  stormimp: { attack: 'SEND LITTLE ZAPS', grumble: 'CRACKLE', rest: 'HUDDLE' },
+  frostimp: { attack: 'THROW SNOWBALLS', grumble: 'TEASE', rest: 'HUDDLE' },
+  cinderimp: { attack: 'TOSS EMBERS', grumble: 'HISS', rest: 'HUDDLE' },
 });
-/** A short name for a baddie (stopWord: a stop's word, as the challenges have theirs). */
-export const FOE_WORD: Readonly<Record<BaddieId, string>> = Object.freeze({ moleking: 'MOLE KING', stormroc: 'STORM ROC', frostgiant: 'GIANT' });
+/** Whether an enemy is a pack of little enemies (else a boss). */
+export const isPack = (id: BaddieId | FoeId): id is FoeId => id in PACK_STATS;
+/** An enemy's name (a boss's own, a pack's kind's) and its short word. */
+export const foeName = (id: BaddieId | FoeId): string => (isPack(id) ? FOES[id].name : BADDIES[id].name);
+export const foeWord = (id: BaddieId | FoeId): string => (isPack(id) ? FOES[id].word : BADDIES[id].word);
 /** How a pick is written on the menu and in the lines. */
 export const ABILITY_NAME: Readonly<Record<'rest' | 'rider' | 'sit', string>> = Object.freeze({ rest: 'REST', rider: 'SPECIAL', sit: 'SITS IT OUT' });
 
@@ -204,17 +259,19 @@ export function partyOf(sim: CareSim, trip: Trip): Party {
 
 // ---------- what a stop is ----------
 
-/** A stop's counter (regions.ts): the challenge's, or a baddie's two (its element, its skill). */
+/** A stop's counter (regions.ts): the challenge's, a boss's two (its element, its skill), or none (a pack: every element even on it). */
 function counterOf(stop: Stop): Counter[] {
-  return stop.kind === 'baddie' ? [...BADDIES[stop.baddie!].counters] : [CHALLENGES[stop.challenge!].counter];
+  return stop.kind === 'baddie' ? [...BADDIES[stop.baddie!].counters] : stop.kind === 'foes' ? [] : [CHALLENGES[stop.challenge!].counter];
 }
 /** The element that meets a stop (null: a people stop), and the rider's skill that does (null: a land stop). */
 export function stopElement(stop: Stop): DragonElement | null { return counterOf(stop).find((c) => c.element)?.element ?? null; }
 export function stopSkill(stop: Stop): RiderSkill | null { return counterOf(stop).find((c) => c.skill)?.skill ?? null; }
-/** A stop's name: the challenge's, or the baddie's. */
-export function stopName(stop: Stop): string { return stop.kind === 'baddie' ? BADDIES[stop.baddie!].name : CHALLENGES[stop.challenge!].name; }
-/** A stop's short word (the chip): the challenge's, or the baddie's. */
-export function stopWord(stop: Stop): string { return stop.kind === 'baddie' ? FOE_WORD[stop.baddie!] : CHALLENGES[stop.challenge!].word; }
+/** A stop's enemy (a fight's), or null: an obstacle. */
+export function stopFoe(stop: Stop): BaddieId | FoeId | null { return stop.kind === 'baddie' ? stop.baddie : stop.kind === 'foes' ? stop.foe : null; }
+/** A stop's name: the challenge's, the pack's or the boss's. */
+export function stopName(stop: Stop): string { const f = stopFoe(stop); return f ? foeName(f) : CHALLENGES[stop.challenge!].name; }
+/** A stop's short word (the chip): the challenge's, the pack's or the boss's. */
+export function stopWord(stop: Stop): string { const f = stopFoe(stop); return f ? foeWord(f) : CHALLENGES[stop.challenge!].word; }
 /** Whether a stop is one a rider's skill meets (the miller, the hurt animal, the fog, the gap). */
 export function riderStop(stop: Stop): boolean { return stop.kind === 'challenge' && !!CHALLENGES[stop.challenge!].counter.skill; }
 /** Whether a stop is somebody a dragon's show-off charms (the grumpy miller, the hurt animal), where a breath does little. */
@@ -257,7 +314,7 @@ export const pct = (c: number) => `${Math.round(c * 100)} %`;
  */
 export function offersFor(enc: Encounter, party: Party, stop: Stop, i: number): Offer[] {
   const m = party.members[i], out: Offer[] = [], charm = charmStop(stop), el = stopElement(stop), fight = enc.kind === 'fight';
-  const on = fight ? BADDIES[stop.baddie!].name : CHALLENGES[stop.challenge!].it;
+  const on = fight ? stopName(stop) : CHALLENGES[stop.challenge!].it;
   for (const s of skillsOf(m.el, m.level)) {
     if (s.type === 'status') {
       if (!fight) continue;
@@ -305,17 +362,28 @@ export const evenRoll: Roll = () => 0.5;
 
 // ---------- a stop begins ----------
 
+/**
+ * An enemy's stats on a road of this difficulty: a boss's, its puff and POWER at FOE_SCALE of its own; a pack's, its
+ * kind's, its puff times its size.
+ */
+export function foeStats(id: BaddieId | FoeId, difficulty: Difficulty, pack: number): Stats {
+  if (isPack(id)) { const s = PACK_STATS[id]; return { ...s, puff: s.puff * Math.max(1, pack) }; }
+  const s = FOE_STATS[id], k = FOE_SCALE[difficulty];
+  return { ...s, puff: Math.round(s.puff * k), power: Math.max(1, Math.round(s.power * (0.6 + 0.4 * k))) };
+}
+
 /** A new encounter at stop j of the road (the trip's team having rested WALK_REST on the walk: partyOf applies it). */
 export function newEncounter(trip: Trip, j: number): Encounter {
-  const stop = trip.stops[j], fight = stop.kind === 'baddie', n = trip.pairs.length, mark = MARK[trip.mission.difficulty];
-  const foe: Foe | null = fight ? { id: stop.baddie!, stats: { ...FOE_STATS[stop.baddie!] }, puff: FOE_STATS[stop.baddie!].puff, power: 0, guard: 0 } : null;
+  const stop = trip.stops[j], id = stopFoe(stop), fight = id != null, n = trip.pairs.length, mark = MARK[trip.mission.difficulty];
+  const pack = stop.kind === 'foes' ? Math.max(1, trip.mission.pack || 1) : 1, stats = id ? foeStats(id, trip.mission.difficulty, pack) : null;
+  const foe: Foe | null = id && stats ? { id, stats, puff: stats.puff, power: 0, guard: 0, pack } : null;
   return { stop: j, kind: fight ? 'fight' : 'obstacle', state: 'meet', t: 0, turn: 0, picks: trip.pairs.map(() => null), moves: [], cur: 0,
     mark0: fight ? 0 : mark, mark: fight ? 0 : mark, foe, power: Array(n).fill(0), guard: Array(n).fill(0), special: Array(n).fill(true), outcome: null, log: [] };
 }
 
 /** The line a stop opens with. */
 export function meetLine(enc: Encounter, stop: Stop): string {
-  if (enc.kind === 'fight') return `${stopName(stop)}! ${enc.foe!.stats.puff} PUFF TO WEAR IT OUT`;
+  if (enc.kind === 'fight') return `${stopName(stop)}! ${enc.foe!.stats.puff} PUFF TO WEAR ${stop.kind === 'foes' ? 'THEM' : 'IT'} OUT`;
   return `${stopName(stop)} AHEAD: BEAT ${enc.mark} TO ${CHALLENGES[stop.challenge!].clear}`;
 }
 /** The try a stop is on (1 to MAX_OBSTACLE_TURNS): the turn playing, or the one whose picks wait. */
@@ -356,34 +424,39 @@ export function coachPick(enc: Encounter, party: Party, stop: Stop, i: number, u
 }
 
 /**
- * The baddie's coach: a rest when it is low (under 35 % of its puff, three rolls in ten), a grumble early (the first
- * three turns, one roll in four), else an attack; at the pair with puff left that roll v picks (the forecast: the one
- * with the most puff).
+ * The enemy's coach: a rest when a boss is low (under 35 % of its puff, three rolls in ten: a pack never rests), a
+ * grumble early (the first three turns, one roll in four), else an attack; at the pair with puff left that roll v picks
+ * (the forecast: the one with the most puff).
  */
 export function foePick(enc: Encounter, party: Party, u: number, v: number, mostPuff = false): { move: FoeMoveKind; target: number } {
   const foe = enc.foe!, up = party.puff.map((p, i) => (p > 0 ? i : -1)).filter((i) => i >= 0);
   let target = up[0] ?? 0;
   if (mostPuff) { for (const i of up) if (party.puff[i] > party.puff[target]) target = i; }
   else target = up[Math.min(up.length - 1, Math.floor(v * up.length))] ?? 0;
-  if (foe.puff < 0.35 * foe.stats.puff && u < 0.3) return { move: 'rest', target: FOE };
+  if (!isPack(foe.id) && foe.puff < 0.35 * foe.stats.puff && u < 0.3) return { move: 'rest', target: FOE };
   if (enc.turn <= 3 && u >= 0.5 && u < 0.75) return { move: 'grumble', target };
   return { move: 'attack', target };
 }
 
 // ---------- a turn ----------
 
-/** A move's length and impact: its dragon's anim (the skill's, or the sit), the rider's special, the baddie's. */
-function moveShape(party: Party, m: Member | null, pick: Pick | null, foeMove: FoeMoveKind | null): { len: number; at: number } {
-  if (foeMove) return { len: FOE_MOVE_STEPS, at: Math.round(FOE_MOVE_STEPS / 2) };
+/**
+ * A move's length and impact: its dragon's anim (the skill's, or the sit) -- in a fight a breath lands when its bolt
+ * does (BREATH_SNAP + BOLT_STEPS in, the anim held long enough) -- the rider's special, the enemy's (its missile thrown at
+ * FOE_THROW, landing at FOE_IMPACT).
+ */
+function moveShape(fight: boolean, m: Member | null, pick: Pick | null, foeMove: FoeMoveKind | null): { len: number; at: number } {
+  if (foeMove) return { len: FOE_MOVE_STEPS, at: FOE_IMPACT };
   if (pick === 'rest' || pick === 'sit') return { len: REST_STEPS, at: Math.round(REST_STEPS / 2) };
   if (pick === 'rider') return { len: RIDER_STEPS, at: Math.round(RIDER_STEPS / 2) };
   const s = skillOf(m!.el, pick as SkillKind), len = animLen(m!.el, m!.stage, s.anim);
+  if (fight && s.anim === 'breath') { const at = BREATH_SNAP + BOLT_STEPS; return { len: Math.max(len, at + 12), at }; }
   return { len, at: Math.max(1, Math.round(len * s.impact)) };
 }
 
 /**
- * A turn begins: every pair's pick (a pair out of puff sits it out) and, in a fight, the baddie's move, the quicker
- * first (SPEED: a pair's dragon's, the baddie's; a pair before the baddie on a tie, the lower pair first). The turn's
+ * A turn begins: every pair's pick (a pair out of puff sits it out) and, in a fight, the enemy's move, the quicker
+ * first (SPEED: a pair's dragon's, the enemy's; a pair before the enemy on a tie, the lower pair first). The turn's
  * number counts from 1.
  */
 export function beginTurn(enc: Encounter, party: Party, roll: Roll, mostPuff = false): void {
@@ -399,7 +472,7 @@ export function beginTurn(enc: Encounter, party: Party, roll: Roll, mostPuff = f
   }
   movers.sort((a, b) => b.speed - a.speed || (a.by === FOE ? 1 : b.by === FOE ? -1 : a.by - b.by));
   enc.moves = movers.map((v, n): EMove => {
-    const shape = moveShape(party, v.by === FOE ? null : party.members[v.by], v.pick, v.foeMove);
+    const shape = moveShape(enc.kind === 'fight', v.by === FOE ? null : party.members[v.by], v.pick, v.foeMove);
     return { by: v.by, ability: v.pick, foeMove: v.foeMove, target: v.target, n, t: 0, len: shape.len, at: shape.at, landed: false, hit: false, loss: 0, roll: 0, score: 0, gain: 0, moved: null };
   });
   enc.cur = 0; enc.state = 'play'; enc.t = 0;
@@ -410,7 +483,7 @@ export function beginTurn(enc: Encounter, party: Party, roll: Roll, mostPuff = f
 function costOf(power: number, myPower: number, itsGuard: number, w: number, spread: number): number {
   return Math.max(1, Math.round(power * (myPower / itsGuard) * w * LOSS_SCALE * (0.85 + 0.15 * spread)));
 }
-/** A stage moved by `by` for a pair (or the baddie), within its limits; false if it was at its limit already. */
+/** A stage moved by `by` for a pair (or the enemy), within its limits; false if it was at its limit already. */
 function moveStage(enc: Encounter, who: number, stat: 'power' | 'guard', by: number): boolean {
   const at = who === FOE ? enc.foe![stat] : enc[stat][who], to = Math.max(STAGE_MIN, Math.min(STAGE_MAX, at + by));
   if (to === at) return false;
@@ -423,34 +496,34 @@ export const LOG_MAX = 8;
 
 /**
  * A move lands (at its impact): its rolls (k: the move's place in the turn, twice), the check or the cost, the puff
- * back, the stage moved; and its line. An obstacle passed or a baddie out of puff ends the turn there: the moves after
+ * back, the stage moved; and its line. An obstacle passed or an enemy out of puff ends the turn there: the moves after
  * this one are dropped.
  */
 export function landMove(enc: Encounter, party: Party, stop: Stop, m: EMove, roll: Roll): void {
   m.landed = true;
   const hitRoll = roll(20 + m.n * 2), spread = roll(21 + m.n * 2), foe = enc.foe;
-  const foeName = foe ? BADDIES[foe.id].name : '';
+  const them = foe ? foeName(foe.id) : '', many = !!foe && isPack(foe.id);
   if (m.by === FOE) {
-    // the baddie's move
+    // the enemy's move
     const verb = FOE_VERBS[foe!.id][m.foeMove!];
     if (m.foeMove === 'rest') {
       m.hit = true; m.gain = Math.min(FOE_REST_GAIN, foe!.stats.puff - foe!.puff); foe!.puff += m.gain;
-      push(enc, `${foeName} ${verb}: +${m.gain} PUFF`);
+      push(enc, `${them} ${verb}: +${m.gain} PUFF`);
       return;
     }
     const i = m.target, t = party.members[i];
-    if (!t || party.puff[i] <= 0) { m.hit = false; push(enc, `${foeName} ${verb} AT NOBODY`); return; }
+    if (!t || party.puff[i] <= 0) { m.hit = false; push(enc, `${them} ${verb} AT NOBODY`); return; }
     if (m.foeMove === 'grumble') {
       m.hit = true;
-      if (moveStage(enc, i, 'power', -1)) { m.moved = { who: i, stat: 'power', by: -1 }; push(enc, `${foeName} ${verb}: ${t.name}'S POWER DOWN`); }
-      else push(enc, `${foeName} ${verb}: ${t.name} IS AS DROWSY AS IT GETS`);
+      if (moveStage(enc, i, 'power', -1)) { m.moved = { who: i, stat: 'power', by: -1 }; push(enc, `${them} ${verb}: ${t.name}'S POWER DOWN`); }
+      else push(enc, `${them} ${verb}: ${t.name} IS AS DROWSY AS IT GETS`);
       return;
     }
-    if (hitRoll >= FOE_ATTACK.acc) { m.hit = false; push(enc, `${foeName} ${verb}: ${t.name} DODGES!`); return; }
+    if (hitRoll >= FOE_ATTACK.acc) { m.hit = false; push(enc, `${them} ${verb}: ${t.name} DODGES!`); return; }
     m.hit = true;
     m.loss = Math.min(party.puff[i], costOf(FOE_ATTACK.power, foe!.stats.power * stageMult(foe!.power), t.stats.guard * stageMult(enc.guard[i]), 1, spread));
     party.puff[i] -= m.loss;
-    push(enc, `${foeName} ${verb}: ${t.name} -${m.loss} PUFF${party.puff[i] <= 0 ? `. ${t.name} IS OUT OF PUFF AND SITS DOWN` : ''}`);
+    push(enc, `${them} ${verb}: ${t.name} -${m.loss} PUFF${party.puff[i] <= 0 ? `. ${t.name} IS OUT OF PUFF AND SITS DOWN` : ''}`);
     return;
   }
   const i = m.by, me = party.members[i];
@@ -466,12 +539,12 @@ export function landMove(enc: Encounter, party: Party, stop: Stop, m: EMove, rol
       m.loss = Math.min(foe!.puff, Math.round(FOE_SPECIAL * foe!.stats.puff)); foe!.puff -= m.loss;
       const down = moveStage(enc, FOE, 'power', -1);
       if (down) m.moved = { who: FOE, stat: 'power', by: -1 };
-      push(enc, `${me.riderName} ${riderVerb(me.rider)} ${foeName}: -${m.loss} PUFF${down ? ', ITS POWER DOWN' : ''}`);
+      push(enc, `${me.riderName} ${riderVerb(me.rider)} ${them}: -${m.loss} PUFF${down ? ', ITS POWER DOWN' : ''}`);
     } else {
       enc.mark = 0;
       push(enc, `${me.riderName} ${CHALLENGES[stop.challenge!].met}!`);
     }
-    if (enc.mark <= 0 || (foe && foe.puff <= 0)) enc.moves.splice(m.n + 1);
+    if ((enc.kind === 'obstacle' && enc.mark <= 0) || (foe && foe.puff <= 0)) enc.moves.splice(m.n + 1);
     return;
   }
   const o = offerOf(enc, party, stop, i, m.ability as Ability);
@@ -479,16 +552,19 @@ export function landMove(enc: Encounter, party: Party, stop: Stop, m: EMove, rol
   if (s.type === 'status') {
     m.hit = true;
     if (s.kind === 'preen') { const up = moveStage(enc, i, 'guard', 1); if (up) m.moved = { who: i, stat: 'guard', by: 1 }; push(enc, up ? `${me.name} PREENS: GUARD UP` : `${me.name} PREENS: ITS GUARD IS AS HIGH AS IT GOES`); }
-    else { const down = moveStage(enc, FOE, 'power', -1); if (down) m.moved = { who: FOE, stat: 'power', by: -1 }; push(enc, down ? `${me.name} YAWNS AND ${foeName} CATCHES IT: POWER DOWN` : `${me.name} YAWNS: ${foeName} IS AS DROWSY AS IT GETS`); }
+    else { const down = moveStage(enc, FOE, 'power', -1); if (down) m.moved = { who: FOE, stat: 'power', by: -1 }; push(enc, down ? `${me.name} YAWNS AND ${them} ${many ? 'CATCH' : 'CATCHES'} IT: POWER DOWN` : `${me.name} YAWNS: ${them} ${many ? 'ARE AS DROWSY AS THEY GET' : 'IS AS DROWSY AS IT GETS'}`); }
     return;
   }
   const w = o?.weight ?? 1;
   if (enc.kind === 'fight') {
+    const had = packLeft(foe!);
     if (hitRoll >= s.acc) { m.hit = false; push(enc, `${me.name}'S ${s.name} GOES WIDE`); return; }
     m.hit = true;
     m.loss = Math.min(foe!.puff, costOf(s.power, me.stats.power * stageMult(enc.power[i]), foe!.stats.guard * stageMult(foe!.guard), w, spread));
     foe!.puff -= m.loss;
-    push(enc, `${me.name}'S ${s.name}: ${foeName} -${m.loss} PUFF${w > 1 ? ', A STRONG ONE!' : ''}`);
+    // (a pack: one of it goes up in a puff of smoke for every share of its puff gone)
+    const gone = had - packLeft(foe!);
+    push(enc, `${me.name}'S ${s.name}: ${them} -${m.loss} PUFF${w > 1 ? ', A STRONG ONE!' : gone && foe!.puff > 0 ? `. ${gone > 1 ? `${gone} GO` : 'ONE GOES'} UP IN ${gone > 1 ? 'PUFFS' : 'A PUFF'} OF SMOKE` : ''}`);
     if (foe!.puff <= 0) enc.moves.splice(m.n + 1);
     return;
   }
@@ -502,6 +578,15 @@ export function landMove(enc: Encounter, party: Party, stop: Stop, m: EMove, rol
     enc.moves.splice(m.n + 1);
   } else push(enc, m.roll <= 1 ? `A ONE... ${me.name}'S ${s.name} FALLS SHORT: ${sum}` : `${me.name}'S ${s.name}: ${sum} FALLS SHORT OF ${enc.mark}`);
 }
+/**
+ * How many of a pack are still standing: one for every share of its whole puff it has left, any part of one a whole one
+ * (a boss: 1 while it has puff). The view poofs the rest (missionview.ts).
+ */
+export function packLeft(foe: Foe): number {
+  if (foe.puff <= 0) return 0;
+  return Math.min(foe.pack, Math.ceil((foe.puff * foe.pack) / Math.max(1, foe.stats.puff) - 1e-9));
+}
+
 /** A rider's special in a fight, in words: CHARM charms, MEDIC soothes, NAVIGATOR outwits, NIMBLE dodges round. */
 function riderVerb(look: KeeperId): string {
   switch (KEEPER_SKILL[look]) {
@@ -533,15 +618,23 @@ export function endTurn(enc: Encounter, party: Party, stop: Stop): 'cleared' | '
   return null;
 }
 
+/** How a fight's stop ends, in words (stopLine; missions.ts's upgrade writes a resolved stop's line with it too): a boss worn out or not, a pack. */
+export function fightLine(name: string, pack: boolean, cleared: boolean): string {
+  if (pack) return cleared ? `${name} - FOUGHT OFF: THE LAST ONE GOES UP IN A PUFF OF SMOKE` : `${name} - THE TEAM SITS DOWN FOR A BREATHER, AND THEY SCAMPER OFF`;
+  return cleared ? `${name} - WORN OUT: IT SEES STARS AND RUNS OFF` : `${name} - THE TEAM SITS DOWN FOR A BREATHER, AND IT STOMPS OFF UNBEATEN`;
+}
+
 /**
  * The stop's log line once it is resolved, always `NAME - HOW`: cleared by its counter's move or the rider's special
  * (`SPRING FLOOD - RIPPLE SWIMS THEM ACROSS`), cleared by work (`SPRING FLOOD - THE WATER GOES DOWN`), waited out
- * (`SPRING FLOOD - THE TEAM WAITS IT OUT`); a fight won (`THE MOLE KING - WORN OUT: IT CURLS UP AND DOZES`) or not
- * (`THE MOLE KING - THE TEAM SITS DOWN FOR A BREATHER, BUT IT CURLS UP AND DOZES`). Never the trip's outcome.
+ * (`SPRING FLOOD - THE TEAM WAITS IT OUT`); a boss worn out (`THE MOLE KING - WORN OUT: IT SEES STARS AND RUNS OFF`) or
+ * not (`THE MOLE KING - THE TEAM SITS DOWN FOR A BREATHER, AND IT STOMPS OFF UNBEATEN`); a pack fought off
+ * (`MUD GOBLINS - FOUGHT OFF: THE LAST ONE GOES UP IN A PUFF OF SMOKE`) or not (`... AND THEY SCAMPER OFF`). Never the
+ * trip's outcome.
  */
 export function stopLine(enc: Encounter, party: Party, stop: Stop, outcome: 'cleared' | 'waited'): string {
   const name = stopName(stop);
-  if (enc.kind === 'fight') { const b = BADDIES[stop.baddie!]; return outcome === 'cleared' ? `${name} - WORN OUT: IT ${b.how}` : `${name} - THE TEAM SITS DOWN FOR A BREATHER, BUT IT ${b.how}`; }
+  if (enc.kind === 'fight') return fightLine(name, stop.kind === 'foes', outcome === 'cleared');
   const c = CHALLENGES[stop.challenge!];
   if (outcome === 'waited') return `${name} - THE TEAM WAITS IT OUT`;
   // (the move that finished it: its counter's, the rider's special, or another's try)
@@ -560,7 +653,7 @@ export function stopLine(enc: Encounter, party: Party, stop: Stop, outcome: 'cle
 export function stopStart(trip: Trip, j: number): number { return Math.round(trip.stops[j].at * trip.travel); }
 
 /**
- * The team reaches stop j (missions.ts stepAway): the walk's rest, the encounter begun (an obstacle's meet, a baddie's
+ * The team reaches stop j (missions.ts stepAway): the walk's rest, the encounter begun (an obstacle's meet, an enemy's
  * walk-in), its opening line, and a `meet` event for the view's toast.
  */
 export function beginEncounter(sim: CareSim, trip: Trip, j: number): Encounter {
@@ -589,6 +682,16 @@ export function pendingPair(trip: Trip): number {
   return enc.picks.findIndex((p, i) => p == null && trip.puff[i] > 0);
 }
 
+/** What a stop brings each pair's dragon (XP_ROAD): an obstacle's, a pack's, a boss's; cleared or not. */
+export function xpOf(kind: Stop['kind'], cleared: boolean): number {
+  if (kind === 'baddie') return cleared ? XP_ROAD.won : XP_ROAD.lost;
+  if (kind === 'foes') return cleared ? XP_ROAD.pack : XP_ROAD.packLost;
+  return cleared ? XP_ROAD.cleared : XP_ROAD.waited;
+}
+
+/** A stop's resolution beat: an obstacle's, a pack's (its last puff of smoke, or its scamper), a boss's exit (down seeing stars and off, or its stomp). */
+export function beatOf(kind: Stop['kind']): number { return kind === 'baddie' ? EXIT_STEPS : kind === 'foes' ? PACK_EXIT : DONE_STEPS; }
+
 /** Resolve the stop: its record, its line, the XP (training.ts levels and skills: `level` and `learn` events) and a `stopEnd` event. */
 function resolve(sim: CareSim, trip: Trip, enc: Encounter, party: Party, outcome: 'cleared' | 'waited'): void {
   const stop = trip.stops[enc.stop], fight = enc.kind === 'fight';
@@ -597,7 +700,7 @@ function resolve(sim: CareSim, trip: Trip, enc: Encounter, party: Party, outcome
   stop.turns = enc.turn; stop.resolvedAt = sim.clock;
   stop.log = stopLine(enc, party, stop, outcome);
   push(enc, stop.log);
-  const xp = fight ? (outcome === 'cleared' ? XP_ROAD.won : XP_ROAD.lost) : outcome === 'cleared' ? XP_ROAD.cleared : XP_ROAD.waited;
+  const xp = xpOf(stop.kind, outcome === 'cleared');
   trip.pairs.forEach((p, i) => {
     const d = sim.dragons.find((q) => q.id === p.dragon);
     if (!d) return;
@@ -616,8 +719,8 @@ function resolve(sim: CareSim, trip: Trip, enc: Encounter, party: Party, outcome
  * A step of the encounter on (missions.ts stepAway): the meet's beat; the picks -- given, or the trail coach's (AUTO, or
  * once the pick has waited PICK_WAIT_TRAIL: then every pick still missing is the coach's at once) -- then the turn; the
  * moves, one after another, each landing at its impact (a mover out of puff by then sits it out); the turn's end; and
- * the resolution's beat (an obstacle's DONE_STEPS, a fight's EXIT_STEPS), after which the trip walks on (encounter
- * null). Every roll is the stop's own: liveRoll.
+ * the resolution's beat (beatOf: an obstacle's DONE_STEPS, a pack's PACK_EXIT, a boss's EXIT_STEPS), after which the
+ * trip walks on (encounter null). Every roll is the stop's own: liveRoll.
  */
 export function stepEncounter(sim: CareSim, trip: Trip): void {
   const enc = trip.encounter;
@@ -651,7 +754,7 @@ export function stepEncounter(sim: CareSim, trip: Trip): void {
       break;
     }
     case 'done':
-      if (enc.t >= (enc.kind === 'fight' ? EXIT_STEPS : DONE_STEPS)) trip.encounter = null;
+      if (enc.t >= beatOf(stop.kind)) trip.encounter = null;
       break;
   }
 }
@@ -663,7 +766,7 @@ export interface Forecast { cleared: number; stops: number; turns: number; puff:
 
 /**
  * The trail coach's dry run of mission m's road with this team (BASE_DESIGN 11): every stop played by the rules with
- * the rolls fixed (evenRoll: every move lands with its middling spread, the baddie attacks the dragon with the most
+ * the rolls fixed (evenRoll: every move lands with its middling spread, the enemy attacks the dragon with the most
  * puff, nobody gambles on a rest, yawn or preen), the walk's rest between stops. A pure function of the world's dragons
  * and keepers: the chooser's FORECAST, and BEST TEAM ranks teams by it.
  */
@@ -706,7 +809,7 @@ const lookKey = (enc: Encounter, n: number) => enc.stop * 10000 + enc.turn * 10 
 /**
  * What pair i's dragon shows now (missionview.ts plays it), or null for the scene's own choice (standing at the stop):
  * during its own move, its skill's anim (a REST the sit) from the move's first step to its last -- or, for the rider's
- * special, `rider` true (the rider's moment plays, the dragon stands) -- and, a move landed on it (the baddie's), its
+ * special, `rider` true (the rider's moment plays, the dragon stands) -- and, a move landed on it (the enemy's), its
  * face for FACE_FRAMES: surprised at a cost, a grin at a dodge.
  */
 export function pairLook(enc: Encounter, i: number): Look | null {
@@ -729,14 +832,32 @@ export function pickAnim(el: DragonElement, pick: Pick | null): string | null {
   return skillOf(el, pick).anim;
 }
 
-/** The baddie's face and pose now: surprised for FACE_FRAMES after a move lands on it, stomping (a walk in place) through its attack, sitting through its rest; else grumpy, standing. */
-export function foeShow(enc: Encounter): { face: 'grumpy' | 'surprised' | 'neutral'; pose: 'stand' | 'walk' | 'sit' } {
-  if (enc.state !== 'play') return { face: 'grumpy', pose: 'stand' };
+/** A hit on the enemy rocks it back this many steps, and flashes it pale (cel.ts HIT_FLASH) this many. */
+export const HIT_FRAMES = 14, FLASH_FRAMES = 6;
+/** The enemy as it shows now: its face, its pose and whether a hit is flashing on it (a boss's and each of a pack's alike). */
+export interface FoeShow { face: BaddieFace; pose: 'stand' | 'walk' | 'attack' | 'hit'; flash: boolean }
+/**
+ * The enemy's face and pose now (missionview.ts draws a boss and each of a pack by it): through its own move, an
+ * attack's lunge until its missile has left its hand (FOE_THROW), a grumble's stomp (a walk in place), a boss's rest
+ * stood still; a move of the team's landed on it -- a cost: rocked back HIT_FRAMES and flashing FLASH_FRAMES, wincing
+ * for FACE_FRAMES; a yawn caught: dazed for FACE_FRAMES; else fierce, standing.
+ */
+export function foeShow(enc: Encounter): FoeShow {
+  const stand: FoeShow = { face: 'fierce', pose: 'stand', flash: false };
+  if (enc.state !== 'play') return stand;
   const m = enc.moves[enc.cur];
-  if (!m) return { face: 'grumpy', pose: 'stand' };
-  if (m.by === FOE && m.t < m.len) return { face: 'grumpy', pose: m.foeMove === 'attack' ? 'walk' : m.foeMove === 'rest' ? 'sit' : 'stand' };
-  if (m.by !== FOE && m.landed && m.t - m.at < FACE_FRAMES && (m.loss > 0 || m.moved?.who === FOE)) return { face: 'surprised', pose: 'stand' };
-  return { face: 'grumpy', pose: 'stand' };
+  if (!m) return stand;
+  if (m.by === FOE) {
+    if (m.t >= m.len) return stand;
+    if (m.foeMove === 'attack') return { face: 'fierce', pose: m.t >= 4 && m.t < FOE_THROW + 8 ? 'attack' : 'stand', flash: false };
+    return m.foeMove === 'grumble' ? { face: 'fierce', pose: 'walk', flash: false } : stand;
+  }
+  const since = m.t - m.at;
+  if (m.landed && since >= 0 && since < FACE_FRAMES) {
+    if (m.loss > 0) return { face: 'hurt', pose: since < HIT_FRAMES ? 'hit' : 'stand', flash: since < FLASH_FRAMES };
+    if (m.moved?.who === FOE) return { face: 'dazed', pose: 'stand', flash: false };
+  }
+  return stand;
 }
 
 /** A landed move's popup: over whom (a pair's index, FOE, or `work` for the obstacle), its words and the note under them. */
@@ -756,7 +877,7 @@ export function popupOf(enc: Encounter, m: EMove): { on: number | 'work'; words:
 }
 /** The mark this turn's tries are checked against (the stop's, eased by the turns before it): what a passed try beat, once the mark is down. */
 export function markOfTurn(enc: Encounter): number { return Math.max(1, enc.mark0 - Math.max(0, enc.turn - 1) * MARK_EASE); }
-/** Whether the move playing now is a breath strong on the baddie (its counter element): the popup's STRONG!. */
+/** Whether the move playing now is a breath strong on the boss (its counter element): the popup's STRONG!. */
 function strongOnFoe(enc: Encounter): boolean { return enc.moves[enc.cur]?.loss > 0 && enc.log[enc.log.length - 1]?.endsWith('A STRONG ONE!') === true; }
 
 // ---------- saves ----------
@@ -788,7 +909,7 @@ export function checkEncounter(raw: unknown, pairs: number, stops: readonly Stop
   const e = raw as Encounter, whole = (v: unknown, min = 0) => Number.isInteger(v) && (v as number) >= min, stage = (v: unknown) => Number.isInteger(v) && (v as number) >= STAGE_MIN && (v as number) <= STAGE_MAX;
   const pick = (p: unknown) => p === null || p === 'sit' || (ABILITIES as readonly string[]).includes(p as string);
   const stop = stops[e.stop];
-  if (!whole(e.stop) || !stop || !ENCOUNTER_STATES.includes(e.state) || !whole(e.t) || !whole(e.turn) || (e.kind !== 'obstacle' && e.kind !== 'fight') || (e.kind === 'fight') !== (stop.kind === 'baddie')) bad(`(${JSON.stringify({ stop: e.stop, kind: e.kind, state: e.state })}) is not at a stop of this road`);
+  if (!whole(e.stop) || !stop || !ENCOUNTER_STATES.includes(e.state) || !whole(e.t) || !whole(e.turn) || (e.kind !== 'obstacle' && e.kind !== 'fight') || (e.kind === 'fight') !== (stop.kind !== 'challenge')) bad(`(${JSON.stringify({ stop: e.stop, kind: e.kind, state: e.state })}) is not at a stop of this road`);
   // (the stop is still ahead until the encounter is resolved; resolved, the stop says how it went while the beat plays out)
   if (stop.result !== (e.state === 'done' ? (e.outcome === 'cleared' ? 'met' : 'unmet') : 'ahead')) bad(`at ${e.state} has its stop ${stop.result}`);
   if (!Array.isArray(e.picks) || e.picks.length !== pairs || !e.picks.every(pick) || !Array.isArray(e.power) || !Array.isArray(e.guard) || !Array.isArray(e.special) || e.power.length !== pairs || e.guard.length !== pairs || e.special.length !== pairs
@@ -796,8 +917,9 @@ export function checkEncounter(raw: unknown, pairs: number, stops: readonly Stop
   if (!whole(e.mark0) || !whole(e.mark) || e.mark > e.mark0) bad(`has a mark of ${e.mark} from ${e.mark0}`);
   if (e.kind === 'fight') {
     const f = e.foe;
-    if (!f || f.id !== stop.baddie || !f.stats || !whole(f.puff) || f.puff > f.stats.puff || !stage(f.power) || !stage(f.guard)) bad(`has a baddie this build can't run: ${JSON.stringify(f)}`);
-  } else if (e.foe !== null) bad('has a baddie at an obstacle');
+    const stats = (q: Stats) => !!q && typeof q === 'object' && whole(q.puff, 1) && whole(q.power, 1) && whole(q.guard, 1) && whole(q.speed);
+    if (!f || f.id !== stopFoe(stop) || !stats(f.stats) || !whole(f.puff) || f.puff > f.stats.puff || !stage(f.power) || !stage(f.guard) || !whole(f.pack, 1) || (stop.kind === 'baddie' && f.pack !== 1)) bad(`has an enemy this build can't run: ${JSON.stringify(f)}`);
+  } else if (e.foe !== null) bad('has an enemy at an obstacle');
   const move = (m: EMove) => m && typeof m === 'object' && Number.isInteger(m.by) && m.by >= FOE && m.by < pairs && whole(m.n) && whole(m.t) && whole(m.len, 1) && whole(m.at, 1)
     && (m.by === FOE ? m.ability === null && FOE_MOVE_KINDS.includes(m.foeMove!) : pick(m.ability) && m.ability !== null && m.foeMove === null)
     && typeof m.landed === 'boolean' && typeof m.hit === 'boolean' && whole(m.loss) && whole(m.roll) && m.roll <= SIDES && whole(m.score) && whole(m.gain);
