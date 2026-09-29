@@ -13,9 +13,13 @@ off from the Aerie, and the game follows it on its adventure: the camera stays o
 sets out over the sky bridge, then goes with it down its road -- the keepers mind the barn meanwhile, and there's no
 going back to it (MAP still shows the team's flag on the map) until the team is home and you tap its result card away.
 On the road you play it: at each stop the team meets a challenge (a spring flood, a grumpy miller, thick fog...) or, at
-a hard road's end, a big baddie, and you pick what each dragon does turn by turn as in the Arena (its breath, a
-show-off, a rest, its rider's special), or leave it to the trail coach (AUTO); nobody is hurt, the outcome is told at
-the road's end, and every stop brings XP. Tap
+a hard road's end, a big baddie. A challenge is a skill check: a mark to beat, and each dragon's move a try at it -- a
+roll of a d20 plus its bonus, the menu telling you each try's chance (`95 %: STRONG ON THE FLOOD!`, `55 %: HELPS`),
+the rider's special clearing it outright -- three tries, the mark easing after each that falls short; a big baddie is
+fought turn by turn as in the Arena (its breath, a show-off, a rest, its rider's special), its puff worn down; or leave
+either to the trail coach (AUTO). Past a land stop the road runs on through its passage -- the cave beyond the dark's
+mouth, lit by lanterns if the way was lit, the canyon after the gap, the bramble tunnel, the fog bank... -- and nobody
+is hurt, the outcome is told at the road's end, and every stop brings XP. Tap
 a keeper (or their badge, or Tab) to take them by hand: WASD or the arrows walk and climb, E or Space fetches and does
 the chore in reach, Esc lets go -- and on a touch screen a pad of arrows, E and LET GO does the same. ARENA (or b) opens
 the Arena on the roof: tap your dragon, then its sparring partner, and START BOUT -- the two ride up and spar turn by

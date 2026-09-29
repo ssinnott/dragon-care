@@ -10,6 +10,7 @@ import { copyMissions, upgradeMissions } from './missions.ts';
 import type { MissionsState } from './missions.ts';
 import { copyArena, newArena } from './arena.ts';
 import type { ArenaState } from './arena.ts';
+import { upgradeEncounterV11 } from './encounter.ts';
 
 /**
  * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded (the
@@ -23,10 +24,11 @@ import type { ArenaState } from './arena.ts';
  * Hatchery's nests; the garden's plots; the missions (the board and its day, the map, the coin, the trip out -- its
  * road walked so far, its stops' results, the team's stats, puff and XP, the trail coach, the encounter on at a stop:
  * trip.ts, encounter.ts -- and each pair's deck spot); the Arena (the bout on, its fighters by id, and the bouts
- * begun: arena.ts); and the stats. Version 10 kept a trip as a timer (its return clock, its odds and its outcome rolled
- * at the send) and version 9 (the first shipped) was that less the XP and the Arena: each loads brought up to this one.
+ * begun: arena.ts); and the stats. Version 11 played an obstacle as work to grind down (its toughness and the work
+ * left), version 10 kept a trip as a timer (its return clock, its odds and its outcome rolled at the send) and version 9
+ * (the first shipped) was that less the XP and the Arena: each loads brought up to this one.
  */
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }
@@ -107,8 +109,9 @@ export function serialize(sim: CareSim, exact = false): SaveV {
  * A save of an older version brought up to this one (storage.ts loadSave, before the view loads it), a version at a
  * time: version 9 had no XP and no Arena, so every dragon starts at 0 XP (level 1) and the Arena with no bout begun;
  * version 10 kept a trip out as a timer, so a trip is given its road walked so far and its stops' results as the old
- * scene had them (missions.ts upgradeMissions); the rest is unchanged. Any other save is returned as it is (a save of
- * this version, or one CareSim.fromSave refuses).
+ * scene had them (missions.ts upgradeMissions); version 11 ground an obstacle down as work, so an encounter on at one
+ * gets its mark to beat in the work's place (encounter.ts upgradeEncounterV11); the rest is unchanged. Any other save is
+ * returned as it is (a save of this version, or one CareSim.fromSave refuses).
  */
 export function migrateSave(raw: unknown): unknown {
   if (!raw || typeof raw !== 'object') return raw;
@@ -117,7 +120,13 @@ export function migrateSave(raw: unknown): unknown {
   if (s.v === 10) {
     const dragons = Array.isArray(s.dragons) ? (s.dragons as { id: number; element: Dragon['element']; stage: Dragon['stage']; xp?: number; mood: number }[]) : [];
     const dayLen = typeof s.dayLen === 'number' ? s.dayLen : 10800, clock = (typeof s.clock0 === 'number' ? s.clock0 : 0) + (typeof s.tick === 'number' ? s.tick : 0);
-    s = { ...s, v: SAVE_VERSION, missions: upgradeMissions(s.missions, dragons, dayLen, clock) as MissionsState };
+    s = { ...s, v: 11, missions: upgradeMissions(s.missions, dragons, dayLen, clock) as MissionsState };
+  }
+  if (s.v === 11) {
+    const ms = s.missions as { trip?: { encounter?: unknown; mission?: { difficulty?: 'easy' | 'normal' | 'hard' } } | null } | undefined;
+    const trip = ms?.trip;
+    const missions = trip && typeof trip === 'object' && trip.encounter ? { ...ms, trip: { ...trip, encounter: upgradeEncounterV11(trip.encounter, trip.mission?.difficulty ?? 'normal') } } : ms;
+    s = { ...s, v: SAVE_VERSION, missions: missions as MissionsState };
   }
   return s;
 }

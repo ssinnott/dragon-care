@@ -1,10 +1,11 @@
 // The encounter's screen (docs/BASE_DESIGN.md 11): the furniture drawn over the watchable scene while the team stands at
 // a stop -- a plate for each pair (its dragon's name and level, its puff as a bar, its stats' stages), the stop's plate
-// (an obstacle's work left, a baddie's puff, as a bar), the pick menu while a pair's pick waits (each ability it has
-// here: its name, what it is, and how it lands at this stop -- STRONG ON THE FLOOD!, HELPS A LITTLE, CHARMS THE
-// MILLER, +8 PUFF, the rider's special), THE TRAIL COACH PICKS with AUTO on, AUTO itself, and the popups over the heads
-// as moves land (-9, +8, GUARD UP, POWER DOWN, DODGED!, 18 WORK over the obstacle). The scene's own banner carries the
-// encounter's latest line. Drawing and hit rects only, at the view's 640 x 360: base.ts owns what a tap does, and
+// (an obstacle's mark to beat and the try it is on, its tries left as a bar; a baddie's puff, as a bar), the pick menu
+// while a pair's pick waits (each ability it has here: its name, what it is, and how it lands at this stop -- at an
+// obstacle its roll's bonus and its chance, `ROLL + 22` and `95 %: STRONG ON THE FLOOD!`, `50 %: HELPS`, `CHARMS THE
+// MILLER`; +8 PUFF; the rider's special), THE TRAIL COACH PICKS with AUTO on, AUTO itself, and the popups over the
+// heads as moves land (-9, +8, GUARD UP, POWER DOWN, DODGED!, PASSED! or NOT QUITE with the score against the mark
+// over the obstacle). The scene's own banner carries the encounter's latest line. Drawing and hit rects only, at the view's 640 x 360: base.ts owns what a tap does, and
 // encounter.ts every rule. House style: 1 px ink outlines, flat fills, the engine's 5 x 7 font, no alpha (the Arena's:
 // arenaui.ts), the whole of it in the sky over the road, so it never covers a dragon, a rider or the baddie.
 import { drawText, drawTextOutlined, measureText } from '../lib/engine/text.ts';
@@ -17,7 +18,7 @@ import type { Trip } from './trip.ts';
 import type { Hit } from './maptable.ts';
 import type { SceneFrame, ScenePets } from './missionview.ts';
 import { baddieHead, pieceAt } from './missionview.ts';
-import { partyOf, offersFor, pendingPair, popupOf, stopName, FOE, FACE_FRAMES, ABILITY_NAME } from './encounter.ts';
+import { partyOf, offersFor, pendingPair, popupOf, stopName, tryOf, FOE, FACE_FRAMES, ABILITY_NAME, MAX_OBSTACLE_TURNS } from './encounter.ts';
 import type { Encounter, Offer } from './encounter.ts';
 
 // ---------- where things are (screen px) ----------
@@ -41,9 +42,9 @@ export const POP_FRAMES = FACE_FRAMES + 12;
 
 const PARCHMENT = '#e8d8a8', BORDER = '#8a6a4a', INKY = '#4a3428', FADED = '#8a7a64';
 const FACE = '#3a2e34', ACTIVE = '#6b4a34', TEXT = '#f3e6c8', OFF = '#a89c88', GOOD = '#8fd07a', BAD = '#e87a64', FLAG = '#f2c14e', BAR_OFF = '#5a5054';
-/** The puff bar's colour by the share left: plenty, getting low, nearly out; an obstacle's work bar. */
+/** The puff bar's colour by the share left: plenty, getting low, nearly out; an obstacle's tries bar. */
 const puffColour = (share: number) => (share > 0.5 ? '#7bbf6a' : share > 0.2 ? '#e3b23e' : '#d8402e');
-const WORK = '#8ecaf0';
+const TRIES = '#8ecaf0';
 
 // ---------- the pen ----------
 
@@ -86,7 +87,7 @@ function puffLine(ctx: CanvasRenderingContext2D, r: Rect, long: string, short: s
   if (stages) text(ctx, stages, r.x + r.w - 4, r.y + 25, FLAG, 'right');
 }
 
-/** The stop's plate: an obstacle's name and the work left to clear it, or the baddie's name and its puff left. */
+/** The stop's plate: an obstacle's name, the mark to beat and the try it is on (its tries left as a bar), or the baddie's name and its puff left. */
 function stopPlate(ctx: CanvasRenderingContext2D, trip: Trip, enc: Encounter): void {
   const r = STOP_PLATE, stop = trip.stops[enc.stop];
   box(ctx, r, FACE);
@@ -97,9 +98,10 @@ function stopPlate(ctx: CanvasRenderingContext2D, trip: Trip, enc: Encounter): v
     const stages = ([['POW', f.power], ['GRD', f.guard]] as const).filter(([, n]) => n !== 0).map(([k, n]) => `${k}${n > 0 ? '+' : ''}${n}`).join(' ');
     puffLine(ctx, r, `${f.puff}/${f.stats.puff} PUFF`, `${f.puff}/${f.stats.puff}`, TEXT, stages);
   } else {
-    bar(ctx, r.x + 4, r.y + 16, 100, 7, enc.toughness ? enc.work / enc.toughness : 0, WORK);
-    text(ctx, enc.work > 0 ? `${enc.work} WORK` : 'CLEARED!', r.x + 4, r.y + 25, TEXT);
-    text(ctx, `TURN ${Math.max(1, enc.turn)}`, r.x + r.w - 4, r.y + 25, OFF, 'right');
+    const t = tryOf(enc), left = enc.outcome ? (enc.outcome === 'cleared' ? MAX_OBSTACLE_TURNS - t + 1 : 0) : MAX_OBSTACLE_TURNS - t + 1;
+    bar(ctx, r.x + 4, r.y + 16, 100, 7, left / MAX_OBSTACLE_TURNS, TRIES);
+    text(ctx, enc.outcome === 'cleared' ? 'PASSED!' : enc.outcome === 'waited' ? 'WAITED OUT' : `BEAT ${enc.mark}`, r.x + 4, r.y + 25, TEXT);
+    text(ctx, `TRY ${t}/${MAX_OBSTACLE_TURNS}`, r.x + r.w - 4, r.y + 25, OFF, 'right');
   }
 }
 
@@ -120,16 +122,16 @@ function row(ctx: CanvasRenderingContext2D, r: Rect, o: Offer, i: number): void 
 }
 
 /**
- * The pick menu for the pair whose pick waits (BASE_DESIGN 11): WHAT WILL RIPPLE DO? (TURN 2), and a row for each
- * ability it has at this stop (encounter.ts offersFor), in the menu's order. Returns the rows' tap targets.
+ * The pick menu for the pair whose pick waits (BASE_DESIGN 11): WHAT WILL RIPPLE DO? (TRY 2 OF 3; a fight's TURN 2), and
+ * a row for each ability it has at this stop (encounter.ts offersFor), in the menu's order. Returns the rows' tap targets.
  */
 function pickMenu(ctx: CanvasRenderingContext2D, sim: CareSim, trip: Trip, enc: Encounter, pair: number, hits: Hit[]): void {
   const party = partyOf(sim, trip), stop = trip.stops[enc.stop], offers = offersFor(enc, party, stop, pair).slice(0, MAX_ROWS);
   const d = sim.dragons.find((q) => q.id === trip.pairs[pair].dragon);
   box(ctx, MENU, BORDER);
   rect(ctx, { x: MENU.x + 2, y: MENU.y + 2, w: MENU.w - 4, h: MENU.h - 4 }, PARCHMENT);
-  text(ctx, `WHAT WILL ${d?.name ?? 'THE TEAM'} DO?  (TURN ${enc.turn + 1})`, MENU.x + 6, MENU.y + 5, INKY);
-  text(ctx, enc.kind === 'fight' ? `${stopName(stop)}: ${enc.foe!.puff} PUFF LEFT` : `${enc.work} WORK TO ${CHALLENGES[stop.challenge!].clear}`, MENU.x + MENU.w - 6, MENU.y + 5, FADED, 'right');
+  text(ctx, `WHAT WILL ${d?.name ?? 'THE TEAM'} DO?  (${enc.kind === 'fight' ? `TURN ${enc.turn + 1}` : `TRY ${tryOf(enc)} OF ${MAX_OBSTACLE_TURNS}`})`, MENU.x + 6, MENU.y + 5, INKY);
+  text(ctx, enc.kind === 'fight' ? `${stopName(stop)}: ${enc.foe!.puff} PUFF LEFT` : `BEAT ${enc.mark} TO ${CHALLENGES[stop.challenge!].clear}`, MENU.x + MENU.w - 6, MENU.y + 5, FADED, 'right');
   offers.forEach((o, i) => {
     const r = { x: MENU.x + 4, y: MENU.y + ROW_Y0 + i * ROW_H, w: MENU.w - 8, h: ROW_H - 1 };
     row(ctx, r, o, i);

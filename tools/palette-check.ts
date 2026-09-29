@@ -108,6 +108,7 @@ import { KEEPER_IDS, NPC_IDS } from '../src/art/keeper/cast.ts';
 import type { CastId } from '../src/art/keeper/cast.ts';
 import { BOWL } from '../src/art/props.ts';
 import { SETPIECE_COLOURS } from '../src/game/setpieces.ts';
+import { PASSAGE_COLOURS } from '../src/game/passages.ts';
 import { FLOORS, INK, BACKDROPS, WALLS, PROPS, NEST, LAMP_RINGS, HEARTH_RING, LANTERN_RINGS, STRAW_SEAM, PATH_EDGE, ROAD_SCENE, CAVE, NIGHT, stepped, nightColour } from '../src/game/surfaces.ts';
 import { lampPool, climateBands } from '../src/game/backdrops.ts';
 import { BADDIE_ART, BADDIE_HOME, BADDIE_EDGE, BADDIE_PAIRS, BADDIE_WHITE, BADDIE_FILLS } from '../src/game/baddies.ts';
@@ -925,8 +926,13 @@ function lighterBy(a: string, b: string): number {
   }
   // (the fog bank's bands, setpieces.ts SETPIECE_COLOURS.fog: the one set piece drawn as a backdrop BEHIND the team, so
   // gated like one -- each band lighter than every dark body, and off the ink.)
-  SETPIECE_COLOURS.fog.forEach((hex, i) => {
-    const what = `set piece fog band ${i}`;
+  // (and the passages' walls, passages.ts PASSAGE_COLOURS: the cave's wall, seams and glints and the canyon's wall and
+  // rim -- backdrops the team walks in front of for a whole stretch of road -- and the rainbow's bands in the sky)
+  const behind: [string, string][] = [...SETPIECE_COLOURS.fog.map((hex, i) => [`set piece fog band ${i}`, hex] as [string, string]),
+    ['passage cave wall', PASSAGE_COLOURS.caveWall], ['passage cave seam', PASSAGE_COLOURS.caveDeep], ['passage cave glint', PASSAGE_COLOURS.caveGlint],
+    ['passage canyon wall', PASSAGE_COLOURS.canyonWall], ['passage canyon rim', PASSAGE_COLOURS.canyonDeep],
+    ...PASSAGE_COLOURS.rainbow.map((hex, i) => [`passage rainbow band ${i}`, hex] as [string, string])];
+  behind.forEach(([what, hex]) => {
     let least = Infinity, by = '';
     for (const b of dark) { const d = lighterBy(hex, b.hex); wcount(`(w) ${what} / ${b.who}`, d >= LUM_MIN); if (d < least) { least = d; by = b.who; } }
     const ink = okDiff(hex, INK), inkOk = wcount(`(w) ${what} / ink`, ink >= OKL_MIN);

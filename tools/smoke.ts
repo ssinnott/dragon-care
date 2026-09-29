@@ -97,6 +97,7 @@ import { serialize, SAVE_VERSION } from '../src/game/save.ts';
 import { SAVE_KEY, BACKUP_KEY } from '../src/game/storage.ts';
 import { FLOORS, STRAW_SEAM, PATH_EDGE } from '../src/game/surfaces.ts';
 import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS } from '../src/game/missiondata.ts';
+import { PASSAGES } from '../src/game/passages.ts';
 import { PHASE_ORDER } from '../src/game/clock.ts';
 import { PLACES, growthSamples } from '../src/game/worldmap.ts';
 import { PLATES, LOG_LINE, MENU, AUTO, BOUT_BACK } from '../src/game/arenaui.ts';
@@ -1291,6 +1292,7 @@ const CASES: Case[] = [
   { query: 'view=missionart&sheet=climates&t=0', minColours: 1000, allScales: false, art: { sheet: 'climates', want: CLIMATES.flatMap((c) => PHASE_ORDER.map((p) => `${c}:${p}`)) } },
   { query: 'view=missionart&sheet=climates&climate=peaks&phase=night&t=90', minColours: 500, allScales: false, art: { sheet: 'climates', want: ['peaks:night:scene'] } },
   { query: 'view=missionart&sheet=setpieces&t=60', minColours: 1000, allScales: false, art: { sheet: 'setpieces', want: CHALLENGE_IDS } },
+  { query: 'view=missionart&sheet=passages&t=60', minColours: 300, allScales: false, art: { sheet: 'passages', want: (Object.keys(PASSAGES) as string[]).flatMap((id) => [`${id}:unmet`, `${id}:met`]) } },
   { query: 'view=missionart&sheet=baddies&t=30', minColours: 1000, allScales: false, art: { sheet: 'baddies', want: [...BADDIE_IDS, ...BADDIE_IDS.map((b) => `${b}:portrait`)] } },
   { query: 'view=missionart&sheet=people&t=50', minColours: 1000, allScales: false, keepers: true, art: { sheet: 'people', want: ['miller:grumpy', 'miller:talkedRound', ...KEEPER_IDS] } },
   { query: 'view=missionart&sheet=icons&t=0', minColours: 300, allScales: false, art: { sheet: 'icons', want: [...CHALLENGE_IDS.map((c) => `challenge:${c}`), ...SKILLS.map((k) => `skill:${k}`), 'saddle', ...DRAGON_ELEMENTS.map((e) => `egg:${e}`), ...BADDIE_IDS.map((b) => `portrait:${b}`)] } },
