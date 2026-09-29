@@ -2463,7 +2463,7 @@ if (MAIN) {
       revealed = JSON.stringify({ first: w.missions.firstSuccess, pending: w.missions.pendingReveal, frost: w.missions.explored.includes('frostmere') });
       if (revealed !== JSON.stringify({ first: ['millbrook'], pending: ['frostmere'], frost: false })) fail(`trip: as it ended, ${revealed}`);
     }
-    if (overAt > 0 && w.clock > overAt && w.clock % w.dayLen === 125 && !w.missions.explored.includes('frostmere')) fail('trip: FROSTMERE was not revealed at the dawn after the success');
+    if (overAt > 0 && w.tick > overAt && w.clock % w.dayLen === 125 && !w.missions.explored.includes('frostmere')) fail('trip: FROSTMERE was not revealed at the dawn after the success');
   }
   const used = (k: string) => (w.stats.used[k] ?? 0) - (used0[k] ?? 0);
   if (departed < 0 || departed > 3600) fail(`trip: the muster took ${departed} steps (want <= 3600)`);
@@ -2478,7 +2478,7 @@ if (MAIN) {
   if (w.missions.coin !== 40) fail(`trip: the coin is ${w.missions.coin}, not 40`);
   if (riders.some((k) => onTrip(k) || k.phase === 'rest' || k.carrying === 'saddle' || k.carrying === 'egg')) fail(`trip: the riders are ${riders.map((k) => `${k.name} ${k.phase} ${k.carrying}`).join(', ')}, not back on duty`);
   if (team.some((d) => d.place !== 'barn' || d.goal === 'muster')) fail(`trip: the team is ${team.map((d) => `${d.name} ${d.place} ${d.goal}`).join(', ')}, not home`);
-  const dawn = () => w.clock > overAt && w.clock % w.dayLen === 125;
+  const dawn = () => w.tick > overAt && w.clock % w.dayLen === 125;
   while (!dawn()) w.step();
   if (!w.missions.explored.includes('frostmere') || w.missions.pendingReveal.length) fail(`trip: FROSTMERE was not revealed at the next dawn (explored ${w.missions.explored})`);
   // (and the egg hatches, two days after it was laid, into a baby of its element)
