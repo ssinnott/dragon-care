@@ -929,16 +929,18 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   trip state and clock give the same frame, always.
 - **The trip is a road with the challenges as stops** (trip.ts: challenge i of n at (i+1)/(n+1) x 0.85 of the walk,
   the baddie at 0.9). Reaching a stop, the team halts and its **encounter** begins (11): an obstacle's meet (60
-  steps: the banner names it, `SPRING FLOOD AHEAD: 16 WORK TO GET ACROSS`), or the baddie walking in from the right
+  steps: the banner names it, `SPRING FLOOD AHEAD: BEAT 22 TO GET ACROSS`), or the baddie walking in from the right
   (160 steps, grumpy); then turn by turn -- the picks (yours, or the trail coach's), then each move played through
   where the team stands, its dragon's own anim landing at its impact (dusk, fire, lightning, water and spike breathe,
   rock heaves, slinkwing calls, the show-offs, a PREEN, a YAWN; a REST sits the dragon down for a breather, `beg`), a
   rider's special its rider's own moment (a wave for CHARM, a kneel to pet for MEDIC, a hush for NAVIGATOR, a cheer
-  for NIMBLE), the baddie's move its own -- and a popup rising over the head it landed on (`-9` and STRONG!, `6 WORK`,
-  `+8`, DODGED!, POWER DOWN, GUARD UP; the one it landed on looks surprised, or grins at a dodge). Cleared, the set
+  for NIMBLE), the baddie's move its own -- and a popup rising over the head it landed on (`-9` and STRONG!, `+8`,
+  DODGED!, POWER DOWN, GUARD UP; the one it landed on looks surprised, or grins at a dodge) or over the set piece
+  (PASSED! or NOT QUITE, with the try's score against the mark: 11.3). Cleared, the set
   piece shows the challenge met (the water down, the miller talked round) for a beat (90 steps) and the team walks
   on; a baddie out of puff takes its exit (360 steps) and the team walks past. Waited out, the team walks on all the
-  same: **the team never turns back**, and walks every stop to the road's end.
+  same: **the team never turns back**, and walks every stop to the road's end -- and past a land stop, through its
+  **passage** (below): the cave beyond the dark's mouth, lit or not as the stop went.
 - **The pace** (no skating paw, as in the barn: 2). The team walks at the slowest dragon's mean pace V. Each dragon's walk plays at
   speed s = V / its own mean (1 or less), and its body moves by D(s n), the distance its walk carries it by anim time
   s n (the frames' moves summed, the last one's in part): each step exactly s times the move of the frame it is in.
@@ -955,12 +957,13 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   every trip, a failure's too ("THE MOLE KING - THE TEAM SITS DOWN FOR A BREATHER, BUT IT CURLS UP AND DOZES"), and
   the team walks on to the road's end. No knockback, no hurt pose, nothing flung (B8).
 - **What you see** (`encounterui.ts`). A banner at the top names the stop as it is reached, then the encounter's
-  latest line through it (`RIPPLE'S BUBBLE JET: 8 WORK, STRONG!`, `THE MOLE KING FLINGS DIRT: ECHO -9 PUFF`), then how
+  latest line through it (`RIPPLE'S BUBBLE JET: 14 + 20 = 34 BEATS 22!`, `THE MOLE KING FLINGS DIRT: ECHO -9 PUFF`), then how
   the stop went (with a check mark when it was cleared), and stays up until the next stop. Through an encounter, each
   pair's **plate** at the left (the dragon's name and level, its puff bar, its rider) and the **stop's plate** at the
-  right (an obstacle's WORK left of its toughness and the turn; a baddie's name, its puff bar and its stages) sit in the sky over the road, and
-  between them, while a pick is yours, the **ability menu**: `WHAT WILL RIPPLE DO?  (TURN 2)` and a row per ability
-  it has here -- its Arena skills (each with how it works this stop: STRONG, HELPS, A LITTLE, CHARMS; a fight's
+  right (an obstacle's mark to beat and the try it is on, its tries left as a bar; a baddie's name, its puff bar and its stages) sit in the sky over the road, and
+  between them, while a pick is yours, the **ability menu**: `WHAT WILL RIPPLE DO?  (TRY 2 OF 3)` (a fight's `TURN 2`) and a row per ability
+  it has here -- its Arena skills (each with its bonus to the roll and how it works this stop: `ROLL + 20` and `95 %:
+  STRONG ON THE FLOOD!`, `55 %: HELPS`, `5 %: HELPS A LITTLE`, `70 %: CHARMS THE MILLER`; a fight's
   STRONG ON THE MOLE KING or EVEN), REST (+8 PUFF), and its rider's SPECIAL where the rider has the stop's counter --
   with an AUTO button beside TRIP LOG under the road: on, the menu's place says THE TRAIL COACH PICKS: TAP AUTO TO PICK
   YOURSELF. When the team lands, at the road's end, a **result card**: the pass or the fail, told here and nowhere
@@ -1002,6 +1005,20 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
   piece per challenge (a cave mouth, a boulder cart, a snowdrift, a storm cloud, a ford, a bramble arch, a signpost,
   the mill, a bandaged bird, a fog bank behind the team, two rocks); the moves are the rig's own anims (the Arena's
   skills: 10.4).
+- **The passages** (`passages.ts`; ART_BIBLE 5.10). Every land stop opens onto a stretch of road the team walks
+  through after it, 600 px long from just past its set piece (cut short where the next stop stands closer, so the
+  team never halts inside one), drawn as the stop went: the dark's **cave** (a tunnel of rock the whole way, the way
+  out an arch of daylight at its end; the lanterns lit along its wall and their pools on the road when the way was lit,
+  only glints in the dark when it wasn't), the gap's **canyon** (a rock wall behind the road, flagged along its rim
+  once the rope is over), the thorns' **bramble tunnel** (arches over the road, in flower once pushed through, the
+  tangle still along the verge if not), the fog's **fog bank** (the bands drifting the whole way, thinned with waymarks
+  once the way was found), the cold's **snow lane** (drifts and falling snow; melted to heaps and puddles), the storm's
+  **rain** (a cloud band overhead and the rain; a white band, the sun and a stepped rainbow once ridden out), the
+  flood's **water meadow** (water along the verge; down to puddles and the stones), the heavy load's **rockfall**
+  (boulders along the verge; stacked into cairns), the lost things' **waymarks** (signposts hanging with a "?"; straight
+  with a check). The people's stops (the miller, the hurt animal) open onto none: they are met at a place, not in the
+  land. The scene knows which passage the lead is in (`SceneFrame.passage`, the hook's `scene.passage`), and sim-check
+  24 walks a long road's three whole, each after its stop and in order.
 - **The dark** follows section 1: in the tunnel only the lamp's pool of light is open, stepped in flat rings (no
   gradients).
 - **Back to the barn.** At the road's end the team lands on the sky bridge and walks back onto the Aerie deck (the
@@ -1082,7 +1099,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
     *lighter* than every dark body (lightning, dusk and slinkwing, at every stage: so L >= 0.159, and a black night
     fails; the thinnest at night is the moonlit wood `#807277`, 33 % from lightning's elder), the big props right behind
     a slot (the hearth and its dark firebox, the tub, the dorm's pallets) >= 25 % from them either way, day and night,
-    and all 6 Oklab L from the ink: 4215 gates, all passing (ART_BIBLE 5.8; 1771 of them the barn's and the garden's,
+    and all 6 Oklab L from the ink: 4332 gates, all passing (ART_BIBLE 5.8; 1771 of them the barn's and the garden's,
     52 the watchable scene's ground, gated as it is drawn at every hour, and 2392 the mission art kit's climates at
     their own four phases, the cave mouth and the fog bank (ART_BIBLE 5.10): each climate has its own night, so none is in the night
     table). It also fails any wall, backdrop or prop
@@ -1198,6 +1215,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
 | Missions I (#5, #11): the Map Room's table, the world map, the team, the trip from the Aerie, rewards | built | 5 |
 | Missions II (#5): the watchable scene, challenges on the road, big baddies | built | 6 |
 | Missions III: encounters on the road -- obstacles overcome by the dragons' abilities, big baddies worn out in a bout, the trail coach and its forecast | built | 11 |
+| Missions IV: the obstacles as skill checks (a mark, a d20 and a bonus, three tries), and the passages after the land stops (the cave after the dark...) | built | 11.3, 6 |
 | The mission art kit: climates, set pieces, baddies, the grumpy miller, icons | built | ART_BIBLE 5.10 |
 | Training in the Arena: sparring bouts on the roof, XP, levels and skills | built | 10 |
 
@@ -1285,7 +1303,7 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    | `src/game/regions.ts` | the missions' world: the six regions (climate, challenge pool, eggs, baddie, neighbours, titles, their places -- the landmarks a mission is met at, `placeOf` -- and where their land grows from on the map), the eleven challenges and what meets each, the baddies' two counters and cozy exits, the keepers' rider skills |
    | `src/game/missions.ts` | the missions, DOM-free: the board rolled at dawn, who may go, auto riders, the trail coach's forecast, BEST TEAM, sending (the road laid, the egg drawn, the nest reserved), the trip (the muster, the departure over the sky bridge, the road walked step by step with each stop's encounter begun and stepped -- `encounter.ts` -- the landing and the outcome decided there, the egg, the saddles, the rest), a trip placed along its road (the preset's `placeAlong`), the save's checks, and a version 10 trip brought up to the played road |
    | `src/game/trip.ts` | a mission and a trip as plain data (5, 11): the road's stops (each with its result, its turns and the clock it was resolved at), the walk (`travel`, `walked`), the team's stats, puff and XP, the trail coach's switch (AUTO), the encounter at the stop the team stands at, the baddie's exit |
-   | `src/game/encounter.ts` | the encounters on the road (11), DOM-free and seeded: an obstacle's work and bite, a fight's baddie and its coach, the abilities offered each pair at a stop (with their weights) and the trail coach's pick, a turn's moves (the quicker first, each its anim's length, landing at its impact), the stop's outcome, line and XP; the forecast's dry run (`forecastRoad`); what the scene shows for each move (`pairLook`, `foeShow`, `popupOf`); the save's checks |
+   | `src/game/encounter.ts` | the encounters on the road (11), DOM-free and seeded: an obstacle's check (its mark, each try's bonus and chance, the d20, the bite and the mark's easing), a fight's baddie and its coach, the abilities offered each pair at a stop (with their weights and chances) and the trail coach's pick, a turn's moves (the quicker first, each its anim's length, landing at its impact), the stop's outcome, line and XP; the forecast's dry run (`forecastRoad`); what the scene shows for each move (`pairLook`, `foeShow`, `popupOf`); the save's checks |
    | `src/game/worldmap.ts` | the world map's picture (5.1): the island generated from seeded noise (the coast, the regions' land, the lake, the brook, the roads), what grows on it, every place's landmark and HOME, cloud over the regions not explored yet, and its living parts (glints, the mill's sails, smoke); the team's route; the layout's self-check (`mapProblems`) |
    | `src/game/maptable.ts` | the Map Room's table, drawn: the world map (worldmap.ts's picture, the regions' names, each mission's pin and plate at its place, the team's road and flag), the mission chooser, the TEAM OUT chip, the follow line and the trip's log (over the watch overlay); their tap targets |
    | `src/game/sim.ts` | the care simulation: the queue, the keepers' trips and jobs (fetch, go, wait at the stand spot, work), and Rush; no drawing, seeded, deterministic; dragons with stable ids, a clock, and its options (seed, day length, start time) |
@@ -1301,7 +1319,8 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    | `src/game/gardenArt.ts` | the garden, drawn: a plot's tile (the hedge, the lawn, an apple tree on every other, a nest mound, a lantern, flowers on stalks; the path, the kerb, the ground), drawn only where it is on screen; the fence at the world's end; the lanterns' rings at night, clipped to the hedge's own shape; the GARDEN sign |
    | `src/game/control.ts` | taking a keeper by hand (4.10): the player's commands (take, steer, act, let go; the Map Room's send, a pair's ability at a stop and the trail coach's switch: 11; and the Arena's bout, skill and coach: 10), applied at the start of a step; walking and climbing by hand under the bay rule; what E does (pick up, serve, put back) and the line that says so; a keeper held saved as let go; a rider on a mission's trip never taken |
    | `src/game/missionview.ts` | the watchable scene: the scene as a pure function of the trip's state and the clock (`sceneAt`: the road as far as it is walked, the stop the team stands at and its encounter's move, the pace from each walk's own root motion, the baddie's walk-in and exit -- never the outcome), the team's characters played to it (the riders with their saddles; each move its dragon's own anim, a rider's special the rider's moment), and its drawing (the climate, the road, the set pieces, the miller, the baddie, the banner, the result card) |
-   | `src/game/encounterui.ts` | the encounter's furniture over the scene, drawn (11.6): each pair's plate (its puff), the stop's plate (the work left, or the baddie's puff), the ability menu and its rows (each with how it works this stop), THE TRAIL COACH PICKS, AUTO, the popups over the heads, and the TEAM OUT chip's words; their tap targets |
+   | `src/game/encounterui.ts` | the encounter's furniture over the scene, drawn (11.6): each pair's plate (its puff), the stop's plate (the mark to beat and the try, or the baddie's puff), the ability menu and its rows (each with how it works this stop), THE TRAIL COACH PICKS, AUTO, the popups over the heads, and the TEAM OUT chip's words; their tap targets |
+   | `src/game/passages.ts` | the passages (6): the stretch of road each land stop opens onto, drawn behind the team as the stop went -- the cave, the canyon, the bramble tunnel, the fog bank, the snow lane, the rain, the water meadow, the rockfall, the waymarks -- and which challenge has which |
    | The mission art kit (`src/game/backdrops.ts`, `setpieces.ts`, `baddies.ts`, `npcs.ts`, `missionicons.ts`, `cel.ts`, `missionart.ts`) | the missions' pictures (ART_BIBLE 5.10): each region's climate at every phase of the day in parallax layers, the eleven set pieces, the three big baddies (their faces, poses and cozy exits) and their portraits, the grumpy miller on the keepers' rig, the challenge and skill icons and the saddle; the gallery's `view=missionart` lays them out; the scene and the Map Room draw them from these modules |
    | `src/game/tripdemo.ts` | the `trip` preset's mission and team: a region's mission at a difficulty from `regions.ts`, the best two pairs for its road (the baddie's counters first, then the forecast) with the missions' own auto riders and road (`missions.ts`); `placeAlong` then puts it that far along, the stops before resolved as asked |
    | `src/game/training.ts` | the Arena's rules (10.4), pure: levels and XP, each element's stats by stage and level, the spirits, the ring of the seven elements, the skills and the levels they are learned at, a move's outcome from its rolls, who moves first, the coach's pick, the XP a bout brings |
@@ -1388,15 +1407,17 @@ managerial (B2): the other keepers go on taking jobs by themselves. But any one 
    (section 24): six trips -- an easy, a normal and each baddie's hard road by their best teams, and the Mole King's by
    RIPPLE alone -- read at every one of 24 596 steps, 8994 of them walk steps without a skating paw, the baddie in view
    on 9081; the view's walks on the road's frame at 490 synced steps; the best teams wore each baddie out in 6 turns,
-   and RIPPLE alone sat the Mole King out after 9. The encounters (section 28,
-   under a second): the offers at ten stop-and-pair cases as 11.2 says; by the rules alone RIPPLE clears an easy flood
-   in 1 turn and EMBER in 2 (bitten 3), EMBER alone waits a hard miller out after 4 turns and BEA's CHARM clears it in
-   1, BEA's CHARM costs the Mole King 24 of its 96 puff and a POWER stage, and the best team wears it out in 6 turns;
+   and RIPPLE alone sat the Mole King out after 9; on a long road (a 15 000-step walk) the lead walked the cave, the
+   bramble tunnel and the fog bank whole, each after its stop and in order. The encounters (section 28,
+   under a second): the offers at ten stop-and-pair cases as 11.2 says, with their chances (RIPPLE's STRONG try 95 %,
+   EMBER's little one 5 %); by the rules alone RIPPLE passes an easy flood's check on its first try (11 + 20 = 31
+   against 22) and the cold's on its second (bitten 3, the mark eased to 18), EMBER alone waits a hard miller out after
+   3 tries and BEA's CHARM clears it in 1 with no roll, BEA's CHARM costs the Mole King 24 of its 96 puff and a POWER stage, and the best team wears it out in 6 turns;
    over 9 fights the best two pairs wore their baddie out every time (6.4 turns on average) and a lone pair with
    neither counter sat it out every time, and THE LOST NEST's two counters cleared both stops in a turn or two each on
    10 of 10 seeds; a road by commands (11.6's refusals, a pick by hand, AUTO) came out the same twice, its saves
-   stepping on to the same world, and brought RIPPLE and ECHO each LV 2 and the YAWN; 12 encounters a build can't run
-   threw, and none of 77 encounter lines nor the road's text has a word of harm. Taking a keeper (section 25): BEA feeds
+   stepping on to the same world, and brought RIPPLE and ECHO each LV 2 and the YAWN; 13 encounters a build can't run
+   threw, and no encounter line nor the road's text has a word of harm. Taking a keeper (section 25): BEA feeds
    EMBER by hand (149 steps at work), climbs the centre ladder up and down in 141 steps each, is held 10 251 steps
    while 20 Rushes go on open jobs and is never given a job, and walks home in 515 steps once let go. The cap (section
    26): the twelve at the cap send THE LOST NEST (the chooser's BARN FULL: THE EGG WILL WAIT, the team away and still
@@ -1642,17 +1663,25 @@ played: a trip walks its road in the world's own steps and halts at each stop fo
 (the challenges of 5.3, the land's and the people's, kept) that the dragons' abilities overcome, or, at a hard road's
 end, a fight with the region's big baddie by the Arena's own rules (10.4), kept cozy (B8). The encounter's screen is the
 watchable scene itself (6), with the team's plates and the ability menu in the sky over the road; the world waits for
-your pick there, as it does in the Arena, and the trail coach plays for a team you leave to it. Built:
+your pick there, as it does in the Arena, and the trail coach plays for a team you leave to it. Asked again after that
+("the encounters ... should be more exciting ... the dark cave should have you go through a cave after it ... the
+encounters for them should be a little more like skill checks and less like combat encounters"): an obstacle is now a
+**skill check** -- a mark to beat, each dragon's move a try at it, a roll of a d20 plus its bonus, passed or fallen
+short, with the chance on the menu (11.3) -- not a bar of work worn down like a baddie's puff; and every land stop
+opens onto a **passage** the team walks through after it (the cave after the dark, the canyon after the gap, the
+bramble tunnel after the thorns...: 6). Built:
 `src/game/encounter.ts` (the rules, and the encounter stepped in the simulation), `trip.ts` (the trip's shape),
 `missions.ts` (the road walked, the forecast, the landing), `encounterui.ts` (the plates, the menu, the popups),
-`missionview.ts` (the scene); checked by `npm run sim` sections 18, 20 to 24, 26 and 28 and the smoke's trip cases.
+`missionview.ts` (the scene), `passages.ts` (the passages); checked by `npm run sim` sections 18, 20 to 24, 26 and 28
+and the smoke's trip cases.
 
 **11.1 The shape.** A trip's walk is its mission's days (1, 2 or 3 game days: `travel` steps), counted in `walked`;
 reaching stop j's step (`stopStart`: its `at` of the travel, 5.5) the team halts, the walk waits, and the stop's
 encounter runs meet, pick, play and done: the **meet** (an obstacle: 60 steps, the banner names it -- `SPRING FLOOD
-AHEAD: 16 WORK TO GET ACROSS`; a baddie: 160 steps, it walks in from the right, grumpy -- `THE MOLE KING! 96 PUFF TO
-WEAR IT OUT`), then **turns**: the picks (one a pair) wait, the turn's moves play one after another, each its dragon's
-own anim landing at its impact (10.4) with 24 steps between, and the turn ends with the stop cleared, waited out, or
+AHEAD: BEAT 22 TO GET ACROSS`; a baddie: 160 steps, it walks in from the right, grumpy -- `THE MOLE KING! 96 PUFF TO
+WEAR IT OUT`), then **turns** (an obstacle's are its **tries**, three at most): the picks (one a pair) wait, the turn's
+moves play one after another, each its dragon's own anim landing at its impact (10.4) with 24 steps between, and the
+turn ends with the stop cleared, waited out, or
 another turn; **done**, an obstacle's beat is 90 steps (the set piece shows the challenge met) and a baddie's exit
 360, then the trip walks on. A stop takes the same steps whether or not anyone watches: the encounter is stepped by the
 simulation (`missions.ts` stepAway, `encounter.ts` stepEncounter), saved with the trip (`Trip.encounter`, plain data,
@@ -1668,31 +1697,43 @@ is HOME SAFE!, any stop waited out NOT THIS TIME (5.5), told only at the landing
   the grumpy miller, TOMAS's MEDIC at the hurt animal, IRIS's NAVIGATOR in the fog, PIP's NIMBLE at the gap; and in a
   fight, the baddie's counter skill.
 
-The menu says what each is (`POWER 10 - 95 %`, `A BREATHER`, `ONCE A STOP`) and how it lands here, which is its
-**weight** on the work or the cost:
+The menu says what each is (at an obstacle `ROLL + 20`, the try's bonus; in a fight `POWER 10 - 95 %`; `A BREATHER`,
+`ONCE A STOP`) and how it lands here -- at an obstacle its chance and why (`95 %: STRONG ON THE FLOOD!`, `55 %:
+HELPS`, `5 %: HELPS A LITTLE`, `70 %: CHARMS THE MILLER`), in a fight its weight on the cost -- which is its **weight**
+on the try's bonus or on the cost:
 
-| At an obstacle | Weight | In a fight | Weight |
+| At an obstacle | Weight (on the bonus) | In a fight | Weight (on the cost) |
 |---|---|---|---|
 | the counter element's breath (water at the flood) | STRONG ×2 | the counter element's breath (dusk on the Mole King) | STRONG ×1.5 (the ring's, 10.4) |
 | another element's breath on a land stop | HELPS ×1 | any other breath | EVEN ×1 |
 | a breath at the miller or the hurt animal | HELPS A LITTLE ×0.4 | a show-off | NEVER WEAK ×1 |
 | a show-off on a land stop | HELPS A LITTLE ×0.4 | PREEN | its GUARD up a stage |
 | a show-off at the miller or the hurt animal | CHARMS ×1.5 | YAWN | the baddie's POWER down a stage |
-| the rider's special | clears it outright | the rider's special | a quarter of the baddie's whole puff, and its POWER down a stage |
+| the rider's special | clears it outright, no roll | the rider's special | a quarter of the baddie's whole puff, and its POWER down a stage |
 
 A dragon out of puff sits the rest of the stop out (its pick is `sit`, it does nothing); a pair's pick is refused for a
 pair there isn't, an ability the pair hasn't got here, or once its pick is made (`control.ts`: the `ability` command).
 
-**11.3 An obstacle** has TOUGHNESS work to do, by the road's difficulty: 16 easy, 20 normal, 24 hard (the stop's plate
-shows the work left; the menu's corner says `16 WORK TO GET ACROSS`). A move that lands (the skill's own chance: a
-breath 95 %, a big breath 85 %, a show-off always) does work = round(the skill's power × (the dragon's POWER at its
-stage / 12) × the weight × 0.85 to 1), at least 1 and never more than is left: a young adult's breath STRONG on its
-stop clears an easy one in a turn and a hard one in two; helping (×1) it takes two or three turns. Every turn the
-obstacle still stands, it **bites**: 3 puff off every dragon with puff left (`THE FLOOD SOAKS THE TEAM: -3 PUFF
-EACH`, `THE COLD BITES`, `THE MILLER GRUMBLES ON`). Cleared when its work is done, its line the counter's move's
-(`SPRING FLOOD - RIPPLE SWIMS THEM ACROSS`), the rider's (`GRUMPY MILLER - BEA TALKS HIM ROUND`) or the plain one
-(`SPRING FLOOD - THE WATER GOES DOWN`, `THE COLD - THE COLD IS SEEN OFF`); **waited out** (`... - THE TEAM WAITS IT
-OUT`) when every dragon is out of puff, or after 4 turns.
+**11.3 An obstacle is a skill check.** It has a **mark** to beat, by the road's difficulty: 22 easy, 25 normal, 28
+hard (the stop's plate shows `BEAT 22` and `TRY 1/3`, its tries left as a bar; the menu's corner says `BEAT 22 TO GET
+ACROSS`). A dragon's move is a **try**: it rolls a d20 (1 to 20) and adds its **bonus** = round(the skill's power ×
+(the dragon's POWER at its stage / 12) × the weight), at least 1; a score at the mark or over **passes** and clears the
+stop then and there (the moves after it are dropped), a lower one **falls short**; a 20 always passes and a 1 never
+does, so no try is surer than 95 % or worse than 5 %. The menu tells each try's chance before you pick, and the line
+tells the sum (`RIPPLE'S BUBBLE JET: 14 + 20 = 34 BEATS 22!`, `EMBER'S FIRE BREATH: 6 + 13 = 19 FALLS SHORT OF 22`, `A
+TWENTY! WICK'S NIGHTFALL CLEARS IT: 20 + 11 = 31`, `A ONE... ECHO'S SHRIEK FALLS SHORT: 1 + 11 = 12`), the popup over
+the set piece PASSED! or NOT QUITE with the score against the mark. A young adult's breath STRONG on its stop (a bonus
+of about 20) passes an easy check 95 times in 100 and a hard one 75; one that merely helps (about 12) passes an easy
+one 55 times in 100 and a hard one 25 on its first try; a breath at the miller or the bird (about 5) is a long shot,
+which is what the rider's special is for. The rider's special clears the stop outright, no roll (`BEA TALKS HIM
+ROUND!`). Every turn the obstacle still stands, it **bites**: 3 puff off every dragon with puff left, and, with a try
+still to come, the **mark eases** by 4 -- the team gets its measure (`THE FLOOD SOAKS THE TEAM: -3 PUFF EACH. THE
+MARK EASES TO 18`, `THE COLD BITES`, `THE MILLER GRUMBLES ON`): a helper's 25 % at a hard mark is 45 % on its second
+try and 65 % on its third. Cleared, its line is the counter's move's (`SPRING FLOOD - RIPPLE SWIMS THEM ACROSS`), the
+rider's (`GRUMPY MILLER - BEA TALKS HIM ROUND`) or the plain one (`SPRING FLOOD - THE WATER GOES DOWN`, `THE COLD -
+THE COLD IS SEEN OFF`); **waited out** (`... - THE TEAM WAITS IT OUT`) when every dragon is out of puff, or after 3
+tries. The check is the road's own roll: a team the forecast (11.7) clears every stop for can still fall short on the
+day, and come home NOT THIS TIME -- that is the skill check's tension, and the counters are how you shorten the odds.
 
 **11.4 A fight** is a bout against the baddie: its stats (THE MOLE KING 96 puff, POWER 12, GUARD 12, SPEED 6; THE
 STORM ROC 88, 13, 10, 16 -- quick and light; THE FROST GIANT 104, 14, 13, 4 -- slow and stout), its puff on its plate
@@ -1717,8 +1758,8 @@ come on the road as in the Arena (the toast `RIPPLE IS LEVEL 2! NEW SKILL: YAWN`
 and the result card totals the road's XP.
 
 **11.6 Playing it.** The game follows the team (6), so at a stop its road is already on screen: the pairs' plates and
-the stop's, the menu for the pair whose pick waits (`WHAT WILL RIPPLE DO?  (TURN 2)`, a row an ability, a tap picks
-it; then the next pair's), the moves played where the team stands, the popups over the heads, and the AUTO button
+the stop's, the menu for the pair whose pick waits (`WHAT WILL RIPPLE DO?  (TRY 2 OF 3)`; a fight's `(TURN 2)`; a row an
+ability, a tap picks it; then the next pair's), the moves played where the team stands, the popups over the heads, and the AUTO button
 beside TRIP LOG; at the stop's end a toast says `SPRING FLOOD CLEARED! +15 XP EACH` (`THE MOLE KING IS WORN OUT!`).
 **The world waits for your pick** while a pick is yours to make (the road's one choice, as the Arena's bout waits for
 its pick; `base.ts` worldWaits), and steps on otherwise; the Map Room's table opened over the road makes it wait too.
@@ -1728,23 +1769,28 @@ checks' headless runs) a pick waits PICK_WAIT_TRAIL (450 steps, 7.5 s at 1x) and
 missing: a road always plays out. The coach picks (`encounter.ts` coachPick) the rider's special whenever it is to be
 had; a REST when low (under a fifth of its puff at an obstacle, under three tenths in a fight, two rolls in five); in a
 fight a YAWN in the first three turns while the baddie's POWER can still go down and a PREEN while over 60 % puff
-(about one roll in seven each); else the move that does most on average (its power × its chance × its weight).
+(about one roll in seven each); else, in a fight, the move that does most on average (its power × its chance × its
+weight), and at an obstacle the try with the best chance.
 
-**11.7 The forecast** is the coach's dry run of the road (5.4: every roll even, `evenRoll`, the coach picking every
-move, the baddie's coach at the dragon with the most puff): the chooser's FORECAST line and bar, and BEST TEAM's
-ranking. The forecast never sends a team with a stop it can't clear as the sure thing: a 100 % team can still take a
-turn longer on the road's own rolls.
+**11.7 The forecast** is the coach's dry run of the road (5.4: every roll even, `evenRoll` -- every try rolls an 11 --
+the coach picking every move, the baddie's coach at the dragon with the most puff): the chooser's FORECAST line and
+bar, and BEST TEAM's ranking. It is the median road, not a promise: a 100 % team can still take a try longer, or fall
+short of a check, on the road's own rolls (11.3).
 
 **11.8 Saves and checks.** The save keeps the trip's shape (trip.ts: the walk, the stats, the puff, the XP, AUTO, the
-encounter with its turn, picks, moves and lines): version 11; a version 10 save's trip (a timer, its odds and its
-outcome rolled at the send) is brought up as it loads (`missions.ts` upgradeMissions: its walk from its clocks, the
-stops it had passed resolved as their coverage said, full of puff, no XP, the coach off, a landed one with its
-outcome), and a version 9 save comes up through 10. `checkMissions` and `checkEncounter` throw on a trip or an
-encounter this build can't run (a stop off the road, a pick short, more work than its toughness, a baddie over its
-whole puff, a move by a pair there isn't, a stage past +2...). `npm run sim` checks the forecast (18), a full trip with
-its stops played (20), a failure that walks on (21), the road the seed's (22), care with a team away (23), the scene
-at every step of six roads (24), the cap beside a played road (26) and the encounters themselves (28: the offers, the
-rules alone, the balance, a road by commands, its saves, no word of harm); the smoke reads the fight's menu frozen,
-the failing road beside the succeeding one, both result cards, and plays a fight live on the road the game follows
-(the pick waited for, the row tapped, AUTO, the exit, the road still on screen), and loads a version 9 save in the
+encounter with its turn, picks, moves and lines; an obstacle's mark as the stop began and as it stands): version 12; a
+version 11 save's encounter at an obstacle (work ground down of a toughness) gets its mark in the work's place as it
+loads (`encounter.ts` upgradeEncounterV11: the difficulty's mark, eased by the turns played, the check rolled afresh
+from there), a version 10 save's trip (a timer, its odds and its outcome rolled at the send) is brought up
+(`missions.ts` upgradeMissions: its walk from its clocks, the stops it had passed resolved as their coverage said,
+full of puff, no XP, the coach off, a landed one with its outcome), and a version 9 save comes up through 10 and 11.
+`checkMissions` and `checkEncounter` throw on a trip or an encounter this build can't run (a stop off the road, a
+pick short, a mark over its start, a roll past the d20, a baddie over its whole puff, a move by a pair there isn't, a
+stage past +2...). `npm run sim` checks the forecast (18), a full trip with its stops played (20), a failure that
+walks on (21), the road the seed's (22), care with a team away (23), the scene at every step of six roads and the
+passages walked whole on a long one (24), the cap beside a played road (26) and the encounters themselves (28: the
+offers with their chances, the d20's rules, the checks by the rules alone, the balance, a road by commands, its
+saves, no word of harm); the smoke reads the fight's menu frozen, the failing road beside the succeeding one, both
+result cards, plays a fight live on the road the game follows (the pick waited for, the row tapped, AUTO, the exit,
+the road still on screen), draws every passage on the mission art kit's sheet, and loads a version 9 save in the
 browser. 8's paragraph has the numbers.

@@ -83,8 +83,9 @@ interface Window {
      * id, the clock it left, its walk -- `walked` of `travel` steps, and its share `progress`, 0..1 -- the trail coach's
      * forecast and whether it picks (`auto`), each pair's dragon's puff and whole, the XP the road has brought each,
      * each stop (its name, kind, how it went and its line) and the encounter at the stop the team stands at, or null
-     * (its stop, kind, state, steps and turn, the pair whose pick waits, this turn's picks, an obstacle's work left of
-     * its toughness, a fight's baddie and its puff, the outcome once resolved, the latest line, and the move playing).
+     * (its stop, kind, state, steps and turn, the pair whose pick waits, this turn's picks, an obstacle's mark to beat
+     * now and as the stop began, a fight's baddie and its puff, the outcome once resolved, the latest line, and the
+     * move playing -- an obstacle's with its roll and score).
      * The overlays (`ui`, BASE_DESIGN 5 and 6): the screen open -- `none` (the barn), `map` or `mission` (the Map Room table's
      * world map or a mission's chooser: the world waits while one is open) or `watch` (the team out followed on its
      * road, the world stepping on underneath) -- the mission chosen (id) and the team being put together, the map's
@@ -104,7 +105,8 @@ interface Window {
      * The watchable scene (BASE_DESIGN 6, 11): `scene`, while a trip is out (null
      * otherwise): the last stop the team reached (`baddie` or its challenge; null before the first), how it went
      * (`result`: ahead while the team stands at it, then met or unmet), whether the team has its counter, the state of
-     * the encounter the team stands at (`at`: null while walking), the banner, the baddie on the road (its id, face and
+     * the encounter the team stands at (`at`: null while walking), the banner, the passage the lead's dragon is walking
+     * through (`passage`: the challenge whose stop opened onto it -- the cave after the dark; null on the open road), the baddie on the road (its id, face and
      * pose; null when none is in view), its exit (once it is the last stop reached), how far along the walk is (0..1),
      * and once the road is walked whole, the result card's title (`result_card`: the trip's pass or fail).
      * Barn capacity (BASE_DESIGN 4.7): the barn's dragons against its cap (`count`: every dragon not living in the garden,
@@ -150,8 +152,8 @@ interface Window {
         puff: { puff: number; max: number }[]; xp: number[];
         stops: { name: string; kind: 'challenge' | 'baddie'; result: 'ahead' | 'met' | 'unmet'; log: string }[];
         encounter: { stop: number; kind: 'obstacle' | 'fight'; state: 'meet' | 'pick' | 'play' | 'done'; t: number; turn: number; pending: number; picks: (string | null)[];
-          work: number; toughness: number; foe: { id: string; puff: number; max: number } | null; outcome: 'cleared' | 'waited' | null; line: string | null;
-          move: { by: number; ability: string | null; foeMove: string | null; landed: boolean; hit: boolean; loss: number; work: number } | null } | null } | null;
+          mark: number; mark0: number; foe: { id: string; puff: number; max: number } | null; outcome: 'cleared' | 'waited' | null; line: string | null;
+          move: { by: number; ability: string | null; foeMove: string | null; landed: boolean; hit: boolean; loss: number; roll: number; score: number } | null } | null } | null;
       arena: { bouts: number; bout: { id: number; state: 'muster' | 'face' | 'pick' | 'play' | 'over' | 'home'; t: number; turn: number; auto: boolean; pick: string | null;
         fighters: { dragon: number; name: string; corner: 0 | 1 | null; level: number; puff: number; max: number; power: number; guard: number }[];
         moves: { by: 0 | 1; skill: string; t: number; len: number; landed: boolean; hit: boolean; loss: number }[];
@@ -163,6 +165,7 @@ interface Window {
         chip: { x: number; y: number; w: number; h: number } | null; follow: 'gather' | 'road' | null; log: boolean;
         notice: 'HATCHERY FULL: NO EGG' | 'BARN FULL: THE EGG WILL WAIT' | null };
       scene: { stop: string | null; result: 'ahead' | 'met' | 'unmet' | null; covered: boolean | null; at: 'meet' | 'pick' | 'play' | 'done' | null; banner: string | null;
+        passage: string | null;
         baddie: 'moleking' | 'stormroc' | 'frostgiant' | null;
         face: 'neutral' | 'grumpy' | 'surprised' | 'sleepy' | null; pose: 'walk' | 'stand' | 'sit' | 'turn' | 'leave' | null;
         exit: 'calmed' | 'outwitted' | 'drivenOff' | null; progress: number; done: boolean; result_card: string | null } | null;

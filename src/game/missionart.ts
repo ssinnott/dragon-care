@@ -5,6 +5,8 @@
 //   view=missionart&sheet=climates&climate=<c>&phase=<p>
 //                                      one climate filling a 640 x 300 road scene, scrolling with t (the watchable scene's parallax),
 //                                      the road band (FLOORS.road) at y 292-306
+//   view=missionart&sheet=passages     the nine passages the land stops open onto (passages.ts), each as its stop was
+//                                      waited out and as it was met, side by side, an adult dragon walking the cave
 //   view=missionart&sheet=setpieces    the eleven set pieces on the road, ahead and met side by side (an adult dragon
 //                                      standing in the fog, which is drawn behind it)
 //   view=missionart&sheet=baddies      the three big baddies: every face, every pose and each exit, an adult dragon for
@@ -19,6 +21,8 @@
 import { drawText } from '../lib/engine/text.ts';
 import { drawClimate, CLIMATE_PIC } from './backdrops.ts';
 import { drawSetPiece } from './setpieces.ts';
+import { drawPassage, PASSAGES } from './passages.ts';
+import type { ChallengeId } from './missiondata.ts';
 import { drawBaddie, drawBaddiePortrait, BADDIE_ART, BADDIE_EXIT_LOOK } from './baddies.ts';
 import { drawMiller } from './npcs.ts';
 import { CHALLENGE_ICONS, SKILL_ICONS, SADDLE, drawCarriedEgg } from './missionicons.ts';
@@ -37,7 +41,7 @@ import type { KeeperAgent } from '../care/keeper.ts';
 import { KEEPER_IDS, KEEPERS } from '../art/keeper/cast.ts';
 import { DRAGON_ELEMENTS } from '../art/dragon/palettes.ts';
 
-export const SHEETS = ['climates', 'setpieces', 'baddies', 'people', 'icons', 'places'] as const;
+export const SHEETS = ['climates', 'setpieces', 'passages', 'baddies', 'people', 'icons', 'places'] as const;
 export type Sheet = typeof SHEETS[number];
 
 /** The gallery's scene shape (gallery.ts Scene), structurally. */
@@ -124,6 +128,7 @@ export function missionArtScene(search: string): ArtScene {
   const phase = (PHASE_ORDER as readonly string[]).includes(q.get('phase') || '') ? q.get('phase') as DayPhase : 'day';
   switch (sheet) {
     case 'setpieces': return setPiecesSheet();
+    case 'passages': return passagesSheet();
     case 'baddies': return baddiesSheet((BADDIE_IDS as readonly string[]).includes(q.get('id') || '') ? [q.get('id') as BaddieId] : BADDIE_IDS);
     case 'people': return peopleSheet();
     case 'icons': return iconsSheet();
@@ -196,6 +201,36 @@ function setPiecesSheet(): ArtScene {
       });
       drawPets(ctx, pets, { top, budget, frame: t });
       publish('setpieces', drawn);
+    },
+  };
+}
+
+/** The passages (passages.ts): a row each, the stretch of road after its stop as it looks when the stop was waited out (left) and met (right), an adult dragon walking the cave. */
+function passagesSheet(): ArtScene {
+  let t = 0;
+  const ids = (Object.keys(PASSAGES) as ChallengeId[]), cw = 640, ch = 150, w = cw, h = ch * ids.length;
+  const pets = [makePet('dusk', 'adult', 5, 'walk', 470, ch - 22, { desync: false })];
+  const top = new TopPass(40), budget = new AmbientBudget();
+  return {
+    w, h, pets, step() { t++; for (const p of pets) stepPet(p); },
+    draw(ctx) {
+      ctx.fillStyle = PAGE; ctx.fillRect(0, 0, w, h);
+      const drawn: string[] = [];
+      ids.forEach((id, i) => {
+        const y0 = i * ch, feet = y0 + ch - 22;
+        // (the sky's band behind each half, so a passage that fills the backdrop shows its walls against something)
+        ctx.fillStyle = '#dde4e6'; ctx.fillRect(0, y0 + 12, cw, feet - 8 - y0 - 12);
+        roadBand(ctx, 0, cw, feet);
+        ctx.fillStyle = INK; ctx.fillRect(0, y0 + ch - 1, cw, 1); ctx.fillRect(cw / 2 - 1, y0 + 12, 1, ch - 12);
+        label(ctx, `${id.toUpperCase()}: ${PASSAGES[id]!.toUpperCase()}`, cw / 2, y0 + 3);
+        label(ctx, 'WAITED OUT', 80, y0 + ch - 11, SUB); label(ctx, 'MET', 400, y0 + ch - 11, SUB);
+        const a = drew(ctx, 0, y0 + 12, cw / 2 - 2, ch - 12, () => drawPassage(ctx, id, 10, 300, feet, y0 + 12, 'unmet', t));
+        const m = drew(ctx, cw / 2, y0 + 12, cw / 2 - 2, ch - 12, () => drawPassage(ctx, id, 330, 620, feet, y0 + 12, 'met', t));
+        if (a) drawn.push(`${id}:unmet`);
+        if (m) drawn.push(`${id}:met`);
+      });
+      drawPets(ctx, pets, { top, budget, frame: t });
+      publish('passages', drawn);
     },
   };
 }

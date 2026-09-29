@@ -210,18 +210,19 @@
 //    overcome them ... when we encounter enemies we need to fight them ... similar to the battle arena"; BASE_DESIGN 11):
 //    the offers (encounter.ts offersFor) at ten stop-and-pair cases -- STRONG for the counter element, HELPS for another,
 //    a little at the miller and the hurt animal where a show-off CHARMS, the rider's special where the rider has the
-//    stop's counter, PREEN and YAWN in a fight only, the ring's STRONG on the baddie -- and each difficulty's toughness;
-//    the rules alone (every roll even): a STRONG dragon clears an easy flood in a turn with no bite, one that helps
-//    takes more and is bitten each turn the flood stands, a lone breath that does little at a hard miller is waited out
-//    after MAX_OBSTACLE_TURNS, the CHARM clears it in one, a dragon out of puff sits, the special costs the Mole King a
+//    stop's counter, PREEN and YAWN in a fight only, the ring's STRONG on the baddie -- each try's chance by its bonus
+//    and the mark, and each difficulty's mark; the rules alone (every roll even: an 11): a STRONG dragon passes an
+//    easy flood's check on its first try with no bite, one that helps takes another try and is bitten each turn the
+//    stop stands (the mark easing), a lone breath that does little at a hard miller is waited out after
+//    MAX_OBSTACLE_TURNS tries, the CHARM clears it in one, a dragon out of puff sits, the special costs the Mole King a
 //    quarter of its puff and a POWER stage, and the best team wears it out; the balance: each baddie's road by its best
 //    two pairs on three seeds won every time in ten turns or fewer, a lone pair with neither counter sat every one out,
 //    and THE LOST NEST's two counters cleared both stops in a turn or two on ten seeds; a whole road in the world by
 //    commands (seed 2's LOST NEST): met at its step, the picks waited PICK_WAIT_TRAIL for the player then the coach's
-//    turn played, each move its dragon's own anim landing at its impact for exactly its work; a pick for a pair there
+//    turn played, each move its dragon's own anim landing at its impact for its roll against the mark; a pick for a pair there
 //    isn't, an ability the pair hasn't and a special nobody has refused, a pick by hand taken, AUTO filling the rest at
 //    once (the quicker first); the XP, the level and the skill it brings; the same twice, and saves at the meet, the
-//    pick, mid-move and the resolution stepping on to the same world; 12 encounters this build can't run thrown out;
+//    pick, mid-move and the resolution stepping on to the same world; 13 encounters this build can't run thrown out;
 //    and no word of harm in any encounter's line or the road's text (the Decisions' B8).
 import { isDeepStrictEqual } from 'node:util';
 import fs from 'node:fs';
@@ -239,7 +240,7 @@ import {
 } from '../src/game/missions.ts';
 import {
   newEncounter, offersFor, coachPick, foePick, beginTurn, landMove, endTurn, stopLine, partyOf, pendingPair, stopStart, stopName, forecastRoad, walkRest, evenRoll, checkEncounter, pairLook, foeShow,
-  TOUGHNESS, BITE, REST_GAIN, WORK_STRONG, WORK_HELP, WORK_LITTLE, WORK_CHARM, FOE_SPECIAL, MEET_STEPS, FOE_ENTER, DONE_STEPS, EXIT_STEPS, PICK_WAIT_TRAIL, MAX_OBSTACLE_TURNS, MAX_FIGHT_TURNS,
+  MARK, SIDES, MARK_EASE, BITE, REST_GAIN, CHECK_STRONG, CHECK_HELP, CHECK_LITTLE, CHECK_CHARM, FOE_SPECIAL, passes, chanceOf, MEET_STEPS, FOE_ENTER, DONE_STEPS, EXIT_STEPS, PICK_WAIT_TRAIL, MAX_OBSTACLE_TURNS, MAX_FIGHT_TURNS,
   WALK_REST, XP_ROAD, FOE_STATS, FOE_MOVES, FOE, ABILITIES, FACE_FRAMES as ROAD_FACE_FRAMES,
 } from '../src/game/encounter.ts';
 import type { Ability, Encounter, Party } from '../src/game/encounter.ts';
@@ -292,8 +293,9 @@ import { DRAGON_ELEMENTS } from '../src/art/dragon/palettes.ts';
 import type { DragonElement } from '../src/art/dragon/palettes.ts';
 import type { Stage } from '../src/art/dragon/stages.ts';
 import { STAGES } from '../src/art/dragon/stages.ts';
-import { sceneAt, walkDist, frameAt, resultTitle, roadFraction, roadDone, PAIR_BACK, RIDER_AHEAD, BADDIE_AHEAD, ScenePets } from '../src/game/missionview.ts';
+import { sceneAt, walkDist, frameAt, resultTitle, roadFraction, roadDone, PAIR_BACK, RIDER_AHEAD, BADDIE_AHEAD, PIECE_AHEAD, PASSAGE_CLEAR, ScenePets } from '../src/game/missionview.ts';
 import type { SceneFrame } from '../src/game/missionview.ts';
+import { hasPassage, PASSAGES, PASSAGE_FROM, PASSAGE_LEN } from '../src/game/passages.ts';
 import { demoTrip } from '../src/game/tripdemo.ts';
 import { stopStates } from '../src/game/maptable.ts';
 import { tripStart } from '../src/game/presets.ts';
@@ -2163,19 +2165,19 @@ if (MAIN) {
 if (MAIN) {
   // the trail coach's dry run of a road (encounter.ts forecastRoad, through missions.ts forecastOf), read for hand-picked
   // teams (moods set by hand: every need full, or food at 0.2 for a low one): THE LOST NEST with both counters (RIPPLE the
-  // flood, ECHO the lost things) is cleared in one turn a stop with no puff lost; RIPPLE alone clears both (the flood in
-  // one turn, the lost things by plain work in more) with puff to spare, and low in spirits too; a hard road with both of
-  // the Storm Roc's counters is cleared whole; EMBER alone on the Mole King's road clears its three obstacles and loses
-  // the fight (three of four); an empty team clears nothing; the share is the stops'; and BEST TEAM on THE LOST NEST is
-  // the two counters, not a lone dragon that clears both in more turns
+  // flood, ECHO the lost things) is cleared in one try a stop with no puff lost; RIPPLE alone clears both (the flood
+  // STRONG, the lost things by a helping try that just makes the easy mark in good spirits, and falls short once when
+  // low); a hard road with both of the Storm Roc's counters is cleared whole; EMBER alone on the Mole King's road clears
+  // its three obstacles (a second try each) and loses the fight (three of four); an empty team clears nothing; the
+  // share is the stops'; and BEST TEAM on THE LOST NEST is the two counters
   const w = newSim(1), by = (n: string) => w.dragons.find((d) => d.name === n)!, keeper = (n: string) => w.keepers.find((k) => k.name === n)!.id;
   const mood = (n: string, good: boolean) => { const d = by(n); for (const k of NEEDS) if (hasNeed(d.element, k)) d.needs[k] = 1; if (!good) d.needs.food = 0.2; d.mood = moodOf(d.element, d.needs); };
   const nest = w.missions.board.find((m) => m.title === LOST_NEST)!;
   const mission = (region: RegionId, challenges: ChallengeId[], baddie: BaddieId | null): Mission => ({ id: 999, region, title: 'TEST', difficulty: 'hard', challenges, baddie, days: 3, coin: 150, eggChance: 0.6, guaranteedEgg: false });
   const cases: [string, Mission, [string, string][], Record<string, boolean>, { cleared: number; turns?: number; puff?: (p: number) => boolean }][] = [
     ['THE LOST NEST, RIPPLE (IRIS) and ECHO (TOMAS), both in good spirits', nest, [['RIPPLE', 'IRIS'], ['ECHO', 'TOMAS']], { RIPPLE: true, ECHO: true }, { cleared: 2, turns: 2, puff: (p) => p === 1 }],
-    ['THE LOST NEST, RIPPLE alone, in good spirits', nest, [['RIPPLE', 'IRIS']], { RIPPLE: true }, { cleared: 2, puff: (p) => p > 0.75 && p < 1 }],
-    ['THE LOST NEST, RIPPLE alone, low', nest, [['RIPPLE', 'IRIS']], { RIPPLE: false }, { cleared: 2 }],
+    ['THE LOST NEST, RIPPLE alone, in good spirits', nest, [['RIPPLE', 'IRIS']], { RIPPLE: true }, { cleared: 2, turns: 2, puff: (p) => p === 1 }],
+    ['THE LOST NEST, RIPPLE alone, low', nest, [['RIPPLE', 'IRIS']], { RIPPLE: false }, { cleared: 2, turns: 3, puff: (p) => p > 0.75 && p < 1 }],
     ['a hard road, both of the Storm Roc\'s counters: ZAP (PIP) and WICK (IRIS)', mission('highfold', ['storm', 'dark', 'gap'], 'stormroc'), [['ZAP', 'PIP'], ['WICK', 'IRIS']], { ZAP: true, WICK: true }, { cleared: 4 }],
     ['the Mole King\'s road with neither counter: EMBER (PIP) alone', mission('oldmine', ['dark', 'heavy', 'lost'], 'moleking'), [['EMBER', 'PIP']], { EMBER: true }, { cleared: 3 }],
   ];
@@ -2573,7 +2575,8 @@ if (ROLE === 'service') {
     if (z.xs.some((x, i) => x !== -PAIR_BACK * i) || z.n !== 0 || z.done || z.stop != null || z.last != null) fail(`${what}: at the start the team is at ${z.xs.join(', ')} (n ${z.n}, done ${z.done}, stop ${z.stop}), not at its places`);
     if (!isDeepStrictEqual(sceneAt(sim, trip), sceneAt(sim, trip))) fail(`${what}: two reads of one state differ`);
     let prev: SceneFrame | null = null, prevU: number | null = null, exitSeen: string | null = null, lastOff: number | null = null, reached = -1, bad = 0;
-    const met: number[] = [], ended: number[] = [];
+    const met: number[] = [], ended: number[] = [], walkedThrough: number[] = [];
+    let inPassage = 0;
     let title: string | null = null, endWalked = -1;
     for (let s = 0; s < 60000 && sim.missions.trip && (sim.missions.trip.state === 'away'); s++) {
       sim.step();
@@ -2590,6 +2593,16 @@ if (ROLE === 'service') {
       // (the stops as the set pieces and the TRIP LOG tell them: ahead until the encounter resolves the stop, then how it went)
       for (const p of f.pieces) { const want = stops[p.stop].result === 'ahead' ? 'ahead' : stops[p.stop].result; if (p.state !== want && bad++ < 3) fail(`${what}: stop ${p.stop}'s set piece is ${p.state} at E ${E}, its result ${stops[p.stop].result}`); }
       if (!isDeepStrictEqual(stopStates(sim, trip), stops.map((q) => q.result)) && bad++ < 3) fail(`${what}: the TRIP LOG says ${stopStates(sim, trip).join(', ')} at E ${E}, the road ${stops.map((q) => q.result).join(', ')}`);
+      // (the passages, missionview.ts and passages.ts: every land stop's, just past its set piece and PASSAGE_LEN long, drawn as
+      // the stop went; the lead walks through each after its stop is resolved -- never while the team stands at a stop,
+      // never one whose stop is still ahead -- each once, in road order)
+      if (!isDeepStrictEqual(f.passages.map((p) => p.stop), stops.map((q, j) => (q.kind === 'challenge' && hasPassage(q.challenge!) ? j : -1)).filter((j) => j >= 0))) fail(`${what}: the passages are stops ${f.passages.map((p) => p.stop).join(', ')} at E ${E}`);
+      for (const p of f.passages) { const piece = f.pieces.find((q) => q.stop === p.stop)!; if (p.x0 !== piece.x + PASSAGE_FROM || p.x1 > p.x0 + PASSAGE_LEN || p.x1 <= p.x0 || p.state !== piece.state || (p.stop + 1 < stops.length && f.pieces.some((q) => q.stop === p.stop + 1 && p.x1 > Math.max(p.x0 + 1, q.x - PIECE_AHEAD - PASSAGE_CLEAR) + 1e-9))) { if (bad++ < 3) fail(`${what}: stop ${p.stop}'s passage is ${JSON.stringify(p)} beside its piece ${JSON.stringify(piece)} at E ${E}`); } }
+      if (f.passage != null) {
+        inPassage++;
+        if (f.stop != null || stops[f.passage].result === 'ahead') fail(`${what}: the lead walks stop ${f.passage}'s passage (${stops[f.passage].result}) while ${f.stop != null ? `standing at stop ${f.stop}` : 'the stop is ahead'} at E ${E}`);
+        if (walkedThrough[walkedThrough.length - 1] !== f.passage) walkedThrough.push(f.passage);
+      }
       // (the banner: the stop's name as it is met, the encounter's lines through it, how it went after -- never the outcome)
       if (f.banner && /HOME SAFE|NOT THIS TIME/.test(f.banner)) fail(`${what}: the banner tells the outcome at E ${E}: ${f.banner}`);
       if (f.stop != null && (!enc || enc.stop !== f.stop || !f.banner)) fail(`${what}: the team stands at stop ${f.stop} with ${enc ? `the encounter at ${enc.stop}` : 'no encounter'}, banner ${JSON.stringify(f.banner)} at E ${E}`);
@@ -2645,10 +2658,18 @@ if (ROLE === 'service') {
     // (every stop reached and resolved in road order, the road walked to its end; the result card's title there the
     // outcome's, and the outcome every stop cleared)
     if (!isDeepStrictEqual(met, stops.map((_, j) => j)) || !isDeepStrictEqual(ended, met) || reached !== stops.length - 1 || !prev?.done || endWalked !== L) fail(`${what}: met stops ${met.join(',')}, ended ${ended.join(',')}, reached ${reached} of ${stops.length}, done ${prev?.done} at walked ${endWalked} of ${L}`);
+    // (the land stops' passages walked through in road order, each once at most: on these short days the stops stand
+    // so close that a passage is cut to a step or two, and the road's end cuts the last one short -- the long road below
+    // walks them whole)
+    const landStops = stops.map((q, j) => (q.kind === 'challenge' && hasPassage(q.challenge!) ? j : -1)).filter((j) => j >= 0);
+    if (walkedThrough.some((j, k) => !landStops.includes(j) || (k > 0 && j <= walkedThrough[k - 1]))) fail(`${what}: the lead walked passages ${walkedThrough.join(',')} (${inPassage} frames), the land stops are ${landStops.join(',')}`);
     const cleared = stops.filter((q) => q.result === 'met').length;
     if (trip.success !== (cleared === stops.length) || title !== (trip.success ? 'HOME SAFE!' : 'NOT THIS TIME')) fail(`${what}: ${cleared} of ${stops.length} cleared, success ${trip.success}, the result card ${title}`);
-    if (lone && trip.success) fail(`${what}: a lone pair wore the Mole King out (${stops.map((q) => q.result).join(', ')})`);
-    if (!lone && !trip.success) fail(`${what}: the best team failed (${stops.map((q) => `${q.result} in ${q.turns}`).join(', ')})`);
+    // (the fight: the best team, with both counters, wears the baddie out; a lone pair with neither sits it out -- the
+    // obstacles are checks the road's own rolls decide, so a best team can still come home NOT THIS TIME)
+    const kb = stops.findIndex((q) => q.kind === 'baddie');
+    if (lone && (trip.success || (kb >= 0 && stops[kb].result === 'met'))) fail(`${what}: a lone pair wore the Mole King out (${stops.map((q) => q.result).join(', ')})`);
+    if (!lone && kb >= 0 && stops[kb].result !== 'met') fail(`${what}: the best team sat the fight out (${stops.map((q) => `${q.result} in ${q.turns}`).join(', ')})`);
     // (a baddie always leaves the road, worn out or waited out, by its own exit: the team walks on past where it stood)
     if (trip.exit !== (trip.mission.baddie ? BADDIES[trip.mission.baddie].exit : null)) fail(`${what}: the baddie's exit is ${trip.exit}`);
     if (trip.mission.baddie) {
@@ -2657,7 +2678,38 @@ if (ROLE === 'service') {
       if (trip.exit !== 'calmed' && (lastOff == null || lastOff <= 640)) fail(`${what}: the baddie (${trip.exit}) was last seen at screen x ${lastOff}, not off the right edge`);
     }
     noteUse(sim);
-    lines.push(`${region} ${diff}${lone ? ' (RIPPLE alone)' : ''}: all ${stops.length} stops met (${stops.map((q) => `${q.result} in ${q.turns}`).join(', ')}), ${title} at the end${trip.mission.baddie ? `, ${trip.mission.baddie} ${trip.exit}${lastOff != null ? ` (off ahead of the team, last seen at screen x ${lastOff.toFixed(0)})` : ''}` : ''}`);
+    lines.push(`${region} ${diff}${lone ? ' (RIPPLE alone)' : ''}: all ${stops.length} stops met (${stops.map((q) => `${q.result} in ${q.turns}`).join(', ')}), ${walkedThrough.length} passages walked through (${walkedThrough.map((j) => PASSAGES[stops[j].challenge!]).join(', ')}, ${inPassage} frames), ${title} at the end${trip.mission.baddie ? `, ${trip.mission.baddie} ${trip.exit}${lastOff != null ? ` (off ahead of the team, last seen at screen x ${lastOff.toFixed(0)})` : ''}` : ''}`);
+  }
+  // (a long road -- the dark, thorns and fog on a 15000-step walk, the stops far apart -- read every fourth step: each
+  // land stop's passage is PASSAGE_LEN long from PASSAGE_FROM past its set piece, drawn as the stop went (the cave lit
+  // once the way was lit, else dark; the arches in flower once pushed through); the lead walks each whole -- into it
+  // only after its stop is resolved, on for hundreds of frames, out the far end -- in road order, and never stands at
+  // a stop inside one)
+  {
+    const sim = new CareSim(START_ROOMS, START_DRAGONS, START_KEEPERS, { seed: 3, dayLen: 600 });
+    const m: Mission = { id: 997, region: 'oldmine', title: 'THE LONG ROAD', difficulty: 'normal', challenges: ['dark', 'thorns', 'fog'], baddie: null, days: 2, coin: 80, eggChance: 0, guaranteedEgg: false };
+    const wick = sim.dragons.find((d) => d.name === 'WICK')!, ember = sim.dragons.find((d) => d.name === 'EMBER')!, iris = sim.keepers.find((k) => k.name === 'IRIS')!, bea = sim.keepers.find((k) => k.name === 'BEA')!;
+    const trip = tripOf(sim, m, [{ dragon: wick.id, keeper: iris.id }, { dragon: ember.id, keeper: bea.id }], 15000);
+    trip.auto = true;
+    awayNow(sim, trip, sim.clock);
+    const runs: { stop: number; frames: number; from: number; state: string; resolved: boolean }[] = [];
+    let lastIn: number | null = null;
+    for (let s = 0; s < 60000 && sim.missions.trip && sim.missions.trip.state === 'away'; s++) {
+      sim.step();
+      if (s % 4) continue;
+      const f = sceneAt(sim, trip);
+      if (f.passages.length !== 3 || f.passages.some((p, j) => p.stop !== j || p.x1 - p.x0 !== PASSAGE_LEN || p.x0 !== f.pieces[j].x + PASSAGE_FROM || p.state !== f.pieces[j].state)) fail(`scene (long road): the passages are ${JSON.stringify(f.passages)} beside the pieces ${JSON.stringify(f.pieces)} at step ${s}`);
+      if (f.passage == null) { lastIn = null; continue; }
+      if (f.stop != null) fail(`scene (long road): the lead stands at stop ${f.stop} inside stop ${f.passage}'s passage at step ${s}`);
+      if (lastIn !== f.passage) { runs.push({ stop: f.passage, frames: 0, from: s, state: f.passages[f.passage].state, resolved: trip.stops[f.passage].result !== 'ahead' }); lastIn = f.passage; }
+      runs[runs.length - 1].frames++;
+    }
+    const V = Math.min(...trip.pairs.map((p) => { const d = sim.dragons.find((q) => q.id === p.dragon)!; return gaitOf(d.element, d.stage).avg; }));
+    const want = Math.floor(PASSAGE_LEN / V / 4);
+    if (runs.length !== 3 || runs.some((r, j) => r.stop !== j || !r.resolved || r.state === 'ahead' || Math.abs(r.frames - want) > 3)) fail(`scene (long road): the lead walked the passages as ${JSON.stringify(runs)} (want three, stops 0-2 in order, each resolved, about ${want} reads of ${PASSAGE_LEN} px at V ${V.toFixed(3)})`);
+    if (trip.stops.some((q) => q.result === 'ahead')) fail(`scene (long road): the road ended with stops ${trip.stops.map((q) => q.result).join(', ')}`);
+    noteUse(sim);
+    lines.push(`the long road (${m.challenges.join(', ')}, a 15000-step walk): the lead walked ${runs.length} passages whole, in order (${runs.map((r) => `${PASSAGES[trip.stops[r.stop].challenge!]} ${r.state}, ${r.frames} reads`).join('; ')}), each after its stop, none while standing at one`);
   }
   // (the preset puts the trip that far along its walk, the stops before that point resolved -- the world's own trip, as a
   // sent one is once away: its dragons off the map, its riders away, nobody else's -- and a stop at that very point
@@ -3537,31 +3589,38 @@ if (ROLE === 'babies') {
     const t = tripOf(w, m, pairs, 1000), party = partyOf(w, t);
     const at = (j: number, i: number) => Object.fromEntries(offersFor(newEncounter(t, j), party, t.stops[j], i).map((o) => [o.ability, o.weight]));
     const want: [number, number, Record<string, number>, string][] = [
-      [0, 0, { breath: WORK_STRONG, show: WORK_LITTLE, rest: 0 }, 'RIPPLE at the flood: STRONG, its show-off a little, REST; no PREEN, YAWN or special'],
-      [0, 1, { breath: WORK_HELP, rest: 0 }, 'EMBER at the flood: helps'],
-      [1, 0, { breath: WORK_LITTLE, show: WORK_CHARM, rest: 0, rider: 0 }, 'RIPPLE at the miller: a breath does little, its show-off charms, BEA\'s CHARM'],
-      [1, 1, { breath: WORK_LITTLE, rest: 0 }, 'EMBER at the miller: TOMAS has no CHARM'],
-      [2, 1, { breath: WORK_HELP, rest: 0 }, 'EMBER in the fog: helps, nobody\'s NAVIGATOR'],
-      [3, 1, { breath: WORK_LITTLE, rest: 0, rider: 0 }, 'EMBER at the hurt animal: TOMAS\'s MEDIC'],
-      [3, 0, { breath: WORK_LITTLE, show: WORK_CHARM, rest: 0 }, 'RIPPLE there: BEA can\'t bandage'],
-      [4, 1, { breath: WORK_STRONG, rest: 0 }, 'EMBER in the cold: STRONG'],
+      [0, 0, { breath: CHECK_STRONG, show: CHECK_LITTLE, rest: 0 }, 'RIPPLE at the flood: STRONG, its show-off a little, REST; no PREEN, YAWN or special'],
+      [0, 1, { breath: CHECK_HELP, rest: 0 }, 'EMBER at the flood: helps'],
+      [1, 0, { breath: CHECK_LITTLE, show: CHECK_CHARM, rest: 0, rider: 0 }, 'RIPPLE at the miller: a breath does little, its show-off charms, BEA\'s CHARM'],
+      [1, 1, { breath: CHECK_LITTLE, rest: 0 }, 'EMBER at the miller: TOMAS has no CHARM'],
+      [2, 1, { breath: CHECK_HELP, rest: 0 }, 'EMBER in the fog: helps, nobody\'s NAVIGATOR'],
+      [3, 1, { breath: CHECK_LITTLE, rest: 0, rider: 0 }, 'EMBER at the hurt animal: TOMAS\'s MEDIC'],
+      [3, 0, { breath: CHECK_LITTLE, show: CHECK_CHARM, rest: 0 }, 'RIPPLE there: BEA can\'t bandage'],
+      [4, 1, { breath: CHECK_STRONG, rest: 0 }, 'EMBER in the cold: STRONG'],
       [5, 0, { breath: 1, show: 1, preen: 0, yawn: 0, rest: 0, rider: 0 }, 'RIPPLE at the Mole King: even, PREEN and YAWN, BEA\'s CHARM'],
       [5, 1, { breath: 1, preen: 0, rest: 0 }, 'EMBER at the Mole King: even, PREEN, no special'],
     ];
     for (const [j, i, exp, what] of want) { const got = at(j, i); if (!isDeepStrictEqual(got, exp)) fail(`encounter (offers): ${what}: offered ${JSON.stringify(got)}, not ${JSON.stringify(exp)}`); }
     const t2 = tripOf(w, m, [{ dragon: named(w, 'WICK').id, keeper: kid(w, 'IRIS') }], 1000), o2 = offersFor(newEncounter(t2, 5), partyOf(w, t2), t2.stops[5], 0);
     if (o2.find((o) => o.ability === 'breath')?.weight !== STRONG || o2.some((o) => o.ability === 'rider')) fail(`encounter (offers): WICK at the Mole King is offered ${JSON.stringify(o2.map((o) => [o.ability, o.weight]))} (want its NIGHTFALL STRONG, no special for IRIS)`);
-    for (const d of ['easy', 'normal', 'hard'] as const) { const e = newEncounter(tripOf(w, test(['flood'], null, d), pairs, 100), 0); if (e.toughness !== TOUGHNESS[d] || e.work !== TOUGHNESS[d] || e.kind !== 'obstacle' || e.foe) fail(`encounter: a ${d} road's obstacle has ${e.work} of ${e.toughness} work`); }
+    for (const d of ['easy', 'normal', 'hard'] as const) { const e = newEncounter(tripOf(w, test(['flood'], null, d), pairs, 100), 0); if (e.mark0 !== MARK[d] || e.mark !== MARK[d] || e.kind !== 'obstacle' || e.foe) fail(`encounter: a ${d} road's obstacle has a mark of ${e.mark} from ${e.mark0}`); }
     const ef = newEncounter(t, 5);
-    if (ef.kind !== 'fight' || !ef.foe || ef.foe.puff !== FOE_STATS.moleking.puff || ef.toughness !== 0) fail(`encounter: the fight begins as ${JSON.stringify({ kind: ef.kind, foe: ef.foe })}`);
-    lines28.push(`the offers at ${want.length} stop-and-pair cases as the rules say (STRONG x${WORK_STRONG}, HELPS x${WORK_HELP}, a little x${WORK_LITTLE}, CHARMS x${WORK_CHARM}; the fight's ring x${STRONG}); toughness ${TOUGHNESS.easy}/${TOUGHNESS.normal}/${TOUGHNESS.hard}`);
+    if (ef.kind !== 'fight' || !ef.foe || ef.foe.puff !== FOE_STATS.moleking.puff || ef.mark0 !== 0) fail(`encounter: the fight begins as ${JSON.stringify({ kind: ef.kind, foe: ef.foe })}`);
+    // (each try's chance: the rolls of the die that pass its bonus against the mark -- STRONG at the flood 95 %, a
+    // little at the miller 5 %; a 20 always passes, a 1 never, and the note says the chance)
+    const o0 = offersFor(newEncounter(t, 0), party, t.stops[0], 0), strong = o0.find((o) => o.ability === 'breath')!, little = offersFor(newEncounter(t, 1), party, t.stops[1], 1).find((o) => o.ability === 'breath')!;
+    if (strong.chance !== 0.95 || strong.chance !== chanceOf(strong.bonus, MARK.hard) || !strong.note.startsWith('95 %') || strong.what !== `ROLL + ${strong.bonus}`) fail(`encounter (offers): RIPPLE's STRONG try at the hard flood is ${JSON.stringify(strong)}`);
+    if (little.chance !== 0.05 || little.bonus + SIDES - 1 >= MARK.hard || !little.note.startsWith('5 %')) fail(`encounter (offers): EMBER's little try at the hard miller is ${JSON.stringify(little)}`);
+    if (!passes(SIDES, 0, 99) || passes(1, 99, 2) || !passes(11, 13, 24) || passes(11, 12, 24) || chanceOf(13, 24) !== 0.5 || chanceOf(22, 24) !== 0.95) fail('encounter (offers): the die\'s rules');
+    lines28.push(`the offers at ${want.length} stop-and-pair cases as the rules say (STRONG x${CHECK_STRONG}, HELPS x${CHECK_HELP}, a little x${CHECK_LITTLE}, CHARMS x${CHECK_CHARM}; the fight's ring x${STRONG}); the mark ${MARK.easy}/${MARK.normal}/${MARK.hard}, a d${SIDES} plus the bonus against it (RIPPLE's STRONG try ${strong.note}, EMBER's little one ${little.note})`);
   }
-  // (b) a stop by the rules alone (encounter.ts beginTurn, landMove, endTurn, stopLine), every roll even: a STRONG dragon
-  // clears an easy flood in one turn with no bite; a dragon that only helps takes more turns and is bitten each turn the
-  // flood stands; a lone breath that does little at a hard miller is waited out after MAX_OBSTACLE_TURNS, bitten every
-  // turn; the rider's special clears its stop outright, once; a pair out of puff sits; the bite never takes puff below
-  // 0; a fight: the special costs the baddie FOE_SPECIAL of its whole and a POWER stage, its rest gives back at most
-  // FOE_REST_GAIN, and the best team wears the Mole King out within MAX_FIGHT_TURNS
+  // (b) a stop by the rules alone (encounter.ts beginTurn, landMove, endTurn, stopLine), every roll even (an 11): a
+  // STRONG dragon passes an easy flood's check on its first try with no bite; a dragon that only helps (RIPPLE in the
+  // cold) falls short and is bitten, the mark easing, then passes; a lone breath that does little at a hard miller is
+  // waited out after MAX_OBSTACLE_TURNS tries, bitten every turn; the rider's special clears its stop outright, once, no
+  // roll; a pair out of puff sits; the bite never takes puff below 0; a fight: the special costs the baddie FOE_SPECIAL
+  // of its whole and a POWER stage, its rest gives back at most FOE_REST_GAIN, and the best team wears the Mole King out
+  // within MAX_FIGHT_TURNS
   {
     const w = dayW();
     const play = (t: Trip, j: number, picks?: (party: Party) => (Ability | 'sit')[]) => {
@@ -3578,13 +3637,14 @@ if (ROLE === 'babies') {
     };
     const one = (name: string, rider: string, challenges: ChallengeId[], baddie: BaddieId | null, difficulty: Difficulty) => tripOf(w, test(challenges, baddie, difficulty), [{ dragon: named(w, name).id, keeper: kid(w, rider) }], 100);
     const a = play(one('RIPPLE', 'IRIS', ['flood'], null, 'easy'), 0);
-    if (a.out !== 'cleared' || a.enc.turn !== 1 || a.party.puff[0] !== a.party.members[0].stats.puff || a.line !== 'SPRING FLOOD - RIPPLE SWIMS THEM ACROSS') fail(`encounter (rules): RIPPLE at an easy flood: ${a.out} in ${a.enc.turn} turns, puff ${a.party.puff[0]}, "${a.line}"`);
-    const b = play(one('EMBER', 'IRIS', ['flood'], null, 'easy'), 0);
-    if (b.out !== 'cleared' || b.enc.turn < 2 || b.party.puff[0] !== b.party.members[0].stats.puff - (b.enc.turn - 1) * BITE || b.line !== 'SPRING FLOOD - THE WATER GOES DOWN') fail(`encounter (rules): EMBER at an easy flood: ${b.out} in ${b.enc.turn} turns, puff ${b.party.puff[0]} of ${b.party.members[0].stats.puff}, "${b.line}"`);
+    const a1 = a.enc.moves[0];
+    if (a.out !== 'cleared' || a.enc.turn !== 1 || a.party.puff[0] !== a.party.members[0].stats.puff || a.line !== 'SPRING FLOOD - RIPPLE SWIMS THEM ACROSS' || a1.roll !== 11 || !a1.hit || a1.score < MARK.easy || a.enc.mark !== 0 || !a.enc.log.some((l) => l.endsWith(`= ${a1.score} BEATS ${MARK.easy}!`))) fail(`encounter (rules): RIPPLE at an easy flood: ${a.out} in ${a.enc.turn} turns, puff ${a.party.puff[0]}, "${a.line}", ${JSON.stringify(a1)}: ${a.enc.log.join(' | ')}`);
+    const b = play(one('RIPPLE', 'IRIS', ['cold'], null, 'easy'), 0), b1 = b.enc.moves[0];
+    if (b.out !== 'cleared' || b.enc.turn < 2 || b.party.puff[0] !== b.party.members[0].stats.puff - (b.enc.turn - 1) * BITE || b.line !== 'THE COLD - THE COLD IS SEEN OFF' || !b1.hit || b1.score < MARK.easy - (b.enc.turn - 1) * MARK_EASE || b1.score >= MARK.easy - (b.enc.turn - 2) * MARK_EASE || !b.enc.log.some((l) => l.includes(`FALLS SHORT OF ${MARK.easy}`)) || !b.enc.log.some((l) => l.endsWith(`THE MARK EASES TO ${MARK.easy - MARK_EASE}`))) fail(`encounter (rules): RIPPLE in an easy cold: ${b.out} in ${b.enc.turn} turns, puff ${b.party.puff[0]} of ${b.party.members[0].stats.puff}, "${b.line}": ${b.enc.log.join(' | ')}`);
     const c = play(one('EMBER', 'IRIS', ['miller'], null, 'hard'), 0);
-    if (c.out !== 'waited' || c.enc.turn !== MAX_OBSTACLE_TURNS || c.party.puff[0] !== c.party.members[0].stats.puff - MAX_OBSTACLE_TURNS * BITE || c.line !== 'GRUMPY MILLER - THE TEAM WAITS IT OUT') fail(`encounter (rules): EMBER alone at a hard miller: ${c.out} in ${c.enc.turn} turns, puff ${c.party.puff[0]}, "${c.line}"`);
+    if (c.out !== 'waited' || c.enc.turn !== MAX_OBSTACLE_TURNS || c.party.puff[0] !== c.party.members[0].stats.puff - MAX_OBSTACLE_TURNS * BITE || c.line !== 'GRUMPY MILLER - THE TEAM WAITS IT OUT' || c.enc.mark !== MARK.hard - (MAX_OBSTACLE_TURNS - 1) * MARK_EASE) fail(`encounter (rules): EMBER alone at a hard miller: ${c.out} in ${c.enc.turn} turns, puff ${c.party.puff[0]}, mark ${c.enc.mark}, "${c.line}"`);
     const d = play(one('EMBER', 'BEA', ['miller'], null, 'hard'), 0);
-    if (d.out !== 'cleared' || d.enc.turn !== 1 || d.enc.special[0] || d.line !== 'GRUMPY MILLER - BEA TALKS HIM ROUND') fail(`encounter (rules): EMBER with BEA at a hard miller: ${d.out} in ${d.enc.turn} turns, special left ${d.enc.special[0]}, "${d.line}"`);
+    if (d.out !== 'cleared' || d.enc.turn !== 1 || d.enc.special[0] || d.line !== 'GRUMPY MILLER - BEA TALKS HIM ROUND' || d.enc.moves[0].roll !== 0 || d.enc.mark !== 0) fail(`encounter (rules): EMBER with BEA at a hard miller: ${d.out} in ${d.enc.turn} turns, special left ${d.enc.special[0]}, "${d.line}"`);
     // (out of puff: the pick is to sit, the move does nothing; the bite stops at 0)
     const e = one('EMBER', 'IRIS', ['flood'], null, 'hard'), ep = partyOf(w, e), ee = newEncounter(e, 0);
     ep.puff[0] = 2;
@@ -3593,7 +3653,7 @@ if (ROLE === 'babies') {
     const bitten = endTurn(ee, ep, e.stops[0]);
     if (ep.puff[0] !== 0 || bitten !== 'waited' || coachPick(ee, ep, e.stops[0], 0, 0.49) !== 'sit') fail(`encounter (rules): at 2 puff the bite left ${ep.puff[0]}, the stop ${bitten}, the pick ${coachPick(ee, ep, e.stops[0], 0, 0.49)}`);
     ee.picks = ['sit']; beginTurn(ee, ep, evenRoll, true); landMove(ee, ep, e.stops[0], ee.moves[0], evenRoll);
-    if (ee.moves[0].ability !== 'sit' || ee.moves[0].work !== 0 || ee.moves[0].hit) fail(`encounter (rules): a sit did ${JSON.stringify(ee.moves[0])}`);
+    if (ee.moves[0].ability !== 'sit' || ee.moves[0].score !== 0 || ee.moves[0].roll !== 0 || ee.moves[0].hit) fail(`encounter (rules): a sit did ${JSON.stringify(ee.moves[0])}`);
     // (the fight: WICK with IRIS and RIPPLE with BEA against the Mole King)
     const f = tripOf(w, test(['dark'], 'moleking'), [{ dragon: named(w, 'RIPPLE').id, keeper: kid(w, 'BEA') }, { dragon: named(w, 'WICK').id, keeper: kid(w, 'IRIS') }], 100);
     const fp = partyOf(w, f), fe = newEncounter(f, 1), whole = fe.foe!.stats.puff;
@@ -3610,7 +3670,7 @@ if (ROLE === 'babies') {
     }
     logs28.push(...fe.log);
     if (out !== 'cleared' || fe.turn > MAX_FIGHT_TURNS || fe.foe!.puff !== 0 || stopLine(fe, fp, f.stops[1], out) !== 'THE MOLE KING - WORN OUT: IT CURLS UP AND DOZES') fail(`encounter (rules): the best team's fight: ${out} in ${fe.turn} turns, the Mole King at ${fe.foe!.puff}: "${stopLine(fe, fp, f.stops[1], out)}"`);
-    lines28.push(`by the rules: RIPPLE clears an easy flood in ${a.enc.turn} turn, EMBER in ${b.enc.turn} (bitten ${(b.enc.turn - 1) * BITE}), EMBER alone waits a hard miller out after ${c.enc.turn}, BEA's CHARM clears it in ${d.enc.turn}; a dragon at 2 puff is bitten to 0 and sits; BEA's CHARM costs the Mole King ${special.loss} of ${whole} and a POWER stage, and the best team wears it out in ${fe.turn} turns (${rests} rests)`);
+    lines28.push(`by the rules: RIPPLE passes an easy flood's check on try ${a.enc.turn} (${a1.roll} + ${a1.score - a1.roll} = ${a1.score} against ${MARK.easy}), and the cold's on try ${b.enc.turn} (bitten ${(b.enc.turn - 1) * BITE}, the mark eased to ${MARK.easy - (b.enc.turn - 1) * MARK_EASE}), EMBER alone waits a hard miller out after ${c.enc.turn} tries, BEA's CHARM clears it in ${d.enc.turn} with no roll; a dragon at 2 puff is bitten to 0 and sits; BEA's CHARM costs the Mole King ${special.loss} of ${whole} and a POWER stage, and the best team wears it out in ${fe.turn} turns (${rests} rests)`);
   }
   // (c) the balance in the world, the trail coach playing (AUTO): each baddie's best two pairs (the trip preset's,
   // both counters) put at its stop on seeds 1-3 wear it out every time within 10 turns; a lone pair with neither
@@ -3655,7 +3715,8 @@ if (ROLE === 'babies') {
   }
   // (d) a whole road in the world by commands (seed 2's LOST NEST, RIPPLE and ECHO, away at once with a 600-step walk):
   // the team halts at the first stop as it reaches it; nobody picks, so the picks wait PICK_WAIT_TRAIL and the coach's
-  // turn plays -- each move its dragon's own anim, landing at its impact for exactly its work; at the second stop a pick
+  // turn plays -- each move its dragon's own anim, landing at its impact with its roll of the die against the mark (a
+  // pass takes the mark to 0 and ends the turn; a short one leaves it); at the second stop a pick
   // for a pair there isn't, an ability the pair hasn't and the special nobody has are refused, RIPPLE's breath is taken
   // by command, and AUTO fills ECHO's pick at once (the quicker moving first); the stop cleared, XP for both (a level
   // and its skill), the walk on and the landing; the same script twice gives the same world; saves taken at the meet, at
@@ -3700,10 +3761,10 @@ if (ROLE === 'babies') {
     // (the turn's moves: each its dragon's anim, landing at its impact for exactly its work)
     const party = partyOf(w, t);
     while (t.encounter?.state === 'play') {
-      const enc: Encounter = t.encounter, mv = enc.moves[enc.cur], me = party.members[mv.by], sk = skillOf(me.el, mv.ability as SkillKind), work0 = enc.work;
+      const enc: Encounter = t.encounter, mv = enc.moves[enc.cur], me = party.members[mv.by], sk = skillOf(me.el, mv.ability as SkillKind), mark0 = enc.mark;
       if (mv.len !== animLen(me.el, me.stage, sk.anim) || mv.at !== Math.max(1, Math.round(mv.len * sk.impact))) fail(`encounter (road): ${me.name}'s ${sk.name} lasts ${mv.len} and lands at ${mv.at}`);
       step();
-      if (t.encounter === enc && mv.landed && mv.t === mv.at) { out.moves++; if (enc.work !== work0 - mv.work || (mv.hit && mv.work <= 0 && work0 > 0)) fail(`encounter (road): ${me.name}'s ${sk.name} landed for ${mv.work} work, the stop's work ${work0} to ${enc.work}`); if (!seen.has('mid-move')) fork('mid-move'); }
+      if (t.encounter === enc && mv.landed && mv.t === mv.at) { out.moves++; if (mv.roll < 1 || mv.roll > SIDES || mv.score <= mv.roll || mv.hit !== passes(mv.roll, mv.score - mv.roll, mark0) || enc.mark !== (mv.hit ? 0 : mark0) || (mv.hit && enc.moves.length !== mv.n + 1)) fail(`encounter (road): ${me.name}'s ${sk.name} landed as ${JSON.stringify(mv)} against ${mark0}, the mark now ${enc.mark}`); if (!seen.has('mid-move')) fork('mid-move'); }
     }
     if (t.encounter?.state !== 'done' || t.stops[0].result !== 'met') fail(`encounter (road): the first stop ended ${t.encounter?.state}, ${t.stops[0].result}`);
     logs28.push(...(t.encounter?.log ?? []));
@@ -3754,7 +3815,8 @@ if (ROLE === 'babies') {
       ['a state it doesn\'t know', (s) => { enc(s).state = 'brawl'; }],
       ['a stop off the road', (s) => { enc(s).stop = 9; }],
       ['a pick short', (s) => { enc(s).picks = [null]; }],
-      ['more work than its toughness', (s) => { enc(s).work = enc(s).toughness + 1; enc(s).toughness = 0; }],
+      ['a mark over its start', (s) => { enc(s).mark = enc(s).mark0 + 1; }],
+      ['a roll past the die', (s) => { enc(s).moves[0].roll = SIDES + 1; }],
       ['a baddie over its whole puff', (s) => { enc(s).foe.puff = enc(s).foe.stats.puff + 1; }],
       ['no baddie at a fight', (s) => { enc(s).foe = null; }],
       ['a move by a pair there isn\'t', (s) => { enc(s).moves[0].by = 5; }],
