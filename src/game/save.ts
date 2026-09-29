@@ -6,29 +6,29 @@
 import type { CareSim, Dragon, Keeper, Job, SimStats, LiftState, Egg } from './sim.ts';
 import type { RoomPlace } from './layout.ts';
 import { releasedState } from './control.ts';
-import { copyMissions } from './missions.ts';
+import { copyMissions, upgradeMissions, upgradeRoads } from './missions.ts';
 import type { MissionsState } from './missions.ts';
+import { copyArena, newArena } from './arena.ts';
+import type { ArenaState } from './arena.ts';
 
 /**
  * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded (the
- * page keeps it aside and starts a new barn: storage.ts) -- but for the one before, which is brought up to this one
- * as it loads (MIGRATES_FROM). Version 9 (the earlier ones were never shipped) holds the whole world: the rooms and
- * their uses (stats.used by kind, stats.usedRoom by room id); every dragon -- its slot by room id and index, its goal
- * and that goal's job by id, its route, its walk and the speed it last played at (`gaitS`), its turn, its `hold`, its
- * act, its stage and the step it began, its place (barn, garden or away), its plot (`home`) and a resident's rhythm
- * (`garden`); every keeper -- their station and job by id, route, phase (a mission's phases too), what they carry, and
- * the hand-held state, always saved released (control.ts releasedState); the open jobs; the lift (its car, its rider
- * by id, its calls); the eggs in the Hatchery's nests; the garden's plots; the missions (the board and its day, the
- * map, the coin, the trip out and each pair's deck spot); and the stats. Version 10 is 9 with every road's fights
- * (BASE_DESIGN 5.3): each mission's boss, its might and the road's foes, fights and packs; a trip's road with its
- * fights among its stops; no baddie exit.
+ * page keeps it aside and starts a new barn: storage.ts) -- but for the one before it, which migrateSave brings up to
+ * this one. Version 12 holds the whole world: the rooms and their uses (stats.used by kind, stats.usedRoom by room id);
+ * every dragon -- its slot by room id and index, its goal and that goal's job by id, its route, its walk and the speed
+ * it last played at (`gaitS`), its turn, its `hold`, its act, its stage and the step it began, its place (barn, garden
+ * or away), its plot (`home`), a resident's rhythm (`garden`) and its XP (`xp`: its level); every keeper -- their
+ * station and job by id, route, phase (a mission's phases too), what they carry, and the hand-held state, always saved
+ * released (control.ts releasedState); the open jobs; the lift (its car, its rider by id, its calls); the eggs in the
+ * Hatchery's nests; the garden's plots; the missions (the board and its day, the map, the coin, the trip out -- its
+ * road walked so far -- its challenges, its packs of little enemies and its boss -- its stops' results, the team's
+ * stats, puff and XP, the trail coach, the encounter on at a stop: trip.ts, encounter.ts -- and each pair's deck spot);
+ * the Arena (the bout on, its fighters by id, and the bouts begun: arena.ts); and the stats. Version 11 had a big
+ * baddie at the end of some hard roads only, and no little enemies; version 10 kept a trip as a timer (its return
+ * clock, its odds and its outcome rolled at the send); and version 9 (the first shipped) was that less the XP and the
+ * Arena: each loads brought up to this one.
  */
-export const SAVE_VERSION = 10;
-/**
- * The version a save may be of and still load, brought up to SAVE_VERSION (CareSim.fromSave: missions.ts
- * upgradeMissions and upgradeTrip give its board and its trip out their fights, the trip's rolled outcome kept).
- */
-export const MIGRATES_FROM = 9;
+export const SAVE_VERSION = 12;
 
 /** A slot as saved: its room's id and its index in that room's slots (CareSim.fromSave takes the room's own slot again). */
 export interface SlotRef { room: number; i: number }
@@ -62,14 +62,16 @@ export interface SaveV {
   garden: { plots: number };
   /** The missions (missions.ts): the board, the map, the coin, the trip out (its pairs by id). */
   missions: MissionsState;
+  /** The Arena (arena.ts): the bout on (its fighters by dragon id), and the bouts begun. */
+  arena: ArenaState;
   stats: SimStats;
 }
 
-/** A save this build can't read: another version (not MIGRATES_FROM), or not a save at all. The storage layer (storage.ts) starts a new barn on it. */
+/** A save this build can't read: another version, or not a save at all. The storage layer (storage.ts) starts a new barn on it. */
 export class SaveVersionError extends Error {
   readonly found: unknown;
   constructor(found: unknown) {
-    super(`save version ${JSON.stringify(found) ?? 'none'} is not ${SAVE_VERSION} (nor ${MIGRATES_FROM}, which loads brought up to it)`);
+    super(`save version ${JSON.stringify(found) ?? 'none'} is not ${SAVE_VERSION}`);
     this.name = 'SaveVersionError';
     this.found = found;
   }
@@ -98,8 +100,31 @@ export function serialize(sim: CareSim, exact = false): SaveV {
     eggs: sim.eggs.map((e) => ({ ...e })),
     garden: { plots: sim.garden.plots },
     missions: copyMissions(sim.missions),
+    arena: copyArena(sim.arena),
     stats: { ...sim.stats, used: { ...sim.stats.used }, usedRoom: [...sim.stats.usedRoom], doneBy: { ...sim.stats.doneBy } },
   };
+}
+
+/**
+ * A save of an older version brought up to this one (storage.ts loadSave, before the view loads it), a version at a
+ * time: version 9 had no XP and no Arena, so every dragon starts at 0 XP (level 1) and the Arena with no bout begun;
+ * version 10 kept a trip out as a timer, so a trip is given its road walked so far and its stops' results as the old
+ * scene had them (missions.ts upgradeMissions); version 11 had no fights on most roads, so every mission gets its
+ * road's little enemies and its boss, and a trip not yet at its first stop its road laid again (missions.ts
+ * upgradeRoads); the rest is unchanged. Any other save is returned as it is (a save of this version, or one
+ * CareSim.fromSave refuses).
+ */
+export function migrateSave(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw;
+  let s = raw as Partial<SaveV> & { v?: unknown; dragons?: unknown; keepers?: unknown; missions?: unknown };
+  if (s.v === 9) s = { ...s, v: 10, dragons: Array.isArray(s.dragons) ? s.dragons.map((d) => (d && typeof d === 'object' ? { ...d, xp: 0 } : d)) : s.dragons, arena: newArena() };
+  if (s.v === 10) {
+    const dragons = Array.isArray(s.dragons) ? (s.dragons as { id: number; element: Dragon['element']; stage: Dragon['stage']; xp?: number; mood: number }[]) : [];
+    const dayLen = typeof s.dayLen === 'number' ? s.dayLen : 10800, clock = (typeof s.clock0 === 'number' ? s.clock0 : 0) + (typeof s.tick === 'number' ? s.tick : 0);
+    s = { ...s, v: 11, missions: upgradeMissions(s.missions, dragons, dayLen, clock) as MissionsState };
+  }
+  if (s.v === 11) s = { ...s, v: SAVE_VERSION, missions: upgradeRoads(s.missions, Array.isArray(s.dragons) ? s.dragons : [], Array.isArray(s.keepers) ? s.keepers : []) as MissionsState };
+  return s;
 }
 
 /**

@@ -10,13 +10,14 @@
 //   view=missionart&sheet=baddies      the six bosses: every face, every pose (a hit with its flash), an adult dragon for
 //                                      scale, and their 24 x 24 portraits (&id=<baddie>: that one's row alone)
 //   view=missionart&sheet=foes         the six little enemies: every face and pose (a hit with its flash) and the puff of
-//                                      smoke a beaten one goes up in, beside an adult dragon and a keeper for scale
+//                                      smoke a worn-out one goes up in, beside an adult dragon and a keeper for scale
 //   view=missionart&sheet=fights       the fights' marks: every element's breath bolt, every missile small and big, a
-//                                      hit's spark, a puff of smoke and the knocked-down stars through their steps, a
-//                                      WEAK SPOT! pop and the boss's health bar
+//                                      hit's spark, a puff of smoke and the sat-down stars through their steps
 //   view=missionart&sheet=people       the grumpy miller, grumpy and talked round, at 1x and 3x, beside the four keepers,
 //                                      and all five as flat silhouettes at a third of their size
 //   view=missionart&sheet=icons        the challenge, skill and fight icons, the saddle and the carried eggs, at 1x and 3x
+//   view=missionart&sheet=places       the world map's landmarks (worldmap.ts PLACE_ART, one for each place) and HOME at 2x,
+//                                      each over its region's ground, and every growth the map's land has, at 1x and 2x
 //
 // The page's hook (window.__dragonCare.missionart) names the sheet and what it drew, for the smoke run.
 import { drawText } from '../lib/engine/text.ts';
@@ -24,11 +25,12 @@ import { drawClimate, CLIMATE_PIC } from './backdrops.ts';
 import { drawSetPiece } from './setpieces.ts';
 import { drawBaddie, drawBaddiePortrait, BADDIE_ART } from './baddies.ts';
 import { drawFoe, FOE_ART } from './foes.ts';
-import { BOLTS, MISSILES, SPARK_LEN, POOF_LEN, drawBolt, drawMissile, drawSpark, drawPoof, drawStars, drawPop, drawBossBar } from './fightfx.ts';
+import { BOLTS, MISSILES, SPARK_LEN, POOF_LEN, drawBolt, drawMissile, drawSpark, drawPoof, drawStars } from './fightfx.ts';
 import type { MissileKind } from './fightfx.ts';
 import { drawMiller } from './npcs.ts';
 import { CHALLENGE_ICONS, SKILL_ICONS, SADDLE, FIGHT_ICON, drawCarriedEgg } from './missionicons.ts';
 import { drawSprite } from './icons.ts';
+import { drawLandmark, drawScaled, growthSamples, PLACES, HOME_ART, GROUND_OF } from './worldmap.ts';
 import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS, BADDIE_FACES, FOE_IDS } from './missiondata.ts';
 import type { Climate, BaddieId, BaddiePose } from './missiondata.ts';
 import { PHASE_ORDER } from './clock.ts';
@@ -42,7 +44,7 @@ import type { KeeperAgent } from '../care/keeper.ts';
 import { KEEPER_IDS, KEEPERS } from '../art/keeper/cast.ts';
 import { DRAGON_ELEMENTS } from '../art/dragon/palettes.ts';
 
-export const SHEETS = ['climates', 'setpieces', 'baddies', 'foes', 'fights', 'people', 'icons'] as const;
+export const SHEETS = ['climates', 'setpieces', 'baddies', 'foes', 'fights', 'people', 'icons', 'places'] as const;
 export type Sheet = typeof SHEETS[number];
 
 /** The gallery's scene shape (gallery.ts Scene), structurally. */
@@ -86,6 +88,41 @@ function publish(sheet: string, drawn: string[]): void {
   if (dc) dc.missionart = { sheet, drawn };
 }
 
+/**
+ * The world map's landmarks (BASE_DESIGN 5.1; worldmap.ts): every place's, named by its art, and HOME, each twice its
+ * size over its region's ground (the mill with its sails), then every growth of the map's land at 1x and 2x.
+ */
+function placesSheet(): ArtScene {
+  const w = 640, h = 370;
+  return {
+    w, h, pets: [], step() { /* still */ },
+    draw(ctx) {
+      ctx.fillStyle = PAGE; ctx.fillRect(0, 0, w, h);
+      const drawn: string[] = [];
+      label(ctx, 'PLACES (2X)', 8, 6, LABEL, 'left');
+      const cells: { name: string; ground: string; draw: (cx: number, foot: number) => void }[] = [
+        ...PLACES.map((p) => ({ name: p.art, ground: GROUND_OF(p.region), draw: (cx: number, foot: number) => drawLandmark(ctx, p.art, cx, foot, 2) })),
+        { name: 'home', ground: GROUND_OF('millbrook'), draw: (cx: number, foot: number) => drawScaled(ctx, HOME_ART, cx - HOME_ART.rows[0].length, foot - HOME_ART.rows.length * 2, 2) },
+      ];
+      cells.forEach((c, i) => {
+        const cx = 40 + (i % 8) * 78, top = 18 + Math.floor(i / 8) * 64, foot = top + 44;
+        ctx.fillStyle = c.ground; ctx.fillRect(cx - 36, top, 72, 50);
+        if (drew(ctx, cx - 36, top, 72, 50, () => c.draw(cx, foot))) drawn.push(c.name === 'home' ? 'home' : `place:${c.name}`);
+        label(ctx, c.name.toUpperCase(), cx, top + 52, SUB);
+      });
+      label(ctx, 'GROWTHS (1X AND 2X)', 8, 214, LABEL, 'left');
+      let x = 12;
+      for (const g of growthSamples()) {
+        const gw = g.s.rows[0].length, gh = g.s.rows.length;
+        if (drew(ctx, x - 1, 226, gw + 2, gh + 2, () => drawScaled(ctx, g.s, x, 227, 1))) drawn.push(`growth:${g.name}`);
+        drawScaled(ctx, g.s, x, 270, 2);
+        x += gw * 2 + 8;
+      }
+      publish('places', drawn);
+    },
+  };
+}
+
 /** Build the sheet the query asks for (an unknown sheet: climates). */
 export function missionArtScene(search: string): ArtScene {
   const q = new URLSearchParams(search);
@@ -99,6 +136,7 @@ export function missionArtScene(search: string): ArtScene {
     case 'fights': return fightsSheet();
     case 'people': return peopleSheet();
     case 'icons': return iconsSheet();
+    case 'places': return placesSheet();
     default: return climate ? roadScene(climate, phase) : climatesSheet();
   }
 }
@@ -243,10 +281,10 @@ function foesSheet(): ArtScene {
   };
 }
 
-/** The fights' marks: the bolts, the missiles small and big, a spark's steps, a puff's, the stars, a pop and the boss's bar. */
+/** The fights' marks: the bolts, the missiles small and big, a spark's steps, a puff's, and the stars. */
 function fightsSheet(): ArtScene {
   let t = 0;
-  const w = 640, h = 300;
+  const w = 640, h = 224;
   return {
     w, h, pets: [], step() { t++; },
     draw(ctx) {
@@ -272,9 +310,6 @@ function fightsSheet(): ArtScene {
       for (let a = 0; a < POOF_LEN; a += 5) if (drew(ctx, 60 + a * 12 - 16, 150, 32, 34, () => drawPoof(ctx, 60 + a * 12, 170, a))) drawn.push(`poof:${a}`);
       label(ctx, 'STARS', 8, 202, LABEL, 'left');
       if (drew(ctx, 40, 190, 60, 24, () => drawStars(ctx, 70, 202, t))) drawn.push('stars');
-      if (drew(ctx, 120, 190, 80, 24, () => drawPop(ctx, 'WEAK SPOT!', 160, 204, 6))) drawn.push('pop');
-      label(ctx, 'BOSS BAR', 8, 232, LABEL, 'left');
-      [1, 0.65, 0.2, 0].forEach((hp, i) => { if (drew(ctx, 20 + i * 150, 244, 150, 12, () => drawBossBar(ctx, 95 + i * 150, 246, hp))) drawn.push(`bar:${hp}`); label(ctx, `${Math.round(hp * 100)} %`, 95 + i * 150, 262, SUB); });
       void BOLTS;
       publish('fights', drawn);
     },

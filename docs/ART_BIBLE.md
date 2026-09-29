@@ -2245,16 +2245,15 @@ shots `missionart_*`). The shared names (climates, challenges, skills, bosses, l
   boots), CINDER IMPS (a charcoal crest glowing inside, glowing eyes). Faces: fierce (V brows slanted down onto the
   eyes, a scowl and a fang) and hurt (the eyes screwed shut, an "o" mouth), the bosses' set; poses (`FoePose`): walk
   (scurrying in), stand, attack (a hop at the team, leaning in), hit (knocked back, leaning away). A hit flashes it as
-  it does a boss; a beaten one goes up in a puff of smoke.
+  it does a boss; a worn-out one goes up in a puff of smoke.
 - **The fights' marks** (`src/game/fightfx.ts`), small sprites in the icons format (every pixel ringed in ink): each
   element's breath bolt -- the breath its anim shows at the mouth, thrown: fire's fireball, lightning's zig-zag, water's
   bubble ball, rock's pebble, spike's quill, slinkwing's sound rings, dusk's nightfall orb with its star (5-7 px); the
   enemies' missiles, one kind per region, a foe's small (5 px) and a boss's big (7 px): a clod, a pebble, a thorn burr, a
-  zap, a snowball, an ember; the spark where a hit lands (12 steps); the puff of smoke a beaten foe goes up in (30
-  steps: three puffs swelling and thinning away, two stars popping up); the three stars circling a knocked-down boss's
-  head (a 5 x 5 star, stepping round every 5 steps); the "WEAK SPOT!" pop over a hit on a boss's weak spot (48 steps,
-  rising, in outlined text); and the boss's health bar (162 x 9 px, 20 segments, under the banner). Each is a pure
-  function of its age or the scene's step.
+  zap, a snowball, an ember; the spark where a hit lands (12 steps); the puff of smoke a worn-out foe goes up in (30
+  steps: three puffs swelling and thinning away, two stars popping up); and the three stars circling a sat-down boss's
+  head (a 5 x 5 star, stepping round every 5 steps). Each is a pure function of its age or the scene's step. (An enemy's
+  puff is the encounter's stop plate's, never a bar over its head: `encounterui.ts`.)
 - **Gate (x)** (`tools/palette-check.ts`, counted apart with the scene's half, 5.11: `BADDIES: PASS 1623 of 1623`): each
   fill on a boss's or a little enemy's silhouette edge (`BADDIE_EDGE`, `FOE_EDGE`) keeps >= 25 % luminance from the road
   (`FLOORS.road` `#dcd6c4`, L 0.673, S 0.11, itself gated by (i) and (Ki)) and from every band of its home climate at
@@ -2288,12 +2287,48 @@ shots `missionart_*`). The shared names (climates, challenges, skills, bosses, l
   the eleven challenges (a crescent moon, a boulder, a snowflake, a storm cloud, water, a bramble, a "?", a windmill,
   a sticking plaster, fog bands, two rocks), the four skills (a speech bubble with a heart, a first-aid cross, a compass,
   a feather), a fight (two crossed claws over a spark: the trip log's fights), a saddle (11 x 7), and the egg a rider carries home (the Hatchery's egg, whole: `carriedEgg`, `drawCarriedEgg`).
+- **The world map** (`src/game/worldmap.ts`; the Map Room's map, BASE_DESIGN 5.1): a little island at 1x filling the Map
+  Room panel (616 x 310), every mark whole pixels -- no anti-aliased edge, no alpha, never a gradient (the smoke run
+  holds the map's panel to 110 colours, 96 in the new game's frame) -- each shape ringed in 1 px ink, flat fills lit
+  from the top left. The land is generated once from seeded value noise, never `Math.random` (the same map in every
+  game): a rounded coast roughened by noise, with bays, headlands and islets, inked all round, a shallow band of sea
+  along it and a pale strand inside it; the regions' borders a weighted nearest-site split over a warp, each region's
+  ground a base and a patch tone; the lake in the middle and Frostmere's frozen mere (pale ice with long cracks); the
+  brook from the Highfold snows through the lake to the sea, inked along both banks; the roads, gentle curves 2 px wide
+  with an edge either side and a plank bridge wherever one crosses the brook. What grows and stands on the land sits on
+  seeded jittered grids, sorted back to front by its foot, each on its own region's dry land and clear of the roads, the
+  brook and the places: Millbrook's fields (four crops, a hedge along their tops) and hedgerow trees, Bramblewood's
+  close wood of round crowns and pines, the Highfold peaks (snow on their top two fifths, the left side lit), the Old
+  Mine Road's mesas (a pale top, banded sides) and rocks, Frostmere's snowy pines and drifts, Emberfell's cones (a
+  glowing crater and a lava streak), cinders and dead trees -- and a few big shapes set by hand (a great peak, three
+  smoking cones, three tall mesas). **The places** (`PLACE_ART`, one for each of regions.ts's 24 places, 13-19 px wide
+  in the `icons.ts` sprite format): the mill (its sails turn), the willow over its pond, the stone bridge on the brook,
+  the Bridge Troll's mossy arch over the brook (two lamp-yellow eyes in the dark under it);
+  the deep seam's timbered mouth and rails, the lamps along Lantern Run, the ore cart on its track, the Mole King's
+  crowned door among molehills; the bramble thicket and its berries, the mossy log and its mushrooms, the owl's great
+  oak (two lamp-yellow eyes in the hollow), the Briar Boar's den (a mound of brambles, tusks and red eyes at its
+  door); the high pass's notch and cairn, Thunder Ridge under its storm cloud (its
+  bolt flashes), the goat on its crag, the Storm Roc's spire and the big egg in its nest; the ice road's red-and-white
+  stakes and a sledge, the frozen falls, the snowbound hut (lamplit, its chimney smoking), the Frost Giant's pass
+  between two ice crags, giant footprints before it; the cinder field's glowing rocks, the steaming turquoise springs,
+  the ash-roofed cottages of Ashfall, the Cinder Golem's forge (its fire in the rock, an anvil at its door); and HOME (the barn in small: its red gable between the Aerie's tower, the yellow
+  flag, and the blue-spired tower). **Cloud** over a region not explored yet (its places under it, every pixel): a flat
+  mass over its land (and its places' landmarks) grown by 2 px, lumps every 11 px along its edge for a scalloped rim,
+  ringed in ink, and a few big lumps inside, each lump's upper rim over the one behind in the cloud's shade, lit inside
+  its top left and shaded along its bottom. **The living parts** (`drawAlive`, from the view's own frame count, so the
+  map lives while the world waits): the sea's glints, the mill's sails a quarter turn in four steps, smoke from the
+  cones and from Ashfall's and Snowbound's chimneys, steam off the springs, the ridge's bolt lit white for 8 frames in
+  150. Over it (maptable.ts): each explored region's name on a parchment ribbon, a "?" on each cloud, and each mission's
+  pin and plate; the chooser stands the place's landmark in the climate picture at twice its size (`drawLandmark`). The
+  gallery lays the landmarks and the growths out on `view=missionart&sheet=places` (shot `missionart_places`).
 
 **Status:** built as above. The watchable scene (5.11) draws them from the kit's own modules: the climate in parallax
 behind the road, the set pieces, the packs of little enemies and the bosses in their fights with the fights' marks,
 the miller at the `miller` stop (grumpy until the Charm rider's moment has talked him round) and the riders' saddles.
-The Map Room's chooser (BASE_DESIGN 5) draws the climate picture (each region's, by day), the challenge and skill
-icons and the boss's portrait from the same modules (the trip log its fight icon), and the riders carry the saddle in the barn's muster and landing too.
+The Map Room's chooser (BASE_DESIGN 5) draws the climate picture (each region's, by day) with the mission's place standing
+in it, the challenge and skill icons and the boss's portrait from the same modules (the trip log its fight icon), and the
+riders carry the saddle in the barn's muster and landing too. The Map Room's world map draws the island above
+(worldmap.ts), the missions pinned at their places, every road's plate with its boss's crown.
 Follow-ups:
 the rain and snow are placed, not falling (a frozen scene's weather moves only with `scroll`); the miller has no walk.
 
@@ -2320,22 +2355,25 @@ ask of it, and how each is kept:
   clear of the team's heads at every stop; the card's bottom edge sits over the riders' heads once home); an enemy's
   missile lands on a dragon's back, over its shoulders, never on its face.
 - **Fights, never wounds (BASE_DESIGN B8).** Only the enemies look fierce, hurt or dazed (the kit's faces: 5.10); the
-  dragons keep their own face set (D18: never angry) and the keepers theirs (KEEPERS K3). A hit on a dragon is a spark
-  on its back and its fills flashed pale inside its ink for 6 steps (the grow-up flash's `flat`), over whatever it is
-  playing: no knockback, no hurt pose, no fall. A hit on an enemy is a spark on its body, its flash and its hurt face (a
-  boss rocked back in its `hit` pose); a beaten foe goes up in a puff of smoke; a beaten boss sits down hard, dazed,
-  stars circling its head, then runs off; one too strong for the team stomps off unbeaten, as fierce as it came --
-  either way up the road ahead of the team and off the screen's right edge, never back through the team, on a trip
-  that will fail as on one that will succeed, so the team walks on past where it stood. No blood, no wound, no death,
-  nothing broken.
+  dragons keep their own face set (D18: never angry; a dragon an enemy's missile lands on looks surprised, or grins at
+  a dodge) and the keepers theirs (KEEPERS K3). A hit on a dragon is a spark on its back and its fills flashed pale
+  inside its ink for 6 steps (the grow-up flash's `flat`), over whatever it is playing: no knockback, no hurt pose, no
+  fall. A hit on an enemy is a spark on its body, its flash for 6 steps and its hurt face (rocked back in its `hit` pose
+  for 14); a yawn caught leaves it dazed a moment; a worn-out foe goes up in a puff of smoke (one of a pack for every
+  share of its puff worn down: `encounter.ts` packLeft); a worn-out boss sits down hard, dazed, stars circling its head,
+  then runs off; one the team can't wear out stomps off unbeaten, as fierce as it came, and a pack scampers off --
+  either way up the road ahead of the team and off the screen's right edge, never back through the team, so the team
+  walks on past where it stood. No blood, no wound, no death, nothing broken.
 - **The riders keep out of the line of fire.** In a fight each rider steps back from 56 px ahead of its dragon's root to
-  22 px behind it (`RIDER_FIGHT`), at their own walk's pace (the slowest sets the time: at most 0.15 of a pack's beat,
-  0.12 of the boss's), before anything is thrown, and comes forward again once it is over; sim-check 24 checks every
-  rider behind its dragon on every step something is in flight.
+  22 px behind it (`RIDER_FIGHT`), turned, at their own walk's pace (100 steps at most, within the enemy's 160-step
+  walk-in), before anything is thrown, and comes forward again as the fight's beat plays out; sim-check 24 checks every
+  rider behind its dragon on every step of a fight's turns, and beside it everywhere else.
 - **What flies where.** A dragon's bolt leaves its mouth on the breath's snap frame (frame 22 of every stage's
-  breath; the mouth is the rig's own joint, `mouthOf`) and flies low and quick to where it lands on the enemy
-  (`hitAt`); an enemy's missile leaves its hand (`throwAt`) in a higher lob. The enemies stand ahead of the lead
-  dragon's snout (a pack from 118 px ahead, 30 px apart; a boss 200 px ahead), so no breath passes through anyone.
+  breath; the mouth is the rig's own joint, `mouthOf`) and flies low and quick (30 steps: the move lands when it does,
+  `encounter.ts` BREATH_SNAP, BOLT_STEPS) to where it lands on the enemy (`hitAt`: a pack's nearest); an enemy's
+  missile leaves its hand (`throwAt`: 18 steps into its move, a pack's a few steps apart) in a higher lob and lands at
+  48. One that goes wide, or is dodged, flies on past for 12 steps. The enemies stand ahead of the lead dragon's snout
+  (a pack from 118 px ahead, 30 px apart; a boss 200 px ahead): the second pair's breath arcs over the first.
 - **Gate (x)** (`tools/palette-check.ts`, counted apart with the kit's half, 5.10: `BADDIES: PASS 1623 of 1623`): every
   fill the scene sees an enemy by (the silhouette edge fills: `baddies.ts` `BADDIE_FILLS`, `foes.ts` `FOE_FILLS`) keeps
   >= 25 % luminance from the road, its slab, the grass strip and the earth, and from its region's backdrop bands at

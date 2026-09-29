@@ -1,8 +1,8 @@
 // Starts built in code (view=base&preset=<name>): a world other than the new game's, for views and checks that need
 // what a new game has not got yet -- every stage at once, the barn at its cap (the capacity benchmark's twelve, and it
 // with an egg waiting), a dragon about to grow up, eggs in the nests (one about to hatch), every baby sub-slot taken
-// (forced over the cap), elders in the garden and elders about to retire to it, a team mustering for its mission, and a
-// team away on the road (so far along it). A preset is always code, never a save and never hundreds of thousands of
+// (forced over the cap), elders in the garden and elders about to retire to it, a team mustering for its mission, a
+// team away on the road (so far along it), and a bout in the Arena. A preset is always code, never a save and never hundreds of thousands of
 // steps, so a frozen view of it (t=) is as quick and as deterministic as the new game's.
 import { CareSim } from './sim.ts';
 import type { SimOptions } from './sim.ts';
@@ -10,9 +10,12 @@ import { STAGE_DAYS, HATCH_DAYS, RETIRE_DAYS } from './clock.ts';
 import { NEEDS, hasNeed, moodOf } from './needs.ts';
 import { NAMES } from './names.ts';
 import { settleInGarden } from './garden.ts';
-import { send, autoRider, awayNow, LOST_NEST } from './missions.ts';
+import { send, autoRider, awayNow, placeAlong, rollBoard, LOST_NEST } from './missions.ts';
+import { REGIONS } from './regions.ts';
 import type { Pair } from './trip.ts';
 import { demoTrip, parseTripParam } from './tripdemo.ts';
+import { boutNow } from './arena.ts';
+import { xpFor } from './training.ts';
 import type { TripParam } from './tripdemo.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from './start.ts';
@@ -100,24 +103,26 @@ export const GARDEN_RESIDENTS: readonly string[] = Object.freeze(['BRAMBLE', 'CO
 export const RETIRE_AT = RETIRE_DAYS - 0.1;
 
 /** The `trip` preset's trip when no `trip=` is given (or one that doesn't parse): half way along the Old Mine Road. */
-export const TRIP_DEFAULT: TripParam = Object.freeze({ region: 'oldmine', progress: 0.5, fail: false, weak: false });
+export const TRIP_DEFAULT: TripParam = Object.freeze({ region: 'oldmine', progress: 0.5, fail: false, auto: false });
 
 /**
- * The new game with a team away on a hard mission (BASE_DESIGN 6: view=base&preset=trip&trip=<region>:<progress>[:fail]
- * [:weak]): the region's hard mission (its fights, and its boss at the end of the road), the best two pairs of the seven
- * with their auto riders -- or, `:weak`, a lone pair too weak for the boss -- and its road (tripdemo.ts demoTrip: the
- * missions' own rider pick, odds and road, missions.ts), the outcome as asked -- a success unless `:fail`, told by the
- * result card at the road's end -- and the team away as a sent team is once it has left the Aerie
- * (missions.ts awayNow: its dragons off the map, its riders away), left so long ago that at step `at` (the frozen t=;
- * 0 live) exactly `progress` of the trip's length has gone by. The world's own trip (sim.missions.trip): it lands, and
- * its riders come home, as any.
+ * The new game with a team away on a hard mission (BASE_DESIGN 6, 11: view=base&preset=trip&trip=<region>:<progress>[:fail][:auto]):
+ * the region's hard mission (its packs of little enemies between its challenges, its boss at the road's end), the best two pairs of the seven with
+ * their auto riders and its road (tripdemo.ts demoTrip: the missions' own rider pick, forecast and road, missions.ts),
+ * the team away as a sent team is once it has left the Aerie (missions.ts awayNow: its dragons off the map, its
+ * riders away) and put `progress` of its walk along the road (missions.ts placeAlong: every stop before that point
+ * cleared -- or, with `:fail`, the last of them waited out, so the road's end tells NOT THIS TIME -- and a stop at that
+ * very point met on the first step: `oldmine:0.9` is the Mole King's fight from its walk-in). From there it walks on a
+ * step a step: `at` (the frozen t=) steps in, it is that many steps further (a stop met on the way holds it). The
+ * world's own trip (sim.missions.trip): it lands, and its riders come home, as any.
  */
 export function tripStart(param: TripParam | string | null | undefined, at = 0): StartSpec {
   const p = typeof param === 'string' || param == null ? parseTripParam(param) ?? TRIP_DEFAULT : param;
   return { ...newGame(), after: (sim) => {
-    const trip = demoTrip(sim, p.region, 'hard', !p.fail, p.weak);
-    const L = trip.mission.days * sim.dayLen;
-    awayNow(sim, trip, sim.clock + at - Math.round(p.progress * L));
+    const trip = demoTrip(sim, p.region, 'hard');
+    trip.auto = p.auto;
+    awayNow(sim, trip, sim.clock - Math.round(p.progress * trip.travel) - at);
+    placeAlong(sim, trip, p.progress, p.fail);
   } };
 }
 
@@ -140,6 +145,12 @@ export function sendLostNest(sim: CareSim, opts: { awaySteps?: number } = {}): v
   const t = send(sim, m.id, pairs, opts);
   if (typeof t === 'string') throw new Error(`muster: ${t}`);
 }
+
+/**
+ * The `bout` preset's two (BASE_DESIGN 10): EMBER, the player's, at LV 3 (fire: strong on spike), and BRAMBLE, its sparring
+ * partner, at LV 2 -- each at the start of its level (training.ts xpFor).
+ */
+export const BOUT_PAIR: readonly { name: string; level: number }[] = Object.freeze([{ name: 'EMBER', level: 3 }, { name: 'BRAMBLE', level: 2 }]);
 
 /** The presets by name (view=base&preset=<name>). */
 export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze({
@@ -191,6 +202,11 @@ export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze(
    * somewhere new (travel.ts redirectable), and walks out to the garden.
    */
   retire: () => ({ ...newGame(), dragons: START_DRAGONS.map((p): DragonPlace => ({ ...p, stage: 'elder', days: RETIRE_AT })) }),
+  /**
+   * The new game with every region explored (BASE_DESIGN 5.1: the whole map out from under the cloud) and the day's board
+   * rolled again over all six -- THE LOST NEST first, as on any day 1.
+   */
+  explored: () => ({ ...newGame(), after: (sim) => { sim.missions.explored = REGIONS.map((r) => r.id); rollBoard(sim, sim.missions.day); } }),
   /** A team away (tripStart): half way along the Old Mine Road, here; the view passes its own `trip=` and frozen t. */
   trip: () => tripStart(TRIP_DEFAULT),
   /**
@@ -198,6 +214,13 @@ export const PRESETS: Readonly<Record<string, () => StartSpec>> = Object.freeze(
    * and the Aerie, their riders fetch their saddles from the Tack Room and climb the left tower to the deck beside them.
    */
   muster: () => ({ ...newGame(), after: (sim) => sendLostNest(sim) }),
+  /**
+   * A bout in the Arena from the first frame (BASE_DESIGN 10: arena.ts boutNow): BOUT_PAIR -- EMBER (LV 3), the player's,
+   * in the west corner, BRAMBLE (LV 2) in the east -- facing each other on the east roof, the first pick a second in
+   * (view=base&preset=bout&panel=bout&t=90: the move menu).
+   */
+  bout: () => ({ ...newGame(), dragons: START_DRAGONS.map((p): DragonPlace => { const b = BOUT_PAIR.find((q) => q.name === p.name); return b ? { ...p, xp: xpFor(b.level) } : p; }),
+    after: (sim) => { const [a, b] = BOUT_PAIR.map((q) => sim.dragons.find((d) => d.name === q.name)!); boutNow(sim, a.id, b.id); } }),
 });
 
 /** A preset's start by name; no name, or one no preset has, is the new game. */

@@ -14,7 +14,10 @@
 // after the keepers in every step) is the retired elders' home: its residents keep a nap, sit and stroll rhythm, and
 // need only food and love, slowly -- a keeper comes out to them (BASE_DESIGN 3, The Garden). Missions (missions.ts, last in every step:
 // BASE_DESIGN 5) take a team of dragons and their riders off the Aerie for days: while away they are nobody's to care for
-// (their needs wait), and two keepers always stay home to run the barn.
+// (their needs wait), and two keepers always stay home to run the barn. The Arena (arena.ts, after the missions in every
+// step: BASE_DESIGN 10) holds a training bout: two dragons ride up to the roof's east deck and spar, turn by turn, and
+// both come home with XP (a dragon's `xp`: its level, training.ts); while its bout is on a fighter asks for nothing and
+// its needs wait.
 import { makeRng } from '../lib/engine/rng.ts';
 import { NEEDS, QUEUE, OWN_NEED, GARDEN_NEEDS, drainRate, gardenDrain, hasNeed, moodOf, tierOf, fullNeeds } from './needs.ts';
 import type { NeedKind, Needs } from './needs.ts';
@@ -23,11 +26,14 @@ import type { Room, RoomPlace, RoomKind, Structure, Leg, Spot, Slot, Nets } from
 import { NEED_ROOM, LEAD_PX, WAIT_MAX, KEEPER_HALF, LIVELY, stepTravel, arrived, remainingCost, ridesLeft, retarget, raiseCall, bayShut, inBay } from './travel.ts';
 import { stepLife } from './life.ts';
 import { stepGarden, standAtResident } from './garden.ts';
-import { newMissions, firstBoard, stepMissions, checkMissions, upgradeMissions, upgradeTrip, TRIP_PHASES } from './missions.ts';
+import { newMissions, firstBoard, stepMissions, checkMissions, TRIP_PHASES } from './missions.ts';
 import type { MissionsState } from './missions.ts';
+import { newArena, stepArena, checkArena } from './arena.ts';
+import type { ArenaState } from './arena.ts';
+import type { SkillKind } from './training.ts';
 import { mix32, TAG } from './rand.ts';
 import type { DragonPlace, KeeperPlace } from './start.ts';
-import { SAVE_VERSION, MIGRATES_FROM, SaveVersionError, worldKey } from './save.ts';
+import { SAVE_VERSION, SaveVersionError, worldKey } from './save.ts';
 import type { SaveV } from './save.ts';
 import { DRAGON_ELEMENTS } from '../art/dragon/palettes.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
@@ -79,11 +85,20 @@ export interface SimOptions {
  * garden, or a retiree arrived at its plot there, a resident now (garden.ts); an egg fell due with the barn full (life.ts
  * BARN_CAP: it waits in its nest); the player's commands (control.ts): a team sent on a mission from the Map Room's
  * table (`reason` null) or refused (missions.ts canSend's reason), and a keeper the player asked for who could not be
- * taken (on a mission's trip).
+ * taken (on a mission's trip); a bout begun in the Arena (`reason` null) or refused (arena.ts canSpar's reason); and a
+ * bout decided (its two dragons, the winner's id or null for a draw, the XP each got), a dragon up a level, and a skill
+ * learned (arena.ts decide: training.ts; a stop on the road brings XP too: encounter.ts). On the road (BASE_DESIGN 11):
+ * the team reaches a stop (`meet`: its index, its name, whether it is a fight with the big baddie) and a stop is
+ * resolved (`stopEnd`: cleared or waited out, and the XP each pair's dragon got).
  */
 export type SimEvent = { kind: 'grow'; dragon: number; stage: Stage } | { kind: 'hatch'; dragon: number; egg: number }
   | { kind: 'retire'; dragon: number } | { kind: 'garden'; dragon: number; plot: number } | { kind: 'full'; egg: number }
-  | { kind: 'send'; mission: number; reason: string | null } | { kind: 'refused'; keeper: number; reason: string };
+  | { kind: 'send'; mission: number; reason: string | null } | { kind: 'refused'; keeper: number; reason: string }
+  | { kind: 'bout'; dragons: readonly [number, number]; reason: string | null }
+  | { kind: 'boutEnd'; dragons: readonly [number, number]; winner: number | null; xp: readonly [number, number] }
+  | { kind: 'level'; dragon: number; level: number } | { kind: 'learn'; dragon: number; skill: SkillKind }
+  | { kind: 'meet'; stop: number; name: string; fight: boolean }
+  | { kind: 'stopEnd'; stop: number; name: string; cleared: boolean; fight: boolean; xp: number };
 
 /**
  * An egg in the Hatchery (BASE_DESIGN 7): its id, its element, the seed its baby will have (a stateless draw from the world's
@@ -106,11 +121,11 @@ export type DragonMove = 'still' | 'walk' | 'turn' | 'call' | 'board' | 'ride' |
 /**
  * Why a dragon is on the move: to a slot in its need's room; out of a slot another dragon needed; a baby due to grow
  * up, to a module slot its next stage fits (life.ts: it grows once it is settled there) -- or a dragon back from a
- * mission, to the nearest free slot of its size (missions.ts); an elder retired, to its plot in the garden
- * (garden.ts); or with a mission's team (missions.ts): up to the Aerie and off over the sky bridge, and back onto the
- * deck when it lands.
+ * mission or a bout, to the nearest free slot of its size (missions.ts, arena.ts); an elder retired, to its plot in the
+ * garden (garden.ts); with a mission's team (missions.ts): up to the Aerie and off over the sky bridge, and back onto
+ * the deck when it lands; or in a bout (arena.ts): up to its corner of the Arena, and there until the bout is decided.
  */
-export type DragonGoal = 'need' | 'evict' | 'settle' | 'retire' | 'muster';
+export type DragonGoal = 'need' | 'evict' | 'settle' | 'retire' | 'muster' | 'bout';
 /** Where a dragon lives: the barn, (retired) the garden, or away on a mission (off the map: not drawn, its needs waiting). */
 export type Place = 'barn' | 'garden' | 'away';
 /** What a garden resident is doing (garden.ts): napping, sitting, strolling to a resting place, or waiting for its keeper. */
@@ -168,6 +183,8 @@ export interface Dragon {
   place: Place;
   home: number | null;
   garden: GardenState | null;
+  /** The XP its bouts in the Arena have brought it, in all (BASE_DESIGN 10): its level, and the skills it knows (training.ts levelOf, skillsOf). */
+  xp: number;
 }
 
 /**
@@ -333,6 +350,8 @@ export class CareSim {
   commands: Command[] = [];
   /** The Map Room's board, the map, the coin and the trip out (missions.ts; rolled for the start's day at construction). */
   missions: MissionsState = newMissions();
+  /** The Arena: the bout on, if any, and the bouts begun in all (arena.ts). */
+  arena: ArenaState = newArena();
 
   constructor(rooms: readonly RoomPlace[], dragons: readonly DragonPlace[], keepers: readonly KeeperPlace[], opts: SimOptions = {}) {
     this.seed = opts.seed ?? 1;
@@ -372,7 +391,7 @@ export class CareSim {
       this.dragons.push({ id: this.nextDragonId++, name: p.name, element: p.element, stage: p.stage, seed: p.seed, slot, goal: null, goalJob: null,
         f: slot.f, x: slot.x, facing: slot.facing, legs: [], move: 'still', gaitT: 0, gaitS: 1, walkSeq: 0, turn: -1, waited: 0,
         needs, mood: moodOf(p.element, needs), act: null, asleep: 0, stageSince: this.clock0 - Math.round((p.days ?? 0) * this.dayLen), hold: 0,
-        place: 'barn', home: null, garden: null });
+        place: 'barn', home: null, garden: null, xp: p.xp ?? 0 });
     }
     keepers.forEach((p, id) => {
       const station = roomOf(p.station, p.name, p.n);
@@ -412,17 +431,13 @@ export class CareSim {
 
   /**
    * A world from its save (save.ts serialize), exactly as it was: the rooms placed again, then every dragon, job and
-   * keeper rebuilt and their references relinked by id. A save of another version throws SaveVersionError, but for
-   * one of the version before (save.ts MIGRATES_FROM), whose missions are brought up to this one's as it loads. The life
+   * keeper rebuilt and their references relinked by id. A save of another version throws SaveVersionError. The life
    * state is checked here (the eggs, each dragon's stage start and hold), and a save whose life state this build can't
    * run throws too: an egg lies unseen and unstepped for days before it hatches or is drawn (off the start's camera), so
    * the view's trial step and draw at load (base.ts load) would never meet a bad one, and the page would freeze days on.
    */
   static fromSave(s: SaveV): CareSim {
-    if (!s || typeof s !== 'object' || (s.v !== SAVE_VERSION && s.v !== MIGRATES_FROM)) throw new SaveVersionError(s && typeof s === 'object' ? s.v : s);
-    // (a save of the version before, brought up to this one: its missions get their roads' fights, missions.ts
-    // upgradeMissions, and its trip out its road again once its dragons are here, upgradeTrip)
-    const old = s.v === MIGRATES_FROM;
+    if (!s || typeof s !== 'object' || s.v !== SAVE_VERSION) throw new SaveVersionError(s && typeof s === 'object' ? s.v : s);
     const sim = new CareSim(s.rooms, [], [], { seed: s.seed, dayLen: s.dayLen, clock0: s.clock0 });
     sim.tick = s.tick; sim.nextDragonId = s.nextDragonId; sim.nextJob = s.nextJob; sim.nextEggId = s.nextEggId;
     const whole = (v: unknown, min = -Infinity): v is number => Number.isInteger(v) && (v as number) >= min;
@@ -453,9 +468,13 @@ export class CareSim {
     const homes = new Set<number>();
     // (the missions: a board, a map and a trip this build can run -- missions.ts checkMissions; a dragon away on one
     // holds no slot, no plot, no rhythm, and is its team's)
-    const ms = checkMissions(old ? upgradeMissions(s.missions) : s.missions, s.dragons, s.keepers);
+    const ms = checkMissions(s.missions, s.dragons, s.keepers);
+    // (the Arena: a bout this build can run -- arena.ts checkArena; a dragon in a bout is one of its two fighters, in the barn)
+    const ar = checkArena(s.arena, s.dragons);
     for (const d of s.dragons) {
       if (!whole(d.stageSince) || !whole(d.hold, 0)) throw new Error(`save: ${d.name}'s stage began at ${d.stageSince}, its hold ${d.hold}`);
+      if (!whole(d.xp, 0)) throw new Error(`save: ${d.name}'s XP is ${JSON.stringify(d.xp)}`);
+      if (d.goal === 'bout' && (d.place !== 'barn' || d.home != null || !ar.bout?.fighters.some((f) => f.dragon === d.id))) throw new Error(`save: ${d.name} is in a bout there isn't`);
       // (its walk's speed: 1, or the lively step's -- travel.ts pace; the view plays the walk at it)
       if (d.gaitS !== 1 && d.gaitS !== LIVELY) throw new Error(`save: ${d.name} walks at ${d.gaitS}, not 1 or ${LIVELY}`);
       const out = d.place === 'garden' || d.goal === 'retire', g = d.garden, team = !!ms.trip?.pairs.some((p) => p.dragon === d.id);
@@ -484,7 +503,7 @@ export class CareSim {
     Object.assign(sim.stats, s.stats, { used: { ...s.stats.used }, usedRoom: [...ur], doneBy: { ...s.stats.doneBy } });
     sim.lift = { ...s.lift, calls: s.lift.calls.map((c) => ({ ...c })) };
     sim.missions = ms;
-    if (old) upgradeTrip(sim);
+    sim.arena = ar;
     return sim;
   }
 
@@ -513,7 +532,8 @@ export class CareSim {
    * dragons choose where to go, walk and turn, and the lift runs (travel.ts); then free keepers take jobs, and every
    * keeper steps; then the garden (garden.ts): a retiree at its plot settles in, and the residents keep their rhythm
    * (a job opened this step has one waiting for its keeper from the next); then the missions (missions.ts): the dawn's
-   * board, and the trip out -- its muster, departure, days away and landing -- and the riders resting after one.
+   * board, and the trip out -- its muster, departure, days away and landing -- and the riders resting after one; then
+   * the Arena (arena.ts): the bout on -- its muster, its turns, its end and the walk home.
    */
   step(): void {
     this.events = [];
@@ -523,9 +543,11 @@ export class CareSim {
     for (const d of this.dragons) {
       // (a dragon away on a mission is nobody's to care for: its needs wait until it lands -- missions.ts)
       if (d.place === 'away') continue;
-      // (a garden resident, or an elder on its way there, drains only food and love, slowly: needs.ts gardenDrain)
+      // (a garden resident, or an elder on its way there, drains only food and love, slowly: needs.ts gardenDrain; and a
+      // dragon's needs wait while its bout is on, as a team's do away -- though a job or a nap under way when it began
+      // runs on to its end, and the bout waits for it: arena.ts)
       const out = d.place === 'garden' || d.goal === 'retire';
-      for (const k of NEEDS) if (hasNeed(d.element, k)) d.needs[k] = clamp01(d.needs[k] - (out ? gardenDrain(d.element, k) : drainRate(d.element, d.stage, k)));
+      if (d.goal !== 'bout') for (const k of NEEDS) if (hasNeed(d.element, k)) d.needs[k] = clamp01(d.needs[k] - (out ? gardenDrain(d.element, k) : drainRate(d.element, d.stage, k)));
       const a = d.act;
       if (a) {
         a.t++;
@@ -540,8 +562,8 @@ export class CareSim {
     for (const d of this.dragons) for (const k of NEEDS) {
       if (!hasNeed(d.element, k) || d.needs[k] >= QUEUE || (d.act && d.act.need === k)) continue;
       // (an elder on its way to the garden asks for nothing until it is there; a resident, only for food and love; a
-      // dragon with a mission's team, for nothing until it is back in the barn: missions.ts)
-      if (d.goal === 'retire' || d.goal === 'muster' || d.place === 'away' || (d.place === 'garden' && !GARDEN_NEEDS.includes(k))) continue;
+      // dragon with a mission's team, for nothing until it is back in the barn: missions.ts; nor one in a bout: arena.ts)
+      if (d.goal === 'retire' || d.goal === 'muster' || d.goal === 'bout' || d.place === 'away' || (d.place === 'garden' && !GARDEN_NEEDS.includes(k))) continue;
       if (this.jobs.some((j) => j.dragon === d && j.need === k)) continue;
       this.jobs.push({ id: this.nextJob++, dragon: d, need: k, opened: this.tick, keeper: null, rushed: false });
       this.stats.opened++;
@@ -552,6 +574,7 @@ export class CareSim {
     for (const k of this.keepers) this.stepKeeper(k);
     stepGarden(this);
     stepMissions(this);
+    stepArena(this);
   }
 
   /**

@@ -1,14 +1,13 @@
 // The fights' marks (docs/BASE_DESIGN.md 6; ART_BIBLE 5.10): what flies and what lands when the team fights a pack
 // of little enemies or a boss -- each element's breath bolt (a dragon's breath, thrown), the enemies' missiles (a clod,
 // a pebble, a thorn burr, a zap, a snowball, an ember: one per region, a boss's big), the spark where a hit lands, the
-// puff of smoke a beaten foe goes up in, the stars round a knocked-down boss's head, a "WEAK SPOT!" pop, and the boss's
-// health bar. All in the house style: small sprites in the icons.ts format (every pixel ringed in #1a1018 ink), flat
-// fills, no alpha, no mark under 2 px; each a pure function of its age or the scene's step, so a frozen frame is the
-// same every time. Nothing here is a wound: a hit is a spark, a beaten foe a puff of smoke (BASE_DESIGN B8).
+// puff of smoke a worn-out foe goes up in, and the stars round a sat-down boss's head. All in the house style: small
+// sprites in the icons.ts format (every pixel ringed in #1a1018 ink), flat fills, no alpha, no mark under 2 px; each a
+// pure function of its age or the scene's step, so a frozen frame is the same every time. Nothing here is a wound: a
+// hit is a spark, a worn-out foe a puff of smoke (BASE_DESIGN B8).
 import { drawSprite } from './icons.ts';
 import type { Sprite } from './icons.ts';
 import { INK } from './surfaces.ts';
-import { drawTextOutlined, measureText } from '../lib/engine/text.ts';
 import type { DragonElement } from '../art/dragon/palettes.ts';
 import type { RegionId } from './missiondata.ts';
 
@@ -85,8 +84,8 @@ export function drawMissile(ctx: CanvasRenderingContext2D, kind: MissileKind, bi
   drawSprite(ctx, s, x, y);
 }
 
-/** Steps a hit's spark shows, a beaten foe's puff of smoke, and a "WEAK SPOT!" pop. */
-export const SPARK_LEN = 12, POOF_LEN = 30, POP_LEN = 48;
+/** Steps a hit's spark shows, and a worn-out foe's puff of smoke. */
+export const SPARK_LEN = 12, POOF_LEN = 30;
 
 const SPARK_S = sp(['..w..', '.wyw.', 'wyyyw', '.wyw.', '..w..'], { w: '#fffbe8', y: '#ffe45a' });
 const SPARK_L = sp(['....w....', '....w....', '..w.y.w..', '...yyy...', 'wwyyWyyww', '...yyy...', '..w.y.w..', '....w....', '....w....'], { w: '#fffbe8', y: '#ffe45a', W: '#ffffff' });
@@ -104,7 +103,7 @@ export function drawSpark(ctx: CanvasRenderingContext2D, x: number, y: number, a
 }
 
 const STAR = sp(['..y..', '..y..', 'yyWyy', '.yyy.', '.y.y.'], { y: '#ffd24a', W: '#fff2a8' });
-/** A beaten foe going up in smoke at (x, y) (its body's middle), `age` steps ago (0..POOF_LEN): three puffs swelling and thinning away, two stars popping up. */
+/** A worn-out foe going up in smoke at (x, y) (its body's middle), `age` steps ago (0..POOF_LEN): three puffs swelling and thinning away, two stars popping up. */
 export function drawPoof(ctx: CanvasRenderingContext2D, x: number, y: number, age: number): void {
   if (age < 0 || age >= POOF_LEN) return;
   const u = age / POOF_LEN, grow = Math.round(2 + Math.min(1, u * 2.5) * 5), shrink = u > 0.6 ? Math.round((u - 0.6) * 12) : 0, r = Math.max(2, grow - shrink);
@@ -127,24 +126,5 @@ export function drawStars(ctx: CanvasRenderingContext2D, x: number, y: number, t
   for (let i = 0; i < 3; i++) {
     const a = ((k % 12) / 12 + i / 3) * Math.PI * 2;
     drawSprite(ctx, STAR, Math.round(x + Math.cos(a) * 16), Math.round(y + Math.sin(a) * 5));
-  }
-}
-
-/** A word popping up over a hit (a dragon's breath on the boss's weak spot: "WEAK SPOT!"), `age` steps ago (0..POP_LEN), rising 10 px. */
-export function drawPop(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, age: number): void {
-  if (age < 0 || age >= POP_LEN) return;
-  const w = measureText(text);
-  drawTextOutlined(ctx, text, Math.round(x - w / 2), Math.round(y - Math.min(10, age / 2)), { size: 1, color: '#ffe45a', outline: INK, thickness: 1, shadow: false });
-}
-
-/** The boss's health bar: 20 segments, 162 x 9 with its ink, centred on cx at y; `hp` 0..1 (the segments left, rounded up so a scratch still shows). */
-export const BOSS_BAR = Object.freeze({ w: 162, h: 9, segs: 20 });
-export function drawBossBar(ctx: CanvasRenderingContext2D, cx: number, y: number, hp: number): void {
-  const { w, h, segs } = BOSS_BAR, x = Math.round(cx - w / 2), on = Math.max(0, Math.min(segs, Math.ceil(hp * segs - 1e-9)));
-  ctx.fillStyle = INK; ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = '#3a2e34'; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
-  for (let i = 0; i < segs; i++) {
-    ctx.fillStyle = i < on ? (i < segs * 0.25 ? '#e8a030' : '#d8402e') : '#5a5054';
-    ctx.fillRect(x + 2 + i * 8, y + 2, 7, h - 4);
   }
 }

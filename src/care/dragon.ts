@@ -306,7 +306,7 @@ export function snoutTip(d: DragonAgent, out: { x: number; y: number }): { x: nu
  * screen pixel, device-aligned whatever the head's pitch, mirrored with the sprite and a head that looks back). The
  * rig clips its own head features off this box grown 1 px (bible 1.4 step 12.6); a keeper keeps off it (K7).
  */
-export function eyeBox(d: DragonAgent): { x0: number; y0: number; x1: number; y1: number } {
+export function eyeBox(d: Pick<DragonAgent, 'rig' | 'scale'>): { x0: number; y0: number; x1: number; y1: number } {
   const J = d.rig.j, b = d.rig.info.eye, sc = d.scale * d.rig.scale, t = d.rig.tf;
   rootToScreen(d.rig, J.eye.x, J.eye.y, PT);
   const ex = Math.round(PT.x), ey = Math.round(PT.y), hx = Math.floor(b.w / 2), hy = Math.floor(b.h / 2);

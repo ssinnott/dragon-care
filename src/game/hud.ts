@@ -1,9 +1,9 @@
 // The base's screen furniture (docs/BASE_DESIGN.md 4.8, 7): the top bar -- the time of day (a sun or a moon and
 // `DAY 3 14:00`), the open jobs, a badge per keeper (busy, held by hand -- a tap takes them: 4.10 -- away on a mission,
 // resting after one), the coin the missions have brought home, the barn's dragons against its cap (`BARN 9/12`), and
-// the buttons (NEW, pause, speed, MAP: the Map Room's table) with their hit rects -- the
-// toasts over the barn, the hint at the bottom right, and a dragon's card (its name, element, stage, its day of the
-// stage's 30 and its needs: a tap on a dragon with nothing waiting opens it). House style: every box a 1 px #1a1018 outline, flat fills,
+// the buttons (ARENA: the Arena's chooser or its bout, NEW, pause, speed, MAP: the Map Room's table) with their hit
+// rects -- the toasts over the barn, the hint at the bottom right, and a dragon's card (its name, element, level, stage,
+// its day of the stage's 30 and its needs: a tap on a dragon with nothing waiting opens it). House style: every box a 1 px #1a1018 outline, flat fills,
 // the engine's 5 x 7 font (it has no dot or arrow glyphs, so those are little inked sprites: icons.ts drawSprite).
 // Drawing only: base.ts owns what the buttons do.
 import { drawText, drawTextOutlined, measureText } from '../lib/engine/text.ts';
@@ -22,9 +22,13 @@ import type { KeeperId } from '../art/keeper/cast.ts';
 export const BAR_H = 15;
 const TEXT = '#f3e6c8', FACE = '#3a2e34', ACTIVE = '#6b4a34', HINT = '#b8ac8e';
 
-/** The top bar's buttons (screen px, 640 x 360): NEW (tap twice), pause, the speed that cycles 1x, 2x, 4x, 8x, and MAP (the Map Room's table: BASE_DESIGN 5). */
-export type ButtonName = 'new' | 'pause' | 'speed' | 'map';
+/**
+ * The top bar's buttons (screen px, 640 x 360): ARENA (the Arena's chooser, or its bout: BASE_DESIGN 10), NEW (tap
+ * twice), pause, the speed that cycles 1x, 2x, 4x, 8x, and MAP (the Map Room's table: BASE_DESIGN 5).
+ */
+export type ButtonName = 'arena' | 'new' | 'pause' | 'speed' | 'map';
 export const BUTTONS: Readonly<Record<ButtonName, Rect>> = Object.freeze({
+  arena: { x: 486, y: 1, w: 38, h: 13 },
   new: { x: 528, y: 1, w: 26, h: 13 },
   pause: { x: 558, y: 1, w: 16, h: 13 },
   speed: { x: 578, y: 1, w: 28, h: 13 },
@@ -37,7 +41,7 @@ export const BADGE_X0 = 138, BADGE_DX = 48, BADGE_W = 46, BADGE_Y = 1, BADGE_H =
 /**
  * `BARN n/12`, the barn's dragons against its cap (life.ts BARN_CAP; BASE_DESIGN 4.7), at x 392 -- or a space after a
  * longer `COIN n` (barnAt: from 1 000 coin), never over it. Up to `COIN 9999999` and `BARN 99/12` it ends by x 472,
- * clear of NEW (x 528); the TEAM OUT chip (maptable.ts CHIP, x 394, y 19) is under the bar. Full, it turns amber.
+ * clear of ARENA (x 486); the TEAM OUT chip (maptable.ts CHIP, x 394, y 19) is under the bar. Full, it turns amber.
  */
 export const BARN_COUNT_X = 392;
 const BARN_FULL_TEXT = '#f2c14e';
@@ -85,6 +89,8 @@ export interface TopBar {
   coin?: number;
   /** The Map Room's overlay is open (the MAP button shows it). */
   map?: boolean;
+  /** The Arena's overlay is open (the ARENA button shows it: BASE_DESIGN 10). */
+  arena?: boolean;
   /** World steps a frame: 0 paused, else the rate. */
   speed: Speed;
   /** The rate the speed button shows (and play resumes at). */
@@ -129,6 +135,7 @@ export function drawTopBar(ctx: CanvasRenderingContext2D, s: TopBar): void {
   const coin = s.coin != null ? `COIN ${s.coin}` : null;
   if (coin != null) text(ctx, coin, COIN_X, 4, '#f2d36a');
   text(ctx, `BARN ${s.barn.count}/${s.barn.cap}`, barnAt(coin), 4, s.barn.full ? BARN_FULL_TEXT : TEXT);
+  button(ctx, BUTTONS.arena, 'ARENA', !!s.arena);
   button(ctx, BUTTONS.new, 'NEW', s.armed);
   button(ctx, BUTTONS.pause, 'II', s.speed === 0);
   button(ctx, BUTTONS.speed, `>${s.rate}X`, s.speed > 1);
@@ -191,10 +198,11 @@ export function cardAt(sx: number, heads: Iterable<{ x: number; y: number }> = [
 }
 /**
  * What a dragon's card shows: its name, element and stage, its day of the stage (1..STAGE_DAYS), each need (null: one
- * it hasn't got, or a garden resident's held full), whether it lives in the garden, and whether it is an elder staying
- * on in the barn as its last flier (life.ts staysOn) -- its stage line says so.
+ * it hasn't got, or a garden resident's held full), whether it lives in the garden, whether it is an elder staying
+ * on in the barn as its last flier (life.ts staysOn) -- its stage line says so -- and its level (the Arena's bouts:
+ * BASE_DESIGN 10; shown beside its element).
  */
-export interface CardInfo { name: string; element: string; stage: string; day: number; needs: Readonly<Record<NeedKind, number | null>>; garden?: boolean; stays?: boolean }
+export interface CardInfo { name: string; element: string; stage: string; day: number; needs: Readonly<Record<NeedKind, number | null>>; garden?: boolean; stays?: boolean; level?: number }
 /** A day of the stage's bar: a filled day, a day to come. A need's bar: full enough (over QUEUE), then by its tier (soon, now). */
 const DAY_ON = '#e3b23e', DAY_OFF = '#2e2428', NEED_OK = '#7bbf6a', NEED_TIER = ['#f2d36a', '#e3b23e', '#d8402e'];
 
@@ -209,7 +217,8 @@ export function drawCard(ctx: CanvasRenderingContext2D, c: CardInfo, at: Readonl
   ctx.fillStyle = INK; ctx.fillRect(x, y, w, h);
   ctx.fillStyle = FACE; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
   drawTextOutlined(ctx, c.name, x + 6, y + 5, { size: 1, color: TEXT, outline: INK, thickness: 1, shadow: false });
-  text(ctx, c.element.toUpperCase(), x + w - 6, y + 5, HINT, 'right');
+  text(ctx, c.element.toUpperCase(), x + w - 6 - (c.level != null ? measureText(` LV ${c.level}`) : 0), y + 5, HINT, 'right');
+  if (c.level != null) text(ctx, ` LV ${c.level}`, x + w - 6, y + 5, '#f2d36a', 'right');
   // (a garden resident's month is done, and a last flier's: its bar full, its stage line where it lives, or why it stays)
   const day = c.garden || c.stays ? STAGE_DAYS : Math.max(1, Math.min(STAGE_DAYS, c.day));
   text(ctx, `${c.stage.toUpperCase()} - ${c.garden ? 'IN THE GARDEN' : c.stays ? 'THE LAST FLIER' : `DAY ${day} OF ${STAGE_DAYS}`}`, x + 6, y + 18);

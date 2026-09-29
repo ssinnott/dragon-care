@@ -9,7 +9,9 @@
 // The simulation takes the player's input as commands (CareSim.command), applied in the order they came at the start
 // of the next step (applyCommands) and then cleared, so the same commands at the same steps always make the same world
 // (BASE_DESIGN 7, Seeded). The Map Room's SEND is one of them too (BASE_DESIGN 5: `send`, a team on a board mission -- missions.ts send, which
-// sends it or refuses it with canSend's reason; either way a `send` event says so, for the chooser's toast). The taken keeper is `manual`: auto-assignment skips them, Rush never picks them or takes them off a job, and
+// sends it or refuses it with canSend's reason; either way a `send` event says so, for the chooser's toast), and so
+// are the Arena's (BASE_DESIGN 10: `bout`, two dragons to spar -- arena.ts startBout, begun or refused with canSpar's
+// reason, a `bout` event either way; `skill`, the player's pick for its dragon's next move; `coach`, AUTO on or off). The taken keeper is `manual`: auto-assignment skips them, Rush never picks them or takes them off a job, and
 // their `phase` is 'manual' (free under the player's hand), 'pickup' (taking a supply) or 'work' (meeting a need).
 // DOM-free and deterministic like the rest of the simulation.
 //
@@ -43,13 +45,22 @@ import { NEED_ROOM, KEEPER_HALF, arrived, bayShut, inBay } from './travel.ts';
 import type { NeedKind } from './needs.ts';
 import { send, onTrip } from './missions.ts';
 import type { Pair } from './trip.ts';
+import { startBout, pickSkill, setCoach } from './arena.ts';
+import { pickAbility } from './encounter.ts';
+import type { Ability } from './encounter.ts';
+import type { SkillKind } from './training.ts';
 
 /**
  * The player's input to the simulation, applied at the start of the next step: take a keeper (by id), let go, steer,
- * act; and send a team (its pairs) on a board mission (by id) from the Map Room's table (BASE_DESIGN 5).
+ * act; send a team (its pairs) on a board mission (by id) from the Map Room's table (BASE_DESIGN 5); in the Arena
+ * (BASE_DESIGN 10), begin a bout (the player's dragon, then its sparring partner, by id), pick the player's dragon's next
+ * move, and turn AUTO on or off; and on the road (BASE_DESIGN 11), a pair's pick at the stop the team stands at (the
+ * pair's index and its ability: encounter.ts) and the trail coach, AUTO for the whole trip.
  */
 export type Command = { kind: 'take'; keeper: number } | { kind: 'release' } | { kind: 'steer'; dx: -1 | 0 | 1; dy: -1 | 0 | 1 } | { kind: 'act' }
-  | { kind: 'send'; mission: number; pairs: readonly Pair[] };
+  | { kind: 'send'; mission: number; pairs: readonly Pair[] }
+  | { kind: 'bout'; dragons: readonly [number, number] } | { kind: 'skill'; skill: SkillKind } | { kind: 'coach'; on: boolean }
+  | { kind: 'ability'; pair: number; ability: Ability } | { kind: 'trail'; on: boolean };
 
 /**
  * What E would do now (the view's label; act() does the same): pick up a supply, serve a job (its id), put a supply
@@ -91,6 +102,18 @@ export function applyCommands(sim: CareSim): void {
         sim.events.push({ kind: 'send', mission: c.mission, reason: typeof r === 'string' ? r : null });
         break;
       }
+      case 'bout': {
+        // (the Arena's START: arena.ts begins the bout -- its muster starts this step -- or says why not)
+        const r = startBout(sim, c.dragons[0], c.dragons[1]);
+        sim.events.push({ kind: 'bout', dragons: [c.dragons[0], c.dragons[1]], reason: typeof r === 'string' ? r : null });
+        break;
+      }
+      case 'skill': pickSkill(sim, c.skill); break;
+      case 'coach': setCoach(sim, c.on); break;
+      // (the road's encounters, BASE_DESIGN 11: a pair's pick at the stop the team stands at -- taken only while the picks
+      // wait, for a pair still to pick, an ability it has here: encounter.ts pickAbility -- and the trail coach, AUTO)
+      case 'ability': { const t = sim.missions.trip; if (t) pickAbility(sim, t, c.pair, c.ability); break; }
+      case 'trail': { const t = sim.missions.trip; if (t) t.auto = c.on; break; }
     }
   }
 }

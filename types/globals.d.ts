@@ -32,6 +32,12 @@ interface Window {
     pour?: { id: string; frame: number; top: number; lip: number; column: boolean }[];
     /** view=neutral (src/gallery.ts): per look, the share of its pixels that are neutral (HSV S < 0.25); `over` > 40 % (3.1). */
     neutral?: { id: string; share: number; over: boolean }[];
+    /**
+     * view=arenaaudit (src/gallery.ts; docs/BASE_DESIGN.md 10): per look and sparring skill, the most pixels of it over
+     * the other fighter's eye box, and of the other over its own (never any), against which look and when, how far it
+     * reaches past the ring's middle, and the least gap between the two snouts as drawn.
+     */
+    arena?: { id: string; covered: number; against: string; frame: number; reach: number; own: number; gap: number }[];
     /** view=missionart (src/game/missionart.ts): the sheet shown and every item it drew (ART_BIBLE 5.10's mission art kit). */
     missionart?: { sheet: string; drawn: string[] };
     /**
@@ -70,35 +76,58 @@ interface Window {
      * null (null over an overlay too) and its ink strip (canvas px) or null, and the jobs done by hand so far,
      * by keeper name. The keeper held counts takes and releases still waiting for the next world step in the line and
      * the badges, but not in `controlled` (the simulation's).
-     * Missions (BASE_DESIGN 5): a dragon's place may be `away` (with a team out: not drawn); the coin the missions have brought
-     * home; the Map Room's board (each mission's id, region, title, difficulty, challenges, baddie or null, days and
-     * coin); the trip out, or null (its state -- muster, depart, away, return -- its mission's title and region, its
-     * outcome and egg (rolled when it was sent), its pairs by dragon and keeper id, the clocks it left and lands at, and
-     * how far along the road it is, 0..1).
+     * Missions (BASE_DESIGN 5, 11): a dragon's place may be `away` (with a team out: not drawn); the coin the missions have brought
+     * home; the Map Room's board (each mission's id, region, title, difficulty, challenges, its boss, its little enemies
+     * and how many packs of them (`fights`, `pack` in each), days and coin); the trip out, or null (its state -- muster, depart, away, return -- its mission's title and region, its
+     * outcome (null until the road's end: every stop cleared) and the egg it may bring, its pairs by dragon and keeper
+     * id, the clock it left, its walk -- `walked` of `travel` steps, and its share `progress`, 0..1 -- the trail coach's
+     * forecast and whether it picks (`auto`), each pair's dragon's puff and whole, the XP the road has brought each,
+     * each stop (its name, kind, how it went and its line) and the encounter at the stop the team stands at, or null
+     * (its stop, kind, state, steps and turn, the pair whose pick waits, this turn's picks, an obstacle's work left of
+     * its toughness, a fight's enemy -- a boss, or a pack and how many of it are standing -- and its puff, the outcome
+     * once resolved, the latest line, and the move playing).
      * The overlays (`ui`, BASE_DESIGN 5 and 6): the screen open -- `none` (the barn), `map` or `mission` (the Map Room table's
-     * world map or a mission's chooser: the world waits while one is open) or `watch` (the team out watched on its
+     * world map or a mission's chooser: the world waits while one is open) or `watch` (the team out followed on its
      * road, the world stepping on underneath) -- the mission chosen (id) and the team being put together, the map's
-     * pins (canvas px, board order) and the named buttons on screen (canvas px: `back`, `best`, `send`, and `chip`, the
+     * pins (canvas px, board order: each mission's plate), its places with no mission today (`places`, by name: each
+     * landmark's tap box) and its regions under cloud (`clouds`, by region id: each cloud's "?" -- a tap anywhere on
+     * the cloud says how it clears), and the named buttons on screen (canvas px: `back`, `best`, `send`, on the map
+     * `home` and each mission's landmark `mark0`-`mark2`, and `chip`, the
      * TEAM OUT chip while a team is out and the barn is on screen; over the watch overlay `log`, which opens the trip's
-     * log), and `chip` (the TEAM OUT chip's rect while it shows) and `back` (BACK TO BARN's while watching), and
-     * whether the trip's log is open over the watch overlay (`log`); and the chooser's line about the egg (`notice`:
-     * `HATCHERY FULL: NO EGG`, `BARN FULL: THE EGG WILL WAIT` at the barn's cap, or null -- null too on any other screen).
-     * The watchable scene (BASE_DESIGN 6): `scene`, while a trip is out (null
-     * otherwise): the last stop the team reached (`foes`, `baddie` or its challenge; null before the first), whether it
-     * was met, whether its beat is playing, the banner, the boss on the road (its id, face and pose; null when none is in
-     * view) and its health bar (0..1 while its fight is on, else null), how many foes are in view and how many bolts and
-     * missiles are in flight, how far along the trip is (0..1), and once its time is up, the result card's title (the
-     * trip's pass or fail: nothing before it tells which).
+     * log, and `result`, the result card once the road is walked whole -- tapped away, the barn again), and `chip` (the
+     * TEAM OUT chip's rect while it shows), and whether the trip's log is open over the watch overlay (`log`); and the
+     * chooser's line about the egg (`notice`: `HATCHERY FULL: NO EGG`, `BARN FULL: THE EGG WILL WAIT` at the barn's cap,
+     * or null -- null too on any other screen).
+     * Following the team (`ui.follow`, BASE_DESIGN 6): `gather` from a team's send until it has walked off the Aerie (the
+     * barn on screen, the camera held on the deck), `road` while it is away on its road and landed with its result card
+     * up (the watch overlay, with no way back to the barn but that card), or null (no team out, or its result card
+     * tapped away): while it is set, nobody is held by hand and the barn takes no tap.
+     * The watchable scene (BASE_DESIGN 6, 11): `scene`, while a trip is out (null
+     * otherwise): the last stop the team reached (`foes`, `baddie` or its challenge; null before the first), how it went
+     * (`result`: ahead while the team stands at it, then met or unmet), whether the team has its counter, the state of
+     * the encounter the team stands at (`at`: null while walking), the banner, the boss on the road (its id, face and
+     * pose, and whether a hit is flashing on it; null when none is in view), the pack's ones in view (`foes`), the bolts
+     * and missiles in flight (`shots`) and the puffs of smoke and sparks (`marks`), each rider's place by their dragon
+     * (`riders`: its px from the dragon's root; behind it, below 0, in a fight), which dragons a hit is flashing on, how
+     * far along the walk is (0..1), and once the road is walked whole, the result card's title (`result_card`: the
+     * trip's pass or fail).
      * Barn capacity (BASE_DESIGN 4.7): the barn's dragons against its cap (`count`: every dragon not living in the garden,
      * those away on a mission too -- life.ts barnCount -- and `cap`, life.ts BARN_CAP; a preset may hold more than the
      * cap). The toast showing, if any (`toast`, its text).
+     * The Arena (BASE_DESIGN 10): each dragon's `goal` (sim.ts DragonGoal: `bout` while its bout is on), `level` and
+     * `xp`; `arena` (the bouts begun, and the bout on or null: its state, turn, AUTO, the player's pick waiting, its
+     * fighters -- dragon id and name, corner, level, puff and whole, stages -- this turn's moves, the winner and the XP
+     * each got, its latest line); the overlays' `arena` (the chooser) and `bout` (the bout watched) screens, the
+     * chooser's corners being picked (`corners`, dragon ids or null), their named buttons among `buttons` (`start`,
+     * `swap`, `back`, `corner0`/`corner1`, `fighter<id>` for each dragon that may spar; over the bout `skill0`-`skill3`,
+     * `auto`, `boutBack`, `result`), and the bout's chip (`boutChip`: its rect while a bout is on and the barn is on screen).
      * Gone once the base is detached (the page left it).
      */
     base?: { tick: number; camX: number; camY: number; jobs: number; done: number; rushes: number; preempted: number;
       chips: { x: number; y: number; w: number; h: number; dragon: string; need: string; rushed: boolean }[];
       digest: string;
-      dragons: { id: number; name: string; element: string; stage: string; place: 'barn' | 'garden' | 'away'; f: number; x: number; move: string; room: string | null; slot: string | null;
-        waiting: boolean; head: { x: number; y: number } | null }[];
+      dragons: { id: number; name: string; element: string; stage: string; place: 'barn' | 'garden' | 'away'; f: number; x: number; move: string; goal: string | null; level: number; xp: number;
+        room: string | null; slot: string | null; waiting: boolean; head: { x: number; y: number } | null }[];
       lift: { y: number; rider: number | null };
       walked: number;
       barnDigest: string;
@@ -119,17 +148,29 @@ interface Window {
       line: { x: number; y: number; w: number; h: number } | null;
       doneBy: Record<string, number>;
       coin: number;
-      board: { id: number; region: string; title: string; difficulty: string; challenges: string[]; baddie: string | null; days: number; coin: number }[];
-      trip: { state: string; mission: string; region: string; success: boolean; egg: string | null; pairs: { dragon: number; keeper: number }[];
-        departAt: number | null; returnAt: number | null; progress: number } | null;
-      ui: { screen: 'none' | 'map' | 'mission' | 'watch'; mission: number | null; pairs: { dragon: number; keeper: number }[];
+      board: { id: number; region: string; title: string; difficulty: string; challenges: string[]; baddie: string; foe: string; fights: number; pack: number; days: number; coin: number }[];
+      trip: { state: string; mission: string; region: string; success: boolean | null; egg: string | null; pairs: { dragon: number; keeper: number }[];
+        departAt: number | null; travel: number; walked: number; progress: number; forecast: number; auto: boolean;
+        puff: { puff: number; max: number }[]; xp: number[];
+        stops: { name: string; kind: 'challenge' | 'foes' | 'baddie'; result: 'ahead' | 'met' | 'unmet'; log: string }[];
+        encounter: { stop: number; kind: 'obstacle' | 'fight'; state: 'meet' | 'pick' | 'play' | 'done'; t: number; turn: number; pending: number; picks: (string | null)[];
+          work: number; toughness: number; foe: { id: string; puff: number; max: number; pack: number; left: number } | null; outcome: 'cleared' | 'waited' | null; line: string | null;
+          move: { by: number; ability: string | null; foeMove: string | null; landed: boolean; hit: boolean; loss: number; work: number } | null } | null } | null;
+      arena: { bouts: number; bout: { id: number; state: 'muster' | 'face' | 'pick' | 'play' | 'over' | 'home'; t: number; turn: number; auto: boolean; pick: string | null;
+        fighters: { dragon: number; name: string; corner: 0 | 1 | null; level: number; puff: number; max: number; power: number; guard: number }[];
+        moves: { by: 0 | 1; skill: string; t: number; len: number; landed: boolean; hit: boolean; loss: number }[];
+        winner: 0 | 1 | null; xp: number[]; line: string | null } | null };
+      ui: { screen: 'none' | 'map' | 'mission' | 'watch' | 'arena' | 'bout'; mission: number | null; pairs: { dragon: number; keeper: number }[]; corners: (number | null)[];
+        boutChip: { x: number; y: number; w: number; h: number } | null;
         pins: { x: number; y: number; w: number; h: number }[]; buttons: Record<string, { x: number; y: number; w: number; h: number }>;
-        chip: { x: number; y: number; w: number; h: number } | null; back: { x: number; y: number; w: number; h: number } | null; log: boolean;
+        places: Record<string, { x: number; y: number; w: number; h: number }>; clouds: Record<string, { x: number; y: number; w: number; h: number }>;
+        chip: { x: number; y: number; w: number; h: number } | null; follow: 'gather' | 'road' | null; log: boolean;
         notice: 'HATCHERY FULL: NO EGG' | 'BARN FULL: THE EGG WILL WAIT' | null };
-      scene: { stop: string | null; covered: boolean | null; beat: boolean; banner: string | null;
+      scene: { stop: string | null; result: 'ahead' | 'met' | 'unmet' | null; covered: boolean | null; at: 'meet' | 'pick' | 'play' | 'done' | null; banner: string | null;
         baddie: 'bridgetroll' | 'moleking' | 'briarboar' | 'stormroc' | 'frostgiant' | 'cindergolem' | null;
-        face: 'fierce' | 'hurt' | 'dazed' | null; pose: 'walk' | 'stand' | 'attack' | 'hit' | 'down' | 'flee' | null; bar: number | null;
-        foes: number; shots: number; progress: number; done: boolean; result: string | null } | null;
+        face: 'fierce' | 'hurt' | 'dazed' | null; pose: 'walk' | 'stand' | 'attack' | 'hit' | 'down' | 'flee' | null; flash: boolean;
+        foes: { id: string; x: number; pose: string; face: string; facing: 1 | -1 }[]; shots: number; marks: { kind: 'spark' | 'poof'; age: number }[];
+        riders: number[]; hit: boolean[]; progress: number; done: boolean; result_card: string | null } | null;
       barn: { count: number; cap: number };
       /** The toast showing now, if any (its text). */
       toast: string | null };

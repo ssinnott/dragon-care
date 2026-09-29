@@ -32,9 +32,8 @@
 // its pixels change, darker and cooler, and no floor pixel does (BASE_DESIGN 7: the sky, the lights and the moonlit
 // walls, never a dragon or a floor), and the walls step with the dusk and the dawn; live, the speed button and the keys 1-4 and p run the world faster, and pause it;
 // a frozen page with a save in storage neither loads nor writes it, and nor does a live page given hour=; a live page
-// that saves resumes its world after a reload, and one with a save of the version before (a v9 barn, written by the
-// build before the fights: tools/fixtures) resumes it brought up to this version, its board's roads ending in their
-// bosses, the v9 save kept aside; and one whose save doesn't fit -- another version, or one of this
+// that saves resumes its world after a reload, one with a version 9 save (before the Arena) loads it brought up to
+// date -- every dragon at LV 1 -- and saves it back as this build's version, and one whose save doesn't fit -- another version, or one of this
 // version the view can't build or draw (an unknown element, keeper or need) -- starts a new barn without a page
 // error, keeps the old save aside, and never writes it back. Growing up and eggs (BASE_DESIGN 7): the growup preset's EMBER
 // is an elder a second in, the eggs preset shows its three eggs in the Hatchery's nests, the hatch preset's egg has
@@ -42,28 +41,50 @@
 // other heads on screen where it can be), a tap on the card closes it, and a tap on the head of one with a job waiting
 // opens its card and Rushes the job -- a head drawn over a keeper included. The elder garden (BASE_DESIGN 3): the new game's garden has its two empty plots; the garden preset's
 // three residents live on three plots, by day and by night (each dragon says where it lives: the barn or the garden).
-// The watchable scene (BASE_DESIGN 6): frozen with a team away (preset=trip&trip=...&panel=watch), the scene is on screen in
-// a fight with a pack of little enemies (the foes in view, a bolt in flight), at the boss (the Mole King fighting, its
-// health bar part gone; knocked down, dazed, its bar empty -- and just the same for a team that will fail), at a
-// challenge the team met (with its banner), on a failure just where the team that succeeds is (it never turns back,
-// and nothing tells the outcome early), against a lone pair too weak for the Briar Boar (it stomps off unbeaten, its
-// bar never empty), and home with the result card (HOME SAFE!, or NOT THIS TIME at a failure's end); live, the TEAM
-// OUT chip opens the scene over the barn, the world steps on under it, and BACK TO BARN closes it; beside a keeper held
-// by hand (who stands still under it), a badge or Esc goes back to the barn.
+// The watchable scene (BASE_DESIGN 6, 11): frozen with a team away (preset=trip&trip=...), the game follows it -- its road is
+// on screen with no panel= asking, TRIP LOG and no way back to the barn, and a take= refused -- just past the Mole King's
+// fight (the Mole King gone off up the road, the fight won -- and gone just the same where the team sat it out, the team
+// on its road just where the winning one is), at the fight itself with the picks waiting (the encounter's menu, its rows
+// and AUTO on screen, every head clear of them) and played by the trail coach (`:auto`): a hit landing on the Mole
+// King (rocked back and flashing) and the Mole King worn out, down seeing stars; a pack of mud goblins fought on the
+// Millbrook road -- a dragon's bolt in flight, the goblins' clods in flight, one gone up in a puff of smoke -- each
+// frame the scene's own pure function at that step (the page's hook against Node's); at a challenge
+// the team cleared (with its banner), on a road with a stop waited out (the team walks on: it never turns back, and
+// nothing tells the outcome early), and home with the result card (HOME SAFE!, or NOT THIS TIME when a stop was waited
+// out); live, the road is on screen from the start and the world steps on under it, Esc, a badge, Tab, b, ARENA and a
+// tap leave it there with nobody held, MAP opens the map at once and BACK shuts it onto the road, and at the road's end
+// the result card comes up with the world waiting on it -- Esc shuts the trip's log over it first -- and tapped away (or
+// put away by Esc) it is the barn again, the world on, with the camera on the Aerie as the team lands.
+// The encounter, live (BASE_DESIGN 11): at the Mole King's stop the menu comes up on the road the game follows and the
+// world waits for the pick, the first row takes the first pair's pick (the menu turning to the second pair's), AUTO lets
+// the trail coach play the fight, the Mole King worn out sits down seeing stars and runs off, and the team walks on, the
+// road still on screen.
 // Taking a keeper (BASE_DESIGN 4.10, #6; take= frames too): a tap on a keeper or their badge takes them, d and the pad's
 // arrows walk them, the pad and the line over it (what E does) show while one is held, Esc and LET GO let go, a touch
 // in the pad's gaps is the pad's, and a badge takes and lets go while paused; no dragon's head is under the pad or the
 // line.
 // The Map Room (BASE_DESIGN 5; panel=map and panel=mission frames too): MAP opens the world map, a pin its chooser
-// (the climate picture, the challenges and who meets them, the odds, the egg's notice), BEST TEAM fills the team and
-// SEND starts the muster and eases the camera to the Aerie. The mission loop, live at 8x: the muster to the deck, the
-// TEAM OUT chip to the watch scene, TRIP LOG open and shut, BACK TO BARN.
+// (the climate picture, the challenges and who meets them, the trail coach's forecast, the egg's notice), BEST TEAM fills the team and
+// SEND starts the muster and the game follows the team: the camera held on the Aerie through a drag, a badge taking
+// nobody, the muster preset's gathering frame with no camera asked for on the Aerie too, the job strip given way. The
+// world map's places, live: a place with no mission today says what it is, a cloud how it clears, and a mission's
+// landmark opens its chooser; the map's panel stays flat pixel art (a colour budget) and the places sheet draws every
+// landmark. The mission loop, live at 8x: the muster to the deck (the barn on screen), the team's road on screen by
+// itself as it leaves, TRIP LOG open and shut, Esc leaving the road there.
 // The mission art kit (ART_BIBLE 5.10, view=missionart): every sheet -- the climates (and one as a scrolling road scene), the
-// set pieces, the bosses, the little enemies, the fights' marks, the people (the miller beside the keepers) and the
-// icons -- draws every item on it, with no page error, in enough colours.
+// set pieces, the six bosses, the six little enemies, the fights' marks, the people (the miller beside the keepers), the
+// icons and the places -- draws every item on it, with no page error, in enough colours.
 // Barn capacity (BASE_DESIGN 4.7): the hook counts the barn's dragons against its cap (7 of 12 in the new game, the twelve
 // preset at the cap, the full preset forced over it with its due egg waiting in its nest, and the capped preset at the
 // cap with its due egg waiting in plain view, nobody in front of its nest).
+// The Arena (BASE_DESIGN 10): the sparring audit (view=arenaaudit) plays every sparring skill of every look against
+// every look in the other corner and fails any frame where one fighter covers the other's eye, or its own (ART_BIBLE
+// 1.4); frozen, the chooser (panel=arena) offers every dragon free to spar, and the bout preset's move menu
+// (preset=bout&panel=bout&t=90) shows EMBER's three skills with both fighters' heads on screen, clear of every panel;
+// live, b opens and closes the chooser, ARENA opens it (the world waits under it), two dragons tapped into the corners
+// and SWAP, START BOUT opens the bout, BACK TO BARN leaves it on under its chip and the chip opens it again, the world
+// waits for the player's pick, a skill tapped plays, AUTO lets the coach pick, and once decided the toasts, the result
+// card (tapped away) and the XP, and the pair home with the bout over.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from './server.ts';
@@ -75,13 +96,17 @@ import { REACH_MISS } from '../src/care/limits.ts';
 import { CareSim } from '../src/game/sim.ts';
 import { buildSim, tripStart } from '../src/game/presets.ts';
 import { sceneAt } from '../src/game/missionview.ts';
+import type { SceneFrame } from '../src/game/missionview.ts';
+import type { Trip } from '../src/game/trip.ts';
+import { MISSILES, SPARK_LEN, POOF_LEN } from '../src/game/fightfx.ts';
 import { START_ROOMS, START_DRAGONS, START_KEEPERS } from '../src/game/start.ts';
-import { serialize } from '../src/game/save.ts';
+import { serialize, SAVE_VERSION } from '../src/game/save.ts';
 import { SAVE_KEY, BACKUP_KEY } from '../src/game/storage.ts';
 import { FLOORS, STRAW_SEAM, PATH_EDGE } from '../src/game/surfaces.ts';
 import { CLIMATES, CHALLENGE_IDS, SKILLS, BADDIE_IDS, FOE_IDS } from '../src/game/missiondata.ts';
-import { MISSILES, SPARK_LEN, POOF_LEN } from '../src/game/fightfx.ts';
 import { PHASE_ORDER } from '../src/game/clock.ts';
+import { PLACES, growthSamples } from '../src/game/worldmap.ts';
+import { PLATES, LOG_LINE, MENU, AUTO, BOUT_BACK } from '../src/game/arenaui.ts';
 
 const require = createRequire(import.meta.url);
 function loadPlaywright(): any {
@@ -120,12 +145,19 @@ interface Case {
   init?: (page: any) => Promise<void>;
   /** view=missionart (ART_BIBLE 5.10): the sheet the page's hook must name, and every item it must have drawn. */
   art?: { sheet: string; want: readonly string[] };
-  /** The Map Room's panel (inside its border, screen px 12-628 x 22-332): at most this many colours (flat pixel-art fills, no anti-aliased edges: the house style). */
+  /**
+   * The Map Room's panel (inside its border, screen px 12-628 x 22-332): at most this many colours -- flat pixel-art
+   * fills, no anti-aliased edge anywhere (the house style: a single smoothed edge brings in a spread of in-between shades).
+   * The world map is a painted little world now (worldmap.ts: its land, growths, landmarks and cloud), 96 colours in the
+   * new game's frame at t=60, all of them flat.
+   */
   maxPanelColours?: number;
   /** Hash the frame (an in-page FNV-1a over the canvas's pixels) for TINT: the whole frame, and the world between the HUD's bars (rows 16-338). */
   hash?: boolean;
   /** Keep the frame's pixels (0xRRGGBB each) for TINT's day-and-night comparison (BASE_DESIGN 7). */
   pixels?: boolean;
+  /** view=arenaaudit (BASE_DESIGN 10): at least this many sparring skills played, none covering an eye. */
+  arena?: number;
 }
 
 type BaseHook = NonNullable<NonNullable<Window['__dragonCare']>['base']>;
@@ -265,26 +297,28 @@ async function liveOldSave(page: any): Promise<string[]> {
   return out;
 }
 const OLD_SAVE = JSON.stringify({ ...JSON.parse(PLANTED), v: 999, tick: 9999 });
-/** A barn saved by the build before the fights (version 9: tools/fixtures/save-v9-away.json, a team away on the Mole King's road). */
-const V9_SAVE = fs.readFileSync(new URL('./fixtures/save-v9-away.json', import.meta.url), 'utf8');
+/** A version 9 save (before the Arena: BASE_DESIGN 7, Saves): the planted world less every dragon's XP and the Arena. */
+const V9_SAVE = JSON.stringify((() => {
+  const s = JSON.parse(PLANTED);
+  s.v = 9; delete s.arena;
+  for (const d of s.dragons) delete d.xp;
+  return s;
+})());
 /**
- * view=base, live and saving, with a version-9 save in storage (the build before the fights): it resumes, brought up to
- * this version -- its world at the save's tick or on, persisting, every road on its board ending in its region's boss,
- * its team still out -- the v9 save kept aside at the backup key as it was, and saving now writes this version.
+ * view=base, live and saving, with a version 9 save in storage: it loads, brought up to date (save.ts migrateSave, a
+ * version at a time) -- the world resumed, every dragon at LV 1 and no bout -- nothing is kept aside, and it is saved
+ * back as this build's version.
  */
 async function liveV9Save(page: any): Promise<string[]> {
-  const out: string[] = [], v9 = JSON.parse(V9_SAVE);
+  const out: string[] = [];
   await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 5, null, { timeout: 15000 });
   const b: BaseHook = await page.evaluate(() => (window as any).__dragonCare.base);
-  if (!(b.tick >= v9.tick)) out.push(`the world is at tick ${b.tick}, before the v9 save's ${v9.tick}: it did not resume`);
-  if (b.persist !== true) out.push(`the v9 barn resumed with persist ${b.persist}`);
-  if (!b.board.length || b.board.some((m) => !m.baddie)) out.push(`the resumed board's roads: ${b.board.map((m) => `${m.title} to ${m.baddie}`).join(', ')}`);
-  if (!b.trip || b.trip.mission !== v9.missions.trip.mission.title) out.push(`the v9 barn's team out is ${JSON.stringify(b.trip?.mission)}`);
-  if ((await stored(page, BACKUP_KEY)) !== V9_SAVE) out.push('the v9 save was not kept at the backup key');
+  if (b.tick < 5000) out.push(`the world is at tick ${b.tick}: the version 9 save was not loaded`);
+  if (b.dragons.some((d) => d.level !== 1 || d.xp !== 0) || b.arena.bout || b.arena.bouts) out.push(`loaded, the dragons are at ${b.dragons.map((d) => `${d.name} LV ${d.level} (${d.xp} XP)`).join(', ')}, the Arena ${JSON.stringify(b.arena)}`);
+  if ((await stored(page, BACKUP_KEY)) !== null) out.push('the version 9 save was kept aside as one that didn\'t fit');
   await page.evaluate(() => (window as any).__dragonCare.baseSaveNow());
-  const saved = await stored(page, SAVE_KEY), v = saved ? JSON.parse(saved).v : null;
-  if (v !== 10) out.push(`saved again, the barn is version ${v}`);
-  if (!out.length) console.log(`        v9: resumed at tick ${b.tick} (saved at ${v9.tick}), ${b.board.map((m) => `${m.title} to ${m.baddie}`).join(', ')}; ${b.trip?.mission} still out; the v9 save kept aside, saved again at version ${v}`);
+  const saved = await stored(page, SAVE_KEY);
+  if (!saved || JSON.parse(saved).v !== SAVE_VERSION) out.push(`saved again as version ${saved ? JSON.parse(saved).v : 'nothing'}, not ${SAVE_VERSION}`);
   return out;
 }
 /**
@@ -459,15 +493,21 @@ function gardenIs(residents: number, plots: number) {
 }
 
 /**
- * The watchable scene (BASE_DESIGN 6), frozen: the overlay is the scene, and the scene is as `want` says (the last stop
- * reached, whether it was met, the boss in view, its face, pose and health bar, the way the team faces...), with a
- * banner once a stop is reached.
+ * The watchable scene (BASE_DESIGN 6), frozen: the game follows the team out -- the overlay is the scene though no panel
+ * asked for it, with TRIP LOG and no way back to the barn (but the result card, once the road is done) -- and the scene is
+ * as `want` says (the last stop reached, whether it was met, the baddie in view, its exit, the way the team faces...),
+ * with a banner once a stop is reached.
  */
 function sceneIs(want: Partial<NonNullable<BaseHook['scene']>>) {
   return (b: BaseHook): string[] => {
     const out: string[] = [], s = b.scene;
-    if (b.ui?.screen !== 'watch') out.push(`the overlay is ${b.ui?.screen}, not watch`);
-    if (!b.ui?.back || b.ui.back.w <= 0) out.push('no BACK TO BARN button while watching');
+    if (b.ui?.screen !== 'watch' || b.ui.follow !== 'road') out.push(`the overlay is ${b.ui?.screen} (following ${b.ui?.follow}), not the team followed on its road`);
+    // (the buttons: TRIP LOG, the result card once the road is done, and -- only while the team stands at a stop -- the
+    // encounter's rows and AUTO: BASE_DESIGN 11)
+    const keys = Object.keys(b.ui?.buttons ?? {}), encounters = (k: string) => k.startsWith('ability') || k === 'trail';
+    const ways = keys.filter((k) => !encounters(k)).sort().join(' '), only = s?.done ? 'log result' : 'log';
+    if (ways !== only) out.push(`over the road the buttons are ${ways || 'none'}, not ${only}`);
+    if (s?.at == null && keys.some(encounters)) out.push(`the encounter's buttons (${keys.join(' ')}) with the team walking`);
     if (!s) return [...out, 'no scene in the hook'];
     for (const [k, v] of Object.entries(want)) if ((s as Record<string, unknown>)[k] !== v) out.push(`scene.${k} is ${JSON.stringify((s as Record<string, unknown>)[k])}, not ${JSON.stringify(v)}`);
     if (s.stop != null && !s.banner) out.push(`the team is past the ${s.stop} and no banner shows`);
@@ -477,88 +517,226 @@ function sceneIs(want: Partial<NonNullable<BaseHook['scene']>>) {
 }
 
 /**
- * The scene a trip preset's page shows at its frozen step `t` for the team that SUCCEEDS on it (trip=<region>:<progress>),
- * read in Node from the scene's own pure function as the page's hook reports it (base.ts sceneHook): the last stop
- * reached, whether it was met, whether its beat is playing, the banner, the boss (its face and pose) and its bar, the foes
- * in view and what is in flight, and not done. The same page for a team that fails must show just this: it never turns
- * back, its fights are the same fights, and nothing on the road tells the outcome.
+ * The scene a trip preset's page shows at its frozen step `t` (trip=<region>:<progress>), read in Node from the scene's
+ * own pure function as the page's hook reports it (base.ts sceneHook): the last stop reached, how it went, whether the
+ * team has its counter, the encounter's state if the team stands at a stop, the banner, and not done -- the page must
+ * show just this.
  */
 function succeedingScene(trip: string, t: number): Partial<NonNullable<BaseHook['scene']>> {
   const w = buildSim(tripStart(trip, t), 1);
   for (let i = 0; i < t; i++) w.step();
   const tr = w.missions.trip!, f = sceneAt(w, tr), s = f.last == null ? null : tr.stops[f.last];
-  return { stop: s ? (s.kind === 'challenge' ? s.challenge : s.kind) : null, covered: s ? s.covered : null, beat: f.stop != null, banner: f.banner,
-    baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, bar: f.bar, foes: f.foes.length, shots: f.shots.length, done: false, result: null };
+  return { stop: s ? (s.kind === 'challenge' ? s.challenge : s.kind) : null, result: s ? s.result : null, covered: s ? s.covered : null, at: tr.encounter?.state ?? null, banner: f.banner, done: false, result_card: null };
+}
+/**
+ * The first step (1..max) at which a trip preset's world, stepped on, shows what `pred` asks of its scene (a fight's
+ * moment for a frozen page's t=: the encounter plays the same whatever step the team left at), or it throws.
+ */
+function firstStep(trip: string, pred: (f: SceneFrame, t: Trip) => boolean, max = 6000): number {
+  const w = buildSim(tripStart(trip, 0), 1);
+  for (let i = 1; i <= max; i++) { w.step(); const tr = w.missions.trip; if (tr && pred(sceneAt(w, tr), tr)) return i; }
+  throw new Error(`smoke: trip=${trip} never shows the moment wanted in ${max} steps`);
+}
+/**
+ * A fight's frozen frame (BASE_DESIGN 6, 11): the page's scene, read from its hook, just what Node's own run of the
+ * scene's pure function says at that step -- the stop and its encounter's state, the boss (its face, pose and flash),
+ * the pack's ones in view, what is in flight, the sparks and puffs of smoke, the riders' places and the dragons'
+ * flashes -- and `also` of it (the moment the case is for).
+ */
+function fightIs(trip: string, t: number, also: (s: NonNullable<BaseHook['scene']>) => string | null) {
+  const w = buildSim(tripStart(trip, t), 1);
+  for (let i = 0; i < t; i++) w.step();
+  const tr = w.missions.trip!, f = sceneAt(w, tr), last = f.last == null ? null : tr.stops[f.last];
+  const want = { stop: last ? (last.kind === 'challenge' ? last.challenge : last.kind) : null, at: tr.encounter?.state ?? null, baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, flash: !!f.baddie?.flash,
+    foes: f.foes.map((q) => `${q.id}:${q.pose}:${q.facing}`).join(), shots: f.shots.length, marks: f.marks.map((m) => `${m.kind}:${m.age}`).join(), riders: f.riders.map((r) => r.dx).join(), hit: f.flash.join() };
+  return (b: BaseHook): string[] => {
+    const s = b.scene;
+    if (!s) return ['no scene in the hook'];
+    const got = { stop: s.stop, at: s.at, baddie: s.baddie, face: s.face, pose: s.pose, flash: s.flash, foes: s.foes.map((q) => `${q.id}:${q.pose}:${q.facing}`).join(), shots: s.shots, marks: s.marks.map((m) => `${m.kind}:${m.age}`).join(), riders: s.riders.join(), hit: s.hit.join() };
+    const out = Object.entries(want).filter(([k, v]) => (got as Record<string, unknown>)[k] !== v).map(([k, v]) => `scene.${k} is ${JSON.stringify((got as Record<string, unknown>)[k])}, not the pure scene's ${JSON.stringify(v)}`);
+    const why = also(s);
+    return why ? [...out, why] : out;
+  };
+}
+/** The fights' moments the frozen cases show (the first step each is on screen): a bolt at a pack of mud goblins, their clods in flight, one gone up in smoke; a hit on the Mole King, and the Mole King down seeing stars. */
+const PACK_TRIP = 'millbrook:0.12:auto', BOSS_TRIP = 'oldmine:0.9:auto';
+const atPack = (tr: Trip) => !!tr.encounter && tr.stops[tr.encounter.stop].kind === 'foes';
+const PACK_BOLT_T = firstStep(PACK_TRIP, (f, tr) => atPack(tr) && f.shots.some((q) => q.el) && f.foes.length >= 2);
+const PACK_THROW_T = firstStep(PACK_TRIP, (f, tr) => atPack(tr) && f.shots.filter((q) => q.missile).length >= 2);
+const PACK_POOF_T = firstStep(PACK_TRIP, (f, tr) => atPack(tr) && f.marks.some((m) => m.kind === 'poof' && m.age === 8));
+const BOSS_HIT_T = firstStep(BOSS_TRIP, (f) => f.baddie?.pose === 'hit' && f.baddie.flash);
+const BOSS_DOWN_T = firstStep(BOSS_TRIP, (f) => f.baddie?.pose === 'down') + 120;
+/**
+ * The same page with `:fail`: the team on its road just where the succeeding one is (the same stop, the same standing),
+ * the last stop reached waited out -- its result and its banner (`THORNS - THE TEAM WAITS IT OUT`, a baddie's `... SITS
+ * DOWN FOR A BREATHER ...`) the failing road's own, everything else the succeeding road's.
+ */
+function failingScene(trip: string, t: number): Partial<NonNullable<BaseHook['scene']>> {
+  const ok = succeedingScene(trip, t), bad = succeedingScene(`${trip}:fail`, t);
+  if (ok.stop !== bad.stop || ok.at !== bad.at || ok.covered !== bad.covered || bad.result !== 'unmet' || !/WAITS IT OUT|SITS DOWN/.test(bad.banner ?? '')) throw new Error(`smoke: trip=${trip}:fail is not the succeeding road waited out: ${JSON.stringify({ ok, bad })}`);
+  return { ...ok, result: 'unmet', banner: bad.banner };
 }
 
 /**
- * view=base&preset=trip, live (save=0): a team is out, so the TEAM OUT chip shows under the top bar; a tap on
- * it opens the scene over the barn (the world stepping on underneath), and BACK TO BARN closes it. Then the watch
- * overlay beside taking a keeper (BASE_DESIGN 4.10), with the two keepers who are not on the trip (its riders are away on
- * the road, and never taken): the first taken by their badge and the scene opened, they stay held but stand still under
- * it -- d held walks them nowhere, and the line over the pad is gone -- a tap on the pad's arrow or on the world is the
- * overlay's (swallowed: never a pad press, nor empty space letting them go), Esc goes back to the barn with them still
- * held and walking on with d still down, and over the scene again the second's badge goes back to the barn and takes them.
+ * The encounter's screen, frozen at the Mole King's fight with the picks waiting (BASE_DESIGN 11): the menu's rows
+ * (ability0...: the pair's breath, PREEN, REST and its rider's special at least) and AUTO among the buttons, TRIP LOG
+ * beside them, the trip's encounter at `pick` with pair 0 pending, and every dragon's head on screen clear of the
+ * furniture in the sky (ART_BIBLE 1.4: nothing over an eye).
  */
-async function baseWatch(page: any): Promise<string[]> {
+function encounterMenu(b: BaseHook): string[] {
+  const out: string[] = [], e = b.trip?.encounter;
+  if (!e || e.state !== 'pick' || e.pending !== 0 || e.kind !== 'fight') return [`the trip's encounter is ${JSON.stringify(e && { state: e.state, pending: e.pending, kind: e.kind })}, not the fight's first pick`];
+  const rows = Object.keys(b.ui.buttons).filter((k) => k.startsWith('ability'));
+  if (rows.length < 3 || !b.ui.buttons.trail || !b.ui.buttons.log) out.push(`the encounter's buttons: ${Object.keys(b.ui.buttons).join(' ')} (want ability0-2 at least, trail, log)`);
+  const sky = [...rows.map((k) => b.ui.buttons[k]), ...(b.ui.buttons.trail ? [b.ui.buttons.trail] : [])];
+  for (const d of b.dragons) {
+    if (!d.head) continue;
+    for (const r of sky) if (d.head.x + 6 > r.x && d.head.x - 6 < r.x + r.w && d.head.y + 6 > r.y && d.head.y - 6 < r.y + r.h) out.push(`${d.name}'s head (${d.head.x.toFixed(0)}, ${d.head.y.toFixed(0)}) under the encounter's menu`);
+  }
+  if (b.ui.chip) out.push('the TEAM OUT chip shows over the scene');
+  return out;
+}
+
+/**
+ * view=base&preset=trip&trip=oldmine:0.9, live (save=0; BASE_DESIGN 6, 11): the team at the Mole King's stop from the
+ * first step, the game following it (its road on screen); once the walk-in is done the picks wait -- the menu up, and
+ * the world waiting for the pick; the first row tapped (the first pair's breath) is taken and the menu turns to the
+ * second pair (pending 1, the world still waiting); AUTO on lets the trail coach pick the rest at once and the turn
+ * plays (the encounter at `play`, a move under way); the fight ends (the stop met), the Mole King dozes off and the
+ * team walks on, the road still on screen (Esc only says the game is following the team).
+ */
+async function baseEncounter(page: any): Promise<string[]> {
   const out: string[] = [];
   const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  const until = (fn: string, ms: number) => page.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (r: { x: number; y: number; w: number; h: number }) => page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  if (!(await until('window.__dragonCare?.base?.trip?.encounter?.state === "pick"', 15000))) return [`the fight's picks never waited (the encounter ${JSON.stringify((await st()).trip?.encounter)})`];
+  const a = await st();
+  if (a.ui.screen !== 'watch' || a.ui.follow !== 'road' || !a.ui.buttons.ability0 || !a.ui.buttons.trail || a.trip?.encounter?.pending !== 0) return [`at the stop the view is ${a.ui.screen} (following ${a.ui.follow}), buttons ${Object.keys(a.ui.buttons).join(' ')}, pending ${a.trip?.encounter?.pending}`];
+  const t1 = a.tick;
+  await page.waitForTimeout(400);
+  if ((await st()).tick !== t1) out.push(`the world ran on while the pick waited on screen (tick ${t1} -> ${(await st()).tick})`);
+  await click(a.ui.buttons.ability0);
+  if (!(await until('window.__dragonCare?.base?.trip?.encounter?.pending === 1', 3000))) out.push(`the first row tapped left the encounter at ${JSON.stringify((await st()).trip?.encounter && { state: (await st()).trip!.encounter!.state, pending: (await st()).trip!.encounter!.pending })}`);
+  const p2 = await st(), t2 = p2.tick;
+  await page.waitForTimeout(300);
+  if ((await st()).tick !== t2) out.push(`the world ran on while the second pick waited on screen (tick ${t2} -> ${(await st()).tick})`);
+  if (!p2.ui.buttons.ability0) out.push('the second pair got no menu');
+  await click(a.ui.buttons.trail);
+  if (!(await until('window.__dragonCare?.base?.trip?.auto === true', 3000))) out.push('AUTO did not put the trail coach on');
+  if (!(await until('window.__dragonCare?.base?.trip?.encounter?.state === "play"', 3000))) out.push(`AUTO left the encounter at ${(await st()).trip?.encounter?.state}`);
+  else if ((await st()).trip?.encounter?.move?.by === -1 ? false : (await st()).trip?.encounter?.move?.ability == null) out.push(`the move playing is ${JSON.stringify((await st()).trip?.encounter?.move)}`);
+  await page.keyboard.press('4');
+  // (the boss is the road's last stop)
+  if (!(await until('((s) => !!s && s[s.length - 1].result !== "ahead")(window.__dragonCare?.base?.trip?.stops)', 80000))) return [...out, `the fight never ended (${JSON.stringify((await st()).trip?.encounter)})`];
+  const done = await st(), fight = done.trip!.stops[done.trip!.stops.length - 1];
+  if (fight.kind !== 'baddie' || fight.result !== 'met' || !fight.log.includes('WORN OUT: IT SEES STARS')) out.push(`the fight ended ${JSON.stringify(fight)}`);
+  if (done.scene?.baddie !== 'moleking' || (done.scene.pose !== 'down' && done.scene.pose !== 'flee')) out.push(`as the fight ended the Mole King is ${JSON.stringify(done.scene && { baddie: done.scene.baddie, pose: done.scene.pose })}, not down seeing stars`);
+  if (!(await until('window.__dragonCare?.base?.trip?.encounter === null', 30000))) out.push(`the Mole King's exit never let the team walk on (${JSON.stringify((await st()).trip?.encounter)})`);
+  const on = await st();
+  if ((on.scene?.baddie != null && on.scene.pose !== 'flee') || on.trip!.walked <= done.trip!.walked - 1) out.push(`after the fight the scene shows ${JSON.stringify(on.scene)}, walked ${on.trip?.walked}`);
+  await page.keyboard.press('1');
+  await page.keyboard.press('Escape');
+  if (!(await until('(window.__dragonCare?.base?.toast ?? "").startsWith("FOLLOWING THE TEAM")', 2000))) out.push(`Esc on the road after the fight said ${JSON.stringify((await st()).toast)}`);
+  const e = await st();
+  if (e.ui.screen !== 'watch' || e.ui.follow !== 'road') out.push(`after the fight the view is ${e.ui.screen} (following ${e.ui.follow}), not the road`);
+  if (!out.length) console.log(`        encounter: the Mole King's picks waited at step ${a.tick} on the road the game follows, the menu up with ${Object.keys(a.ui.buttons).filter((q) => q.startsWith('ability')).length} rows and the world waiting; the first row took RIPPLE's pick and the menu turned to the second pair; AUTO on, the fight ended at step ${done.tick} in a win ("${fight.log}"), the Mole King down seeing stars and off up the road as the team walked on, the road still on screen`);
+  return out;
+}
+
+/**
+ * view=base&preset=trip, live (save=0; BASE_DESIGN 6): the game follows the team out -- its riders BEA and IRIS away on
+ * the road, near its end. The road is on screen from the first frame, the world stepping on under it, with no way back
+ * to the barn: Esc says the game is following the team, and it, TOMAS's badge (TOMAS is not a rider), Tab, b, ARENA and
+ * a tap on the road all leave the road on screen and nobody held. MAP opens the map at once, the world waiting under
+ * it, and BACK shuts it onto the road again; TRIP LOG opens the trip's log and Esc shuts it. At 8x the road ends in the
+ * result card, the road still on screen; the card tapped away, the game's following is over: the barn again, the camera
+ * on the Aerie as the team lands, and TOMAS's badge takes him.
+ */
+async function baseFollow(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  const until = (fn: string, ms: number) => page.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
   await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 10, null, { timeout: 15000 });
   const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
-  const a = await st(), chip = a.ui?.chip, home = a.keepers.filter((q) => q.phase !== 'away').map((q) => q.name), [ONE, TWO] = home;
-  if (a.ui?.screen !== 'none' || !chip) return [`with a team out the overlay is ${a.ui?.screen} and the chip ${JSON.stringify(chip)}`];
-  if (home.length !== 2) return [`with a team out ${home.join(', ')} are home, not two keepers`];
-  await page.mouse.click(box.x + (chip.x + chip.w / 2) * k, box.y + (chip.y + chip.h / 2) * k);
+  const click = (r: { x: number; y: number; w: number; h: number }) => page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  const onRoad = 'window.__dragonCare?.base?.ui?.screen === "watch" && window.__dragonCare?.base?.ui?.follow === "road"';
+  const a = await st();
+  if (a.ui.screen !== 'watch' || a.ui.follow !== 'road' || !a.scene) return [`with a team away the view is ${a.ui.screen} (following ${a.ui.follow}), not its road`];
   await page.waitForTimeout(300);
   const b = await st();
-  if (b.ui?.screen !== 'watch' || !b.scene) out.push(`tapping the TEAM OUT chip left the overlay ${b.ui?.screen}`);
+  if (!(b.tick > a.tick)) out.push(`the world stood still under the road (tick ${a.tick} -> ${b.tick})`);
+  // (nothing leaves the road, and nobody is taken)
+  await page.keyboard.press('Escape');
+  if (!(await until('(window.__dragonCare?.base?.toast ?? "").startsWith("FOLLOWING THE TEAM")', 2000))) out.push(`Esc on the road said ${JSON.stringify((await st()).toast)}`);
+  await click(b.badges.TOMAS);
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('b');
+  await click(b.buttons.arena);
+  await click({ x: 320, y: 200, w: 0, h: 0 });
   await page.waitForTimeout(300);
   const c = await st();
-  if (!(c.tick > b.tick)) out.push(`the world stood still under the scene (tick ${b.tick} -> ${c.tick})`);
-  const back = c.ui?.back;
-  if (!back) return [...out, 'no BACK TO BARN button while watching'];
-  await page.mouse.click(box.x + (back.x + back.w / 2) * k, box.y + (back.y + back.h / 2) * k);
-  await page.waitForTimeout(300);
+  if (c.ui.screen !== 'watch' || c.ui.follow !== 'road' || c.controlled !== null) out.push(`Esc, TOMAS's badge, Tab, b, ARENA and a tap on the road: the view ${c.ui.screen} (following ${c.ui.follow}), ${c.controlled ?? 'nobody'} held`);
+  // (MAP: the map at once, the world waiting under it; BACK, the road again)
+  await click(c.buttons.map);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "map"', 1000))) out.push(`MAP on the road opened ${(await st()).ui.screen}, not the map at once`);
+  else {
+    const m0 = (await st()).tick;
+    await page.waitForTimeout(300);
+    const m = await st();
+    if (m.tick !== m0) out.push(`the world ran on under the map (tick ${m0} -> ${m.tick})`);
+    await click(m.ui.buttons.back);
+    if (!(await until(onRoad, 1000))) out.push(`BACK on the map left the view ${(await st()).ui.screen} (following ${(await st()).ui.follow}), not the road`);
+  }
+  // (the trip's log: TRIP LOG opens it, Esc shuts it, the road still on screen)
+  await click((await st()).ui.buttons.log);
+  if (!(await until('window.__dragonCare?.base?.ui?.log === true', 1000))) out.push('TRIP LOG did not open the log');
+  await page.keyboard.press('Escape');
+  if (!(await until(`window.__dragonCare?.base?.ui?.log === false && ${onRoad}`, 1000))) out.push(`Esc on the log: the log ${(await st()).ui.log ? 'still open' : 'shut'}, the view ${(await st()).ui.screen}`);
+  // (8x to the road's end: the result card over the road)
+  await page.keyboard.press('4');
+  if (!(await until('window.__dragonCare?.base?.scene?.done === true', 20000))) return [...out, `the road never ended (${Math.round(((await st()).scene?.progress ?? 0) * 100)} % along)`];
+  await page.keyboard.press('1');
   const d = await st();
-  if (d.ui?.screen !== 'none') out.push(`BACK TO BARN left the overlay ${d.ui?.screen}`);
-  // the overlay beside a keeper held by hand
-  const click = (x: number, y: number) => page.mouse.click(box.x + x * k, box.y + y * k);
-  const held = (name: string | null) => page.waitForFunction((n: string | null) => (window as any).__dragonCare?.base?.controlled === n, name, { timeout: 5000 }).then(() => true, () => false);
-  const screen = (want: string) => page.waitForFunction((w: string) => (window as any).__dragonCare?.base?.ui?.screen === w, want, { timeout: 5000 }).then(() => true, () => false);
-  const tomasX = (h: BaseHook) => h.keepers.find((q) => q.name === ONE)!.x;
-  const tb = d.badges[ONE], pb = d.badges[TWO];
-  await click(tb.x + tb.w / 2, tb.y + tb.h / 2);
-  if (!(await held(ONE))) return [...out, `a tap on ${ONE}'s badge: controlled is ${(await st()).controlled}`];
-  await page.waitForTimeout(200);
-  await click(chip.x + chip.w / 2, chip.y + chip.h / 2);
-  if (!(await screen('watch'))) return [...out, `${ONE} held, the TEAM OUT chip left the overlay ${(await st()).ui?.screen}`];
-  const e = await st(), ex = tomasX(e);
-  if (e.controlled !== ONE || e.action !== null) out.push(`the scene opened with ${ONE} held: controlled ${e.controlled}, the line ${JSON.stringify(e.action)}`);
-  // (d stays down from here until the one held has walked on in the barn)
-  await page.keyboard.down('d'); await page.waitForTimeout(400);
-  const pr = e.pad.right;
-  await click(pr.x + pr.w / 2, pr.y + pr.h / 2);
-  await click(320, 200);
-  await page.waitForTimeout(150);
-  const f = await st(), fx = tomasX(f);
-  if (Math.abs(fx - ex) > 0.5) out.push(`over the scene, d and a tap on the pad's arrow walked ${ONE} from x ${ex.toFixed(1)} to ${fx.toFixed(1)}`);
-  if (f.ui?.screen !== 'watch' || f.controlled !== ONE) out.push(`taps on the pad and the world over the scene: the overlay ${f.ui?.screen}, controlled ${f.controlled}`);
+  if (d.ui.screen !== 'watch' || d.ui.follow !== 'road' || !d.ui.buttons.result || d.scene?.result_card !== 'HOME SAFE!') out.push(`at the road's end: the view ${d.ui.screen} (following ${d.ui.follow}), the result card ${JSON.stringify(d.ui.buttons.result ?? null)} saying ${d.scene?.result}`);
+  if (!d.ui.buttons.result) return out;
+  // (the world waits on the card; Esc shuts the trip's log over it first, and leaves the card up)
+  await click(d.ui.buttons.log);
+  await page.waitForTimeout(300);
   await page.keyboard.press('Escape');
-  if (!(await screen('none'))) out.push(`Esc over the scene left the overlay ${(await st()).ui?.screen}`);
-  if ((await st()).controlled !== ONE) out.push(`Esc over the scene let go of ${ONE} (controlled ${(await st()).controlled})`);
-  const g0 = tomasX(await st());
-  await page.waitForTimeout(400);
-  const gx = tomasX(await st());
-  await page.keyboard.up('d');
-  if (!(gx > g0 + 5)) out.push(`back in the barn with d still down, ${ONE} stood (x ${g0.toFixed(1)} -> ${gx.toFixed(1)})`);
-  await click(chip.x + chip.w / 2, chip.y + chip.h / 2);
-  if (!(await screen('watch'))) out.push(`the TEAM OUT chip again left the overlay ${(await st()).ui?.screen}`);
-  await click(pb.x + pb.w / 2, pb.y + pb.h / 2);
-  if (!(await screen('none')) || !(await held(TWO))) out.push(`over the scene, ${TWO}'s badge: the overlay ${(await st()).ui?.screen}, controlled ${(await st()).controlled}`);
-  await page.keyboard.press('Escape');
-  if (!(await held(null))) out.push(`back in the barn, Esc left ${(await st()).controlled} held`);
-  if (!out.length) console.log(`        watch: the chip opened the scene (${b.scene?.stop ?? 'on the road'}, ${Math.round((b.scene?.progress ?? 0) * 100)} % along), the world stepped on under it, BACK returned to the barn; ${ONE} (not a rider) held under the scene stood still (x ${ex.toFixed(0)} -> ${fx.toFixed(0)} through d, the pad and a tap on the world), Esc back to the barn with them held, walking on with d still down (x ${g0.toFixed(0)} -> ${gx.toFixed(0)}), ${TWO}'s badge over the scene back to the barn and them taken`);
+  await page.waitForTimeout(100);
+  const w = await st();
+  if (w.tick !== d.tick) out.push(`the world ran on under the result card (tick ${d.tick} -> ${w.tick})`);
+  if (w.ui.log || w.ui.screen !== 'watch' || !w.ui.buttons.result) out.push(`TRIP LOG then Esc over the result card: the log ${w.ui.log ? 'open' : 'shut'}, the view ${w.ui.screen}, the card ${w.ui.buttons.result ? 'up' : 'gone'}`);
+  // (the card tapped away: the barn again, the world on, the camera on the Aerie as the team lands, the keepers the
+  // player's again)
+  await click(d.ui.buttons.result);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "none" && window.__dragonCare?.base?.ui?.follow === null', 1000))) out.push(`the result card tapped away left the view ${(await st()).ui.screen} (following ${(await st()).ui.follow})`);
+  if (!(await until('window.__dragonCare?.base?.camX === 0 && window.__dragonCare?.base?.camY === 20', 3000))) out.push(`home, the camera is at ${(await st()).camX}, ${(await st()).camY}, not on the Aerie (0, 20)`);
+  const e = await st();
+  if (!(e.tick > d.tick)) out.push(`the result card tapped away, the world stood still (tick ${d.tick} -> ${e.tick})`);
+  if (e.trip?.state !== 'return') out.push(`home, the trip is ${JSON.stringify(e.trip?.state ?? null)}, not landing`);
+  await click(e.badges.TOMAS);
+  if (!(await until('window.__dragonCare?.base?.controlled === "TOMAS"', 3000))) out.push(`home, TOMAS's badge: ${(await st()).controlled ?? 'nobody'} held`);
+  if (!out.length) console.log(`        follow: the road on screen from the start (${Math.round((a.scene?.progress ?? 0) * 100)} % along), the world stepping on under it; Esc, TOMAS's badge, Tab, b, ARENA and a tap on the road left it there, nobody held; MAP at once and BACK to the road; TRIP LOG and Esc; at 8x the result card (${d.scene?.result}) at step ${d.tick}, the world waiting on it, Esc shutting the log over it; tapped away, the barn with the camera on the Aerie, the world on, the team landing, and TOMAS taken`);
   return out;
+}
+
+/**
+ * view=base&preset=trip, live (save=0; BASE_DESIGN 6): a failure's road about to end -- its result card (NOT THIS TIME)
+ * comes up, the world waiting on it, and Esc puts it away as a tap would: the barn again, the game's following over.
+ */
+async function baseHomeEsc(page: any): Promise<string[]> {
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  const until = (fn: string, ms: number) => page.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
+  if (!(await until('window.__dragonCare?.base?.scene?.done === true', 15000))) return [`the road never ended (${Math.round(((await st()).scene?.progress ?? 0) * 100)} % along)`];
+  const a = await st();
+  if (a.scene?.result_card !== 'NOT THIS TIME' || !a.ui.buttons.result) return [`at the road's end, the result card ${JSON.stringify(a.ui.buttons.result ?? null)} saying ${a.scene?.result_card}`];
+  await page.keyboard.press('Escape');
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "none" && window.__dragonCare?.base?.ui?.follow === null', 1000))) return [`Esc on the result card left the view ${(await st()).ui.screen} (following ${(await st()).ui.follow})`];
+  console.log(`        home by Esc: the result card (${a.scene.result_card}) at step ${a.tick}, put away by Esc, the barn again`);
+  return [];
 }
 
 /**
@@ -580,16 +758,33 @@ function tableIs(screen: 'map' | 'mission') {
 function noticeIs(want: string | null) {
   return (b: BaseHook): string[] => (b.ui?.notice === want ? [] : [`the chooser's egg line is ${JSON.stringify(b.ui?.notice)}, not ${JSON.stringify(want)}`]);
 }
-/** The muster preset at the step its team all stands on the Aerie deck (npm run sim section 20): leaving now, every dragon in the barn's world (none away yet). */
+/**
+ * The muster preset at the step its team all stands on the Aerie deck (npm run sim section 20): leaving now, every dragon
+ * in the barn's world (none away yet), and the game following it there -- the barn on screen.
+ */
 function mustered(b: BaseHook): string[] {
   const t = b.trip, team = t ? t.pairs.map((p) => b.dragons.find((d) => d.id === p.dragon)) : [];
   if (!t || t.state !== 'depart' || t.mission !== 'THE LOST NEST') return [`the trip is ${JSON.stringify(t)}, not THE LOST NEST departing`];
-  return team.every((d) => d && d.f === 5 && d.place === 'barn') ? [] : [`the team is ${team.map((d) => d && `${d.name} f${d.f} ${d.place}`).join(', ')}, not on the Aerie`];
+  const out = b.ui.follow === 'gather' && b.ui.screen === 'none' ? [] : [`the team setting out: following ${b.ui.follow}, the view ${b.ui.screen}, not the barn`];
+  return team.every((d) => d && d.f === 5 && d.place === 'barn') ? out : [...out, `the team is ${team.map((d) => d && `${d.name} f${d.f} ${d.place}`).join(', ')}, not on the Aerie`];
+}
+/**
+ * The muster preset as its team gathers, the page asking for no camera (BASE_DESIGN 6): the game follows the team -- the
+ * barn on screen with the camera held on the Aerie deck, the TEAM OUT chip up, and the job strip given way (the barn runs
+ * itself).
+ */
+function gathering(b: BaseHook): string[] {
+  const out: string[] = [];
+  if (b.trip?.state !== 'muster' || b.ui.follow !== 'gather' || b.ui.screen !== 'none') out.push(`the trip ${b.trip?.state}, following ${b.ui.follow}, the view ${b.ui.screen}: not the team gathering, followed in the barn`);
+  if (b.camX !== 0 || b.camY !== 20) out.push(`the camera is at ${b.camX}, ${b.camY}, not held on the Aerie (0, 20)`);
+  if (!b.ui.chip || b.chips.length) out.push(`the TEAM OUT chip ${JSON.stringify(b.ui.chip)} and ${b.chips.length} job chips: the job strip gives way while the game follows the team`);
+  return out;
 }
 /**
  * view=base, live (save=0): the Map Room's table (BASE_DESIGN 5, #5: launched from the Aerie). MAP eases the camera to the Map Room and opens the
  * map (within 2 s); a tap on the first pin opens its mission's chooser; BEST TEAM puts a team together; SEND sends it
- * -- the table closes, the trip is mustering, and the camera is at the Aerie within 2 s.
+ * -- the table closes, the trip is mustering, and the game follows the team (BASE_DESIGN 6): the camera held on the Aerie
+ * within 2 s (a drag leaves it there), and a keeper at home not taken by a tap on their badge, which says why.
  */
 async function baseMission(page: any): Promise<string[]> {
   const out: string[] = [];
@@ -615,19 +810,35 @@ async function baseMission(page: any): Promise<string[]> {
   await click((await st()).ui.buttons.send);
   await page.waitForTimeout(100);
   const s = await st();
-  if (!s.trip || s.trip.state !== 'muster' || s.ui.screen !== 'none') out.push(`after SEND the trip is ${JSON.stringify(s.trip?.state)} and the table ${s.ui.screen}`);
-  try { await page.waitForFunction(() => ((window as any).__dragonCare?.base?.camY ?? 999) <= 200, null, { timeout: 2000 }); } catch { out.push(`the camera is at y ${(await st()).camY} 2 s after SEND, not at the Aerie (<= 200)`); }
+  if (!s.trip || s.trip.state !== 'muster' || s.ui.screen !== 'none' || s.ui.follow !== 'gather') out.push(`after SEND the trip is ${JSON.stringify(s.trip?.state)}, the table ${s.ui.screen}, following ${s.ui.follow}`);
+  try { await page.waitForFunction(() => (window as any).__dragonCare?.base?.camX === 0 && (window as any).__dragonCare?.base?.camY === 20, null, { timeout: 2000 }); } catch { out.push(`the camera is at ${(await st()).camX}, ${(await st()).camY} 2 s after SEND, not held on the Aerie (0, 20)`); }
   if (!(await st()).ui.buttons.chip) out.push('no TEAM OUT chip with the team out');
-  if (!out.length) console.log(`        mission: MAP, pin 1 (${m.board[0].title}), BEST TEAM (${team.length} pairs), SEND: mustering, camera at y ${(await st()).camY}`);
+  // (following the team as it gathers: a drag leaves the camera on the Aerie, and a badge takes nobody, saying why)
+  await page.mouse.move(box.x + 350 * k, box.y + 200 * k);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 150 * k, box.y + 300 * k, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  const g = await st();
+  if (g.camX !== 0 || g.camY !== 20) out.push(`a drag moved the camera off the Aerie to ${g.camX}, ${g.camY} while the team gathers`);
+  // (a keeper at home: not on the trip's phases, missions.ts TRIP_PHASES)
+  const home = g.keepers.find((q) => !['muster', 'depart', 'away', 'deliver'].includes(q.phase))?.name;
+  if (!home) return [...out, `nobody is at home: ${g.keepers.map((q) => `${q.name} ${q.phase}`).join(', ')}`];
+  await click(g.badges[home]);
+  await page.waitForTimeout(200);
+  const h = await st();
+  if (h.controlled !== null || !h.toast?.startsWith('FOLLOWING THE TEAM')) out.push(`a tap on ${home}'s badge while the team gathers: ${h.controlled ?? 'nobody'} held, the toast ${JSON.stringify(h.toast)}`);
+  if (!out.length) console.log(`        mission: MAP, pin 1 (${m.board[0].title}), BEST TEAM (${team.length} pairs), SEND: mustering, followed -- the camera held on the Aerie through a drag, ${home}'s badge taking nobody`);
   return out;
 }
 
 /**
  * view=base, live (save=0; BASE_DESIGN 5, 6): the whole mission loop, as a player plays it -- MAP opens the Map Room's
  * map; the first pin (THE LOST NEST) its chooser; BEST TEAM puts a team together; SEND (a command the world takes at its
- * next step) closes the table and the team musters; at 8x the team stands together on the Aerie deck (the muster done:
- * leaving over the sky bridge); the TEAM OUT chip opens the watch overlay -- the team on its road, the world stepping
- * on underneath -- its TRIP LOG opens the trip's log and closes it again, and BACK TO BARN goes back to the barn.
+ * next step) closes the table and the team musters, the game following it; at 8x the team stands together on the Aerie
+ * deck (the muster done: leaving over the sky bridge), the barn still on screen; and as it walks off the bridge, its
+ * road comes on screen by itself -- the world stepping on underneath, Esc leaving it there -- where TRIP LOG opens the
+ * trip's log and closes it again.
  */
 async function baseLoop(page: any): Promise<string[]> {
   const out: string[] = [];
@@ -651,23 +862,174 @@ async function baseLoop(page: any): Promise<string[]> {
   await page.keyboard.press('4');
   if (!(await until('["depart", "away"].includes(window.__dragonCare?.base?.trip?.state)', 40000))) return [`the team never stood together on the Aerie (the trip ${(await st()).trip?.state})`];
   const deck = await st();
+  if (deck.trip?.state === 'depart' && (deck.ui.screen !== 'none' || deck.ui.follow !== 'gather')) out.push(`the team setting out over the sky bridge: the view ${deck.ui.screen} (following ${deck.ui.follow}), not the barn`);
+  // (off the bridge, away: its road on screen by itself)
+  const onRoad = 'window.__dragonCare?.base?.ui?.screen === "watch" && window.__dragonCare?.base?.ui?.follow === "road"';
+  if (!(await until(`window.__dragonCare?.base?.trip?.state === "away" && ${onRoad}`, 10000))) return [...out, `the trip ${(await st()).trip?.state}: the view ${(await st()).ui.screen} (following ${(await st()).ui.follow}), not the team's road`];
   await page.keyboard.press('1');
-  const chip = (await st()).ui.chip;
-  if (!chip) return [`no TEAM OUT chip with the team ${deck.trip?.state}`];
-  await click(chip);
-  if (!(await until('window.__dragonCare?.base?.ui?.screen === "watch"', 2000))) return [`the TEAM OUT chip left the overlay ${(await st()).ui.screen}`];
   const w = await st();
-  if (!w.scene || w.scene.progress < 0 || !w.ui.back || !w.ui.buttons.log) out.push(`the watch overlay: scene ${JSON.stringify(w.scene)}, back ${JSON.stringify(w.ui.back)}, log ${JSON.stringify(w.ui.buttons.log)}`);
+  if (!w.scene || w.scene.progress < 0 || !w.ui.buttons.log || Object.keys(w.ui.buttons).length !== 1) out.push(`the road: scene ${JSON.stringify(w.scene)}, buttons ${Object.keys(w.ui.buttons).join(' ')} (TRIP LOG alone)`);
   await click(w.ui.buttons.log);
   if (!(await until('window.__dragonCare?.base?.ui?.log === true', 2000))) out.push('TRIP LOG did not open the trip\'s log');
   await click(w.ui.buttons.log);
   if (!(await until('window.__dragonCare?.base?.ui?.log === false', 2000))) out.push('TRIP LOG again did not close the log');
   const t0 = (await st()).tick;
+  await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
-  if (!((await st()).tick > t0)) out.push('the world stood still under the watch overlay');
-  await click((await st()).ui.back!);
-  if (!(await until('window.__dragonCare?.base?.ui?.screen === "none"', 2000))) out.push(`BACK TO BARN left the overlay ${(await st()).ui.screen}`);
-  if (!out.length) console.log(`        loop: MAP, pin 1 (${title}), BEST TEAM (${pairs.length} pairs), SEND, the muster at 8x to the Aerie deck (${deck.trip?.state} at step ${deck.tick}), the TEAM OUT chip to the watch scene (${Math.round((w.scene?.progress ?? 0) * 100)} % along), TRIP LOG open and shut, BACK TO BARN`);
+  const e = await st();
+  if (!(e.tick > t0)) out.push('the world stood still under the road');
+  if (e.ui.screen !== 'watch' || e.ui.follow !== 'road') out.push(`Esc on the road left the view ${e.ui.screen} (following ${e.ui.follow})`);
+  if (!out.length) console.log(`        loop: MAP, pin 1 (${title}), BEST TEAM (${pairs.length} pairs), SEND, the muster at 8x to the Aerie deck (${deck.trip?.state} at step ${deck.tick}, the barn on screen), the team's road on screen by itself as it left (${Math.round((w.scene?.progress ?? 0) * 100)} % along, step ${w.tick}), TRIP LOG open and shut, Esc leaving the road there`);
+  return out;
+}
+
+/**
+ * view=base, live (save=0): the world map's places (BASE_DESIGN 5.1). MAP opens the map; a tap on a place with no
+ * mission today says what it is (the toast opens with its name) and the map stays open; a tap on a region under cloud
+ * (its "?") says how the cloud clears -- a success next door, named; a tap on the first mission's landmark (not its
+ * plate) opens its chooser.
+ */
+async function baseMapPlaces(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  const until = (fn: string, ms: number) => page.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (r: { x: number; y: number; w: number; h: number }) => page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  await click((await st()).buttons.map);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "map"', 2000))) return [`MAP did not open the map (screen ${(await st()).ui.screen})`];
+  const m = await st(), places = Object.entries(m.ui.places), clouds = Object.entries(m.ui.clouds);
+  if (places.length !== 9 || clouds.length !== 3) out.push(`the new game's map has ${places.length} quiet places (want 9: the start regions' twelve, their bosses' lairs among them, less the board's three) and ${clouds.length} clouds (want 3)`);
+  const [name, pr] = places[0] ?? [], said: string[] = [];
+  if (pr) {
+    await click(pr);
+    if (!(await until(`(window.__dragonCare?.base?.toast ?? '').startsWith(${JSON.stringify(name)})`, 2000))) out.push(`tapping ${name} said ${JSON.stringify((await st()).toast)}`);
+    if ((await st()).ui.screen !== 'map') out.push(`tapping ${name} left the map for ${(await st()).ui.screen}`);
+    said.push(`${(await st()).toast}`);
+  }
+  const [region, cr] = clouds[0] ?? [];
+  if (cr) {
+    await click(cr);
+    if (!(await until(`(window.__dragonCare?.base?.toast ?? '').startsWith('UNDER CLOUD: A SUCCESS IN ')`, 2000))) out.push(`tapping ${region}'s cloud said ${JSON.stringify((await st()).toast)}`);
+    said.push(`${(await st()).toast}`);
+  }
+  const mark = (await st()).ui.buttons.mark0;
+  if (!mark) return [...out, 'the map has no landmark for its first mission'];
+  await click(mark);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "mission"', 2000))) return [...out, `the first mission's landmark opened ${(await st()).ui.screen}, not its chooser`];
+  if ((await st()).ui.mission !== m.board[0].id) out.push(`the first mission's landmark opened mission ${(await st()).ui.mission}, not ${m.board[0].id}`);
+  if (!out.length) console.log(`        map places: ${name} told of ("${said[0]}"), ${region}'s cloud how it clears ("${said[1]}"), ${m.board[0].title}'s landmark opened its chooser`);
+  return out;
+}
+
+/**
+ * view=base&panel=arena (BASE_DESIGN 10): the Arena's chooser, open over a world that waits, with a button for every
+ * dragon free to spar (every one, a minute into the new game), no corner filled and no bout on.
+ */
+function chooserIs(b: BaseHook): string[] {
+  const out: string[] = [], picks = b.dragons.filter((d) => b.ui.buttons[`fighter${d.id}`]);
+  if (b.ui.screen !== 'arena') out.push(`the screen is ${b.ui.screen}, not the Arena's chooser`);
+  if (picks.length !== b.dragons.length) out.push(`only ${picks.map((d) => d.name).join(', ') || 'nobody'} may be picked`);
+  for (const k of ['start', 'swap', 'back']) if (!b.ui.buttons[k]) out.push(`no ${k} button`);
+  if (b.ui.corners.some((c) => c != null) || b.arena.bout || b.arena.bouts) out.push(`the corners ${JSON.stringify(b.ui.corners)}, the bout ${JSON.stringify(b.arena.bout?.state ?? null)} (${b.arena.bouts} begun)`);
+  return out;
+}
+/**
+ * view=base&preset=bout&panel=bout&t=90 (BASE_DESIGN 10): the bout preset at its move menu -- EMBER (LV 3, the player's)
+ * in the west corner and BRAMBLE (LV 2) in the east, the pick waiting with AUTO off, a button for each of EMBER's three
+ * skills (its breath, the preen and the yawn), AUTO and BACK TO BARN -- and both fighters' heads on screen, under the
+ * top bar and clear of every panel by 8 px (ART_BIBLE 1.4: nothing covers an eye).
+ */
+function boutMenu(b: BaseHook): string[] {
+  const out: string[] = [], bt = b.arena.bout;
+  if (b.ui.screen !== 'bout' || !bt || bt.state !== 'pick' || bt.auto || bt.t !== 30) return [`the screen ${b.ui.screen}, the bout ${JSON.stringify(bt && { state: bt.state, t: bt.t, auto: bt.auto })}: not the move menu`];
+  const want = [['EMBER', 3, 0], ['BRAMBLE', 2, 1]] as const;
+  bt.fighters.forEach((f, i) => { if (f.name !== want[i][0] || f.level !== want[i][1] || f.corner !== want[i][2] || f.puff !== f.max) out.push(`fighter ${i} is ${f.name} LV ${f.level} in corner ${f.corner} (${f.puff}/${f.max} puff), not ${want[i][0]} LV ${want[i][1]} in corner ${want[i][2]}, fresh`); });
+  const skills = ['skill0', 'skill1', 'skill2', 'skill3'].filter((k) => b.ui.buttons[k]);
+  if (skills.length !== 3 || !b.ui.buttons.auto || !b.ui.buttons.boutBack) out.push(`the menu's buttons: ${Object.keys(b.ui.buttons).join(' ')} (want skill0-skill2, auto, boutBack)`);
+  const panels = [...PLATES, LOG_LINE, MENU, AUTO, BOUT_BACK], M = 8;
+  for (const f of bt.fighters) {
+    const h = b.dragons.find((d) => d.id === f.dragon)?.head;
+    if (!h) { out.push(`${f.name}'s head was not drawn`); continue; }
+    if (h.x < M || h.x > 640 - M || h.y - M < 16) out.push(`${f.name}'s head (${h.x.toFixed(0)}, ${h.y.toFixed(0)}) is off screen or under the top bar`);
+    for (const r of panels) if (h.x + M > r.x && h.x - M < r.x + r.w && h.y + M > r.y && h.y - M < r.y + r.h) out.push(`${f.name}'s head (${h.x.toFixed(0)}, ${h.y.toFixed(0)}) is under a panel at (${r.x}, ${r.y}, ${r.w} x ${r.h})`);
+  }
+  return out;
+}
+
+/**
+ * The Arena's loop, live (BASE_DESIGN 10): b opens the chooser and b again closes it; ARENA opens it (the world waits
+ * under it); EMBER then BRAMBLE tapped into the corners, SWAP and SWAP back; START BOUT opens the bout, its muster
+ * begun; BACK TO BARN leaves it on under its chip, and the chip opens it again; at 8x the pair up to their corners and
+ * the move menu -- the world waits for the pick; the breath tapped plays; AUTO lets the coach pick; decided, the toasts
+ * (who won, and the level and skill it brought), the result card (tapped away: the barn again), and at 8x the pair home,
+ * the bout over, the XP each got in the hook.
+ */
+async function baseArena(page: any): Promise<string[]> {
+  const out: string[] = [];
+  const st = (): Promise<BaseHook> => page.evaluate(() => (window as any).__dragonCare?.base);
+  const until = (fn: string, ms: number) => page.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
+  await page.waitForFunction(() => ((window as any).__dragonCare?.base?.tick ?? 0) > 30, null, { timeout: 15000 });
+  const box = await page.locator('#stage').boundingBox(), k = box.width / 640;
+  const click = (r: { x: number; y: number; w: number; h: number }) => page.mouse.click(box.x + (r.x + r.w / 2) * k, box.y + (r.y + r.h / 2) * k);
+  await page.keyboard.press('b');
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "arena"', 3000))) return [`b did not open the Arena (screen ${(await st()).ui.screen})`];
+  await page.keyboard.press('b');
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "none"', 3000))) return [`b again did not close the Arena (screen ${(await st()).ui.screen})`];
+  await click((await st()).buttons.arena);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "arena"', 3000))) return [`ARENA did not open the chooser (screen ${(await st()).ui.screen})`];
+  let s = await st();
+  const t0 = s.tick, ember = s.dragons.find((d) => d.name === 'EMBER')!, bramble = s.dragons.find((d) => d.name === 'BRAMBLE')!;
+  if (!s.ui.buttons[`fighter${ember.id}`] || !s.ui.buttons[`fighter${bramble.id}`]) return [`EMBER or BRAMBLE can't be picked (${Object.keys(s.ui.buttons).join(' ')})`];
+  await click(s.ui.buttons[`fighter${ember.id}`]);
+  await click((await st()).ui.buttons[`fighter${bramble.id}`]);
+  await page.waitForTimeout(100);
+  s = await st();
+  if (s.ui.corners[0] !== ember.id || s.ui.corners[1] !== bramble.id) out.push(`EMBER then BRAMBLE tapped put ${JSON.stringify(s.ui.corners)} in the corners`);
+  await click(s.ui.buttons.swap);
+  await page.waitForTimeout(100);
+  if ((await st()).ui.corners[0] !== bramble.id) out.push(`SWAP left the corners ${JSON.stringify((await st()).ui.corners)}`);
+  await click((await st()).ui.buttons.swap);
+  await page.waitForTimeout(100);
+  if ((await st()).tick !== t0) out.push(`the world stepped under the chooser (tick ${t0} to ${(await st()).tick})`);
+  await click((await st()).ui.buttons.start);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "bout" && window.__dragonCare?.base?.arena?.bout?.state === "muster"', 3000))) return [...out, `START BOUT left the screen ${(await st()).ui.screen} and the bout ${JSON.stringify((await st()).arena.bout?.state ?? null)}`];
+  await click((await st()).ui.buttons.boutBack);
+  if (!(await until('window.__dragonCare?.base?.ui?.screen === "none" && !!window.__dragonCare?.base?.ui?.boutChip', 3000))) out.push(`BACK TO BARN left the screen ${(await st()).ui.screen}, the bout's chip ${JSON.stringify((await st()).ui.boutChip)}`);
+  else {
+    await click((await st()).ui.boutChip!);
+    if (!(await until('window.__dragonCare?.base?.ui?.screen === "bout"', 3000))) out.push(`the bout's chip opened ${(await st()).ui.screen}, not the bout`);
+  }
+  // (8x: up to the corners, and the move menu: the world waits for the pick)
+  await page.keyboard.press('4');
+  if (!(await until('window.__dragonCare?.base?.arena?.bout?.state === "pick"', 60000))) return [...out, `the pair never stood in their corners (the bout ${(await st()).arena.bout?.state})`];
+  const up = await st();
+  await page.waitForTimeout(400);
+  if ((await st()).tick !== up.tick) out.push(`the world stepped on with the move menu up (tick ${up.tick} to ${(await st()).tick})`);
+  await page.keyboard.press('1');
+  await click((await st()).ui.buttons.skill0);
+  if (!(await until('window.__dragonCare?.base?.arena?.bout?.state === "play"', 3000))) out.push(`the breath tapped left the bout at ${(await st()).arena.bout?.state}`);
+  else if ((await st()).arena.bout?.moves.find((m) => m.by === 0)?.skill !== 'breath') out.push(`EMBER's move is ${(await st()).arena.bout?.moves.find((m) => m.by === 0)?.skill}, not the breath tapped`);
+  await click((await st()).ui.buttons.auto);
+  if (!(await until('window.__dragonCare?.base?.arena?.bout?.auto === true', 3000))) out.push('AUTO did not let the coach pick');
+  await page.keyboard.press('4');
+  if (!(await until('["over", "home"].includes(window.__dragonCare?.base?.arena?.bout?.state)', 60000))) return [...out, `the bout never ended (${(await st()).arena.bout?.state})`];
+  await page.keyboard.press('1');
+  const won = await until('/WINS THE BOUT|A DRAW/.test(window.__dragonCare?.base?.toast ?? "")', 5000);
+  const decided = await st(), bt = decided.arena.bout!, name = bt.winner == null ? null : bt.fighters[bt.winner].name;
+  if (!won) out.push(`no toast of the bout's end (the toast ${JSON.stringify(decided.toast)})`);
+  const levelled = name ? await until(`/${name} IS LEVEL 2! NEW SKILL: YAWN/.test(window.__dragonCare?.base?.toast ?? "")`, 8000) : true;
+  if (!levelled) out.push(`no toast of ${name}'s level and new skill (the toast ${JSON.stringify((await st()).toast)})`);
+  if (!(await st()).ui.buttons.result) out.push('no result card once the bout was decided');
+  else {
+    await click((await st()).ui.buttons.result);
+    if (!(await until('window.__dragonCare?.base?.ui?.screen === "none"', 3000))) out.push(`the result card tapped left the screen ${(await st()).ui.screen}`);
+  }
+  await page.keyboard.press('4');
+  if (!(await until('window.__dragonCare?.base?.arena?.bout === null', 60000))) return [...out, `the pair never got home (the bout ${(await st()).arena.bout?.state})`];
+  const home = await st(), xp = [ember, bramble].map((d) => home.dragons.find((q) => q.id === d.id)!);
+  if (xp[0].xp !== bt.xp[0] || xp[1].xp !== bt.xp[1] || home.arena.bouts !== 1 || home.ui.boutChip) out.push(`home: EMBER ${xp[0].xp} XP LV ${xp[0].level}, BRAMBLE ${xp[1].xp} XP LV ${xp[1].level} (the bout gave ${JSON.stringify(bt.xp)}); ${home.arena.bouts} bouts begun; the chip ${JSON.stringify(home.ui.boutChip)}`);
+  if (!out.length) console.log(`        arena: b open and shut, ARENA, EMBER and BRAMBLE tapped into the corners, SWAP and back, START BOUT, BACK TO BARN and the chip, the move menu at step ${up.tick} (the world waiting), the breath tapped, AUTO; ${name ?? 'nobody'} ${name ? 'won' : 'drew'} in ${bt.turn} turns (+${bt.xp.join(' and +')} XP), the toasts, the result card tapped away; the pair home by step ${home.tick}`);
   return out;
 }
 
@@ -950,16 +1312,32 @@ const CASES: Case[] = [
   // and the capped preset, the barn at its cap (BARN 12/12), its egg due on the first step waiting in the Hatchery's
   // first nest with nobody in front of it (the nest's dots in view)
   { query: 'view=base&preset=capped&t=60&cam=168,280', minColours: 150, allScales: false, check: (b) => [...castIs(12, null)(b), ...barnIs(12)(b), ...eggWaits(b), ...nestClear(b)] },
-  { query: 'view=base&preset=trip&trip=oldmine:0.1245&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'foes', beat: true, baddie: null, bar: null })(b), ...(b.scene && b.scene.foes > 0 && b.scene.shots > 0 ? [] : [`a fight with ${b.scene?.foes} foes and ${b.scene?.shots} bolts in flight`])] },
-  { query: 'view=base&preset=trip&trip=oldmine:0.9679&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', beat: true, baddie: 'moleking' })(b), ...(b.scene?.bar != null && b.scene.bar > 0 && b.scene.bar < 1 ? [] : [`the boss's bar is ${b.scene?.bar}`])] },
-  { query: 'view=base&preset=trip&trip=oldmine:0.9833&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ stop: 'baddie', baddie: 'moleking', pose: 'down', face: 'dazed', bar: 0 }) },
-  { query: 'view=base&preset=trip&trip=oldmine:0.9833:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ ...succeedingScene('oldmine:0.9833', 60), baddie: 'moleking', pose: 'down' }) },
-  { query: 'view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ covered: true, baddie: null })(b), ...(b.scene?.stop && b.scene.stop !== 'baddie' && b.scene.stop !== 'foes' ? [] : [`the last stop is ${b.scene?.stop}, not a challenge`])] },
-  { query: 'view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs(succeedingScene('bramblewood:0.7', 60)) },
-  { query: 'view=base&preset=trip&trip=bramblewood:0.99:weak&panel=watch&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', covered: false, baddie: 'briarboar', face: 'fierce', pose: 'walk' })(b), ...(b.scene?.bar != null && b.scene.bar > 0 ? [] : [`the unbeaten boss's bar is ${b.scene?.bar}`])] },
-  { query: 'view=base&preset=trip&trip=oldmine:1&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result: 'HOME SAFE!' }) },
-  { query: 'view=base&preset=trip&trip=bramblewood:1:fail&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result: 'NOT THIS TIME' }) },
-  { query: 'view=base&preset=trip&trip=oldmine:0.2&save=0', minColours: 150, allScales: false, act: baseWatch },
+  // (a team away: the game follows it, its road on screen with no panel= asking -- and a keeper asked for by take= is
+  // not taken, the game saying why. The walked road, BASE_DESIGN 11: 0.905 is just past the Mole King's stop, its fight
+  // won -- the Mole King dozing off calmed, in view; with :fail the team sat that fight out (the banner says so) and it
+  // dozed off just the same, the team on its road just where the winning one is; 0.9 is the fight itself from its
+  // walk-in: at t=200 the picks wait -- the menu on screen, its rows and AUTO among the buttons, the fighters' plates and
+  // the Mole King's, every head clear of them; 0.3 on Millbrook's road is past its first stop, cleared, as the scene's
+  // own function says)
+  { query: 'view=base&preset=trip&trip=oldmine:0.905&take=tomas&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', result: 'met', baddie: null, at: null })(b), ...(b.controlled === null && b.toast?.startsWith('FOLLOWING THE TEAM') ? [] : [`take=tomas on the road: ${b.controlled ?? 'nobody'} held, the toast ${JSON.stringify(b.toast)}`])] },
+  { query: 'view=base&preset=trip&trip=oldmine:0.905:fail&t=60', minColours: 150, allScales: false, check: sceneIs({ ...failingScene('oldmine:0.905', 60), baddie: null }) },
+  { query: 'view=base&preset=trip&trip=oldmine:0.9&t=200', minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', result: 'ahead', at: 'pick', baddie: 'moleking', face: 'fierce', pose: 'stand' })(b), ...encounterMenu(b)] },
+  // (`:auto`: the trail coach plays the fight -- at t=209 BEA's CHARM, the first move, has just landed on the Mole King:
+  // the encounter at play, the Mole King surprised, no menu on screen (THE TRAIL COACH PICKS in its place) and AUTO lit)
+  { query: `view=base&preset=trip&trip=${BOSS_TRIP}&t=${BOSS_HIT_T}`, minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', result: 'ahead', at: 'play', baddie: 'moleking', face: 'hurt', pose: 'hit', flash: true })(b), ...fightIs(BOSS_TRIP, BOSS_HIT_T, () => null)(b), ...(b.trip?.auto && !Object.keys(b.ui.buttons).some((k) => k.startsWith('ability')) && b.ui.buttons.trail ? [] : [`with AUTO the buttons are ${Object.keys(b.ui.buttons).join(' ')}, auto ${b.trip?.auto}`])] },
+  { query: `view=base&preset=trip&trip=${BOSS_TRIP}&t=${BOSS_DOWN_T}`, minColours: 150, allScales: false, check: (b) => [...sceneIs({ stop: 'baddie', result: 'met', at: 'done', baddie: 'moleking', face: 'dazed', pose: 'down' })(b), ...fightIs(BOSS_TRIP, BOSS_DOWN_T, (s) => (s.riders.every((r) => r === 56) ? null : `the riders stand at ${s.riders.join(', ')}, not beside their dragons again`))(b)] },
+  { query: `view=base&preset=trip&trip=${PACK_TRIP}&t=${PACK_BOLT_T}`, minColours: 150, allScales: false, check: fightIs(PACK_TRIP, PACK_BOLT_T, (s) => (s.stop === 'foes' && s.at === 'play' && s.foes.length >= 2 && s.shots >= 1 && s.riders.every((r) => r < 0) ? null : `a pack's fight shows ${JSON.stringify({ stop: s.stop, at: s.at, foes: s.foes.length, shots: s.shots, riders: s.riders })}`)) },
+  { query: `view=base&preset=trip&trip=${PACK_TRIP}&t=${PACK_THROW_T}`, minColours: 150, allScales: false, check: fightIs(PACK_TRIP, PACK_THROW_T, (s) => (s.shots >= 2 && s.foes.every((q) => q.id === 'mudgoblin') ? null : `the goblins' throw shows ${s.shots} in flight`)) },
+  { query: `view=base&preset=trip&trip=${PACK_TRIP}&t=${PACK_POOF_T}`, minColours: 150, allScales: false, check: fightIs(PACK_TRIP, PACK_POOF_T, (s) => (s.marks.some((m) => m.kind === 'poof') ? null : 'no puff of smoke')) },
+  { query: 'view=base&preset=trip&trip=millbrook:0.3&t=60', minColours: 150, allScales: false, check: (b) => [...sceneIs({ ...succeedingScene('millbrook:0.3', 60), result: 'met', baddie: null, at: null })(b), ...(b.scene?.stop && b.scene.stop !== 'baddie' ? [] : [`the last stop is ${b.scene?.stop}, not a challenge`])] },
+  { query: 'view=base&preset=trip&trip=bramblewood:0.7:fail&t=60', minColours: 150, allScales: false, check: sceneIs({ ...failingScene('bramblewood:0.7', 60), baddie: null }) },
+  { query: 'view=base&preset=trip&trip=oldmine:1&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result_card: 'HOME SAFE!' }) },
+  { query: 'view=base&preset=trip&trip=bramblewood:1:fail&t=60', minColours: 150, allScales: false, check: sceneIs({ done: true, result_card: 'NOT THIS TIME' }) },
+  // (panel=watch asks for the scene the game shows anyway)
+  { query: 'view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60', minColours: 150, allScales: false, check: sceneIs({ ...succeedingScene('millbrook:0.3', 60), baddie: null }) },
+  { query: 'view=base&preset=trip&trip=oldmine:0.97&save=0', minColours: 150, allScales: false, act: baseFollow },
+  { query: 'view=base&preset=trip&trip=bramblewood:0.998:fail&save=0', minColours: 150, allScales: false, act: baseHomeEsc },
+  { query: 'view=base&preset=trip&trip=oldmine:0.9&save=0', minColours: 150, allScales: false, act: baseEncounter, timeout: 90000 },
   // the mission art kit (ART_BIBLE 5.10): every sheet draws everything on it (the page's hook lists it), in its colours
   { query: 'view=missionart&sheet=climates&t=0', minColours: 1000, allScales: false, art: { sheet: 'climates', want: CLIMATES.flatMap((c) => PHASE_ORDER.map((p) => `${c}:${p}`)) } },
   { query: 'view=missionart&sheet=climates&climate=peaks&phase=night&t=90', minColours: 500, allScales: false, art: { sheet: 'climates', want: ['peaks:night:scene'] } },
@@ -967,20 +1345,32 @@ const CASES: Case[] = [
   { query: 'view=missionart&sheet=baddies&t=30', minColours: 1000, allScales: false, art: { sheet: 'baddies', want: [...BADDIE_IDS, ...BADDIE_IDS.map((b) => `${b}:portrait`)] } },
   { query: 'view=missionart&sheet=foes&t=30', minColours: 400, allScales: false, art: { sheet: 'foes', want: FOE_IDS } },
   { query: 'view=missionart&sheet=fights&t=30', minColours: 100, allScales: false, art: { sheet: 'fights', want: [...DRAGON_ELEMENTS.map((e) => `bolt:${e}`), ...Object.keys(MISSILES).map((k) => `missile:${k}`),
-    ...Array.from({ length: SPARK_LEN / 2 }, (_, i) => `spark:${i * 2}`), ...Array.from({ length: POOF_LEN / 5 }, (_, i) => `poof:${i * 5}`), 'stars', 'pop', 'bar:1', 'bar:0.65', 'bar:0.2', 'bar:0'] } },
+    ...Array.from({ length: SPARK_LEN / 2 }, (_, i) => `spark:${i * 2}`), ...Array.from({ length: POOF_LEN / 5 }, (_, i) => `poof:${i * 5}`), 'stars'] } },
   { query: 'view=missionart&sheet=people&t=50', minColours: 1000, allScales: false, keepers: true, art: { sheet: 'people', want: ['miller:grumpy', 'miller:talkedRound', ...KEEPER_IDS] } },
   { query: 'view=missionart&sheet=icons&t=0', minColours: 300, allScales: false, art: { sheet: 'icons', want: [...CHALLENGE_IDS.map((c) => `challenge:${c}`), ...SKILLS.map((k) => `skill:${k}`), 'saddle', ...DRAGON_ELEMENTS.map((e) => `egg:${e}`), ...BADDIE_IDS.map((b) => `portrait:${b}`), 'fight'] } },
+  // (the world map's landmarks, HOME and the land's growths: BASE_DESIGN 5.1)
+  { query: 'view=missionart&sheet=places&t=0', minColours: 90, allScales: false, art: { sheet: 'places', want: [...new Set(PLACES.map((p) => `place:${p.art}`)), 'home', ...growthSamples().map((g) => `growth:${g.name}`)] } },
   // missions (BASE_DESIGN 5): the Map Room's world map and a mission's chooser (frozen, the world stepped first), the muster
-  // preset's team all on the Aerie deck, and live, MAP -> a pin -> BEST TEAM -> SEND
-  { query: 'view=base&t=60&panel=map', minColours: 100, maxPanelColours: 40, allScales: false, check: tableIs('map') },
+  // preset's team all on the Aerie deck and gathering there, followed (BASE_DESIGN 6), and live, MAP -> a pin -> BEST
+  // TEAM -> SEND, the camera held on the Aerie
+  { query: 'view=base&t=60&panel=map', minColours: 100, maxPanelColours: 110, allScales: false, check: tableIs('map') },
   { query: 'view=base&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: (b) => [...tableIs('mission')(b), ...noticeIs(null)(b)] },
   // (and over a full barn: the twelve preset at the cap, the chooser open on THE LOST NEST, its egg to wait)
   { query: 'view=base&preset=twelve&t=60&panel=mission&mission=0', minColours: 100, allScales: false, check: (b) => [...tableIs('mission')(b), ...barnIs(12)(b), ...noticeIs('BARN FULL: THE EGG WILL WAIT')(b)] },
   { query: 'view=base&preset=muster&t=2186&cam=0,20', minColours: 150, allScales: false, check: (b) => [...mustered(b), ...travels(b)] },
+  { query: 'view=base&preset=muster&t=900', minColours: 100, allScales: false, check: (b) => [...gathering(b), ...travels(b)] },
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseMission },
-  // the whole loop live (BASE_DESIGN 5, 6): MAP -> a pin -> BEST TEAM -> SEND -> the muster on the Aerie -> the TEAM
-  // OUT chip -> the watch scene (its trip log) -> BACK
+  // (the world map's places, live: a quiet place told of, a cloud's way to clear, a mission's landmark to its chooser)
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseMapPlaces },
+  // the whole loop live (BASE_DESIGN 5, 6): MAP -> a pin -> BEST TEAM -> SEND -> the muster on the Aerie, followed -> the
+  // team's road on screen as it leaves (its trip log; Esc leaves it there)
   { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseLoop },
+  // the Arena (BASE_DESIGN 10): the sparring audit (every look's every sparring skill against every look: no eye
+  // covered), the chooser and the bout preset's move menu frozen, and the loop live
+  { query: 'view=arenaaudit&t=0', minColours: 2, allScales: false, timeout: 300000, arena: 84 },
+  { query: 'view=base&t=60&panel=arena', minColours: 100, allScales: false, check: chooserIs },
+  { query: 'view=base&preset=bout&panel=bout&t=90', minColours: 150, allScales: false, check: boutMenu },
+  { query: 'view=base&save=0', minColours: 150, allScales: false, act: baseArena, timeout: 60000 },
 ];
 
 const hexToInt = (h: string) => parseInt(h.slice(1), 16);
@@ -1040,6 +1430,14 @@ for (const c of CASES) {
         if (r.covered > 0) errors.push(`${r.act} ${r.id}: the keeper covers ${r.covered} px of the eye at f${r.frame} (${r.phase})`);
         if (r.miss > REACH_MISS) errors.push(`${r.act} ${r.id}: the hand lands ${r.miss} px off its mark`);
         if (!r.done) errors.push(`${r.act} ${r.id}: the act never ends`);
+      }
+    }
+    if (c.arena) {
+      const rows: { id: string; covered: number; against: string; frame: number; reach: number; own: number; gap: number }[] = await page.evaluate(() => (window as any).__dragonCare?.arena ?? []);
+      if (rows.length < c.arena) errors.push(`the sparring audit played ${rows.length} skills, not ${c.arena}`);
+      for (const r of rows) {
+        if (r.covered > 0) errors.push(`${r.id} covers ${r.covered} px of ${r.against}'s eye at f${r.frame}`);
+        if (r.own > 0) errors.push(`${r.against} covers ${r.own} px of ${r.id}'s own eye at f${r.frame}`);
       }
     }
     if (c.base) {

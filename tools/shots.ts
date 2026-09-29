@@ -104,37 +104,48 @@ const pairs: string[] = [
   // taking a keeper (BASE_DESIGN 4.10): BEA held by hand from the first step -- the mark over her head in her colour, her badge
   // lit, the line over the pad and the pad at the bottom right, the camera following her
   'shots/base_control.png=view=base&t=120&take=bea',
-  // the watchable scene (BASE_DESIGN 6; frozen, preset=trip: a team away on the region's hard mission, that far along its road
-  // at t=60): on the road past a challenge met (its banner); the first fight with the Mole Miners (0.1245: COBBLE's
-  // rock bolt in flight at the pack) and its first foe beaten (0.1256: a puff of smoke); each region's boss in its fight,
-  // the first hit landed (its bar at 80 %) and its big missile in flight at the team (0.9588; the riders stepped back
-  // behind their dragons); the Mole King knocked down, seeing stars (0.9833) and running off up the road (0.99); the Briar
-  // Boar against a lone pair too weak for it (:weak) -- its big burr in flight (0.9588), and stomping off unbeaten
-  // (0.9865); a failure, on its road just as a success is (0.7); the result card, and a failure's; the TEAM OUT chip over
-  // the barn; and the barn at t=1800
+  // the watchable scene (BASE_DESIGN 6, 11; frozen, preset=trip: a team away on the region's hard mission, that far along
+  // its walk, the stops before resolved -- the game following it, its road on screen): on the road past a challenge
+  // cleared (its banner); a pack of little enemies fought (millbrook:0.12 with `:auto`: the team walks up to its first
+  // stop, the mud goblins run in and the riders step back behind their dragons -- t=230 ECHO's shriek thrown at the
+  // pack, t=268 one goblin gone up in a puff of smoke, t=334 the goblins' clods in flight); each boss's fight -- 0.9 is
+  // its stop, the boss walked in and the fight's menu up at t=200 (the pairs' plates, the boss's, the rows, AUTO) --
+  // played by the trail coach with `:auto` (oldmine at t=207: BEA's CHARM landing on the Mole King -- rocked back,
+  // flashing, its popup; highfold at t=192: the Storm Roc's zap in flight at the team; each boss worn out, sat down
+  // seeing stars, the riders back beside their dragons, and the Mole King off up the road at t=2720); an obstacle's menu
+  // (millbrook at its second stop, the first pack behind the team: LOST THINGS, met on the first step); a failure, on its
+  // road just where a success is (its last stop waited out); the result card, and a failure's; the game following a
+  // team as it gathers on the Aerie and as it sets out over the sky bridge (the muster preset: the camera held on the
+  // deck, the TEAM OUT chip lit, the follow line in the job strip's place); and the barn at t=1800
   'shots/base_watch.png=view=base&preset=trip&trip=millbrook:0.3&panel=watch&t=60',
-  'shots/base_fight_foes.png=view=base&preset=trip&trip=oldmine:0.1245&panel=watch&t=60',
-  'shots/base_fight_poof.png=view=base&preset=trip&trip=oldmine:0.1256&panel=watch&t=60',
-  'shots/base_boss_bridgetroll.png=view=base&preset=trip&trip=millbrook:0.9588&panel=watch&t=60',
-  'shots/base_boss_moleking.png=view=base&preset=trip&trip=oldmine:0.9588&panel=watch&t=60',
-  'shots/base_boss_briarboar.png=view=base&preset=trip&trip=bramblewood:0.9588&panel=watch&t=60',
-  'shots/base_boss_stormroc.png=view=base&preset=trip&trip=highfold:0.9588&panel=watch&t=60',
-  'shots/base_boss_frostgiant.png=view=base&preset=trip&trip=frostmere:0.9588&panel=watch&t=60',
-  'shots/base_boss_cindergolem.png=view=base&preset=trip&trip=emberfell:0.9588&panel=watch&t=60',
-  'shots/base_boss_down.png=view=base&preset=trip&trip=oldmine:0.9833&panel=watch&t=60',
-  'shots/base_boss_flee.png=view=base&preset=trip&trip=oldmine:0.99&panel=watch&t=60',
-  'shots/base_boss_weak.png=view=base&preset=trip&trip=bramblewood:0.9588:weak&panel=watch&t=60',
-  'shots/base_boss_stomps.png=view=base&preset=trip&trip=bramblewood:0.9865:weak&panel=watch&t=60',
+  'shots/base_fight_pack.png=view=base&preset=trip&trip=millbrook:0.12:auto&panel=watch&t=230',
+  'shots/base_fight_poof.png=view=base&preset=trip&trip=millbrook:0.12:auto&panel=watch&t=268',
+  'shots/base_fight_throw.png=view=base&preset=trip&trip=millbrook:0.12:auto&panel=watch&t=334',
+  ...(['millbrook:bridgetroll', 'oldmine:moleking', 'bramblewood:briarboar', 'highfold:stormroc', 'frostmere:frostgiant', 'emberfell:cindergolem']).map((rb) => {
+    const [region, boss] = rb.split(':');
+    return `shots/base_baddie_${boss}.png=view=base&preset=trip&trip=${region}:0.9&panel=watch&t=200`;
+  }),
+  'shots/base_baddie_moleking_moments.png=view=base&preset=trip&trip=oldmine:0.9:auto&panel=watch&t=207',
+  'shots/base_baddie_stormroc_zap.png=view=base&preset=trip&trip=highfold:0.9:auto&panel=watch&t=192',
+  'shots/base_baddie_bridgetroll_down.png=view=base&preset=trip&trip=millbrook:0.9:auto&panel=watch&t=2570',
+  'shots/base_baddie_moleking_down.png=view=base&preset=trip&trip=oldmine:0.9:auto&panel=watch&t=2575',
+  'shots/base_baddie_briarboar_down.png=view=base&preset=trip&trip=bramblewood:0.9:auto&panel=watch&t=2183',
+  'shots/base_baddie_stormroc_down.png=view=base&preset=trip&trip=highfold:0.9:auto&panel=watch&t=1688',
+  'shots/base_baddie_frostgiant_down.png=view=base&preset=trip&trip=frostmere:0.9:auto&panel=watch&t=2282',
+  'shots/base_baddie_cindergolem_down.png=view=base&preset=trip&trip=emberfell:0.9:auto&panel=watch&t=2254',
+  'shots/base_baddie_moleking_exit.png=view=base&preset=trip&trip=oldmine:0.9:auto&panel=watch&t=2720',
+  'shots/base_obstacle_menu.png=view=base&preset=trip&trip=millbrook:0.24285714285714283&panel=watch&t=100',
   'shots/base_fail_road.png=view=base&preset=trip&trip=bramblewood:0.7:fail&panel=watch&t=60',
   'shots/base_result.png=view=base&preset=trip&trip=oldmine:1&panel=watch&t=60',
   'shots/base_result_fail.png=view=base&preset=trip&trip=bramblewood:1:fail&panel=watch&t=60',
-  'shots/base_team_chip.png=view=base&preset=trip&trip=oldmine:0.2&t=60',
+  'shots/base_follow_gather.png=view=base&preset=muster&t=900',
+  'shots/base_follow_depart.png=view=base&preset=muster&t=2200',
   'shots/base_final.png=view=base&t=1800',
   // the mission art kit (ART_BIBLE 5.10; docs/ART_BIBLE.md "Mission art"): the six climates at the four phases (the chooser's
   // 300 x 112 pictures), two of them filling a road scene, the eleven set pieces ahead and met (a dragon in the fog,
   // which stands behind it), the six bosses' faces and fight poses beside an adult dragon, the six packs of little
-  // enemies, the fights' marks (the breath bolts, the missiles, the spark, the puff of smoke, the stars, the boss's bar),
-  // the grumpy miller grumpy and talked round beside the keepers (and their silhouettes), and the icons
+  // enemies, the fights' marks (the breath bolts, the missiles, the spark, the puff of smoke, the stars), the grumpy
+  // miller grumpy and talked round beside the keepers (and their silhouettes), the icons and the world map's places
   'shots/missionart_climates.png=view=missionart&sheet=climates&t=0',
   'shots/missionart_road_caves.png=view=missionart&sheet=climates&climate=caves&phase=day&t=120',
   'shots/missionart_road_ice_night.png=view=missionart&sheet=climates&climate=ice&phase=night&t=120',
@@ -144,13 +155,20 @@ const pairs: string[] = [
   'shots/missionart_fights.png=view=missionart&sheet=fights&t=0',
   'shots/missionart_people.png=view=missionart&sheet=people&t=50',
   'shots/missionart_icons.png=view=missionart&sheet=icons&t=0',
-  // missions (BASE_DESIGN 5): the Map Room table's world map (the three start regions, the fog hatched over the rest, the
-  // roads, HOME, the board's three pins) and THE LOST NEST's chooser (the climate picture, the challenges and who at
-  // home meets them, the dragons, the odds) -- each over the world stepped a second -- and the muster preset's team all
+  // the world map's landmarks (every place's, and HOME) at 2x, and its land's growths (BASE_DESIGN 5.1)
+  'shots/missionart_places.png=view=missionart&sheet=places&t=0',
+  // missions (BASE_DESIGN 5): the Map Room table's world map (the island: the three start regions, cloud over the rest,
+  // the roads, the places' landmarks, HOME, the board's three missions pinned at their places, each with its plate) and
+  // THE LOST NEST's chooser (the climate picture with WILLOW POND standing in it, the challenges and who at home meets
+  // them, the dragons, the trail coach's forecast) -- each over the world stepped a second -- the whole map explored (preset=explored:
+  // every region out from under its cloud), the map with a team out (its red road from HOME to THE MOLE KING'S HALL, its
+  // flag half way along), and the muster preset's team all
   // on the Aerie deck, each rider beside its dragon, the last step of the muster (the chip still MUSTER; they walk off at step 2186: npm
   // run sim section 20)
   'shots/base_map.png=view=base&panel=map&t=60',
   'shots/base_mission.png=view=base&panel=mission&mission=0&t=60',
+  'shots/base_map_explored.png=view=base&preset=explored&panel=map&t=60',
+  'shots/base_map_trip.png=view=base&preset=trip&trip=oldmine:0.5&panel=map&t=60',
   // and the chooser over a full barn (the twelve preset: BARN 12/12): THE LOST NEST's sure egg says BARN FULL: THE EGG
   // WILL WAIT (it still comes home, and waits in its nest until a dragon leaves: BASE_DESIGN 4.7)
   'shots/base_mission_full.png=view=base&preset=twelve&panel=mission&mission=0&t=60',
