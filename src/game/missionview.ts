@@ -29,6 +29,7 @@ import { skyPhase } from './sky.ts';
 import { FLOORS, INK, ROAD_SCENE } from './surfaces.ts';
 import { drawClimate } from './backdrops.ts';
 import { drawSetPiece } from './setpieces.ts';
+import { drawPassage, hasPassage, PASSAGE_FROM, PASSAGE_LEN } from './passages.ts';
 import { drawBaddie, BADDIE_ART } from './baddies.ts';
 import { drawFoe, FOE_ART } from './foes.ts';
 import { drawBolt, drawMissile, drawSpark, drawPoof, REGION_MISSILE, SPARK_LEN, POOF_LEN } from './fightfx.ts';
@@ -82,6 +83,8 @@ export const DOWN_SHARE = 0.55, FLEE_PACE = 1.6, STOMP_PACE = 1, SCAMPER_PACE = 
 export const PAST_STEPS = 12;
 /** A pack runs in over this many steps, each one ENTER_STAGGER after the one in front of it. */
 export const PACK_RUN = 96, ENTER_STAGGER = 14;
+/** A passage ends at least this far before where the lead halts for the next stop (a short road's stops stand close: the passage is cut to fit between them). */
+export const PASSAGE_CLEAR = 20;
 /** The camera keeps the team's middle this far from the screen's left edge. */
 export const CAM_BACK = 260;
 /**
@@ -188,6 +191,8 @@ const riderStep = (k: Keeper | null) => Math.min(RIDER_STEP_MAX, Math.round((RID
 export interface Act { key: string; anim: string; start: number; speed: number; phase: number }
 /** A stop's set piece on the road, where it stands and how it looks now. */
 export interface Piece { stop: number; x: number; state: StopState }
+/** The passage a land stop opens onto (passages.ts): the stretch of road from `x0` to `x1` walked through after the stop, drawn as the stop went. */
+export interface Passage { stop: number; x0: number; x1: number; state: StopState }
 /**
  * The boss on the road: where, which way it faces, its face and pose (the art kit draws a sit-down's stars and a run's
  * dust from them: baddies.ts drawBaddie), whether a hit is flashing on it, and its step (its bob and stride).
@@ -224,6 +229,9 @@ export interface SceneFrame {
   marks: MarkAt[];
   flash: boolean[];
   pieces: Piece[];
+  /** The passages the land stops open onto, and the one the lead's dragon is walking through now (its stop), or null. */
+  passages: Passage[];
+  passage: number | null;
   acts: { dragon: Act; rider: Act | null; face: 'surprised' | 'happy' | null }[];
   done: boolean;
 }
@@ -288,12 +296,17 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
   // road where the team will reach them, never bunched at the lead)
   const leadAt = (j: number) => (team.ds.length ? xAt(0, starts[j]) : 0);
 
-  // the set pieces: every stop's (the team reaches them all), where it stands and how it went
-  const pieces: Piece[] = [];
+  // the set pieces: every stop's (the team reaches them all), where it stands and how it went; and the passage each land
+  // stop opens onto (the cave after the dark...), from just past its piece, walked through after the stop as it went
+  const pieces: Piece[] = [], passages: Passage[] = [];
   for (let j = 0; j < stops.length; j++) {
     if (stops[j].kind !== 'challenge') continue;
-    pieces.push({ stop: j, x: leadAt(j) + PIECE_AHEAD, state: stops[j].result === 'met' ? 'met' : stops[j].result === 'unmet' ? 'unmet' : 'ahead' });
+    const x = leadAt(j) + PIECE_AHEAD, state: StopState = stops[j].result === 'met' ? 'met' : stops[j].result === 'unmet' ? 'unmet' : 'ahead';
+    pieces.push({ stop: j, x, state });
+    // (the passage runs PASSAGE_LEN from just past the piece, but ends before the lead halts for the next stop)
+    if (hasPassage(stops[j].challenge!)) { const x0 = x + PASSAGE_FROM, end = j + 1 < stops.length ? leadAt(j + 1) - PASSAGE_CLEAR : Infinity; passages.push({ stop: j, x0, x1: Math.max(x0 + 1, Math.min(x0 + PASSAGE_LEN, end)), state }); }
   }
+  const passage = !stop ? passages.find((p) => xs.length && xs[0] >= p.x0 && xs[0] < p.x1)?.stop ?? null : null;
 
   // the banner: the stop the team stands at -- its name as it is met (a fight's with a "!"), then the encounter's latest
   // line -- or the last stop's line (how it went, with a check when it was cleared), up until the next stop
@@ -431,7 +444,7 @@ export function sceneAt(sim: CareSim, trip: Trip, clock: number = sim.clock): Sc
     return { dragon: walkAct('d'), rider: k ? walkAct('k') : null, face: null };
   });
 
-  return { n, travel, stop, last, xs, speeds: team.speeds, riders, camX, banner, bannerOk, baddie, foes, shots, marks, flash, pieces, acts, done };
+  return { n, travel, stop, last, xs, speeds: team.speeds, riders, camX, banner, bannerOk, baddie, foes, shots, marks, flash, pieces, passages, passage, acts, done };
 }
 
 /** Whether the enemy's own move is playing now (its throw, its stomp): the view's popup timing reads the encounter itself. */
@@ -595,10 +608,10 @@ export function pieceAt(f: SceneFrame, stop: number): { x: number; y: number } |
 }
 
 /**
- * The scene (BASE_DESIGN 6), inside SCENE_RECT: the region's climate (parallax: backdrops.ts drawClimate), the road, the set
- * pieces the road has reached (each behind the team: the fog bank too), the miller at his mill, the boss and the pack
- * (behind the team too), the team, the puffs of smoke, what is in flight and the sparks of the hits over it all, then
- * the banner. Syncs `cast` to the frame first.
+ * The scene (BASE_DESIGN 6), inside SCENE_RECT: the region's climate (parallax: backdrops.ts drawClimate), the road, the
+ * passages the land stops open onto (passages.ts: the cave after the dark, the canyon after the gap..., each behind the
+ * team), the set pieces the road has reached (each behind the team: the fog bank too), the miller at his mill, the boss
+ * and pack (behind the team too), the team, its fight effects, then the banner. Syncs `cast` to the frame first.
  */
 export function drawMissionScene(ctx: CanvasRenderingContext2D, sim: CareSim, trip: Trip, cast: ScenePets, f: SceneFrame = sceneAt(sim, trip)): void {
   const R = SCENE_RECT, cam = Math.round(f.camX), climate = regionOf(trip.mission.region).climate;
@@ -609,6 +622,10 @@ export function drawMissionScene(ctx: CanvasRenderingContext2D, sim: CareSim, tr
   drawRoad(ctx, climate === 'meadow' || climate === 'forest');
   ctx.translate(-cam, 0);
   const seen = (x: number, half: number) => x + half >= cam && x - half <= cam + R.w;
+  for (const p of f.passages) {
+    if (p.x1 + 60 < cam || p.x0 - 60 > cam + R.w) continue;
+    drawPassage(ctx, trip.stops[p.stop].challenge!, p.x0, p.x1, BACK_Y, R.y, p.state, sim.clock);
+  }
   for (const p of f.pieces) {
     if (!seen(p.x, 90)) continue;
     const s = trip.stops[p.stop];

@@ -10,6 +10,7 @@ import { copyMissions, upgradeMissions, upgradeRoads } from './missions.ts';
 import type { MissionsState } from './missions.ts';
 import { copyArena, newArena } from './arena.ts';
 import type { ArenaState } from './arena.ts';
+import { upgradeEncounterV11 } from './encounter.ts';
 
 /**
  * The format's version: every change to what a save holds bumps it, and a save of another version is not loaded (the
@@ -21,12 +22,12 @@ import type { ArenaState } from './arena.ts';
  * station and job by id, route, phase (a mission's phases too), what they carry, and the hand-held state, always saved
  * released (control.ts releasedState); the open jobs; the lift (its car, its rider by id, its calls); the eggs in the
  * Hatchery's nests; the garden's plots; the missions (the board and its day, the map, the coin, the trip out -- its
- * road walked so far -- its challenges, its packs of little enemies and its boss -- its stops' results, the team's
- * stats, puff and XP, the trail coach, the encounter on at a stop: trip.ts, encounter.ts -- and each pair's deck spot);
- * the Arena (the bout on, its fighters by id, and the bouts begun: arena.ts); and the stats. Version 11 had a big
- * baddie at the end of some hard roads only, and no little enemies; version 10 kept a trip as a timer (its return
- * clock, its odds and its outcome rolled at the send); and version 9 (the first shipped) was that less the XP and the
- * Arena: each loads brought up to this one.
+ * road walked so far, its stops' results, the team's stats, puff and XP, the trail coach, the encounter on at a stop:
+ * trip.ts, encounter.ts -- and each pair's deck spot); the Arena (the bout on, its fighters by id, and the bouts
+ * begun: arena.ts); and the stats. Version 11 had a big baddie at the end of some hard roads only, no little enemies,
+ * and obstacles as work to grind down; version 10 kept a trip as a timer (its return clock, its odds and its outcome
+ * rolled at the send); and version 9 (the first shipped) was that less the XP and the Arena: each loads brought up to this
+ * one.
  */
 export const SAVE_VERSION = 12;
 
@@ -109,10 +110,9 @@ export function serialize(sim: CareSim, exact = false): SaveV {
  * A save of an older version brought up to this one (storage.ts loadSave, before the view loads it), a version at a
  * time: version 9 had no XP and no Arena, so every dragon starts at 0 XP (level 1) and the Arena with no bout begun;
  * version 10 kept a trip out as a timer, so a trip is given its road walked so far and its stops' results as the old
- * scene had them (missions.ts upgradeMissions); version 11 had no fights on most roads, so every mission gets its
- * road's little enemies and its boss, and a trip not yet at its first stop its road laid again (missions.ts
- * upgradeRoads); the rest is unchanged. Any other save is returned as it is (a save of this version, or one
- * CareSim.fromSave refuses).
+ * scene had them (missions.ts upgradeMissions); version 11 had work-based obstacles and no packs, so its encounter
+ * gets a mark instead (encounter.ts upgradeEncounterV11) and its roads get their fights (missions.ts upgradeRoads); the
+ * rest is unchanged. Any other save is returned as it is (a save of this version, or one CareSim.fromSave refuses).
  */
 export function migrateSave(raw: unknown): unknown {
   if (!raw || typeof raw !== 'object') return raw;
@@ -123,7 +123,13 @@ export function migrateSave(raw: unknown): unknown {
     const dayLen = typeof s.dayLen === 'number' ? s.dayLen : 10800, clock = (typeof s.clock0 === 'number' ? s.clock0 : 0) + (typeof s.tick === 'number' ? s.tick : 0);
     s = { ...s, v: 11, missions: upgradeMissions(s.missions, dragons, dayLen, clock) as MissionsState };
   }
-  if (s.v === 11) s = { ...s, v: SAVE_VERSION, missions: upgradeRoads(s.missions, Array.isArray(s.dragons) ? s.dragons : [], Array.isArray(s.keepers) ? s.keepers : []) as MissionsState };
+  if (s.v === 11) {
+    const ms = s.missions as { trip?: { encounter?: unknown; mission?: { difficulty?: 'easy' | 'normal' | 'hard' } } | null } | undefined;
+    const trip = ms?.trip;
+    const upgraded = trip && typeof trip === 'object' && trip.encounter ? { ...ms, trip: { ...trip, encounter: upgradeEncounterV11(trip.encounter, trip.mission?.difficulty ?? 'normal') } } : ms;
+    const missions = upgradeRoads(upgraded, Array.isArray(s.dragons) ? s.dragons : [], Array.isArray(s.keepers) ? s.keepers : []);
+    s = { ...s, v: SAVE_VERSION, missions: missions as MissionsState };
+  }
   return s;
 }
 

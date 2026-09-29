@@ -150,6 +150,7 @@ const pairs: string[] = [
   'shots/missionart_road_caves.png=view=missionart&sheet=climates&climate=caves&phase=day&t=120',
   'shots/missionart_road_ice_night.png=view=missionart&sheet=climates&climate=ice&phase=night&t=120',
   'shots/missionart_setpieces.png=view=missionart&sheet=setpieces&t=60',
+  'shots/missionart_passages.png=view=missionart&sheet=passages&t=60',
   'shots/missionart_baddies.png=view=missionart&sheet=baddies&t=30',
   'shots/missionart_foes.png=view=missionart&sheet=foes&t=30',
   'shots/missionart_fights.png=view=missionart&sheet=fights&t=0',

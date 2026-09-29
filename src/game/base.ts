@@ -1031,9 +1031,9 @@ export class BaseView {
       departAt: t.departAt, travel: t.travel, walked: t.walked, progress: tripProgress(this.sim, t), forecast: t.forecast, auto: t.auto,
       puff: t.puff.map((p, i) => ({ puff: p, max: t.stats[i].puff })), xp: [...t.xp],
       stops: t.stops.map((s) => ({ name: stopName(s), kind: s.kind, result: s.result, log: s.log })),
-      encounter: e ? { stop: e.stop, kind: e.kind, state: e.state, t: e.t, turn: e.turn, pending: pendingPair(t), picks: [...e.picks], work: e.work, toughness: e.toughness,
+      encounter: e ? { stop: e.stop, kind: e.kind, state: e.state, t: e.t, turn: e.turn, pending: pendingPair(t), picks: [...e.picks], mark: e.mark, mark0: e.mark0,
         foe: e.foe ? { id: e.foe.id, puff: e.foe.puff, max: e.foe.stats.puff, pack: e.foe.pack, left: packLeft(e.foe) } : null, outcome: e.outcome, line: e.log[e.log.length - 1] ?? null,
-        move: e.state === 'play' && e.moves[e.cur] ? { by: e.moves[e.cur].by, ability: e.moves[e.cur].ability, foeMove: e.moves[e.cur].foeMove, landed: e.moves[e.cur].landed, hit: e.moves[e.cur].hit, loss: e.moves[e.cur].loss, work: e.moves[e.cur].work } : null } : null };
+        move: e.state === 'play' && e.moves[e.cur] ? { by: e.moves[e.cur].by, ability: e.moves[e.cur].ability, foeMove: e.moves[e.cur].foeMove, landed: e.moves[e.cur].landed, hit: e.moves[e.cur].hit, loss: e.moves[e.cur].loss, roll: e.moves[e.cur].roll, score: e.moves[e.cur].score } : null } : null };
   }
 
   /**
@@ -1046,6 +1046,7 @@ export class BaseView {
     if (!this.scene) return null;
     const { trip, f } = this.scene, s = f.last == null ? null : trip.stops[f.last];
     return { stop: s ? (s.kind === 'challenge' ? s.challenge : s.kind) : null, result: s ? s.result : null, covered: s ? s.covered : null, at: trip.encounter?.state ?? null, banner: f.banner,
+      passage: f.passage == null ? null : trip.stops[f.passage].challenge,
       baddie: f.baddie?.id ?? null, face: f.baddie?.face ?? null, pose: f.baddie?.pose ?? null, flash: !!f.baddie?.flash,
       foes: f.foes.map((q) => ({ id: q.id, x: Math.round(q.x - f.camX), pose: q.pose, face: q.face, facing: q.facing })), shots: f.shots.length, marks: f.marks.map((m) => ({ kind: m.kind, age: m.age })),
       riders: f.riders.map((r) => r.dx), hit: [...f.flash], progress: f.travel ? f.n / f.travel : 0, done: f.done, result_card: f.done ? resultTitle(trip) : null };
